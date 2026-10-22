@@ -19,7 +19,7 @@ before touching radio behaviour; it wins over guesses.
 ## Releases (only when the owner asks)
 - Asset name `SignalDeck-<version>.apk` (the updater reads the version from it). Betas `1.0.0-beta.N`: `gh release create
   <tag> <apk> --prerelease`; releases without `-` in the version. Notes start with `## What's new …` and list the APK's
-  SHA-256. Builds up to beta.11 updated from phonedmrapp's releases, so publish the first build from this repository
-  there as well, until those users have moved.
+  SHA-256. Builds up to beta.11 updated from phonedmrapp's releases; beta.12 (published in both) is the bridge, so from
+  beta.13 on releases go to this repository only.
 - Device profiles: edit `profiles/profiles.json`, bump `serial`, sign with `scripts/sign_profiles.py`; builds up to
-  beta.11 read phonedmrapp's copy, so update both.
+  beta.11 read phonedmrapp's copy, so update both (advisories should reach users still on old builds).
