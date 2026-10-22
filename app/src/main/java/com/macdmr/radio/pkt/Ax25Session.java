@@ -253,6 +253,22 @@ public final class Ax25Session {
         return sb.toString();
     }
 
+    /** One line for a diagnostic log: "N0ABC-7>N0RMS-10 I ns=2 nr=1 P 128 B" (no FCS). */
+    public static String describe(byte[] f) {
+        if (f == null || f.length < 15) return "short frame (" + (f == null ? 0 : f.length) + " B)";
+        String dst = addr(f, 0) + ssid(f[6]), src = addr(f, 7) + ssid(f[13]);
+        int off = 14; boolean last = (f[13] & 1) != 0; StringBuilder via = new StringBuilder();
+        while (!last && off + 7 <= f.length) { via.append(',').append(addr(f, off)).append(ssid(f[off + 6])); if ((f[off + 6] & 0x80) != 0) via.append('*'); last = (f[off + 6] & 1) != 0; off += 7; }
+        if (off >= f.length) return src + ">" + dst + via + " (no control byte)";
+        int ctl = f[off] & 0xFF; boolean pf = (ctl & PF) != 0; boolean cmd = (f[6] & 0x80) != 0 && (f[13] & 0x80) == 0;
+        String what;
+        if ((ctl & 1) == 0) what = "I ns=" + ((ctl >> 1) & 7) + " nr=" + ((ctl >> 5) & 7) + (pf ? " P" : "") + " " + Math.max(0, f.length - off - 2) + " B";
+        else if ((ctl & 3) == 1) { int t = ctl & 0x0F; what = (t == RR ? "RR" : t == RNR ? "RNR" : t == REJ ? "REJ" : "S?") + " nr=" + ((ctl >> 5) & 7) + (pf ? (cmd ? " P" : " F") : ""); }
+        else { int t = ctl & ~PF; what = (t == SABM ? "SABM" : t == UA ? "UA" : t == DISC ? "DISC" : t == DM ? "DM" : t == FRMR ? "FRMR" : t == UI ? "UI" : String.format(Locale.US, "U 0x%02X", t)) + (pf ? (cmd ? " P" : " F") : ""); }
+        return src + ">" + dst + via + " " + what;
+    }
+    private static String ssid(byte b) { int s = (b >> 1) & 15; return s == 0 ? "" : "-" + s; }
+
     /** True when the frame is addressed to this call and SSID (cheap check before decoding it as APRS). */
     public static boolean addressedTo(byte[] f, String call, int ssid) {
         return f != null && f.length >= 15 && addr(f, 0).equals(call.toUpperCase(Locale.US)) && ((f[6] >> 1) & 15) == ssid;

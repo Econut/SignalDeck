@@ -40,6 +40,10 @@ public final class Winlink {
         void notifyUser(String title, String text);
         /** The phone's last known position {lat, lon}, or null (for gateway distances; never leaves the phone). */
         default double[] position() { return null; }
+        /** Diagnostic log: a line for every AX.25 frame of the session (null stops it). */
+        default void frameLog(java.util.function.Consumer<String> l) { }
+        /** Diagnostic log: what to say about the phone and radio at the top of the log. */
+        default String describe() { return ""; }
         /** A received message carried a SignalDeck form code line (the host rebuilds the form). */
         default void formText(String from, String line) { }
     }
@@ -82,6 +86,64 @@ public final class Winlink {
     public String gateway() { return prefs.getString("gateway", ""); }
     public String via() { return prefs.getString("via", ""); }
     public void setGateway(String g, String v) { prefs.edit().putString("gateway", g.trim().toUpperCase(Locale.US)).putString("via", v.trim().toUpperCase(Locale.US)).apply(); }
+
+    // ---- diagnostic log (for the first tests with the real Winlink system) --------------------------------
+
+    /** Detailed log: timing, raw protocol bytes, every radio frame. Off by default. */
+    public boolean diagEnabled() { return prefs.getBoolean("diag", false); }
+    public void setDiag(boolean on) { prefs.edit().putBoolean("diag", on).apply(); changed(); }
+    /** Include the bytes of the messages themselves (compressed) in the detailed log; off by default. */
+    public boolean diagContents() { return prefs.getBoolean("diagContents", false); }
+    public void setDiagContents(boolean on) { prefs.edit().putBoolean("diagContents", on).apply(); }
+    /** Whether the user was already asked (at the first connection) to turn the detailed log on. */
+    public boolean diagAsked() { return prefs.getBoolean("diagAsked", false); }
+    public void setDiagAsked() { prefs.edit().putBoolean("diagAsked", true).apply(); }
+    /** Bench only: forget that the first-connection question was asked, and switch the detailed log off. */
+    public void resetDiag() { prefs.edit().remove("diagAsked").putBoolean("diag", false).putBoolean("diagContents", false).apply(); lastWasDiag = false; changed(); }
+    /** Whether the last session ran with the detailed log (the screen then suggests sharing it). */
+    public boolean lastWasDiag() { return lastWasDiag; }
+    private volatile boolean lastWasDiag, diagNow, inBinary; private volatile long t0;
+
+    /** The session log as a text file to share (in the app's share folder). */
+    public java.io.File logFile() throws IOException {
+        java.io.File dir = new java.io.File(ctx.getCacheDir(), "share"); dir.mkdirs();
+        java.io.File f = new java.io.File(dir, "signaldeck_winlink_log.txt");
+        try (java.io.FileOutputStream o = new java.io.FileOutputStream(f)) { o.write(logText().getBytes(StandardCharsets.UTF_8)); }
+        return f;
+    }
+
+    /** Wraps the byte stream: raw bytes both ways (hex + text), message blocks as their size unless contents are wanted. */
+    private B2fClient.Wire diagWire(final B2fClient.Wire w) {
+        return new B2fClient.Wire() {
+            private final java.io.ByteArrayOutputStream rx = new java.io.ByteArrayOutputStream(); private int rxBin;
+            @Override public int read(long timeoutMs) throws IOException {
+                int c;
+                try { c = w.read(timeoutMs); } catch (IOException e) { flushRx(); note("~ read: " + e.getMessage()); throw e; }
+                if (inBinary && !diagContents()) { rxBin++; return c; }
+                if (rxBin > 0) { note("~ RX " + rxBin + " bytes of message data (contents not logged)"); rxBin = 0; }
+                rx.write(c); if (c == '\r' || rx.size() >= 64) flushRx();
+                return c;
+            }
+            @Override public void write(byte[] b) throws IOException {
+                flushRx();
+                if (inBinary && !diagContents()) note("~ TX " + b.length + " bytes of message data (contents not logged)");
+                else note("~ TX " + b.length + " B: " + dump(b));
+                w.write(b);
+            }
+            private void flushRx() {
+                if (rxBin > 0) { note("~ RX " + rxBin + " bytes of message data (contents not logged)"); rxBin = 0; }
+                if (rx.size() > 0) { byte[] b = rx.toByteArray(); rx.reset(); note("~ RX " + b.length + " B: " + dump(b)); }
+            }
+        };
+    }
+    /** "hex | text" with the secure-login answer hidden. */
+    static String dump(byte[] b) {
+        String text = new String(b, StandardCharsets.ISO_8859_1);
+        if (text.contains(";PR:")) return "(the login answer, hidden)";
+        StringBuilder h = new StringBuilder(), t = new StringBuilder();
+        for (int i = 0; i < b.length && i < 256; i++) { h.append(String.format(Locale.US, "%02X", b[i] & 0xFF)).append(i % 4 == 3 ? " " : ""); int c = b[i] & 0xFF; t.append(c >= 32 && c < 127 ? (char) c : c == 13 ? '\u21B5' : '.'); }
+        return h.toString().trim() + " | " + t + (b.length > 256 ? " \u2026" : "");
+    }
 
     // ---- gateway list (the CSV from winlink.org, RMS Channels) --------------------------------------------
 
@@ -182,7 +244,14 @@ public final class Winlink {
     private void start(String how, Job job) {
         busy = true; cancelled = false; viaRadio = false; progress = "";
         synchronized (this) { log.setLength(0); }
+        t0 = System.currentTimeMillis(); diagNow = diagEnabled(); lastWasDiag = diagNow; inBinary = false;
         note("* " + how + " session started " + B2Message.formatDate(System.currentTimeMillis()) + " UTC");
+        if (diagNow) {
+            String ver = ""; try { ver = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0).versionName; } catch (Exception ignored) { }
+            note("* detailed diagnostic log on: SignalDeck " + ver + ", " + android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL + ", Android " + android.os.Build.VERSION.RELEASE
+                    + (radio.describe().isEmpty() ? "" : ", " + radio.describe()) + "; password never logged" + (diagContents() ? "; message data included" : "; message data left out"));
+            if ("radio".equals(how)) radio.frameLog(line -> note("# " + line));
+        }
         new Thread(() -> {
             String result;
             try { job.run(); result = lastResult; }
@@ -193,9 +262,11 @@ public final class Winlink {
             } finally {
                 Socket s = socket; socket = null; if (s != null) try { s.close(); } catch (IOException ignored) { }
                 if (viaRadio) radio.close();
+                radio.frameLog(null);
                 busy = false; progress = "";
             }
             lastResult = result; lastSession = System.currentTimeMillis();
+            if (diagNow) note("* " + result + " (" + (lastSession - t0) / 1000 + " s). Please share this log (Session log \u2192 Share log), whether it worked or not.");
             setState(result);
         }, "winlink").start();
     }
@@ -212,10 +283,12 @@ public final class Winlink {
             }
             @Override public void sent(String mid) { store.markSent(mid); changed(); }
             @Override public void log(String line) { note(line); }
-            @Override public void progress(String what, int done, int total) { progress = what + " · " + done + " of " + total + " bytes"; changed(); }
+            @Override public void progress(String what, int done, int total) { progress = what + " \u00B7 " + done + " of " + total + " bytes"; changed(); }
+            @Override public void binary(boolean on) { inBinary = on; }
         };
         String version = "1.0";
         try { version = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0).versionName; } catch (Exception ignored) { }
+        if (diagNow) w = diagWire(w);
         B2fClient c = new B2fClient(w, box, radio.callsign(), target, grid(), version, prefs.getString("password", ""), timeoutMs);
         c.run();
         lastResult = "Done: " + c.sent() + " sent, " + c.received() + " received";
@@ -240,8 +313,10 @@ public final class Winlink {
 
     private void setState(String s) { state = s; changed(); }
     private synchronized void note(String line) {
+        if (diagNow) log.append(String.format(Locale.US, "+%7.3f ", (System.currentTimeMillis() - t0) / 1000.0));
         log.append(line).append('\n');
-        if (log.length() > 40_000) log.delete(0, log.length() - 30_000);
+        int cap = diagNow ? 600_000 : 40_000;
+        if (log.length() > cap) log.delete(0, log.length() - cap * 3 / 4);
         changed();
     }
     private void changed() { Listener l = listener; if (l != null) l.changed(); }

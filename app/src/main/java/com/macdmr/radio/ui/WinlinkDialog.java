@@ -66,7 +66,8 @@ public final class WinlinkDialog {
         final Runnable refresh = () -> {
             boolean busy = w.busy();
             state.setText(w.state());
-            prog.setText(busy ? w.progress() : (w.passwordSet() ? "" : "No Winlink password set yet (Settings): needed for your mailbox once your callsign is registered."));
+            prog.setText(busy ? w.progress() : w.lastWasDiag() && w.lastSession() > 0 ? "Detailed log recorded: Session log \u2192 Share log, whether it worked or not. Thank you!"
+                    : (w.passwordSet() ? "" : "No Winlink password set yet (Settings): needed for your mailbox once your callsign is registered."));
             net.setText(busy ? "Stop" : "Connect: internet"); rf.setEnabled(!busy); rf.setAlpha(busy ? 0.4f : 1f);
             if (wasBusy[0] != busy || lists.getChildCount() == 0) { wasBusy[0] = busy; fillLists(c, svc, lists, self); }
         };
@@ -74,10 +75,9 @@ public final class WinlinkDialog {
         w.setListener(() -> h.post(() -> { if (queued[0]) return; queued[0] = true; h.postDelayed(() -> { queued[0] = false; refresh.run(); }, 250); }));
         net.setOnClickListener(v -> {
             if (w.busy()) { w.cancel(); return; }
-            String e = w.connectInternet(); if (e != null) toast(c, e);
-            refresh.run();
+            askDiag(c, w, () -> { String e = w.connectInternet(); if (e != null) toast(c, e); refresh.run(); });
         });
-        rf.setOnClickListener(v -> radioConnect(c, svc, refresh));
+        rf.setOnClickListener(v -> askDiag(c, w, () -> radioConnect(c, svc, refresh)));
         later[0] = refresh;
         refresh.run();
         self[0] = Neo.showSheet(c, body);
@@ -192,11 +192,14 @@ public final class WinlinkDialog {
         final EditText pw = new EditText(c); pw.setHint(w.passwordSet() ? "Password (set; leave empty to keep, - to clear)" : "Winlink password"); pw.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD); pw.setTextColor(Neo.TEXT); v.addView(pw);
         final EditText grid = new EditText(c); grid.setHint("Grid square (optional, e.g. JO01)"); grid.setText(w.grid()); grid.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS); grid.setTextColor(Neo.TEXT); v.addView(grid);
         v.addView(Neo.label(c, "The grid square is sent to the gateway at login (optional).", Neo.MUTED, 12, false));
+        final android.widget.CheckBox dg = new android.widget.CheckBox(c); dg.setText("Detailed diagnostic log (timing, raw protocol bytes, every radio frame)"); dg.setTextColor(Neo.TEXT); dg.setChecked(w.diagEnabled()); v.addView(dg);
+        final android.widget.CheckBox dc = new android.widget.CheckBox(c); dc.setText("Include the messages' data in that log"); dc.setTextColor(Neo.TEXT); dc.setChecked(w.diagContents()); v.addView(dc);
+        v.addView(Neo.label(c, "For reporting a problem: the password is never logged; message data is left out unless you tick the second box.", Neo.MUTED, 12, false));
         new AlertDialog.Builder(c).setTitle("Winlink settings").setView(v)
                 .setPositiveButton("Save", (dd, x) -> {
                     String g = grid.getText().toString().trim();
                     if (!g.isEmpty() && !g.matches("(?i)[A-R]{2}[0-9]{2}([A-X]{2})?")) { toast(c, "Grid square like JO01 or JO01ab"); return; }
-                    w.setPassword(pw.getText().toString()); w.setGrid(g); toast(c, "Saved"); after.run();
+                    w.setPassword(pw.getText().toString()); w.setGrid(g); w.setDiag(dg.isChecked()); w.setDiagContents(dc.isChecked()); toast(c, "Saved"); after.run();
                 })
                 .setNegativeButton("Cancel", null).show();
     }
@@ -208,7 +211,32 @@ public final class WinlinkDialog {
         TextView tv = Neo.text(c, t.isEmpty() ? "No session yet." : t, 0xFFCFE8D8, 12, Neo.mono(c));
         tv.setBackground(Neo.rowCard(c)); tv.setPadding((int) (10 * d), (int) (8 * d), (int) (10 * d), (int) (8 * d)); tv.setTextIsSelectable(true);
         body.addView(tv);
+        if (!t.isEmpty()) {
+            TextView share = Neo.button(c, "Share log", "send", Neo.CYAN); share.setTextSize(14);
+            LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (46 * d)); sl.topMargin = (int) (8 * d);
+            body.addView(share, sl);
+            share.setOnClickListener(v -> {
+                try {
+                    android.net.Uri u = androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName() + ".files", svc.winlink().logFile());
+                    Intent i = new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_STREAM, u).putExtra(Intent.EXTRA_SUBJECT, "SignalDeck Winlink log")
+                            .putExtra(Intent.EXTRA_TEXT, "SignalDeck Winlink session log (attached). It worked / it did not work: ").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    c.startActivity(Intent.createChooser(i, "Share the Winlink log"));
+                } catch (Exception e) { toast(c, "Could not share: " + e.getMessage()); }
+            });
+            body.addView(Neo.sheetHint(c, "Share it by e-mail or attach it to an issue on SignalDeck's GitHub page (" + ISSUES + "). It contains your callsign and the gateway's; the password is never in it."));
+        }
         Neo.showSheet(c, body);
+    }
+
+    /** The first connection ever: Winlink here is untested, offer the detailed log and ask for it back. */
+    static void askDiag(Context c, Winlink w, Runnable go) {
+        if (w.diagAsked() || w.diagEnabled()) { go.run(); return; }
+        w.setDiagAsked();
+        new AlertDialog.Builder(c).setTitle("Help test Winlink")
+                .setMessage("Winlink in SignalDeck is new and has not yet been tested with the real Winlink system.\n\nTurn on the detailed diagnostic log for your connections? It records the timing, the protocol and every radio frame (never your password; the messages' data only if you choose to in Settings).\n\nWhether it works or not, please send us the log afterwards (Session log \u2192 Share log): that is how we fix it. You can turn it off in Winlink \u2192 Settings.")
+                .setPositiveButton("Turn on the log", (dd, x) -> { w.setDiag(true); go.run(); })
+                .setNegativeButton("Not now", (dd, x) -> go.run())
+                .setOnCancelListener(x -> go.run()).show();
     }
 
     static void compose(Context c, RadioService svc, String to, String cc, String subject, String text) {

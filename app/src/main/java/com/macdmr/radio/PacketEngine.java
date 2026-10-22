@@ -467,7 +467,10 @@ public final class PacketEngine {
         if (!callsignSet()) return null;
         if (terminal == null) {
             terminal = new com.macdmr.radio.pkt.Ax25Session(callsign(), ssid(), new com.macdmr.radio.pkt.Ax25Session.Link() {
-                @Override public void send(java.util.List<byte[]> frames) { txFramesRaw(frames, "AX.25 " + frames.size() + (frames.size() == 1 ? " frame" : " frames")); }
+                @Override public void send(java.util.List<byte[]> frames) {
+                    java.util.function.Consumer<String> fl = frameLog; if (fl != null) for (byte[] f : frames) fl.accept("TX " + com.macdmr.radio.pkt.Ax25Session.describe(f));
+                    txFramesRaw(frames, "AX.25 " + frames.size() + (frames.size() == 1 ? " frame" : " frames"));
+                }
                 @Override public void received(String text) { if (wlRx == null) termAppend(text); }
                 @Override public void receivedBytes(byte[] info) { java.util.concurrent.LinkedBlockingQueue<Integer> q = wlRx; if (q != null) for (byte b : info) q.offer(b & 0xFF); }
                 @Override public void state(String state) {
@@ -494,6 +497,10 @@ public final class PacketEngine {
         t.connect(call, path.toArray(new String[0]), System.currentTimeMillis());
         return null;
     }
+    // ---- Winlink diagnostic log: every frame of the terminal session, both ways ------------------------
+    private volatile java.util.function.Consumer<String> frameLog;
+    public void setFrameLog(java.util.function.Consumer<String> l) { frameLog = l; }
+
     // ---- packet finder: every decoded frame while it runs --------------------------------------------
     private volatile java.util.function.Consumer<byte[]> finderTap;
     public void setFinderTap(java.util.function.Consumer<byte[]> tap) { finderTap = tap; }
@@ -529,9 +536,14 @@ public final class PacketEngine {
             }
         };
     }
-    /** End the Winlink link: disconnect the AX.25 session (the gateway usually has already). */
+    /** End the Winlink link: let what we sent (the final FQ) be acknowledged first (up to 60 s), then disconnect,
+     *  unless the gateway has already hung up. Disconnecting at once dropped the unacknowledged FQ (bench 2026-10-22). */
     public void closeWinlinkLink() {
         com.macdmr.radio.pkt.Ax25Session t = terminal;
+        long until = System.currentTimeMillis() + 60_000;
+        while (t != null && t.state() == com.macdmr.radio.pkt.Ax25Session.State.CONNECTED && t.pending() > 0 && System.currentTimeMillis() < until && wlRx != null) {
+            try { Thread.sleep(300); } catch (InterruptedException e) { break; }
+        }
         if (t != null && t.state() != com.macdmr.radio.pkt.Ax25Session.State.DISCONNECTED) t.disconnect(System.currentTimeMillis());
         wlRx = null;
     }
@@ -828,6 +840,7 @@ public final class PacketEngine {
                 java.util.function.Consumer<byte[]> ft = finderTap; if (ft != null) try { ft.accept(frame); } catch (Throwable x) { Log.w(TAG, "finder: " + x); }
                 com.macdmr.radio.pkt.Ax25Session ts = terminal;
                 if (ts != null && com.macdmr.radio.pkt.Ax25Session.addressedTo(frame, callsign(), ssid())) {   // connected-mode traffic for our terminal
+                    java.util.function.Consumer<String> fl = frameLog; if (fl != null) fl.accept("RX " + com.macdmr.radio.pkt.Ax25Session.describe(frame) + (duplicateSeen(frame) ? " (repeat)" : ""));
                     if (duplicate(frame)) continue;
                     if (ts.receive(frame, System.currentTimeMillis())) continue;
                 }
@@ -852,6 +865,8 @@ public final class PacketEngine {
         } catch (Throwable t) { Log.w(TAG, "decode: " + t); }
     }
 
+    /** Like duplicate() but without recording (for the diagnostic log). */
+    private synchronized boolean duplicateSeen(byte[] frame) { long now = System.currentTimeMillis(); for (Object[] e : recent) if (now - (Long) e[1] <= 2000 && Arrays.equals((byte[]) e[0], frame)) return true; return false; }
     private synchronized boolean duplicate(byte[] frame) {
         long now = System.currentTimeMillis();
         while (!recent.isEmpty() && now - (Long) recent.getFirst()[1] > 2000) recent.removeFirst();

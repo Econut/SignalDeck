@@ -16,7 +16,6 @@ entry and a device test.
 
 ## Later (owner notes)
 
-- **Winlink diagnostic logging**: an optional detailed log (frames, protocol bytes, timing) offered at a first connection, with a note that Winlink is untested and a request to share the log whether it worked or not.
 - **Winlink gateway list, automatic**: ask Winlink for an API access key so SignalDeck can refresh the gateway list itself (today: the user downloads the CSV in the browser and imports it; winlink.org is behind a Cloudflare bot check, which SignalDeck never works around).
 
 ## Research, later

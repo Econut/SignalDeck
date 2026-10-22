@@ -159,12 +159,14 @@
         <form id="wlSetForm" class="sched-form hidden" autocomplete="off">
           <label>Winlink password<input id="wlPw" type="password" autocomplete="new-password"></label>
           <label>Grid square (optional, e.g. JO01)<input id="wlGrid"></label>
+          <label class="chk"><input type="checkbox" id="wlDiag"> Detailed diagnostic log (timing, raw protocol bytes, every radio frame)</label>
+          <label class="chk"><input type="checkbox" id="wlDiagC"> Include the messages' data in that log</label>
           <p class="muted small" style="grid-column:1/-1">Your callsign comes from the PKT settings. The password is write-only here: it is kept in SignalDeck's private settings and never shown, logged or backed up. Leave it empty to keep the saved one; "-" clears it.</p>
           <div class="row" style="grid-column:1/-1"><button class="btn primary small-btn">Save</button><button class="btn small-btn" id="wlSetCancel" type="button">Cancel</button></div>
         </form>
         <div id="wlGw" class="hidden"><p class="muted small">Winlink lists its gateways at <a href="https://winlink.org/RMSChannels" target="_blank" rel="noopener">winlink.org (RMS Channels)</a>: choose Packet, download the CSV, then import it here. SignalDeck keeps the 1200-baud packet gateways this radio can tune, nearest first (distance worked out on the phone).</p>
           <div class="row wrap"><input type="file" id="wlGwFile" accept=".csv,text/csv"><button class="btn small-btn danger" id="wlGwClear" type="button">Remove the list</button></div><div id="wlGwList" class="list small"></div></div>
-        <pre id="wlLog" class="dec-out hidden"></pre>
+        <div id="wlLogBox" class="hidden"><div class="row"><a class="btn small-btn" href="api/winlink/log" download>Download log</a><span class="muted small">Send it to us (e-mail, or attach it to a <a href="https://github.com/IIMacGyverII/SignalDeck/issues" target="_blank" rel="noopener">GitHub issue</a>), whether it worked or not. The password is never in it.</span></div><pre id="wlLog" class="dec-out"></pre></div>
         <div id="wlView" class="hidden"><div id="wlHead" class="muted small"></div><pre id="wlBody" class="dec-out" style="font-size:15px;white-space:pre-wrap"></pre><div id="wlFiles" class="row wrap"></div>
           <div class="row"><button class="btn small-btn" id="wlReply" type="button">Reply</button><button class="btn small-btn" id="wlFwd" type="button">Forward</button><button class="btn small-btn danger" id="wlDel" type="button">Delete</button><button class="btn small-btn" id="wlClose" type="button">Close</button></div></div>
         <div id="wlList" class="list small"></div>

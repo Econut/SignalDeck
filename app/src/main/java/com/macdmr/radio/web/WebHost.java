@@ -957,8 +957,10 @@ public final class WebHost {
                             String g = b.optString("grid", "").trim();
                             if (!g.isEmpty() && !g.matches("(?i)[A-R]{2}[0-9]{2}([A-X]{2})?")) return WebServer.Response.error(400, "Grid square like JO01 or JO01ab");
                             if (b.has("password") && !b.optString("password").isEmpty()) w.setPassword(b.optString("password"));   // write-only
+                            if (b.has("diag")) w.setDiag(b.optBoolean("diag")); if (b.has("diagContents")) w.setDiagContents(b.optBoolean("diagContents"));
                             w.setGrid(g); return ok("Saved");
                         }
+                        case "diagasked": w.setDiagAsked(); if (b.has("diag")) w.setDiag(b.optBoolean("diag")); return ok("ok");
                         default: return WebServer.Response.error(400, "Unknown action");
                     }
                 }
@@ -976,7 +978,8 @@ public final class WebHost {
                 }
                 JSONArray gws = new JSONArray(); int gn = 0;
                 for (com.macdmr.radio.winlink.RmsList.Gateway g : w.gateways()) { if (++gn > 40) break; gws.put(g.json().put("km", g.km < 0 ? JSONObject.NULL : (Object) Math.round(g.km)).put("dir", g.km < 0 ? "" : com.macdmr.radio.ham.Maidenhead.compass(g.bearing))); }
-                return ok(new JSONObject().put("gateways", gws).put("gatewayCount", w.gateways().size()).put("state", w.state()).put("busy", w.busy()).put("progress", w.progress()).put("passwordSet", w.passwordSet()).put("grid", w.grid())
+                return ok(new JSONObject().put("diag", w.diagEnabled()).put("diagContents", w.diagContents()).put("diagAsked", w.diagAsked()).put("lastWasDiag", w.lastWasDiag() && w.lastSession() > 0)
+                        .put("gateways", gws).put("gatewayCount", w.gateways().size()).put("state", w.state()).put("busy", w.busy()).put("progress", w.progress()).put("passwordSet", w.passwordSet()).put("grid", w.grid())
                         .put("gateway", w.gateway()).put("via", w.via()).put("log", w.logText()).put("folders", fo));
             }
             case "/api/finder": {                                               // GET: state, settings, stations; POST {action: start|stop|clear|settings}
@@ -991,6 +994,10 @@ public final class WebHost {
                     }
                 }
                 return ok(pf.json());
+            }
+            case "/api/winlink/log": {                                           // GET: the session log as a text file
+                WebServer.Response x = WebServer.Response.bytes("text/plain; charset=utf-8", svc.winlink().logText().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                x.headers.put("Content-Disposition", "attachment; filename=\"signaldeck_winlink_log.txt\""); x.headers.put("Cache-Control", "no-store"); return x;
             }
             case "/api/winlink/file": {                                         // GET ?folder=&mid=&i=: an attachment
                 com.macdmr.radio.winlink.WinlinkStore st = svc.winlink().store(); String folder = r.param("folder"), mid = r.param("mid");

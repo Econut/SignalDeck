@@ -389,7 +389,8 @@ async function loadWinlink() {
   S.wl = j;
   $('wlState').textContent = j.state + (j.busy && j.progress ? ' · ' + j.progress : '') + (j.passwordSet ? '' : ' · no Winlink password set yet (Settings)');
   $('wlNet').textContent = j.busy ? 'Stop' : 'Connect: internet'; $('wlRf').disabled = j.busy;
-  if (!$('wlLog').classList.contains('hidden')) $('wlLog').textContent = j.log || 'No session yet.';
+  if (!$('wlLogBox').classList.contains('hidden')) $('wlLog').textContent = j.log || 'No session yet.';
+  if (!j.busy && j.lastWasDiag) $('wlState').textContent += ' · detailed log recorded: Session log → Download log, whether it worked or not. Thank you!';
   const when = t => t ? new Date(t).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
   const sec = (key, title) => {
     const l = j.folders[key] || [];
@@ -400,7 +401,7 @@ async function loadWinlink() {
   $('wlGwList').innerHTML = j.gateways.length ? j.gateways.map((g, i) => '<div class="item click" data-g="' + i + '"><div class="main"><b>' + esc(g.call) + '</b><div class="muted small">' + (g.km !== null ? g.km + ' km ' + g.dir + ' · ' : '') + (g.hz / 1e6).toFixed(4) + ' MHz' + (g.qth ? ' · ' + esc(g.qth) : '') + '</div></div></div>').join('') + (j.gatewayCount > j.gateways.length ? '<div class="empty">' + (j.gatewayCount - j.gateways.length) + ' farther ones not shown</div>' : '') : '<div class="empty">No list imported yet</div>';
   clearTimeout(S.wlTimer); if (j.busy && S.page === 'messages') S.wlTimer = setTimeout(loadWinlink, 1500);
 }
-function wlOnly(id) { ['wlCompose', 'wlRfForm', 'wlSetForm', 'wlView', 'wlLog', 'wlGw'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
+function wlOnly(id) { ['wlCompose', 'wlRfForm', 'wlSetForm', 'wlView', 'wlLogBox', 'wlGw'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
 function wlCompose(to, subj, text) { $('wlTo').value = to || ''; $('wlCc').value = ''; $('wlSubj').value = subj || ''; $('wlText').value = text || ''; wlOnly('wlCompose'); $(to ? 'wlText' : 'wlTo').focus(); }
 $('wlNew').onclick = () => wlCompose();
 $('wlCancelC').onclick = () => wlOnly('');
@@ -409,23 +410,29 @@ $('wlCompose').onsubmit = async e => {
   try { const r = await api('winlink', { action: 'compose', to: $('wlTo').value, cc: $('wlCc').value, subject: $('wlSubj').value, text: $('wlText').value }); toast(r.message); wlOnly(''); loadWinlink(); } catch (x) { toast(x.message); }
 };
 $('wlNet').onclick = async () => {
+  if (!(S.wl && S.wl.busy)) await wlAskDiag();
   try { const r = await api('winlink', { action: S.wl && S.wl.busy ? 'cancel' : 'connect', how: 'internet' }); toast(r.message); } catch (x) { toast(x.message); }
   setTimeout(loadWinlink, 400);
 };
-$('wlRf').onclick = () => { $('wlGw').value = (S.wl && S.wl.gateway) || ''; $('wlVia').value = (S.wl && S.wl.via) || ''; wlOnly('wlRfForm'); };
+$('wlRf').onclick = async () => { await wlAskDiag(); $('wlGw').value = (S.wl && S.wl.gateway) || ''; $('wlVia').value = (S.wl && S.wl.via) || ''; wlOnly('wlRfForm'); };
 $('wlRfCancel').onclick = () => wlOnly('');
 $('wlRfForm').onsubmit = async e => {
   e.preventDefault();
   try { const r = await api('winlink', { action: 'connect', how: 'radio', gateway: $('wlGw').value, via: $('wlVia').value }); toast(r.message); wlOnly(''); } catch (x) { toast(x.message); }
   setTimeout(loadWinlink, 400);
 };
-$('wlSet').onclick = () => { $('wlPw').value = ''; $('wlPw').placeholder = S.wl && S.wl.passwordSet ? 'set (leave empty to keep)' : ''; $('wlGrid').value = (S.wl && S.wl.grid) || ''; wlOnly('wlSetForm'); };
+$('wlSet').onclick = () => { $('wlDiag').checked = !!(S.wl && S.wl.diag); $('wlDiagC').checked = !!(S.wl && S.wl.diagContents); $('wlPw').value = ''; $('wlPw').placeholder = S.wl && S.wl.passwordSet ? 'set (leave empty to keep)' : ''; $('wlGrid').value = (S.wl && S.wl.grid) || ''; wlOnly('wlSetForm'); };
 $('wlSetCancel').onclick = () => wlOnly('');
 $('wlSetForm').onsubmit = async e => {
   e.preventDefault();
-  try { const r = await api('winlink', { action: 'settings', password: $('wlPw').value, grid: $('wlGrid').value }); $('wlPw').value = ''; toast(r.message); wlOnly(''); loadWinlink(); } catch (x) { toast(x.message); }
+  try { const r = await api('winlink', { action: 'settings', password: $('wlPw').value, grid: $('wlGrid').value, diag: $('wlDiag').checked, diagContents: $('wlDiagC').checked }); $('wlPw').value = ''; toast(r.message); wlOnly(''); loadWinlink(); } catch (x) { toast(x.message); }
 };
-$('wlLogB').onclick = () => { if (!$('wlLog').classList.contains('hidden')) { wlOnly(''); return; } wlOnly('wlLog'); $('wlLog').textContent = (S.wl && S.wl.log) || 'No session yet.'; };
+$('wlLogB').onclick = () => { if (!$('wlLogBox').classList.contains('hidden')) { wlOnly(''); return; } wlOnly('wlLogBox'); $('wlLog').textContent = (S.wl && S.wl.log) || 'No session yet.'; };
+async function wlAskDiag() {
+  if (!S.wl || S.wl.diagAsked || S.wl.diag) return;
+  const on = await ask('Winlink in SignalDeck is new and has not yet been tested with the real Winlink system. Turn on the detailed diagnostic log (timing, protocol, every radio frame; never your password)? Whether it works or not, please send us the log afterwards (Session log → Download log).');
+  try { await api('winlink', { action: 'diagasked', diag: !!on }); } catch (x) { }
+}
 $('wlList').onclick = async e => {
   const it = e.target.closest('[data-f]'); if (!it) return;
   const f = it.dataset.f, m = S.wl.folders[f][+it.dataset.i]; S.wlSel = { f, m };

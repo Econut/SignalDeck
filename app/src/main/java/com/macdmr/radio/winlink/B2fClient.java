@@ -39,6 +39,8 @@ public final class B2fClient {
         void sent(String mid);
         /** A protocol line or a note for the session log ("<" in, ">" out, "*" notes). */
         void log(String line);
+        /** A compressed message is being sent or received (true) or the line protocol resumes (false). */
+        default void binary(boolean on) { }
         /** Progress: bytes done of total for the message being moved. */
         default void progress(String what, int done, int total) { }
     }
@@ -176,10 +178,13 @@ public final class B2fClient {
         b.write(4); b.write((-sum) & 0xFF);
         box.log("* sending " + o.m.mid + " (" + o.data.length + " bytes compressed)");
         byte[] all = b.toByteArray();
+        box.binary(true);
+        try {
         for (int p = 0; p < all.length; p += 512) {                           // in pieces, so progress can be shown
             int n = Math.min(512, all.length - p); byte[] part = new byte[n]; System.arraycopy(all, p, part, 0, n);
             wire.write(part); box.progress("sending " + o.m.mid, Math.min(p + n, all.length), all.length);
         }
+        } finally { box.binary(false); }
     }
 
     // ---- their turn ----------------------------------------------------------------------------------
@@ -224,6 +229,10 @@ public final class B2fClient {
     }
 
     private void readCompressed(In in) throws IOException {
+        box.binary(true);
+        try { readCompressedBody(in); } finally { box.binary(false); }
+    }
+    private void readCompressedBody(In in) throws IOException {
         int c = wire.read(timeoutMs);
         if (c == '*') { throw new IOException("the gateway reported an error: *" + readLine()); }
         if (c != 1) throw new IOException("expected the start of a message, got byte " + c);

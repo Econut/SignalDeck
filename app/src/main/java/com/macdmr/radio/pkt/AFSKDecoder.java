@@ -77,14 +77,20 @@ public class AFSKDecoder {
             if (TONE_AGC) tones = AFSKDecoderIQ.normalise(tones[0], tones[1]);
             java.util.HashSet<String> seen = new java.util.HashSet<>();
             float[] gains = !MULTI_SLICER ? new float[] { 1.0f } : slicerGainsOverride != null ? slicerGainsOverride : SLICER_GAINS;
+            List<Object[]> found = new ArrayList<>();                         // {bit position, frame}: one slicer may find a later frame that another missed
             for (float g : gains) {
                 boolean[] nrzi = decodeNRZI(AFSKDecoderIQ.slice(tones[0], tones[1], g));
-                for (boolean[] raw : findPacketBits(nrzi)) {
+                List<Integer> starts = new ArrayList<>();
+                List<boolean[]> raws = findPacketBits(nrzi, starts);
+                for (int k = 0; k < raws.size(); k++) {
+                    boolean[] raw = raws.get(k);
                     byte[] frame = frameFromRaw(raw);
                     if (frame == null && BIT_FIX && raw.length <= 2800) frame = repairOneBit(raw);
-                    if (frame != null && seen.add(java.util.Arrays.toString(frame))) packets.add(frame);
+                    if (frame != null && seen.add(java.util.Arrays.toString(frame))) found.add(new Object[] { starts.get(k), frame });
                 }
             }
+            found.sort((a, b) -> Integer.compare((Integer) a[0], (Integer) b[0]));   // the order they were on the air (connected mode depends on it)
+            for (Object[] f : found) packets.add((byte[]) f[1]);
         } catch (Exception e) {
             android.util.Log.d("pkt", TAG + ": Error decoding AFSK: " + e.getMessage());
         }
@@ -288,7 +294,9 @@ public class AFSKDecoder {
      * Find packets between flag sequences (0x7E)
      * Returns bit arrays (with stuffing) for each packet
      */
-    private static List<boolean[]> findPacketBits(boolean[] bits) {
+    private static List<boolean[]> findPacketBits(boolean[] bits) { return findPacketBits(bits, null); }
+    /** As above; {@code starts} (if given) receives each candidate's first bit position. */
+    private static List<boolean[]> findPacketBits(boolean[] bits, List<Integer> starts) {
         List<boolean[]> packets = new ArrayList<>();
         
         // Search for ALL flag patterns: 01111110 (0x7E)
@@ -322,7 +330,7 @@ public class AFSKDecoder {
             if (packetLength < minFrameBits) continue;
             boolean[] packet = new boolean[packetLength];
             System.arraycopy(bits, packetStart, packet, 0, packetLength);
-            packets.add(packet);
+            packets.add(packet); if (starts != null) starts.add(packetStart);
         }
         if (packets.isEmpty()) {
             android.util.Log.d("pkt", TAG + ": No suitable packet found (no gaps >= " + minFrameBits + " bits)");
