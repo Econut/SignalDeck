@@ -55,6 +55,7 @@ public final class DiagReceiver extends BroadcastReceiver {
                 }, "diag-scope").start();
                 break;
             }
+            case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
             case "formtext": s.onFormText(i.getStringExtra("from"), i.getStringExtra("text"), "bench"); break;   // bench: a text as if it arrived (form parts)
             case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s) on the current channel or VFO
                 int ms = Math.max(200, Math.min(5000, i.getIntExtra("ms", 2000)));
