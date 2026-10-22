@@ -43,12 +43,17 @@ public final class DmrAudioCheck {
         public boolean squelchStuck; public int closedBy = -1;      // after MON off the squelch stayed open with no signal; which step closed it (0 none)   // analog: 10 s with the squelch held open (MON): receiver noise must arrive
         public int musicVolume = -1, musicMax = -1;
         public String output = "";                      // where media plays (speaker, Bluetooth …)
+        public boolean uartPcm; public String pcmPort = "";   // the profile's audio comes over a second serial port (Xplore 1), not PrizeTinyService
     }
+
+    /** Where receive audio comes from on this phone, for the verdict's sentences. */
+    static String source(Facts f) { return f.uartPcm ? "the radio's audio serial port" + (f.pcmPort.isEmpty() ? "" : " (" + f.pcmPort + ")") : "the phone's radio audio service"; }
+    static String below(Facts f) { return f.uartPcm ? "The radio module is not sending audio on its audio serial port" : "The audio path below Android (the tinyservice/tinyserver daemon) is not delivering"; }
 
     /** The most likely cause first, as plain sentences. Pure: host-tested. */
     public static List<String> verdict(Facts f) {
         List<String> v = new ArrayList<>();
-        if (f.classMissing) {
+        if (f.classMissing && !f.uartPcm) {                        // only phones whose audio goes through PrizeTinyService need it
             v.add("This ROM does not have Ulefone's PrizeTinyService framework class, which carries the radio's receive audio on this phone. "
                     + "SignalDeck (and the stock app) can't get any receive audio on it, analog and DMR alike."
                     + (f.binderPresent ? " The vendor audio service itself is still running (binder \"tinyservice\"), so the audio exists below Android: support for this ROM means talking to that service directly. Please send this report." : f.daemonRunning ? " The vendor audio daemon is running." : " The vendor audio service is not running either. Please send this report."));
@@ -58,13 +63,13 @@ public final class DmrAudioCheck {
         String rx = f.digitalChannel ? "call" : "reception";
         if (f.monTested) {                                         // analog: the squelch was held open, so receiver noise had to arrive whatever was on the air
             if (f.monPcm == 0) {
-                v.add("With the squelch held open (MON) for 10 seconds, no audio at all arrived from the phone's radio audio service. "
-                        + "The audio path below Android (the tinyservice/tinyserver daemon) is not delivering, so nothing can be heard on any channel. Please send this report.");
+                v.add("With the squelch held open (MON) for 10 seconds, no audio at all arrived from " + source(f) + ". "
+                        + below(f) + ", so nothing can be heard on any channel. Please send this report.");
                 return v;
             }
             if (f.monRms >= 0 && f.monRms < 30) {
                 v.add(String.format(Locale.US, "With the squelch held open (MON) audio arrived but it was silent (level %.0f): receiver noise should be loud. "
-                        + "The radio's audio output is not reaching the audio service (muted or routed elsewhere below Android). Please send this report.", f.monRms));
+                        + (f.uartPcm ? "The radio module is sending silence on its audio serial port. " : "The radio's audio output is not reaching the audio service (muted or routed elsewhere below Android). ") + "Please send this report.", f.monRms));
                 return v;
             }
             v.add(String.format(Locale.US, "The audio path works: with the squelch held open, the radio's noise arrived (level %.0f).", f.monRms));
@@ -81,8 +86,8 @@ public final class DmrAudioCheck {
         } else {
             if (f.callsOutsideList > 0) v.add(f.callsOutsideList + " call(s) were to a target that is not in this channel's RX list or call number (they got through as private or all calls).");
             if (f.pcmDuringCalls == 0) {
-                v.add("The radio received " + f.receptions + " " + rx + "(s), but no audio arrived from the vendor audio service while they were on. "
-                        + "The audio path below Android (the tinyservice/tinyserver daemon) is not delivering on this ROM. Please send this report.");
+                v.add("The radio received " + f.receptions + " " + rx + "(s), but no audio arrived from " + source(f) + " while they were on. "
+                        + below(f) + (f.uartPcm ? "." : " on this ROM.") + " Please send this report.");
                 return v;
             }
             if (f.rms >= 0 && f.rms < 30) {
@@ -116,8 +121,10 @@ public final class DmrAudioCheck {
         sys.append("  system image ").append(DeviceReport.getprop("ro.product.system.name")).append(" / ").append(DeviceReport.getprop("ro.system.build.fingerprint")).append('\n');
         sys.append("  vendor image ").append(DeviceReport.getprop("ro.vendor.build.fingerprint")).append('\n');
         sys.append("  security patch ").append(Build.VERSION.SECURITY_PATCH).append(" · build type ").append(Build.TYPE).append('/').append(Build.TAGS).append('\n');
+        f.uartPcm = "UartPcmAudio".equals(svc.audioBackendName());
+        if (f.uartPcm) { java.util.regex.Matcher m = java.util.regex.Pattern.compile("(/dev/\\S+)").matcher(String.valueOf(svc.audioStartResult())); if (m.find()) f.pcmPort = m.group(1); }
         try { Class.forName("android.os.PrizeTinyService"); sys.append("  framework class android.os.PrizeTinyService: present\n"); }
-        catch (Throwable t) { f.classMissing = true; sys.append("  framework class android.os.PrizeTinyService: MISSING (").append(t.getClass().getSimpleName()).append(")\n"); }
+        catch (Throwable t) { f.classMissing = true; sys.append("  framework class android.os.PrizeTinyService: MISSING (").append(t.getClass().getSimpleName()).append(")").append(f.uartPcm ? " (not used on this phone: its audio comes over the radio's audio serial port)" : "").append("\n"); }
         if (root) {
             String services = RootSetup.run("service list 2>/dev/null | grep -i -E 'tiny|prize' ; true");
             f.binderPresent = services.toLowerCase(Locale.US).contains("tiny");

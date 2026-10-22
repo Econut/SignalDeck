@@ -21,6 +21,13 @@ public class DmrAudioCheckTest {
         String s = v(f); assertTrue(s, s.contains("PrizeTinyService") && s.contains("analog and DMR alike") && s.contains("still running"));
         assertEquals(1, DmrAudioCheck.verdict(f).size());
     }
+    @Test public void serialPortAudioPhoneIgnoresTheMissingVendorClass() {      // Xplore 1 report 2026-10-22: audio arrived, the verdict said it could not
+        DmrAudioCheck.Facts f = ok(); f.classMissing = true; f.uartPcm = true; f.pcmPort = "/dev/ttyS1";
+        f.digitalChannel = false; f.monTested = true; f.monPcm = 168169; f.monRms = 3042; f.rms = 466;
+        String s = v(f); assertFalse(s, s.contains("PrizeTinyService")); assertTrue(s, s.contains("The audio path works") && s.contains("was played"));
+        f.monPcm = 0; s = v(f); assertTrue(s, s.contains("audio serial port (/dev/ttyS1)") && !s.contains("tinyservice"));
+        f.monPcm = 168169; f.pcmDuringCalls = 0; s = v(f); assertTrue(s, s.contains("audio serial port") && !s.contains("vendor audio service"));
+    }
     @Test public void radioNeverReportedACall() {
         DmrAudioCheck.Facts f = ok(); f.receptions = 0; f.callerReports = 0; f.pcmDuringCalls = 0;
         assertTrue(v(f).contains("RX group list"));
