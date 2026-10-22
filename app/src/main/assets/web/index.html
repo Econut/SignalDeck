@@ -286,6 +286,15 @@
 
     <!-- LOGBOOK -->
     <section id="page-log" class="page hidden">
+      <div class="panel" id="potaPanel">
+        <div class="row between wrap"><span class="label">POTA / SOTA</span><div class="row"><button class="btn small-btn" id="potaRefresh">Refresh</button></div></div>
+        <div id="potaAct" class="pota-act"></div>
+        <form id="potaStart" class="row wrap hidden" autocomplete="off"><input id="potaRef" placeholder="Park (US-1234) or summit (W0C/FR-001)" style="text-transform:uppercase" maxlength="14"><button class="btn small-btn" type="submit">Start the activation</button><button class="btn small-btn" type="button" id="potaParks">Parks near the phone</button></form>
+        <div id="potaParkList" class="list small"></div>
+        <form id="potaLog" class="row wrap hidden" autocomplete="off"><input id="plCall" placeholder="Callsign" style="text-transform:uppercase" maxlength="12"><input id="plSent" value="59" size="4" aria-label="Report sent"><input id="plRcvd" value="59" size="4" aria-label="Report received"><input id="plTheir" placeholder="Their park/summit (optional)" style="text-transform:uppercase" maxlength="14"><button class="btn small-btn" type="submit">Log</button></form>
+        <div class="label" style="margin-top:12px">ON THE AIR NOW</div>
+        <div id="potaSpots" class="list small"></div>
+      </div>
       <div class="grid-side wide">
         <div class="panel">
           <span class="label" id="qsoTitle">LOG A CONTACT</span>

@@ -866,6 +866,50 @@ public final class WebHost {
                             .put("name", e.name).put("notes", e.notes).put("rstSent", e.rstSent).put("rstRcvd", e.rstRcvd).put("qso", e.qso).put("source", e.source).put("grid", e.grid).put("qth", e.qth));
                 return ok(new JSONObject().put("entries", a).put("qsos", lb.count(true)).put("total", lb.count(false)));
             }
+            case "/api/pota": {                                                 // GET: your activation + the spots; POST {action: start|end|log|parks, ...}
+                com.macdmr.radio.ham.Pota.Activation act = com.macdmr.radio.ham.Pota.active(svc);
+                if (post) {
+                    String a0 = b.optString("action");
+                    if (a0.equals("start")) {
+                        String ref = b.optString("ref", "").trim().toUpperCase(java.util.Locale.US);
+                        if (com.macdmr.radio.ham.Pota.programOf(ref) == null) return WebServer.Response.error(400, "Not a POTA (US-1234) or SOTA (W0C/FR-001) reference");
+                        String name = com.macdmr.radio.ham.Pota.lookup(ref); com.macdmr.radio.ham.Pota.start(svc, ref, name == null ? "" : name);
+                        return ok(name == null ? "Activating " + ref + " (not found in the programme's list)" : "Activating " + ref + ": " + name);
+                    }
+                    if (a0.equals("end")) { com.macdmr.radio.ham.Pota.end(svc); return ok("Activation ended"); }
+                    if (a0.equals("parks")) {
+                        android.location.Location me = svc.lastKnownLocation(); if (me == null) return WebServer.Response.error(409, "No position fix on the phone");
+                        JSONArray pa = new JSONArray(); for (com.macdmr.radio.ham.Pota.Park p0 : com.macdmr.radio.ham.Pota.parksNear(me.getLatitude(), me.getLongitude())) { if (pa.length() >= 25) break; pa.put(new JSONObject().put("ref", p0.ref).put("name", p0.name).put("km", Math.round(p0.km * 10) / 10.0)); }
+                        return ok(new JSONObject().put("parks", pa));
+                    }
+                    if (a0.equals("log")) {
+                        String call = b.optString("call", "").trim().toUpperCase(java.util.Locale.US); if (com.macdmr.radio.ham.Logbook.baseCall(call) == null) return WebServer.Response.error(400, "Enter a callsign");
+                        ChannelStore.Channel cur = svc.current(); long f = b.optLong("freqHz", cur != null ? cur.rxFreq : 0);
+                        if (act != null && !b.optBoolean("force") && svc.logbook().isDupe(call, f, System.currentTimeMillis(), act.ref)) return WebServer.Response.error(409, "DUPE: " + call + " is already logged on this band today under " + act.ref);
+                        com.macdmr.radio.ham.Logbook.Entry e = new com.macdmr.radio.ham.Logbook.Entry(); e.ts = System.currentTimeMillis(); e.call = call; e.freqHz = f; e.mode = "FM"; e.qso = true;
+                        e.rstSent = b.optString("sent", "59"); e.rstRcvd = b.optString("rcvd", "59"); e.notes = b.optString("notes", ""); e.source = act != null ? act.program + " activation" : "POTA/SOTA hunting";
+                        String tr = b.optString("theirRef", "").trim().toUpperCase(java.util.Locale.US); if (com.macdmr.radio.ham.Pota.programOf(tr) != null) { e.sig = com.macdmr.radio.ham.Pota.programOf(tr); e.sigInfo = tr; }
+                        if (act != null) { e.mySig = act.program; e.mySigInfo = act.ref; }
+                        svc.logbook().save(e);
+                        return ok(call + " logged");
+                    }
+                    return WebServer.Response.error(400, "Unknown action");
+                }
+                JSONObject o = new JSONObject();
+                if (act != null) { int today = svc.logbook().activation(act.ref, com.macdmr.radio.ham.Pota.utcDay(System.currentTimeMillis())).size(); o.put("activation", new JSONObject().put("program", act.program).put("ref", act.ref).put("name", act.name).put("since", act.since).put("today", today).put("needed", com.macdmr.radio.ham.Pota.needed(act.program)).put("total", svc.logbook().activation(act.ref, null).size())); }
+                java.util.List<String> probs = new java.util.ArrayList<>(); JSONArray sp = new JSONArray();
+                for (com.macdmr.radio.ham.Pota.Spot s0 : com.macdmr.radio.ham.Pota.spots(probs)) { if (sp.length() >= 60) break; sp.put(new JSONObject().put("program", s0.program).put("call", s0.call).put("freqHz", s0.freqHz).put("mode", s0.mode).put("ref", s0.ref).put("name", s0.name).put("where", s0.where).put("time", s0.time).put("workable", s0.workable())); }
+                JSONArray pr = new JSONArray(); for (String x : probs) pr.put(x);
+                return ok(o.put("spots", sp).put("problems", pr));
+            }
+            case "/api/pota/adif": {                                            // the activation's ADIF (POTA's file name)
+                com.macdmr.radio.ham.Pota.Activation act = com.macdmr.radio.ham.Pota.active(svc); if (act == null) return WebServer.Response.error(409, "No activation");
+                String me = svc.packet() == null ? "" : svc.packet().callsign();
+                String adif = com.macdmr.radio.ham.Logbook.adif(svc.logbook().activation(act.ref, null), com.macdmr.radio.BuildConfig.VERSION_NAME, me);
+                WebServer.Response resp = WebServer.Response.bytes("application/octet-stream", adif.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                resp.headers.put("Content-Disposition", "attachment; filename=\"" + (me.isEmpty() ? "MYCALL" : me) + "@" + act.ref.replace('/', '_') + "-" + com.macdmr.radio.ham.Pota.utcDay(System.currentTimeMillis()) + ".adi\"");
+                return resp;
+            }
             case "/api/logbook/delete": if (!post) break; { svc.logbook().delete(b.optLong("id", 0)); return ok("Deleted"); }
             case "/api/settings": {
                 if (post) {

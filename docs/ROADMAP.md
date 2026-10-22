@@ -9,7 +9,7 @@ entry and a device test.
 | 2 | Scheduled operations | Start a scan, beacon, monitoring or recording at set times (once, daily, weekly) | **done** 2026-10-22 |
 | 3 | VHF/UHF conditions | Tropospheric ducting forecast, aurora (Kp) alerts, meteor shower calendar, upcoming satellite passes | **done** 2026-10-22 |
 | 4 | Band scope | Receive-only sweep of a band (signal strength per step), live graph + waterfall over time (about 0.7 s per step: the radio's signal reading needs that long after a retune) | **done** 2026-10-22 |
-| 5 | POTA / SOTA | Activator spots (FM, 2 m / 70 cm) with tune-to, activation mode with park/summit reference, dupe check, ADIF | planned |
+| 5 | POTA / SOTA | Activator spots (FM, 2 m / 70 cm) with tune-to, activation mode with park/summit reference, dupe check, ADIF | **done** 2026-10-22 |
 | 6 | DMR roaming | Switch to the best repeater carrying your talkgroup as you move (GPS + signal) | planned |
 | 7 | ICS-213 / radiogram forms | Standard message forms over APRS messages, packet or DMR text, with a message log | planned |
 | 8 | Winlink over packet | E-mail through a Winlink packet gateway (AX.25 connected mode, B2F); bench-tested against a HackRF test gateway | planned |

@@ -51,7 +51,7 @@ function route() {
   if (S.page === 'contacts') loadContacts();
   if (S.page === 'map') loadMap();
   if (S.page === 'help') loadHelp();
-  if (S.page === 'log') { if (!S.qso) editQso(null); loadLog(); loadNet(); }
+  if (S.page === 'log') { if (!S.qso) editQso(null); loadLog(); loadNet(); loadPota(); }
   if (S.page === 'rec') loadRecordings();
   if (S.page === 'trans') { loadTrans(); loadModels(); }
   if (S.page === 'exam') { loadExam(); loadTrainer(); }

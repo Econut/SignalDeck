@@ -333,6 +333,42 @@ function renderPhone(d) {
 }
 setInterval(() => { if (S.phoneAt && Date.now() - S.phoneAt > 15000) $('phoneAge').textContent = 'NOT UPDATING'; }, 5000);
 
+// ---- POTA / SOTA (Logbook page) ----
+async function loadPota() {
+  $('potaSpots').innerHTML = '<div class="empty">Loading the spots…</div>';
+  try {
+    const j = await api('pota'); S.pota = j; const a = j.activation;
+    $('potaAct').innerHTML = a ? '<div class="big">' + esc(a.program + ' ' + a.ref) + '</div><div>' + esc(a.name || '') + '</div><div class="muted">Today (UTC) ' + a.today + ' of ' + a.needed + ' contacts' + (a.today >= a.needed ? ': it counts' : '') + ' · ' + a.total + ' in all</div><div class="row" style="margin-top:6px"><a class="btn small-btn" href="/api/pota/adif">Download ADIF</a><button class="btn small-btn danger" id="potaEnd" type="button">End the activation</button></div>'
+      : '<div class="muted">Not activating. Start one when you are in a park or on a summit: your contacts are logged under its reference.</div>';
+    $('potaStart').classList.toggle('hidden', !!a); $('potaLog').classList.toggle('hidden', !a);
+    if (a) $('potaEnd').onclick = async () => { if (!await ask('End the activation ' + a.ref + '? Its contacts stay in the logbook.', 'End')) return; try { await api('pota', { action: 'end' }); loadPota(); } catch (e) { toast(e.message); } };
+    const w = j.spots.filter(s => s.workable).length;
+    $('potaSpots').innerHTML = (w ? '' : '<div class="muted">Nobody is on FM on 2 m or 70 cm right now' + (j.spots.length ? ' (' + j.spots.length + ' on HF and other modes):' : '.') + '</div>')
+      + j.spots.map((s, i) => '<div class="item' + (s.workable ? ' click' : ' dim') + '" data-i="' + i + '"><div class="main"><b>' + esc(s.call) + '</b> · ' + (s.freqHz / 1e6).toFixed(4) + ' MHz ' + esc(s.mode || '') + '<div class="sub">' + esc(s.program + ' ' + s.ref + ' ' + (s.name || '')) + (s.where ? ' (' + esc(s.where) + ')' : '') + (s.time ? ' · ' + new Date(s.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '') + '</div></div>' + (s.workable ? '<button class="btn small-btn" data-tune="' + i + '">Tune</button>' : '') + '</div>').join('')
+      + (j.problems.length ? '<div class="muted small">' + esc(j.problems.join(' · ')) + '</div>' : '');
+  } catch (e) { $('potaSpots').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+}
+$('potaRefresh').onclick = loadPota;
+$('potaSpots').onclick = async e => {
+  const b = e.target.closest('[data-tune]'); if (b) { const s = S.pota.spots[+b.dataset.tune]; try { await api('scope/listen', { hz: s.freqHz }); toast('Tuned to ' + s.call); } catch (x) { toast(x.message); } return; }
+  const it = e.target.closest('.item[data-i]'); if (!it) return; const s = S.pota.spots[+it.dataset.i];
+  if (S.pota.activation) { $('plCall').value = s.call; $('plTheir').value = s.ref; $('plCall').focus(); }
+};
+$('potaStart').onsubmit = async e => { e.preventDefault(); try { const r = await api('pota', { action: 'start', ref: $('potaRef').value }); toast(r.message); loadPota(); } catch (x) { toast(x.message); } };
+$('potaParks').onclick = async () => {
+  $('potaParkList').innerHTML = '<div class="empty">Looking…</div>';
+  try { const j = await api('pota', { action: 'parks' }); $('potaParkList').innerHTML = j.parks.map(p => '<div class="item click" data-ref="' + esc(p.ref) + '"><div class="main"><b>' + esc(p.ref) + '</b> · ' + esc(p.name) + '<div class="sub">' + p.km + ' km</div></div></div>').join('') || '<div class="empty">No park within 60 km</div>'; }
+  catch (e) { $('potaParkList').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; }
+};
+$('potaParkList').onclick = e => { const it = e.target.closest('[data-ref]'); if (it) { $('potaRef').value = it.dataset.ref; $('potaParkList').innerHTML = ''; } };
+$('potaLog').onsubmit = async e => {
+  e.preventDefault();
+  const body = { action: 'log', call: $('plCall').value, sent: $('plSent').value, rcvd: $('plRcvd').value, theirRef: $('plTheir').value };
+  try { const r = await api('pota', body); toast(r.message); }
+  catch (x) { if (/^DUPE/.test(x.message) && await ask(x.message + '. Log it again?', 'Log again')) { try { await api('pota', Object.assign(body, { force: true })); toast('Logged'); } catch (y) { toast(y.message); } } else if (!/^DUPE/.test(x.message)) toast(x.message); }
+  $('plCall').value = ''; $('plTheir').value = ''; loadPota(); if (typeof loadLog === 'function') loadLog();
+};
+
 // ---- band scope ----
 async function loadScope() {
   try {

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — POTA / SOTA: activator spots, your activation, duplicate check, ADIF (phone and SignalDeck Web)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Roadmap #5 | `ham/Pota`: POTA (`api.pota.app/spot/activator`, kHz) and SOTA (`api2.sota.org.uk`, MHz) spots merged, workable first (FM or unknown mode on 136–174 / 400–480 MHz); parks within 60 km from POTA's map for a box rounded to 0.5°; reference recognition and lookup (park / summit name); the activation in prefs. **Logbook** v3: `sig`, `sigInfo`, `mySig`, `mySigInfo` columns; `isDupe` (call + band + UTC day under the activation), `activation(ref, day)`; ADIF adds SIG / SIG_INFO / POTA_REF or SOTA_REF, MY_SIG / MY_SIG_INFO / MY_POTA_REF or MY_SOTA_REF, STATION_CALLSIGN / OPERATOR. Phone: PKT → Logbook → POTA / SOTA (activation card with today's count vs 10 / 4, Log a contact, Export ADIF as `CALL@REF-YYYYMMDD.adi` + share, End; parks near you; spots with tune / log). Web: a POTA / SOTA panel on the Logbook page (`/api/pota` GET + start / end / log / parks, `/api/pota/adif`). Help: POTA and SOTA. | `ham/Pota.java` (new), `ham/Logbook.java`, `ui/PotaDialog.java` (new), `ui/PktDialog.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java`, `PotaTest.java` (new, 3 tests) | Host tests (references, both spot formats incl. workable rule, ADIF fields). **Device** (owner's Armor, via the web API): 60 spots (none FM VHF/UHF at the time), 25 parks near the phone (count only), activation of an unrelated test park (GB-0001 "Cassop Vale"), a test QSO with a SOTA park-to-park reference, the second one refused as DUPE, ADIF with MY_POTA_REF / SOTA_REF / STATION_CALLSIGN; activation ended and the test QSO deleted; phone sheet shows the activation buttons and "nobody on FM … (87 on HF)". |
+
 ## 2026-10-22 — Band scope (phone and SignalDeck Web)
 
 | Backlog | Change | Files | Test |

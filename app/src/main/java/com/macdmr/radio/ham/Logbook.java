@@ -27,16 +27,19 @@ import java.util.TimeZone;
 public final class Logbook extends SQLiteOpenHelper {
     public static final class Entry {
         public long id, ts; public long freqHz; public String call = "", mode = "FM", name = "", notes = "", rstSent = "", rstRcvd = "", source = "", grid = "", qth = "";
+        /** POTA / SOTA: the other station's programme and park/summit (hunting), and yours (activating). */
+        public String sig = "", sigInfo = "", mySig = "", mySigInfo = "";
         public boolean qso;
     }
 
-    public Logbook(Context c) { super(c, "logbook.db", null, 2); }
+    public Logbook(Context c) { super(c, "logbook.db", null, 3); }
 
     @Override public void onCreate(SQLiteDatabase db) {
-        db.execSQL("CREATE TABLE log (_id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, call TEXT, freq INTEGER, mode TEXT, rstSent TEXT, rstRcvd TEXT, name TEXT, notes TEXT, qso INTEGER, source TEXT, grid TEXT DEFAULT '', qth TEXT DEFAULT '')");
+        db.execSQL("CREATE TABLE log (_id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, call TEXT, freq INTEGER, mode TEXT, rstSent TEXT, rstRcvd TEXT, name TEXT, notes TEXT, qso INTEGER, source TEXT, grid TEXT DEFAULT '', qth TEXT DEFAULT '', sig TEXT DEFAULT '', sigInfo TEXT DEFAULT '', mySig TEXT DEFAULT '', mySigInfo TEXT DEFAULT '')");
     }
     @Override public void onUpgrade(SQLiteDatabase db, int o, int n) {
         if (o < 2) { db.execSQL("ALTER TABLE log ADD COLUMN grid TEXT DEFAULT ''"); db.execSQL("ALTER TABLE log ADD COLUMN qth TEXT DEFAULT ''"); }   // callsign lookup
+        if (o < 3) for (String col : new String[] { "sig", "sigInfo", "mySig", "mySigInfo" }) db.execSQL("ALTER TABLE log ADD COLUMN " + col + " TEXT DEFAULT ''");   // POTA / SOTA
     }
 
     /** Fill in name, grid and place for every entry of {@code call} that lacks them (from a callsign lookup). */
@@ -70,23 +73,39 @@ public final class Logbook extends SQLiteOpenHelper {
         ContentValues v = new ContentValues();
         v.put("ts", e.ts); v.put("call", e.call.trim().toUpperCase(Locale.US)); v.put("freq", e.freqHz); v.put("mode", e.mode); v.put("rstSent", e.rstSent); v.put("rstRcvd", e.rstRcvd);
         v.put("name", e.name); v.put("notes", e.notes); v.put("qso", e.qso ? 1 : 0); v.put("source", e.source); v.put("grid", e.grid == null ? "" : e.grid); v.put("qth", e.qth == null ? "" : e.qth);
+        v.put("sig", nz(e.sig)); v.put("sigInfo", nz(e.sigInfo)); v.put("mySig", nz(e.mySig)); v.put("mySigInfo", nz(e.mySigInfo));
         if (e.id > 0) { getWritableDatabase().update("log", v, "_id=?", new String[] { String.valueOf(e.id) }); return e.id; }
         return e.id = getWritableDatabase().insert("log", null, v);
+    }
+    private static String nz(String v) { return v == null ? "" : v.trim().toUpperCase(Locale.US); }
+    /** Already worked: the same call on the same band in the same UTC day under the same activation (POTA's rule). */
+    public synchronized boolean isDupe(String call, long freqHz, long ts, String mySigInfo) {
+        String c = baseCall(call); if (c == null) return false; String b = band(freqHz);
+        for (Entry e : activation(nz(mySigInfo), Pota.utcDay(ts))) if (c.equals(baseCall(e.call)) && java.util.Objects.equals(b, band(e.freqHz))) return true;
+        return false;
+    }
+    /** The contacts logged under an activation reference (all days when {@code utcDay} is null), oldest first. */
+    public synchronized List<Entry> activation(String ref, String utcDay) {
+        List<Entry> out = new ArrayList<>();
+        for (Entry e : list(100_000, true)) if (ref.equalsIgnoreCase(e.mySigInfo) && (utcDay == null || utcDay.equals(Pota.utcDay(e.ts)))) out.add(0, e);
+        return out;
     }
     public synchronized void delete(long id) { getWritableDatabase().delete("log", "_id=?", new String[] { String.valueOf(id) }); }
     public synchronized int count(boolean qsoOnly) { try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM log" + (qsoOnly ? " WHERE qso=1" : ""), null)) { return c.moveToFirst() ? c.getInt(0) : 0; } }
 
     public synchronized List<Entry> list(int limit, boolean qsoOnly) {
         List<Entry> out = new ArrayList<>();
-        try (Cursor c = getReadableDatabase().rawQuery("SELECT _id, ts, call, freq, mode, rstSent, rstRcvd, name, notes, qso, source, grid, qth FROM log" + (qsoOnly ? " WHERE qso=1" : "") + " ORDER BY ts DESC LIMIT " + limit, null)) {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT _id, ts, call, freq, mode, rstSent, rstRcvd, name, notes, qso, source, grid, qth, sig, sigInfo, mySig, mySigInfo FROM log" + (qsoOnly ? " WHERE qso=1" : "") + " ORDER BY ts DESC LIMIT " + limit, null)) {
             while (c.moveToNext()) {
                 Entry e = new Entry(); e.id = c.getLong(0); e.ts = c.getLong(1); e.call = c.getString(2); e.freqHz = c.getLong(3); e.mode = c.getString(4); e.rstSent = c.getString(5); e.rstRcvd = c.getString(6);
                 e.name = c.getString(7); e.notes = c.getString(8); e.qso = c.getInt(9) == 1; e.source = c.getString(10); e.grid = c.getString(11) == null ? "" : c.getString(11); e.qth = c.getString(12) == null ? "" : c.getString(12); out.add(e);
+                e.sig = str(c, 13); e.sigInfo = str(c, 14); e.mySig = str(c, 15); e.mySigInfo = str(c, 16);
             }
         }
         return out;
     }
 
+    private static String str(Cursor c, int i) { String v = c.getString(i); return v == null ? "" : v; }
     /** "W1AW-9" or "w1aw" to "W1AW"; null when it does not look like a callsign (a prefix, a digit, a suffix). */
     public static String baseCall(String call) {
         if (call == null) return null;
@@ -121,7 +140,9 @@ public final class Logbook extends SQLiteOpenHelper {
     }
 
     /** The entries as an ADIF 3.1 file. */
-    public static String adif(List<Entry> entries, String version) {
+    public static String adif(List<Entry> entries, String version) { return adif(entries, version, null); }
+    /** ADIF with STATION_CALLSIGN / OPERATOR (POTA's uploads want them). */
+    public static String adif(List<Entry> entries, String version, String station) {
         StringBuilder sb = new StringBuilder("SignalDeck logbook export\n");
         field(sb, "ADIF_VER", "3.1.4"); field(sb, "PROGRAMID", "SignalDeck"); field(sb, "PROGRAMVERSION", version);
         sb.append("<EOH>\n");
@@ -134,6 +155,9 @@ public final class Logbook extends SQLiteOpenHelper {
             if ("DMR".equals(e.mode)) { field(sb, "MODE", "DIGITALVOICE"); field(sb, "SUBMODE", "DMR"); }
             else field(sb, "MODE", e.mode);
             field(sb, "RST_SENT", e.rstSent); field(sb, "RST_RCVD", e.rstRcvd); field(sb, "NAME", e.name); field(sb, "GRIDSQUARE", e.grid); field(sb, "QTH", e.qth);
+            if (e.sig != null && !e.sig.isEmpty()) { field(sb, "SIG", e.sig); field(sb, "SIG_INFO", e.sigInfo); field(sb, Pota.SOTA.equals(e.sig) ? "SOTA_REF" : "POTA_REF", e.sigInfo); }
+            if (e.mySig != null && !e.mySig.isEmpty()) { field(sb, "MY_SIG", e.mySig); field(sb, "MY_SIG_INFO", e.mySigInfo); field(sb, Pota.SOTA.equals(e.mySig) ? "MY_SOTA_REF" : "MY_POTA_REF", e.mySigInfo); }
+            if (station != null && !station.isEmpty()) { field(sb, "STATION_CALLSIGN", station); field(sb, "OPERATOR", station); }
             String comment = (e.notes == null ? "" : e.notes.trim()) + (e.source == null || e.source.isEmpty() ? "" : ((e.notes == null || e.notes.trim().isEmpty()) ? "" : "; ") + e.source);
             field(sb, "COMMENT", comment);
             if (!e.qso) field(sb, "SWL", "Y");

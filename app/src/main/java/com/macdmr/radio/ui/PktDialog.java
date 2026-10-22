@@ -140,6 +140,8 @@ public final class PktDialog {
         body.addView(section("Logbook"));
         LinearLayout lr = row();
         button(lr, "Logbook (" + svc.logbook().count(true) + " contacts)", Theme.SOFTSQ, x -> { dlg.dismiss(); LogbookDialog.show(c, svc); });
+        com.macdmr.radio.ham.Pota.Activation act = com.macdmr.radio.ham.Pota.active(c);
+        button(lr, act != null ? "Activating " + act.ref : "POTA / SOTA", Theme.SOFTSQ, x -> { dlg.dismiss(); PotaDialog.show(c, svc); });
         body.addView(lr);
         body.addView(hint("Your contacts with signal reports, and the stations the radio heard on its own; export as ADIF."));
         // ---- fox hunt ----

@@ -89,6 +89,9 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
 .dec-job { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
 .dec-out { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px ShareTech, ui-monospace, monospace; color: var(--text); max-height: 260px; overflow-y: auto; margin: 8px 0; }
 .dec-out:empty { display: none; }
+.pota-act { margin: 8px 0; }
+.pota-act .big { font: 600 22px Orbitron, sans-serif; color: var(--green); }
+#potaSpots .item.dim { opacity: .55; }
 .scope-cv { width: 100%; height: 460px; display: block; margin: 8px 0; border-radius: 12px; background: #050B12; cursor: crosshair; }
 @media (max-width: 760px) { .scope-cv { height: 340px; } }
 .cond-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
