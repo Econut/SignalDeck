@@ -333,6 +333,54 @@ function renderPhone(d) {
 }
 setInterval(() => { if (S.phoneAt && Date.now() - S.phoneAt > 15000) $('phoneAge').textContent = 'NOT UPDATING'; }, 5000);
 
+// ---- band scope ----
+async function loadScope() {
+  try {
+    const j = await api('scope'); S.scope = j;
+    if (!$('scPreset').options.length) { $('scPreset').innerHTML = j.presets.map((p, i) => '<option value="' + i + '">' + esc(p.name) + ' (' + (p.from / 1e6).toFixed(3) + '–' + (p.to / 1e6).toFixed(3) + ', ' + p.step / 1000 + ' kHz)</option>').join(''); try { $('scPreset').value = localStorage.getItem('scPreset') || 0; } catch (e) { } }
+    $('scStart').textContent = j.running ? 'Stop' : 'Start';
+    const n = j.step > 0 ? Math.floor((j.to - j.from) / j.step) + 1 : 0;
+    $('scSub').textContent = j.running ? (j.from / 1e6).toFixed(3) + '–' + (j.to / 1e6).toFixed(3) + ' MHz · ' + j.step / 1000 + ' kHz steps · a sweep takes ' + (j.sweepMs > 0 ? Math.round(j.sweepMs / 1000) : Math.round(n * (j.settleMs + 15) / 1000)) + ' s · receive only' : 'Receive only: the radio sweeps the band step by step (about 0.7 s a step: its signal reading needs that long after each retune) and comes back to your channel when it stops. Click the graph to pick a frequency.';
+    $('scPeaks').innerHTML = (j.peaks || []).sort((a, b) => b.dbm - a.dbm).slice(0, 8).map(p => '<div class="item click" data-hz="' + p.hz + '"><div class="main"><b class="mono">' + (p.hz / 1e6).toFixed(4) + ' MHz</b> · ' + p.dbm + ' dBm' + (p.name ? ' · ' + esc(p.name) : '') + '</div></div>').join('') || (j.last ? '<div class="empty">Nothing stands out above the noise (8 dB)</div>' : '');
+    drawScope();
+    clearTimeout(S.scT); if (j.running && S.page === 'scope') S.scT = setTimeout(loadScope, 1500);   // the sweep in progress, step by step
+  } catch (e) { }
+}
+function drawScope() {
+  const j = S.scope, cv = $('scCv'); if (!j || !cv) return;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, W, H);
+  const gh = H * 0.55, wt = gh + 6, wh = H - wt, TOP = -40, BOT = -125, y = v => gh * (1 - (Math.max(BOT, Math.min(TOP, v)) - BOT) / (TOP - BOT));
+  g.strokeStyle = 'rgba(255,255,255,.12)'; g.fillStyle = '#6F849A'; g.font = '11px ShareTech, monospace';
+  for (let db = -120; db <= -40; db += 20) { g.beginPath(); g.moveTo(0, y(db)); g.lineTo(W, y(db)); g.stroke(); g.fillText(db, 3, y(db) - 3); }
+  const n = j.step > 0 ? Math.floor((j.to - j.from) / j.step) + 1 : 0; if (n < 2) return;
+  for (let k = 0; k <= 4; k++) { const x = W * k / 4, l = ((j.from + (j.to - j.from) * k / 4) / 1e6).toFixed(3); g.beginPath(); g.moveTo(x, 0); g.lineTo(x, gh); g.stroke(); const tw = g.measureText(l).width; g.fillText(l, Math.max(0, Math.min(W - tw, x - tw / 2)), gh - 3); }
+  const line = (v, col, w, a) => { if (!v) return; g.strokeStyle = col; g.globalAlpha = a; g.lineWidth = w; g.beginPath(); let pen = false; v.forEach((d, i) => { if (d == null) { pen = false; return; } const x = i / (v.length - 1) * W; if (!pen) { g.moveTo(x, y(d)); pen = true; } else g.lineTo(x, y(d)); }); g.stroke(); g.globalAlpha = 1; };
+  line(j.peak, '#FFB020', 1, .7); line(j.last, '#19D3FF', 2, j.partial ? .35 : 1); if (j.partial) { line(j.partial, '#19D3FF', 2, 1); const px = j.partialIndex / (n - 1) * W; g.strokeStyle = 'rgba(43,234,122,.5)'; g.beginPath(); g.moveTo(px, 0); g.lineTo(px, gh); g.stroke(); }
+  const stops = [[10, 20, 32], [14, 78, 106], [25, 211, 255], [43, 234, 122], [255, 176, 32], [255, 84, 104]];
+  const heat = d => { if (d == null) return 'rgb(10,20,32)'; const t = Math.max(0, Math.min(1, (d + 118) / 50)) * (stops.length - 1), k = Math.min(stops.length - 2, Math.floor(t)), f = t - k, a = stops[k], b = stops[k + 1]; return 'rgb(' + a.map((c, i) => Math.round(c * (1 - f) + b[i] * f)).join(',') + ')'; };
+  const h = j.history || [], rh = Math.max(1, wh / 60), cw = W / n;
+  for (let r = 0; r < h.length; r++) { const row = h[h.length - 1 - r], top = wt + r * rh; if (top > H) break; row.forEach((d, i) => { g.fillStyle = heat(d); g.fillRect(i * cw, top, cw + 1, rh + 1); }); }
+  if (S.scSel) { const x = (S.scSel - j.from) / (j.to - j.from) * W; g.strokeStyle = '#2BEA7A'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+}
+$('scCv').onclick = e => {
+  const j = S.scope; if (!j || !j.step) return; const r = $('scCv').getBoundingClientRect(), n = Math.floor((j.to - j.from) / j.step) + 1;
+  const i = Math.round((e.clientX - r.left) / r.width * (n - 1)); S.scSel = j.from + i * j.step; const v = j.last ? j.last[i] : null;
+  $('scSel').textContent = (S.scSel / 1e6).toFixed(4) + ' MHz' + (v != null ? '  ' + Math.round(v) + ' dBm' : ''); $('scListen').classList.remove('hidden'); drawScope();
+};
+$('scPeaks').onclick = e => { const it = e.target.closest('[data-hz]'); if (!it) return; S.scSel = +it.dataset.hz; $('scSel').textContent = (S.scSel / 1e6).toFixed(4) + ' MHz'; $('scListen').classList.remove('hidden'); drawScope(); };
+$('scStart').onclick = async () => {
+  const j = S.scope || {};
+  try {
+    if (j.running) { await api('scope/stop', {}); toast('Stopping: the radio goes back to your channel'); }
+    else { const p = j.presets[+$('scPreset').value]; try { localStorage.setItem('scPreset', $('scPreset').value); } catch (e) { } await api('scope/start', { from: p.from, to: p.to, step: p.step }); toast('Sweeping ' + p.name + ' (receive only)'); }
+  } catch (e) { toast(e.message); }
+  setTimeout(loadScope, 600);
+};
+$('scClear').onclick = () => { if (S.scope) { S.scope.peak = S.scope.last; drawScope(); } };
+$('scListen').onclick = async () => { if (!S.scSel) return; try { const r = await api('scope/listen', { hz: S.scSel }); toast(r.message || 'Listening'); setTimeout(loadScope, 1500); } catch (e) { toast(e.message); } };
+window.addEventListener('resize', () => { if (S.page === 'scope') drawScope(); });
+
 // ---- scheduled operations (Settings) ----
 const SF_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 $('sfDays').innerHTML = SF_DAYS.map((d, i) => '<button type="button" data-b="' + i + '" aria-pressed="false">' + d + '</button>').join('');

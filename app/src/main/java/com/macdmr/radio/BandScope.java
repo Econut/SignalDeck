@@ -1,0 +1,148 @@
+/*
+ * SignalDeck - Copyright (C) 2026 IIMacGyverII
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Free software under the GNU General Public License v3 or later, with the additional terms in COPYRIGHT
+ * (keep this notice and the author credit, mark modified versions, no rights to the SignalDeck name or icon).
+ */
+package com.macdmr.radio;
+
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Band scope: a receive-only sweep across a frequency range. At each step the radio is retuned with one analog channel
+ * write (squelch closed, nothing keyed), allowed to settle, and its signal strength is read (0x32); a full sweep is one
+ * line of the waterfall. While it runs the received audio is dropped, the other signal polls and the coverage log pause,
+ * and when it stops the channel the radio was on is written back. It refuses to run near a tracked satellite pass and
+ * stops by itself for Talk and for a scheduled operation.
+ */
+public final class BandScope {
+    public static final class Preset { public final String name; public final int from, to, step; Preset(String n, int f, int t, int s) { name = n; from = f; to = t; step = s; } }
+    public static final Preset[] PRESETS = {
+        new Preset("2 m", 144_000_000, 148_000_000, 25_000),
+        new Preset("2 m FM simplex", 146_400_000, 147_600_000, 15_000),
+        new Preset("70 cm", 420_000_000, 450_000_000, 100_000),
+        new Preset("70 cm FM", 440_000_000, 450_000_000, 25_000),
+        new Preset("GMRS / FRS", 462_500_000, 467_750_000, 12_500),
+        new Preset("Marine VHF", 156_000_000, 162_025_000, 25_000),
+        new Preset("NOAA weather", 162_400_000, 162_550_000, 25_000),
+    };
+    public static final int MAX_STEPS = 1200, HISTORY = 120;
+
+    public interface Hooks {
+        /** Retune for a sweep step (one analog write, squelch closed). */
+        void tune(int hz) throws Exception;
+        /** Ask the module for the signal strength (the reply comes back through {@link #onRssi}). */
+        void query() throws Exception;
+        /** Put the radio back on its channel (once, when the sweep stops). */
+        void restore();
+        void sweep(int from, int step, float[] dbm, int n);
+        void state(String s);
+    }
+
+    private final Hooks hooks;
+    private final LinkedBlockingQueue<Integer> replies = new LinkedBlockingQueue<>();
+    private volatile Thread thread;
+    private volatile int from, to, step, settleMs = DEFAULT_SETTLE_MS;
+    /** Measured 2026-10-22: the module's signal reading is 15-20 dB low until about 0.7 s after a retune. */
+    public static final int DEFAULT_SETTLE_MS = 700;
+    private volatile float[] partial; private volatile int partialIdx = -1;
+    /** The sweep in progress (NaN past {@link #partialIndex()}), or null. */
+    public float[] partial() { float[] p = partial; return p == null ? null : p.clone(); }
+    public int partialIndex() { return partialIdx; }
+    private final ArrayDeque<float[]> history = new ArrayDeque<>();
+    private float[] last, peak;
+    private volatile long sweepMs;
+    private volatile int timeoutMs = 1200;
+    private volatile int[] latency = new int[0];
+    /** How long each step's reading took to arrive (ms, -1 = none), for the bench. */
+    public int[] latency() { return latency.clone(); }
+    public void setTimeoutMs(int ms) { timeoutMs = Math.max(150, Math.min(2000, ms)); }
+
+    public BandScope(Hooks h) { hooks = h; }
+
+    public boolean running() { return thread != null; }
+    public int from() { return from; } public int to() { return to; } public int step() { return step; } public int settleMs() { return settleMs; }
+    public long sweepMs() { return sweepMs; }
+    /** The signal strength reply (raw byte) while sweeping. */
+    public void onRssi(int raw) { if (thread != null) replies.offer(raw); }
+
+    /** Steps between {@code from} and {@code to} inclusive, and whether the range is one the radio can tune. Pure. */
+    public static int steps(int from, int to, int step) { return step <= 0 || to < from ? 0 : (to - from) / step + 1; }
+    public static boolean tunable(int hz) { return (hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000); }
+    /** Raw RSSI byte to dBm, as the module reports it (0 = no reading). */
+    public static float dbm(int raw) { return raw > 0 ? -(120f - raw / 2f) : Float.NaN; }
+
+    /** Start sweeping (null), or why not. */
+    public synchronized String start(int from, int to, int step, int settleMs) {
+        if (thread != null) stop();
+        int n = steps(from, to, step);
+        if (n < 2) return "Choose a range with at least two steps";
+        if (n > MAX_STEPS) return "Too many steps (" + n + "): use a larger step";
+        if (!tunable(from) || !tunable(to) || (from <= 174_000_000 && to >= 400_000_000)) return "The radio tunes 136–174 and 400–480 MHz: keep the range inside one of them";
+        this.from = from; this.to = to; this.step = step; this.settleMs = Math.max(10, Math.min(3000, settleMs));
+        synchronized (history) { history.clear(); last = null; peak = null; }
+        replies.clear();
+        Thread t = new Thread(this::loop, "band-scope"); thread = t; t.setPriority(Thread.NORM_PRIORITY + 1); t.start();
+        hooks.state("sweeping");
+        return null;
+    }
+
+    /** Stop and put the radio back; returns once the sweep thread has ended. */
+    public void stop() {
+        Thread t; synchronized (this) { t = thread; thread = null; }
+        if (t == null) return;
+        t.interrupt();
+        try { t.join(3000); } catch (InterruptedException ignored) { }
+        hooks.restore();
+        hooks.state("stopped");
+    }
+
+    private void loop() {
+        int n = steps(from, to, step);
+        final float[] row = new float[n]; int[] lat = new int[n];
+        try {
+            while (thread == Thread.currentThread()) {
+                long t0 = System.currentTimeMillis();
+                java.util.Arrays.fill(row, Float.NaN); partial = row; partialIdx = -1;
+                for (int i = 0; i < n && thread == Thread.currentThread(); i++) {
+                    hooks.tune(from + i * step);
+                    Thread.sleep(settleMs);
+                    replies.clear(); long q = System.currentTimeMillis(); hooks.query();
+                    Integer raw = replies.poll(timeoutMs, TimeUnit.MILLISECONDS);      // the module answers after about 0.1 s or 0.55 s (its measuring cycle)
+                    row[i] = raw == null ? Float.NaN : dbm(raw); lat[i] = raw == null ? -1 : (int) (System.currentTimeMillis() - q); partialIdx = i;
+                }
+                if (thread != Thread.currentThread()) break;
+                sweepMs = System.currentTimeMillis() - t0; latency = lat.clone();
+                float[] copy = row.clone(); partialIdx = -1;
+                synchronized (history) {
+                    last = copy; history.addLast(copy); while (history.size() > HISTORY) history.removeFirst();
+                    if (peak == null) peak = copy.clone(); else for (int i = 0; i < n; i++) if (!(copy[i] <= peak[i])) peak[i] = Float.isNaN(peak[i]) ? copy[i] : Math.max(peak[i], copy[i]);
+                }
+                hooks.sweep(from, step, copy, n);
+            }
+        } catch (InterruptedException ignored) {
+        } catch (Throwable x) { hooks.state("stopped: " + x.getMessage()); }
+    }
+
+    public float[] last() { synchronized (history) { return last == null ? null : last.clone(); } }
+    public float[] peak() { synchronized (history) { return peak == null ? null : peak.clone(); } }
+    public List<float[]> history() { synchronized (history) { return new ArrayList<>(history); } }
+    public void clearPeak() { synchronized (history) { peak = last == null ? null : last.clone(); } }
+
+    /** Frequencies standing out above the noise: the median of the sweep + {@code db}, local maxima only. Pure. */
+    public static List<int[]> peaks(float[] dbm, int from, int step, float db) {
+        List<int[]> out = new ArrayList<>(); if (dbm == null) return out;
+        float[] s = dbm.clone(); java.util.Arrays.sort(s); int k = 0; while (k < s.length && Float.isNaN(s[s.length - 1 - k])) k++;
+        float median = s.length - k > 0 ? s[(s.length - k) / 2] : Float.NaN; if (Float.isNaN(median)) return out;
+        for (int i = 0; i < dbm.length; i++) {
+            float v = dbm[i]; if (Float.isNaN(v) || v < median + db) continue;
+            if ((i > 0 && dbm[i - 1] > v) || (i + 1 < dbm.length && dbm[i + 1] >= v)) continue;
+            out.add(new int[] { from + i * step, Math.round(v) });
+        }
+        return out;
+    }
+}

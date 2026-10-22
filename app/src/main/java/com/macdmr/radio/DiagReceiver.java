@@ -39,6 +39,22 @@ public final class DiagReceiver extends BroadcastReceiver {
                 int hz = i.getIntExtra("hz", 0); if (hz < 136_000_000 || hz > 480_000_000) { Log.w("DiagReceiver", "vfo: bad hz " + hz); break; }
                 s.diagVfo(hz, i.getIntExtra("power", 0) == 1 ? 1 : 0); break;
             }
+            case "scope": {                                                     // bench: --ei from --ei to --ei step --ei settle (ms) --ei sweeps N: log N sweeps, then stop
+                final int sw = Math.max(1, i.getIntExtra("sweeps", 2));
+                s.scope().setTimeoutMs(i.getIntExtra("timeout", 900));
+                s.scopeSq = Math.max(0, Math.min(9, i.getIntExtra("sq", 9)));
+                String e = s.scopeStart(i.getIntExtra("from", 146_400_000), i.getIntExtra("to", 146_640_000), i.getIntExtra("step", 25_000), i.getIntExtra("settle", 40));
+                Log.i("DiagReceiver", "scope: " + (e == null ? "started" : e));
+                if (e == null) new Thread(() -> {
+                    int done = 0; long seen = -1;
+                    for (int k = 0; k < 600 && done < sw; k++) {
+                        try { Thread.sleep(250); } catch (InterruptedException x) { return; }
+                        java.util.List<float[]> h = s.scope().history(); if (h.size() > seen && h.size() > 0) { seen = h.size(); done++; float[] r = h.get(h.size() - 1); StringBuilder b = new StringBuilder(); for (float v : r) b.append(Float.isNaN(v) ? "nan" : String.format(java.util.Locale.US, "%.1f", v)).append(' '); Log.i("DiagReceiver", "scope sweep " + done + " (" + s.scope().sweepMs() + " ms): " + b + " | ms " + java.util.Arrays.toString(s.scope().latency())); }
+                    }
+                    s.scopeStop();
+                }, "diag-scope").start();
+                break;
+            }
             case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s) on the current channel or VFO
                 int ms = Math.max(200, Math.min(5000, i.getIntExtra("ms", 2000)));
                 Log.i("DiagReceiver", "testtone " + ms + " ms"); s.diagTestTone(ms); break;

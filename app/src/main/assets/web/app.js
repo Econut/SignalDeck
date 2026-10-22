@@ -37,7 +37,7 @@ $('logout').addEventListener('click', async () => { await fetch('/api/logout'); 
 // ---- pages ----
 function route() {
   const p = (location.hash || '#intercom').slice(1);
-  S.page = ['intercom', 'channels', 'messages', 'contacts', 'aprs', 'sstv', 'pkt', 'sat', 'map', 'log', 'rec', 'trans', 'exam', 'settings', 'help'].includes(p) ? p : 'intercom';
+  S.page = ['intercom', 'channels', 'messages', 'contacts', 'aprs', 'sstv', 'pkt', 'sat', 'scope', 'map', 'log', 'rec', 'trans', 'exam', 'settings', 'help'].includes(p) ? p : 'intercom';
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('hidden', el.id !== 'page-' + S.page));
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.page === S.page));
   const on = document.querySelector('#nav a.on'); if (on && on.scrollIntoView) on.scrollIntoView({ inline: 'center', block: 'nearest' });   // narrow screens scroll the tabs
@@ -45,6 +45,7 @@ function route() {
   if (S.page === 'aprs') loadAprs();
   if (S.page === 'sstv') loadSstv();
   if (S.page === 'sat') { renderSat(); loadPasses(); loadConditions(); }
+  if (S.page === 'scope') loadScope();
   if (S.page === 'intercom') loadHeard();
   if (S.page === 'messages') loadConversations();
   if (S.page === 'contacts') loadContacts();
@@ -77,6 +78,8 @@ function connect() {
   on('tx', d => { S.status.transmitting = d.on; renderState(); });
   on('rssi', d => { S.status.rssi = d.dbm; renderMeter(); });
   on('phone', d => renderPhone(d));
+  on('scope', d => { if (S.page === 'scope') loadScope(); });
+  on('scopeState', d => { if (S.page === 'scope') loadScope(); });
   on('spectrum', d => { S.specTarget = d.b; if (!S.specRaf) S.specRaf = requestAnimationFrame(drawSpectrum); });
   on('level', d => { $('vuFill').style.width = Math.min(100, Math.round(Math.sqrt(d.amp / 32767) * 100)) + '%'; clearTimeout(S.vuT); S.vuT = setTimeout(() => { $('vuFill').style.width = '0'; }, 400); });
   on('history', d => addHistory(d.line));

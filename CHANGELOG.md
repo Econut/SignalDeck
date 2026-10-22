@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Band scope (phone and SignalDeck Web)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Roadmap #4 | `BandScope`: receive-only sweeps; each step one analog channel write (low power, squelch byte 9, nothing keyed), 700 ms settle, then a 0x32 read (timeout 1.2 s); a sweep is one waterfall row (120 kept), peak hold, the sweep in progress readable step by step, peaks ≥ 8 dB above the median. While it runs `RadioService` drops received audio (speaker and decoders), skips other RSSI polls and the coverage log, and on stop writes the radio's channel back once (inline, so Talk never keys on a sweep frequency). It stops for Talk, a scheduled operation and a satellite pass, and refuses to start when a pass is tracked or begins within 15 min. Presets: 2 m, 2 m FM simplex, 70 cm, 70 cm FM, GMRS/FRS, marine VHF, NOAA weather. Phone: PKT → Band scope (graph + waterfall, tap to read, Listen here → VFO, Clear peaks, band picker; PKT bar label while sweeping); Web: Scope page (`/api/scope`, `/start`, `/stop`, `/listen`, SSE `scope`/`scopeState`). DIAG `scope` (bench). Help: Band scope. | `BandScope.java` (new), `RadioService.java`, `MainActivity.java`, `ui/BandScopeScreen.java` (new), `ui/PktDialog.java`, `DiagReceiver.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java`, `BandScopeTest.java` (new, 2 tests) | **HackRF bench** (CW carrier at 5 ft): the module answers an RSSI query only ~0.52–0.6 s after a retune and those readings are 15–20 dB low; at ≥ 700 ms they match the steady VFO reading (carrier −75…−79, floor −95…−97), squelch byte irrelevant → 700 ms default. **Web**: 2 m FM simplex sweep (81 steps, 57.5 s) found the carrier at 147.555 MHz −79 dBm; stop → back on the owner's channel. **Phone**: page opens from the PKT tools, NOAA preset sweeps in 5 s (162.500 −96.5 vs −100.5 floor: under the 8 dB peak threshold, correct), Stop restores the channel. |
+
 ## 2026-10-22 — VHF/UHF conditions: tropo ducting forecast, aurora, meteor showers, next passes
 
 | Backlog | Change | Files | Test |

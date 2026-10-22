@@ -247,12 +247,15 @@ public class MainActivity extends AppCompatActivity {
     private com.macdmr.radio.ui.ModeScreen modeScreenFor() {
         RadioService s = svc; if (s == null || s.packet() == null) return null;
         Runnable close = this::closeOverlay;
+        if (s.scope().running()) return new com.macdmr.radio.ui.BandScopeScreen(this, s, close);   // sweeping: its page, whatever else waits
         if (s.packet().sstvRx() || s.satMode() == com.macdmr.radio.ham.Satellites.SSTV) return new com.macdmr.radio.ui.SstvScreen(this, s, close);
         if (s.satMode() == com.macdmr.radio.ham.Satellites.APRS) return new com.macdmr.radio.ui.AprsScreen(this, s, close);
         if (s.packet().monitoring() || s.packet().kiss().isActive()) return new com.macdmr.radio.ui.AprsScreen(this, s, close);
         if (s.parrot().enabled()) return new com.macdmr.radio.ui.ParrotScreen(this, s, close);
         return null;
     }
+    /** PKT -> Band scope. */
+    public void openBandScope() { RadioService s = svc; if (s == null) return; if (tab != 0) show(0); showOverlay(new com.macdmr.radio.ui.BandScopeScreen(this, s, this::closeOverlay)); updateModeBar(); }
     /** Show the running mode's page; false when no mode has one. */
     public boolean openModeScreen() {
         com.macdmr.radio.ui.ModeScreen m = modeScreenFor();
@@ -264,6 +267,7 @@ public class MainActivity extends AppCompatActivity {
     private String modeLabel() {
         RadioService s = svc; if (s == null || s.packet() == null) return null;
         com.macdmr.radio.PacketEngine pe = s.packet();
+        if (s.scope().running()) return "Band scope sweeping";
         RadioService.SatState ss = s.satState();
         if (ss != null && ss.mode != com.macdmr.radio.ham.Satellites.VOICE) {
             String when = ss.waiting ? "next pass " + new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(new java.util.Date(ss.aos)) : "pass in progress";

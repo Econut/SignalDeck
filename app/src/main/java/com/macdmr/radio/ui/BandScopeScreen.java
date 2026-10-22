@@ -1,0 +1,176 @@
+/*
+ * SignalDeck - Copyright (C) 2026 IIMacGyverII
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Free software under the GNU General Public License v3 or later, with the additional terms in COPYRIGHT
+ * (keep this notice and the author credit, mark modified versions, no rights to the SignalDeck name or icon).
+ */
+package com.macdmr.radio.ui;
+
+import android.app.AlertDialog;
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Path;
+import android.view.MotionEvent;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import com.macdmr.radio.BandScope;
+import com.macdmr.radio.ChannelStore;
+import com.macdmr.radio.RadioService;
+
+import java.util.List;
+import java.util.Locale;
+
+/** PKT → Band scope: the live sweep graph with peak hold, the waterfall, peaks, tap to read or listen. */
+public final class BandScopeScreen extends ModeScreen {
+    private final ScopeView view;
+    private final TextView info, peaks;
+    private TextView startBtn;
+    private int presetIdx;
+
+    public BandScopeScreen(Context c, RadioService svc, Runnable onClose) {
+        super(c, svc, "Band scope", "signal", Neo.GREEN, onClose);
+        BandScope s = svc.scope();
+        presetIdx = c.getSharedPreferences("scope", Context.MODE_PRIVATE).getInt("preset", 0);
+        LinearLayout col = new LinearLayout(c); col.setOrientation(VERTICAL); col.setPadding(dp(14), dp(4), dp(14), dp(4));
+        view = new ScopeView(c);
+        col.addView(view, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+        info = Neo.text(c, "", Neo.CYAN_LIGHT, 15, Neo.mono(c)); info.setPadding(0, dp(8), 0, dp(2)); col.addView(info);
+        peaks = Neo.text(c, "", Neo.MUTED, 13.5f, Neo.uiMedium(c)); peaks.setLineSpacing(0, 1.1f); col.addView(peaks);
+        content.addView(col);
+        LinearLayout r1 = buttonRow();
+        button(r1, "", "scan", Neo.CYAN, v -> choosePreset()).setText(BandScope.PRESETS[presetIdx].name);
+        startBtn = button(r1, "Start", "signal", Neo.GREEN, v -> toggle());
+        LinearLayout r2 = buttonRow();
+        button(r2, "Listen here", "radio", Neo.AMBER, v -> listenHere());
+        button(r2, "Clear peaks", "restore", Neo.VIOLET, v -> { svc.scope().clearPeak(); view.invalidate(); });
+        setSubtitle("Receive only · nothing is transmitted");
+        refresh();
+    }
+
+    @Override protected boolean stillRunning() { return true; }          // the page stays when the sweep stops (Back closes it)
+    @Override protected void refresh() {
+        BandScope s = svc.scope();
+        boolean on = s.running();
+        String l = on ? "Stop" : "Start"; if (!l.contentEquals(startBtn.getText())) { startBtn.setText(l); Neo.fit(startBtn); }
+        int nSteps = BandScope.steps(s.from(), s.to(), s.step());
+        if (on) setSubtitle(String.format(Locale.US, "%.3f–%.3f MHz · %d kHz steps · a sweep takes %s", s.from() / 1e6, s.to() / 1e6, s.step() / 1000, s.sweepMs() > 0 ? String.format(Locale.US, "%.0f s", s.sweepMs() / 1000.0) : String.format(Locale.US, "about %.0f s", nSteps * (s.settleMs() + 15) / 1000.0)));
+        else setSubtitle("Receive only · nothing is transmitted");
+        float[] last = s.last();
+        if (last != null) {
+            StringBuilder b = new StringBuilder();
+            for (int[] p : firstPeaks(BandScope.peaks(last, s.from(), s.step(), 8), 5)) {
+                ChannelStore.Channel ch = channelAt(p[0]);
+                b.append(b.length() > 0 ? "\n" : "").append(String.format(Locale.US, "%.4f MHz  %d dBm", p[0] / 1e6, p[1])).append(ch == null ? "" : "  · " + ch.name);
+            }
+            set(peaks, b.length() == 0 ? "No signal stands out above the noise (8 dB)." : "Strongest above the noise:\n" + b);
+        } else set(peaks, on ? "First sweep…" : "Choose a band and Start. The radio sweeps it step by step (receive only; your channel comes back when it stops). Tap the graph to read a frequency.");
+        view.invalidate();
+    }
+    private static List<int[]> firstPeaks(List<int[]> p, int n) { p.sort((a, b) -> b[1] - a[1]); return p.size() > n ? p.subList(0, n) : p; }
+    private ChannelStore.Channel channelAt(int hz) { for (ChannelStore.Channel ch : svc.store().all()) if (!ch.isDigital() && Math.abs(ch.rxFreq - hz) <= svc.scope().step() / 2) return ch; return null; }
+
+    private void toggle() {
+        BandScope s = svc.scope();
+        if (s.running()) { new Thread(svc::scopeStop, "scope-stop").start(); return; }
+        BandScope.Preset p = BandScope.PRESETS[presetIdx];
+        toast(svc.scopeStart(p.from, p.to, p.step, c.getSharedPreferences("scope", Context.MODE_PRIVATE).getInt("settle", BandScope.DEFAULT_SETTLE_MS)));
+        refresh();
+    }
+    private void choosePreset() {
+        String[] n = new String[BandScope.PRESETS.length];
+        for (int i = 0; i < n.length; i++) { BandScope.Preset p = BandScope.PRESETS[i]; n[i] = String.format(Locale.US, "%s  (%.3f–%.3f, %d kHz, %d steps)", p.name, p.from / 1e6, p.to / 1e6, p.step / 1000, BandScope.steps(p.from, p.to, p.step)); }
+        new AlertDialog.Builder(c).setTitle("Which band?").setItems(n, (dd, w) -> {
+            presetIdx = w; c.getSharedPreferences("scope", Context.MODE_PRIVATE).edit().putInt("preset", w).apply();
+            footer.removeAllViews(); // rebuild the buttons with the new label
+            LinearLayout r1 = buttonRow();
+            button(r1, BandScope.PRESETS[w].name, "scan", Neo.CYAN, v -> choosePreset());
+            startBtn = button(r1, "Start", "signal", Neo.GREEN, v -> toggle());
+            LinearLayout r2 = buttonRow();
+            button(r2, "Listen here", "radio", Neo.AMBER, v -> listenHere());
+            button(r2, "Clear peaks", "restore", Neo.VIOLET, v -> { svc.scope().clearPeak(); view.invalidate(); });
+            if (svc.scope().running()) new Thread(() -> { svc.scopeStop(); post(() -> { toggle(); }); }, "scope-restart").start();
+            refresh();
+        }).show();
+    }
+    private void listenHere() {
+        if (view.selHz <= 0) { toast("Tap the graph first to pick a frequency"); return; }
+        final int hz = view.selHz;
+        new Thread(() -> {
+            svc.scopeStop();
+            post(() -> {
+                ChannelStore.Channel v = new ChannelStore.Channel(); v.type = 1; v.rxFreq = v.txFreq = hz; v.band = 1; v.power = 0; v.sq = 2; v.name = "";
+                svc.applyVfo(v); toast(String.format(Locale.US, "Listening on %.4f MHz (VFO)", hz / 1e6)); close();
+            });
+        }, "scope-listen").start();
+    }
+
+    @Override public void onScope(int from, int step, float[] dbm) { refresh(); }
+    @Override public void onScopeState(String state) { refresh(); }
+
+    /** Graph (top 55 %) and waterfall (bottom). */
+    private final class ScopeView extends View {
+        final Paint grid = new Paint(), line = new Paint(Paint.ANTI_ALIAS_FLAG), hold = new Paint(Paint.ANTI_ALIAS_FLAG), text = new Paint(Paint.ANTI_ALIAS_FLAG), fill = new Paint(), cursor = new Paint();
+        static final float TOP = -40, BOTTOM = -125;
+        int selHz = -1; float selX = -1;
+        ScopeView(Context c) {
+            super(c);
+            grid.setColor(0x33FFFFFF); grid.setStrokeWidth(1);
+            line.setColor(Neo.CYAN); line.setStrokeWidth(dp(2)); line.setStyle(Paint.Style.STROKE);
+            hold.setColor(Neo.AMBER); hold.setStrokeWidth(dp(1)); hold.setStyle(Paint.Style.STROKE); hold.setAlpha(170);
+            text.setColor(Neo.DIM); text.setTextSize(dp(10)); text.setTypeface(Neo.mono(c));
+            cursor.setColor(Neo.GREEN); cursor.setStrokeWidth(dp(1.5f));
+            setContentDescription("Band scope graph and waterfall");
+        }
+        @Override public boolean onTouchEvent(MotionEvent e) {
+            BandScope s = svc.scope(); int n = BandScope.steps(s.from(), s.to(), s.step()); if (n < 2) return true;
+            float x = Math.max(0, Math.min(getWidth(), e.getX()));
+            int i = Math.round(x / getWidth() * (n - 1)); selHz = s.from() + i * s.step(); selX = (float) i / (n - 1) * getWidth();
+            float[] last = s.last(); float v = last != null && i < last.length ? last[i] : Float.NaN;
+            ChannelStore.Channel ch = channelAt(selHz);
+            info.setText(String.format(Locale.US, "%.4f MHz  %s", selHz / 1e6, Float.isNaN(v) ? "" : Math.round(v) + " dBm") + (ch == null ? "" : "  · " + ch.name));
+            invalidate(); return true;
+        }
+        float y(float dbm, float h) { float t = (Math.max(BOTTOM, Math.min(TOP, dbm)) - BOTTOM) / (TOP - BOTTOM); return h * (1 - t); }
+        int heat(float dbm) {                                                 // waterfall colour: dark → cyan → green → amber → red
+            if (Float.isNaN(dbm)) return 0xFF0A1420;
+            float t = Math.max(0, Math.min(1, (dbm + 118) / 50f));
+            int[] st = { 0xFF0A1420, 0xFF0E4E6A, 0xFF19D3FF, 0xFF2BEA7A, 0xFFFFB020, 0xFFFF5468 };
+            float p = t * (st.length - 1); int k = Math.min(st.length - 2, (int) p); float f = p - k;
+            int a = st[k], b = st[k + 1];
+            return 0xFF000000 | ((int) (((a >> 16) & 255) * (1 - f) + ((b >> 16) & 255) * f) << 16) | ((int) (((a >> 8) & 255) * (1 - f) + ((b >> 8) & 255) * f) << 8) | (int) ((a & 255) * (1 - f) + (b & 255) * f);
+        }
+        @Override protected void onDraw(Canvas cv) {
+            BandScope s = svc.scope();
+            int w = getWidth(), h = getHeight(); float gh = h * 0.55f, wt = gh + dp(6), wh = h - wt;
+            for (float db = -120; db <= -40; db += 20) { float yy = y(db, gh); cv.drawLine(0, yy, w, yy, grid); cv.drawText((int) db + "", dp(2), yy - dp(2), text); }
+            int n = BandScope.steps(s.from(), s.to(), s.step());
+            if (n >= 2) {
+                for (int k = 0; k <= 4; k++) { float xx = w * k / 4f; cv.drawLine(xx, 0, xx, gh, grid); String l = String.format(Locale.US, "%.3f", (s.from() + (s.to() - s.from()) * k / 4.0) / 1e6); float tw = text.measureText(l); cv.drawText(l, Math.max(0, Math.min(w - tw, xx - tw / 2)), gh - dp(2), text); }
+                float[] pk = s.peak(); if (pk != null) cv.drawPath(path(pk, w, gh), hold);
+                float[] last = s.last(), part = s.partial(); int pi = s.partialIndex();
+                if (last != null) { line.setAlpha(part != null && pi >= 0 ? 90 : 255); cv.drawPath(path(last, w, gh), line); }
+                if (part != null && pi >= 0) {                                 // the sweep in progress, step by step
+                    line.setAlpha(255); cv.drawPath(path(part, w, gh), line);
+                    float px = n == 1 ? 0 : (float) pi / (n - 1) * w; cursor.setAlpha(120); cv.drawLine(px, 0, px, gh, cursor); cursor.setAlpha(255);
+                }
+                List<float[]> hist = s.history();
+                if (!hist.isEmpty()) {
+                    float rowH = Math.max(1, wh / BandScope.HISTORY), cw = (float) w / n;
+                    for (int r = 0; r < hist.size(); r++) {
+                        float[] row = hist.get(hist.size() - 1 - r); float top = wt + r * rowH; if (top > h) break;
+                        for (int i = 0; i < row.length; i++) { fill.setColor(heat(row[i])); cv.drawRect(i * cw, top, (i + 1) * cw + 1, top + rowH + 1, fill); }
+                    }
+                }
+                if (selX >= 0) cv.drawLine(selX, 0, selX, h, cursor);
+            }
+        }
+        Path path(float[] v, int w, float gh) {
+            Path p = new Path(); boolean pen = false;
+            for (int i = 0; i < v.length; i++) { if (Float.isNaN(v[i])) { pen = false; continue; } float x = v.length == 1 ? 0 : (float) i / (v.length - 1) * w, yy = y(v[i], gh); if (!pen) { p.moveTo(x, yy); pen = true; } else p.lineTo(x, yy); }
+            return p;
+        }
+    }
+}

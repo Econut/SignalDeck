@@ -192,6 +192,8 @@ public final class WebHost {
         @Override public void onTx(boolean t) { pub("tx", "{\"on\":" + t + "}"); }
         @Override public void onRssi(int dbm) { long now = System.currentTimeMillis(); if (now - lastRssi < 400) return; lastRssi = now; pub("rssi", "{\"dbm\":" + dbm + "}"); }
         private long lastSpec;
+        @Override public void onScope(int from, int step, float[] dbm) { try { pub("scope", scopeRow(from, step, dbm).toString()); } catch (Exception ignored) { } }
+        @Override public void onScopeState(String st) { try { pub("scopeState", new JSONObject().put("state", st).put("running", svc.scope().running()).toString()); } catch (Exception ignored) { } }
         @Override public void onSpectrum(float[] b) {                     // the intercom bars in the browser, about 12 times a second
             long now = System.currentTimeMillis(); boolean zero = true; for (float v : b) if (v > 0) { zero = false; break; }
             if (!zero && now - lastSpec < 80) return; lastSpec = now;
@@ -393,6 +395,9 @@ public final class WebHost {
         if (Looper.myLooper() == Looper.getMainLooper()) return c.call();
         FutureTask<T> f = new FutureTask<>(c); ui.post(f); return f.get(5, TimeUnit.SECONDS);
     }
+    private static JSONArray arr(float[] v) throws Exception { JSONArray a = new JSONArray(); for (float x : v) a.put(Float.isNaN(x) ? JSONObject.NULL : (Object) (Math.round(x * 2) / 2.0)); return a; }
+    private JSONObject scopeRow(int from, int step, float[] dbm) throws Exception { return new JSONObject().put("from", from).put("step", step).put("dbm", arr(dbm)).put("sweepMs", svc.scope().sweepMs()); }
+    private String channelNameAt(int hz, int step) { for (ChannelStore.Channel ch : svc.store().all()) if (!ch.isDigital() && Math.abs(ch.rxFreq - hz) <= step / 2) return ch.name; return ""; }
     private static WebServer.Response ok(JSONObject o) { return WebServer.Response.json(200, o.toString()); }
     private static WebServer.Response ok(String msg) { return WebServer.Response.json(200, "{\"ok\":true,\"message\":" + WebServer.quote(msg) + "}"); }
     private static JSONObject body(WebServer.Request r) { try { return r.body.length == 0 ? new JSONObject() : new JSONObject(r.bodyText()); } catch (Exception e) { return new JSONObject(); } }
@@ -773,6 +778,26 @@ public final class WebHost {
                 android.location.Location me = svc.lastKnownLocation();
                 com.macdmr.radio.ham.Conditions.Report rep = com.macdmr.radio.ham.Conditions.get(me == null ? 0 : me.getLatitude(), me == null ? 0 : me.getLongitude(), me != null);
                 return ok(com.macdmr.radio.ham.Conditions.json(rep));
+            }
+            case "/api/scope": {                                                // GET: presets, state, the last sweep, peak hold and the waterfall (newest last)
+                com.macdmr.radio.BandScope s = svc.scope();
+                JSONArray pr = new JSONArray(); for (com.macdmr.radio.BandScope.Preset p0 : com.macdmr.radio.BandScope.PRESETS) pr.put(new JSONObject().put("name", p0.name).put("from", p0.from).put("to", p0.to).put("step", p0.step));
+                JSONObject o = new JSONObject().put("presets", pr).put("running", s.running()).put("from", s.from()).put("to", s.to()).put("step", s.step()).put("sweepMs", s.sweepMs()).put("settleMs", s.settleMs());
+                float[] last = s.last(), peak = s.peak(), part = s.partial();
+                if (last != null) o.put("last", arr(last)); if (peak != null) o.put("peak", arr(peak)); if (part != null && s.partialIndex() >= 0) o.put("partial", arr(part)).put("partialIndex", s.partialIndex());
+                JSONArray h = new JSONArray(); java.util.List<float[]> hist = s.history(); for (int k = Math.max(0, hist.size() - 60); k < hist.size(); k++) h.put(arr(hist.get(k)));
+                JSONArray pk = new JSONArray(); for (int[] p0 : com.macdmr.radio.BandScope.peaks(last, s.from(), s.step(), 8)) pk.put(new JSONObject().put("hz", p0[0]).put("dbm", p0[1]).put("name", channelNameAt(p0[0], s.step())));
+                return ok(o.put("history", h).put("peaks", pk));
+            }
+            case "/api/scope/start": if (!post) break; {
+                String e = svc.scopeStart(b.optInt("from"), b.optInt("to"), b.optInt("step", 25_000), com.macdmr.radio.BandScope.DEFAULT_SETTLE_MS);
+                return e == null ? ok("Sweeping") : WebServer.Response.error(409, e);
+            }
+            case "/api/scope/stop": if (!post) break; { new Thread(svc::scopeStop, "scope-stop").start(); return ok("Stopping"); }
+            case "/api/scope/listen": if (!post) break; {                       // stop and listen on {hz} with the VFO
+                final int hz = b.optInt("hz"); if (!com.macdmr.radio.BandScope.tunable(hz)) return WebServer.Response.error(400, "Not a frequency this radio can tune");
+                new Thread(() -> { svc.scopeStop(); ChannelStore.Channel v = new ChannelStore.Channel(); v.type = 1; v.rxFreq = v.txFreq = hz; v.band = 1; v.power = 0; v.sq = 2; v.name = ""; svc.applyVfo(v); }, "scope-listen").start();
+                return ok(String.format(java.util.Locale.US, "Listening on %.4f MHz (VFO)", hz / 1e6));
             }
             case "/api/sat/status": {                                           // AMSAT's reports of the last 4 days for one satellite (?name=SO-50_[FM])
                 String n = r.param("name"); if (n == null || !n.matches("[A-Za-z0-9 -]+_\\[[A-Z]+\\]")) return WebServer.Response.error(400, "Bad name");

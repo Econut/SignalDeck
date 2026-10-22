@@ -76,6 +76,9 @@ public final class PktDialog {
         button(rSat, svc.satState() != null ? "Satellites: tracking " + svc.satState().name : "Satellite passes", Theme.PKT, x -> { dlg.dismiss(); SatelliteDialog.show(c, svc); });
         body.addView(rSat);
         rSat = row();
+        button(rSat, "Band scope", Theme.PKT, x -> { dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openBandScope(); });
+        body.addView(rSat);
+        rSat = row();
         button(rSat, "VHF/UHF conditions", Theme.PKT, x -> { dlg.dismiss(); ConditionsDialog.show(c, svc); });
         button(rSat, "Decode a recording", Theme.PKT, x -> { dlg.dismiss(); RecordingsDialog.show(c, svc, com.macdmr.radio.RecordingDecodeJob.APRS); });
         body.addView(rSat);

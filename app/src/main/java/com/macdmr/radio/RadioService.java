@@ -38,6 +38,9 @@ public class RadioService extends Service implements RadioEngine.Events {
         void onAudioLevel(int amplitude);
         /** The received audio's spectrum (Spectrum.BANDS values 0…1), every 32 ms while something is heard; all zero when it stops. */
         default void onSpectrum(float[] bands) { }
+        /** A band scope sweep finished: dBm per step from {@code from} in {@code step} Hz (NaN = no reading). */
+        default void onScope(int from, int step, float[] dbm) { }
+        default void onScopeState(String state) { }
         void onHistory(String line);
         void onCaller(String text);
         void onLog(String s);
@@ -221,6 +224,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (System.currentTimeMillis() >= P.aos - 60_000) break;
                     Thread.sleep(1000);
                 }
+                if (scope.running()) { scope.stop(); history("pkt", "\u2702 Band scope stopped for the satellite pass"); }
                 history("pkt", "\uD83D\uDEF0 Tracking " + sat.name + ": tuning for the pass");
                 ChannelStore.Channel v = new ChannelStore.Channel(); v.type = 1; v.band = 1; v.power = 1; v.name = sat.name; dataModeSquelch(v);   // satellites arrive far below the radio's squelch
                 int tone = sat.toneHz > 0 ? com.macdmr.radio.ChannelPresets.ctcssIndex(sat.toneHz) : -1;
@@ -896,6 +900,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private final byte[] mono = new byte[4096];
     private void onRxPcm(byte[] b, int len) {
         rxPcmBytes += len;
+        if (scope.running()) return;                                          // sweeping: noise and fragments, not for the speaker or the decoders
         int n = 0;
         for (int i = 0; i + 3 < len && n + 1 < mono.length; i += 4) { mono[n++] = b[i]; mono[n++] = b[i + 1]; }
         boolean open = injecting || current == null || current.isDigital() ? true : softSq.process(mono, n);
@@ -1467,6 +1472,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         worker.execute(() -> {
             try {
                 if (down) {
+                    if (scope.running()) { scope.stop(); log("band scope stopped for Talk"); }   // back on the channel before keying
                     final boolean fromWheel = wheelPtt, fromCall = callPtt; wheelPtt = false; callPtt = false;      // read once, whatever happens next
                     final AudioBackend.TxFeed webFeed = webFeedNext; webFeedNext = null;
                     if (!isReady()) { log("PTT ignored: radio not ready"); return; }
@@ -1517,7 +1523,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void diagTestTone(int ms) { short[] pcm = new short[8000 * ms / 1000]; for (int i = 0; i < pcm.length; i++) pcm[i] = (short) (12000 * Math.sin(2 * Math.PI * 1000 * i / 8000.0)); transmitPcm(pcm, "1 kHz test tone " + ms + " ms", null); }
 
     /** Ask the module for the signal strength (on the radio worker: never a serial write on the main thread). */
-    public void pollRssi() { worker.execute(() -> { try { if (engine.isOpen()) engine.queryRssi(); } catch (IOException ignored) { } }); }
+    public void pollRssi() { if (scope.running()) return; worker.execute(() -> { try { if (engine.isOpen()) engine.queryRssi(); } catch (IOException ignored) { } }); }
 
     // ---- listeners ----------------------------------------------------------------------------------
 
@@ -1609,7 +1615,9 @@ public class RadioService extends Service implements RadioEngine.Events {
         }
     }
 
-    @Override public void rssi(int raw, double dbm) { rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
+    @Override public void rssi(int raw, double dbm) { if (scope.running()) { scope.onRssi(raw); return; }   // a sweep step's reading: not the channel's signal, not for the coverage log
+        rssi0(raw, dbm); }
+    private void rssi0(int raw, double dbm) { rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     @Override public void version(int v, String text) { log("module " + text); }
     /** One history line, voice announcement and caller report per call (the caller is asked at the start, a second in, and at the end). */
     private volatile boolean callLogged; private volatile int loggedCaller, loggedTarget;
@@ -2215,6 +2223,33 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Something is actually heard: the Soft SQ gate on Soft SQ channels, the radio's own report otherwise. */
     public boolean hearing() { return injecting || (softSq != null && softSq.isEnabled() ? squelchOpen : receiving && rxCounts); }
 
+    // ---- band scope (BandScope): receive-only sweeps ----
+    final BandScope scope = new BandScope(new BandScope.Hooks() {
+        @Override public void tune(int hz) throws Exception { engine.setAnalog(hz, hz, hz < 300_000_000 ? 1 : 0, 0, scopeSq, 0, 0, 0, 0, 8, 2); }   // low power, nothing keyed
+        @Override public void query() throws Exception { engine.queryRssi(); }
+        @Override public void restore() {                                   // inline (Talk waits for it on the worker thread)
+            ChannelStore.Channel ch = vfo != null ? vfo : current;
+            if (ch != null && engine.isOpen()) applyChannelNow(ch, false);
+            log("band scope stopped: back on " + (ch == null ? "?" : ch.freqText(ch.rxFreq)));
+        }
+        @Override public void sweep(int from, int step, float[] dbm, int n) { ui.post(() -> { for (Listener l : listeners) l.onScope(from, step, dbm); }); }
+        @Override public void state(String s) { ui.post(() -> { for (Listener l : listeners) l.onScopeState(s); }); }
+    });
+    public BandScope scope() { return scope; }
+    volatile int scopeSq = 9;                                                 // the squelch byte for sweep steps (bench: DIAG scope --ei sq)
+    /** Start a sweep (null) or why not: never around a tracked satellite pass or while talking. */
+    public String scopeStart(int from, int to, int step, int settleMs) {
+        if (!isReady()) return "The radio is not ready";
+        if (pttDown) return "Not while transmitting";
+        long now = System.currentTimeMillis();
+        if (satBusy(now, now + 15 * 60_000L)) return "A satellite pass is being tracked (or starts within 15 minutes): the scope would retune the radio away from it";
+        if (scanning()) toggleScan();
+        String e = scope.start(from, to, step, settleMs);
+        if (e == null) log(String.format(Locale.US, "band scope %.3f\u2013%.3f MHz, %d kHz steps, %d ms settle", from / 1e6, to / 1e6, step / 1000, settleMs));
+        return e;
+    }
+    public void scopeStop() { scope.stop(); }
+
     // ---- scheduled operations (Scheduler): start, then put the radio back when the time is up ----
     public void runSchedule(int id) { ui.post(() -> runScheduleNow(id, 0)); }
     public void endSchedule(int id) { ui.post(() -> endScheduleNow(id)); }
@@ -2224,6 +2259,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         long t0 = System.currentTimeMillis(), t1 = t0 + (e.hasDuration() ? e.minutes * 60_000L : 60_000L);
         if (satBusy(t0, t1)) { history("pkt", what + " skipped: it overlaps the satellite pass being tracked"); return; }
         if (pttDown) { if (tries < 6) ui.postDelayed(() -> runScheduleNow(id, tries + 1), 20_000); else history("pkt", what + " skipped: the radio was transmitting"); return; }
+        if (scope.running()) { scope.stop(); history("pkt", "\u2702 Band scope stopped for a scheduled operation"); }
         if (Scheduler.runningEnd(this) > 0) endScheduleNow(Scheduler.runningId(this));          // one at a time
         ChannelStore.Channel cur = current;
         int prevCh = cur != null && vfo == null ? cur.number : -1;
