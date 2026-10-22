@@ -1,0 +1,4 @@
+Test data for LzhufTest, copied from the wl2k-go project (https://github.com/la5nta/wl2k-go, lzhuf/testdata),
+Copyright (c) 2014-2017 Martin Hebnes Pedersen (LA5NTA), MIT License.
+The texts are public domain (the Gettysburg Address; Mark Twain, The Adventures of Tom Sawyer); the .lzh files are
+their B2 (LZHUF) compressed forms as other Winlink programs produce them.

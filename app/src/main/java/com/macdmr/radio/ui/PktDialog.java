@@ -130,6 +130,13 @@ public final class PktDialog {
         button(tr, "Terminal (BBS, node)", Theme.SOFTSQ, x -> { dlg.dismiss(); TerminalDialog.show(c, svc); });
         body.addView(tr);
         body.addView(hint("Connect to a packet bulletin board or node on this channel: " + pe.terminalState() + "."));
+        // ---- Winlink ----
+        body.addView(section("Winlink e-mail"));
+        LinearLayout wr = row();
+        int wlUnread = svc.winlink().store().unread(), wlOut = svc.winlink().store().count(com.macdmr.radio.winlink.WinlinkStore.OUTBOX);
+        button(wr, "Winlink" + (wlUnread > 0 ? " (" + wlUnread + " new)" : ""), Theme.SOFTSQ, x -> { dlg.dismiss(); WinlinkDialog.show(c, svc); });
+        body.addView(wr);
+        body.addView(hint("E-mail over the radio through a Winlink packet gateway, or over the internet: " + (svc.winlink().busy() ? svc.winlink().state() : wlOut == 0 ? "outbox empty" : wlOut + " in the outbox") + "."));
         // ---- licence exam practice ----
         body.addView(section("Licence exam practice"));
         LinearLayout xr2 = row();

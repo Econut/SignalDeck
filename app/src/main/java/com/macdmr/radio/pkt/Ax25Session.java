@@ -25,6 +25,8 @@ public final class Ax25Session {
         void send(List<byte[]> frames);
         /** Text the other station sent. */
         void received(String text);
+        /** The same data unchanged (binary protocols such as Winlink B2F). */
+        default void receivedBytes(byte[] info) { }
         /** "connecting", "connected", "disconnected: why". */
         void state(String state);
     }
@@ -76,6 +78,13 @@ public final class Ax25Session {
     public synchronized void sendText(String text, long now) {
         if (state != State.CONNECTED) return;
         byte[] b = text.replace("\n", "\r").getBytes(StandardCharsets.ISO_8859_1);
+        for (int i = 0; i < b.length; i += PACLEN) { int n = Math.min(PACLEN, b.length - i); byte[] p = new byte[n]; System.arraycopy(b, i, p, 0, n); queue.add(p); }
+        pump(now);
+    }
+
+    /** Queue binary data unchanged, in PACLEN pieces. */
+    public synchronized void sendBytes(byte[] b, long now) {
+        if (state != State.CONNECTED || b.length == 0) return;
         for (int i = 0; i < b.length; i += PACLEN) { int n = Math.min(PACLEN, b.length - i); byte[] p = new byte[n]; System.arraycopy(b, i, p, 0, n); queue.add(p); }
         pump(now);
     }
@@ -155,6 +164,7 @@ public final class Ax25Session {
             if (ns == vr) {
                 vr = (vr + 1) & 7; rejSent = false;
                 int pid = off + 1; byte[] info = new byte[Math.max(0, f.length - pid - 1)]; System.arraycopy(f, pid + 1, info, 0, info.length);
+                link.receivedBytes(info);
                 link.received(new String(info, StandardCharsets.ISO_8859_1).replace("\r\n", "\n").replace('\r', '\n'));
                 if (pf) send(s(RR, false, true)); else if (t2At == 0) t2At = now + T2_MS;
             } else if (!rejSent) { rejSent = true; send(s(REJ, false, pf)); }

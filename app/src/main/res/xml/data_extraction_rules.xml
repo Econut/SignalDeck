@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: cloud backup and device-to-device transfer keep everything except the Winlink settings (the Winlink password) -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="winlink.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="winlink.xml" />
+    </device-transfer>
+</data-extraction-rules>

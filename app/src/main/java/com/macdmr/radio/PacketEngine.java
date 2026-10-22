@@ -468,8 +468,10 @@ public final class PacketEngine {
         if (terminal == null) {
             terminal = new com.macdmr.radio.pkt.Ax25Session(callsign(), ssid(), new com.macdmr.radio.pkt.Ax25Session.Link() {
                 @Override public void send(java.util.List<byte[]> frames) { txFramesRaw(frames, "AX.25 " + frames.size() + (frames.size() == 1 ? " frame" : " frames")); }
-                @Override public void received(String text) { termAppend(text); }
+                @Override public void received(String text) { if (wlRx == null) termAppend(text); }
+                @Override public void receivedBytes(byte[] info) { java.util.concurrent.LinkedBlockingQueue<Integer> q = wlRx; if (q != null) for (byte b : info) q.offer(b & 0xFF); }
                 @Override public void state(String state) {
+                    java.util.concurrent.LinkedBlockingQueue<Integer> q = wlRx; if (q != null && state.startsWith("disconnected")) q.offer(-1);
                     termState = state; termAppend("\n*** " + state + " ***\n"); host.event("\uD83D\uDCBB Packet terminal: " + state);
                     if (state.endsWith("(they called)")) host.notifyUser("Packet connection", state, false);
                 }
@@ -492,6 +494,45 @@ public final class PacketEngine {
         t.connect(call, path.toArray(new String[0]), System.currentTimeMillis());
         return null;
     }
+    // ---- Winlink over the packet link: the same AX.25 session carries the B2F bytes -------------------
+    private volatile java.util.concurrent.LinkedBlockingQueue<Integer> wlRx;
+    public com.macdmr.radio.winlink.B2fClient.Wire openWinlinkLink(String gateway, String via, com.macdmr.radio.winlink.Winlink.StatusSink status) throws java.io.IOException {
+        final com.macdmr.radio.pkt.Ax25Session t = terminal();
+        if (t == null) throw new java.io.IOException("Set your callsign first (PKT \u2192 Settings)");
+        if (t.state() != com.macdmr.radio.pkt.Ax25Session.State.DISCONNECTED) throw new java.io.IOException("The packet terminal is connected: disconnect it first");
+        final java.util.concurrent.LinkedBlockingQueue<Integer> q = new java.util.concurrent.LinkedBlockingQueue<>(); wlRx = q;
+        String err = terminalConnect(gateway, via);
+        if (err != null) { wlRx = null; throw new java.io.IOException(err); }
+        long end = System.currentTimeMillis() + 150_000;
+        while (t.state() == com.macdmr.radio.pkt.Ax25Session.State.CONNECTING && System.currentTimeMillis() < end) {
+            try { Thread.sleep(300); } catch (InterruptedException e) { break; }
+        }
+        if (t.state() != com.macdmr.radio.pkt.Ax25Session.State.CONNECTED) { closeWinlinkLink(); throw new java.io.IOException("no connection to " + gateway + " (" + termState + ")"); }
+        return new com.macdmr.radio.winlink.B2fClient.Wire() {
+            @Override public int read(long timeoutMs) throws java.io.IOException {
+                long deadline = System.currentTimeMillis() + timeoutMs;
+                for (;;) {
+                    Integer v; try { v = q.poll(1000, java.util.concurrent.TimeUnit.MILLISECONDS); } catch (InterruptedException e) { throw new java.io.IOException("stopped"); }
+                    if (v != null) { if (v < 0) throw new java.io.IOException("link lost (" + termState + ")"); return v; }
+                    if (wlRx != q) throw new java.io.IOException("stopped");
+                    if (t.pending() > 0) deadline = System.currentTimeMillis() + timeoutMs;   // our own data is still going out: the gateway cannot answer yet
+                    if (System.currentTimeMillis() > deadline) throw new java.io.IOException("no answer from the gateway in " + timeoutMs / 1000 + " s");
+                }
+            }
+            @Override public void write(byte[] b) throws java.io.IOException {
+                if (t.state() != com.macdmr.radio.pkt.Ax25Session.State.CONNECTED || wlRx != q) throw new java.io.IOException("link lost (" + termState + ")");
+                t.sendBytes(b, System.currentTimeMillis());
+            }
+        };
+    }
+    /** End the Winlink link: disconnect the AX.25 session (the gateway usually has already). */
+    public void closeWinlinkLink() {
+        com.macdmr.radio.pkt.Ax25Session t = terminal;
+        if (t != null && t.state() != com.macdmr.radio.pkt.Ax25Session.State.DISCONNECTED) t.disconnect(System.currentTimeMillis());
+        wlRx = null;
+    }
+    public boolean winlinkLinkOpen() { return wlRx != null; }
+
     public void terminalDisconnect() { com.macdmr.radio.pkt.Ax25Session t = terminal; if (t != null) t.disconnect(System.currentTimeMillis()); }
     public String terminalSend(String line) {
         com.macdmr.radio.pkt.Ax25Session t = terminal;

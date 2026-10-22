@@ -56,6 +56,8 @@ public final class DiagReceiver extends BroadcastReceiver {
                 break;
             }
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
+            case "wlbench": com.macdmr.radio.winlink.Winlink.benchPort = Math.max(0, Math.min(65535, i.getIntExtra("port", 0))); Log.i("DiagReceiver", "wlbench port " + com.macdmr.radio.winlink.Winlink.benchPort); break;   // bench: test CMS on 127.0.0.1 (0 = off)
+            case "wlconnect": Log.i("DiagReceiver", "wlconnect: " + s.winlink().connectInternet()); break;
             case "formtext": s.onFormText(i.getStringExtra("from"), i.getStringExtra("text"), "bench"); break;   // bench: a text as if it arrived (form parts)
             case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s) on the current channel or VFO
                 int ms = Math.max(200, Math.min(5000, i.getIntExtra("ms", 2000)));

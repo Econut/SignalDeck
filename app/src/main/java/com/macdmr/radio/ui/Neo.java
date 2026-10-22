@@ -216,6 +216,8 @@ public final class Neo {
         ICONS.put("channels", "M9 6h11M9 12h11M9 18h11M4 6h1M4 12h1M4 18h1");
         ICONS.put("contacts", "M12 4a4 4 0 1 0 0.01 0M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6");
         ICONS.put("messages", "M4 5h16v11H9l-5 4z");
+        ICONS.put("mail", "M3 6h18v12H3zM3.5 6.5l8.5 6.5 8.5-6.5");
+        ICONS.put("inbox", "M4 13l2.5-8h11L20 13v6H4zM4 13h4.5l1.5 2.5h4l1.5-2.5H20");
         ICONS.put("device", "M4 8h16v13H4zM8 3l8 5M7 13h3M7 16h3M15 12a2.5 2.5 0 1 0 0.01 0");
         ICONS.put("scan", "M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4");
         ICONS.put("stop", "M7 7h10v10H7z");

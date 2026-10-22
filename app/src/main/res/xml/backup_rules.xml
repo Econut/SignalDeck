@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android backup (up to Android 11): everything except the Winlink settings, which hold the Winlink password -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="winlink.xml" />
+</full-backup-content>

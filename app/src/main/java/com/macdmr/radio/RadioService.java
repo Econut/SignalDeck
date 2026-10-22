@@ -2258,6 +2258,20 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- message forms (ICS-213, radiogram) over APRS messages or DMR texts ----
     private com.macdmr.radio.ham.FormStore forms;
+    private com.macdmr.radio.winlink.Winlink winlink;
+    /** Winlink e-mail (internet CMS or a packet gateway on the current channel). */
+    public synchronized com.macdmr.radio.winlink.Winlink winlink() {
+        if (winlink == null) winlink = new com.macdmr.radio.winlink.Winlink(this, new com.macdmr.radio.winlink.Winlink.Radio() {
+            @Override public com.macdmr.radio.winlink.B2fClient.Wire open(String gateway, String via, com.macdmr.radio.winlink.Winlink.StatusSink status) throws java.io.IOException {
+                PacketEngine pe = packet(); if (pe == null) throw new java.io.IOException("Take over the radio first");
+                return pe.openWinlinkLink(gateway, via, status);
+            }
+            @Override public void close() { PacketEngine pe = packet(); if (pe != null) pe.closeWinlinkLink(); }
+            @Override public String callsign() { PacketEngine pe = packet(); if (pe != null) return pe.callsignSet() ? pe.callsign() : ""; String c = getSharedPreferences("packet", MODE_PRIVATE).getString("callsign", "").trim().toUpperCase(java.util.Locale.US).replaceAll("-.*", ""); return "N0CALL".equals(c) ? "" : c; }
+            @Override public void notifyUser(String title, String text) { RadioService.this.notifyUser(title, text, false); }
+        });
+        return winlink;
+    }
     public com.macdmr.radio.ham.FormStore forms() { if (forms == null) forms = new com.macdmr.radio.ham.FormStore(this); return forms; }
     private final com.macdmr.radio.ham.Forms.Assembler formParts = new com.macdmr.radio.ham.Forms.Assembler();
     /** An APRS message or DMR text that may be part of a form: rebuilt when all its parts are in. */

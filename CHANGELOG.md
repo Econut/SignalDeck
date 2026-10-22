@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Winlink e-mail (radio gateway or internet)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R#8 | **Winlink e-mail** (PKT → Winlink): inbox, outbox, sent; compose to callsigns or internet addresses, reply, forward, delete; attachments open or share; a session over the radio to a packet gateway (RMS, AX.25 connected mode on the current channel) or over the internet (telnet to the CMS, server.winlink.org:8772); new-mail notification; session log. Protocol: B2F (FBB compressed forwarding v2) client with Winlink secure login, LZHUF compression written to match other Winlink programs byte for byte, the B2 message format. The AX.25 link gained a binary path (`sendBytes`, `receivedBytes`). The Winlink password stays in private settings, excluded from Android cloud backup and device transfer, never logged (the login answer is masked). Bench switch (adb only, loopback only, not saved): DIAG `wlbench --ei port N`, `wlconnect`. Help: Winlink e-mail topic. | `winlink/Lzhuf.java`, `winlink/B2Message.java`, `winlink/B2fClient.java`, `winlink/WinlinkStore.java`, `winlink/Winlink.java` (new), `pkt/Ax25Session.java`, `PacketEngine.java`, `RadioService.java`, `DiagReceiver.java`, `ui/WinlinkDialog.java` (new), `ui/PktDialog.java`, `ui/Neo.java` (mail, inbox icons), `ui/HelpView.java`, `AndroidManifest.xml`, `res/xml/backup_rules.xml`, `res/xml/data_extraction_rules.xml` | Host tests: LZHUF identical to the reference files (wl2k-go test data: the Gettysburg Address and Tom Sawyer, 388 kB) both ways, round trips, corruption caught; secure login matches wl2k-go's vectors; a full exchange against a scripted gateway. **Device (owner's Armor) against a separately written fake CMS on the PC via adb reverse:** telnet login, secure login, our message sent and decoded correctly, the CMS's message with an attachment received and shown, clean FF/FQ ending; a wrong password shows "Secure login failed". Not yet tested: a real CMS login (would register the owner's callsign) and the radio path to a gateway. |
+
 ## 2026-10-22 — Xplore 1: channel-write timing from the stock app (QuickChat analysis)
 
 | Backlog | Change | Files | Test |
