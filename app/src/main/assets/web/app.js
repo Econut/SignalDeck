@@ -54,7 +54,7 @@ function route() {
   if (S.page === 'rec') loadRecordings();
   if (S.page === 'trans') { loadTrans(); loadModels(); }
   if (S.page === 'exam') { loadExam(); loadTrainer(); }
-  if (S.page === 'settings') { loadSettings(); loadBackups(); loadDiagLog(); }
+  if (S.page === 'settings') { loadSettings(); loadBackups(); loadDiagLog(); loadSchedules(); }
   if (S.page === 'pkt') { loadPacket(); loadKeyer(); }
 }
 window.addEventListener('hashchange', route);

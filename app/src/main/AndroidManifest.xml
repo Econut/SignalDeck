@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.INTERNET" />   <!-- localhost socket to the companion recognizer, elevation lookup -->
     <!-- SignalDeck Web's Phone panel: the Wi-Fi link (signal, speed, band) -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Scheduled operations start on the minute (SignalDeck grants this to itself with root; otherwise Android may delay them a little) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- steering-wheel talk as a self-managed call: the car's microphone, stopped by the car's hang-up / End -->
@@ -92,6 +94,7 @@
             <intent-filter><action android:name="android.intent.action.MEDIA_BUTTON" /></intent-filter>
         </receiver>
         <receiver android:name=".CarMessages$Receiver" android:exported="false" />
+        <receiver android:name=".Scheduler$Receiver" android:exported="false" />
         <receiver android:name=".RadioWidget" android:exported="false" android:label="Radio">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/radio_widget_info" />

@@ -6,7 +6,7 @@ entry and a device test.
 | # | Feature | What it is | Status |
 |---|---|---|---|
 | 1 | More FM satellites + live status | The active FM satellites besides ISS / SO-50 / PO-101, AMSAT's live "heard / not heard" reports, same Doppler tracking | **done** 2026-10-22 |
-| 2 | Scheduled operations | Start a scan, beacon, monitoring or recording at set times (once, daily, weekly) | planned |
+| 2 | Scheduled operations | Start a scan, beacon, monitoring or recording at set times (once, daily, weekly) | **done** 2026-10-22 |
 | 3 | VHF/UHF conditions | Tropospheric ducting forecast, aurora (Kp) alerts, meteor shower calendar, upcoming satellite passes | planned |
 | 4 | Band scope | Receive-only sweep of a band (signal strength per step), live graph + waterfall over time | planned |
 | 5 | POTA / SOTA | Activator spots (FM, 2 m / 70 cm) with tune-to, activation mode with park/summit reference, dupe check, ADIF | planned |

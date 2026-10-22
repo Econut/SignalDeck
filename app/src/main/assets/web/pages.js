@@ -333,6 +333,47 @@ function renderPhone(d) {
 }
 setInterval(() => { if (S.phoneAt && Date.now() - S.phoneAt > 15000) $('phoneAge').textContent = 'NOT UPDATING'; }, 5000);
 
+// ---- scheduled operations (Settings) ----
+const SF_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+$('sfDays').innerHTML = SF_DAYS.map((d, i) => '<button type="button" data-b="' + i + '" aria-pressed="false">' + d + '</button>').join('');
+$('sfDays').onclick = e => { const b = e.target.closest('button'); if (!b) return; b.classList.toggle('on'); b.setAttribute('aria-pressed', b.classList.contains('on')); sfShow(); };
+const sfMask = () => [...$('sfDays').children].reduce((m, b, i) => m | (b.classList.contains('on') ? 1 << i : 0), 0);
+function sfShow() {
+  const a = $('sfAction').value;
+  $('sfChWrap').classList.toggle('hidden', !(a === 'listen' || a === 'sstv')); $('sfRecWrap').classList.toggle('hidden', a !== 'listen');
+  $('sfMinWrap').classList.toggle('hidden', a === 'beacon'); $('sfDateWrap').classList.toggle('hidden', sfMask() !== 0);
+  const first = $('sfChannel').options[0]; if (first) first.text = a === 'sstv' ? '144.500 MHz (SSTV calling frequency)' : 'The channel the radio is on';
+}
+$('sfAction').onchange = sfShow;
+async function loadSchedules() {
+  try {
+    const j = await api('schedules'); S.scheds = j.schedules;
+    $('schedList').innerHTML = j.schedules.map((s, i) => '<div class="item click" data-i="' + i + '"><div class="main"><b>' + esc(s.label || s.actionName) + '</b>' + (s.id === j.running ? ' <span class="chip green">RUNNING</span>' : !s.enabled ? ' <span class="chip dim">OFF</span>' : '')
+      + '<div class="sub">' + esc(s.when) + (s.enabled && s.next > 0 ? ' · next ' + new Date(s.next).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '') + '</div></div></div>').join('') || '<div class="empty">Nothing scheduled yet</div>';
+  } catch (e) { }
+}
+async function sfOpen(s) {
+  if (!S.chList) { try { S.chList = (await api('zones')).channels; } catch (e) { S.chList = []; } }
+  $('sfChannel').innerHTML = '<option value="-1">The channel the radio is on</option>' + S.chList.map(ch => '<option value="' + ch.number + '">' + ch.number + '  ' + esc(ch.name) + '</option>').join('');
+  S.sfId = s ? s.id : 0;
+  $('sfAction').value = s ? s.action : 'listen'; $('sfChannel').value = s ? s.channel : -1; $('sfRecord').checked = !!(s && s.record);
+  [...$('sfDays').children].forEach((b, i) => { const on = !!(s && (s.days & (1 << i))); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  $('sfDate').value = s && s.date ? s.date : new Date().toISOString().slice(0, 10);
+  $('sfTime').value = s ? String(s.hour).padStart(2, '0') + ':' + String(s.minute).padStart(2, '0') : '19:00';
+  $('sfMinutes').value = s ? s.minutes : 60; $('sfLabel').value = s ? s.label : '';
+  $('sfDelete').classList.toggle('hidden', !s); $('schedForm').classList.remove('hidden'); sfShow(); $('sfAction').focus();
+}
+$('schedAdd').onclick = () => sfOpen(null);
+$('schedList').onclick = e => { const it = e.target.closest('.item[data-i]'); if (it) sfOpen(S.scheds[+it.dataset.i]); };
+$('sfCancel').onclick = () => $('schedForm').classList.add('hidden');
+$('sfDelete').onclick = async () => { if (!await ask('Delete this schedule?')) return; try { await api('schedules/delete', { id: S.sfId }); $('schedForm').classList.add('hidden'); loadSchedules(); } catch (e) { toast(e.message); } };
+$('schedForm').onsubmit = async e => {
+  e.preventDefault();
+  const [h, m] = $('sfTime').value.split(':').map(Number);
+  const body = { id: S.sfId, action: $('sfAction').value, channel: +$('sfChannel').value, record: $('sfRecord').checked, days: sfMask(), date: $('sfDate').value, hour: h, minute: m, minutes: +$('sfMinutes').value || 60, label: $('sfLabel').value, enabled: true };
+  try { await api('schedules', body); toast('Saved'); $('schedForm').classList.add('hidden'); loadSchedules(); } catch (x) { toast(x.message); }
+};
+
 // ---- mission statement (Settings) ----
 $('missionBtn').onclick = async () => {
   try { const j = await api('mission'); $('missionText').textContent = '\u201C' + j.text + '\u201D'; $('missionBy').textContent = '\u2014 ' + j.by; $('missionLegal').textContent = j.legal || ''; $('missionDlg').classList.remove('hidden'); $('missionX').focus(); } catch (e) { toast(e.message); }

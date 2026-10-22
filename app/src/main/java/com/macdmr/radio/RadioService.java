@@ -843,6 +843,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 startRxAudio();
                 setLink("ready");
                 resumeIssRepeat();
+                Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
             } catch (Throwable t) {
                 log("bring-up failed: " + t);
                 if (pausedStock) {                            // never leave the phone with no working radio app
@@ -2213,6 +2214,69 @@ public class RadioService extends Service implements RadioEngine.Events {
     public boolean isScanHolding() { return scanner != null && scanner.isHolding(); }
     /** Something is actually heard: the Soft SQ gate on Soft SQ channels, the radio's own report otherwise. */
     public boolean hearing() { return injecting || (softSq != null && softSq.isEnabled() ? squelchOpen : receiving && rxCounts); }
+
+    // ---- scheduled operations (Scheduler): start, then put the radio back when the time is up ----
+    public void runSchedule(int id) { ui.post(() -> runScheduleNow(id, 0)); }
+    public void endSchedule(int id) { ui.post(() -> endScheduleNow(id)); }
+    private void runScheduleNow(final int id, final int tries) {
+        Scheduler.Entry e = Scheduler.byId(this, id); if (e == null) return;
+        String what = "\u23F0 Scheduled " + e.actionName().toLowerCase(Locale.US) + (e.label.isEmpty() ? "" : " (" + e.label + ")");
+        long t0 = System.currentTimeMillis(), t1 = t0 + (e.hasDuration() ? e.minutes * 60_000L : 60_000L);
+        if (satBusy(t0, t1)) { history("pkt", what + " skipped: it overlaps the satellite pass being tracked"); return; }
+        if (pttDown) { if (tries < 6) ui.postDelayed(() -> runScheduleNow(id, tries + 1), 20_000); else history("pkt", what + " skipped: the radio was transmitting"); return; }
+        if (Scheduler.runningEnd(this) > 0) endScheduleNow(Scheduler.runningId(this));          // one at a time
+        ChannelStore.Channel cur = current;
+        int prevCh = cur != null && vfo == null ? cur.number : -1;
+        boolean wasRec = recordOn, wasScan = scanning(), wasAprs = packet != null && packet.monitoring(), wasSstv = packet != null && packet.sstvRx();
+        String r = null;
+        switch (e.action) {
+            case Scheduler.LISTEN:
+                if (e.channel >= 0 && store.byNumber(e.channel) == null) { history("pkt", what + " skipped: channel " + e.channel + " no longer exists"); return; }
+                if (wasScan) toggleScan();
+                if (e.channel >= 0) selectChannel(e.channel);
+                if (e.record && !wasRec) setRecord(true);
+                r = (e.channel >= 0 ? "channel " + e.channel : "this channel") + (e.record ? ", recording" : "");
+                break;
+            case Scheduler.SCAN: r = wasScan ? "already scanning" : toggleScan(); break;
+            case Scheduler.APRS: r = wasAprs ? "already monitoring" : aprsMonitor(true); break;
+            case Scheduler.SSTV:
+                if (wasSstv) { r = "already receiving"; break; }
+                if (e.channel >= 0) { selectChannel(e.channel); ui.postDelayed(() -> sstvMonitor(true, false), RETUNE_SETTLE_MS); r = "on channel " + e.channel; }
+                else r = sstvMonitor(true, true);
+                break;
+            case Scheduler.BEACON: r = packet == null ? "the packet engine is not running" : packet.sendBeacon(); if (r == null) r = "sent"; break;
+        }
+        history("pkt", what + (r == null ? "" : ": " + r) + (e.hasDuration() ? " for " + e.minutes + " min" : ""));
+        if (!e.hasDuration()) return;
+        getSharedPreferences("schedules", MODE_PRIVATE).edit().putInt("prevCh", prevCh).putBoolean("startedRec", e.record && !wasRec)
+                .putBoolean("startedScan", Scheduler.SCAN.equals(e.action) && !wasScan).putBoolean("startedAprs", Scheduler.APRS.equals(e.action) && !wasAprs)
+                .putBoolean("startedSstv", Scheduler.SSTV.equals(e.action) && !wasSstv).putBoolean("stoppedScan", Scheduler.LISTEN.equals(e.action) && wasScan).apply();
+        Scheduler.setRunning(this, id, System.currentTimeMillis() + e.minutes * 60_000L);
+        Scheduler.arm(this);
+    }
+    /** A tracked satellite pass needs the radio between {@code from} and {@code to} (2 min before it rises to 1 min after it sets). */
+    boolean satBusy(long from, long to) {
+        SatState st = satState; if (st == null) return false;
+        if (!st.waiting) return true;
+        return from < st.los + 60_000L && to > st.aos - 120_000L;
+    }
+    private void endScheduleNow(int id) {
+        if (Scheduler.runningId(this) != id || Scheduler.runningEnd(this) == 0) return;
+        android.content.SharedPreferences p = getSharedPreferences("schedules", MODE_PRIVATE);
+        Scheduler.Entry e = Scheduler.byId(this, id);
+        Scheduler.setRunning(this, 0, 0);
+        if (p.getBoolean("startedRec", false) && recordOn) setRecord(false);
+        if (p.getBoolean("startedScan", false) && scanning()) toggleScan();
+        boolean satOn = satState != null && !satState.waiting;                // a pass that started meanwhile keeps its decoder
+        if (p.getBoolean("startedAprs", false) && packet != null && packet.monitoring() && !satOn) aprsMonitor(false);
+        if (p.getBoolean("startedSstv", false) && packet != null && packet.sstvRx() && !satOn) sstvMonitor(false, false);
+        int prev = p.getInt("prevCh", -1);
+        boolean moved = e != null && e.channel >= 0 && (Scheduler.LISTEN.equals(e.action) || Scheduler.SSTV.equals(e.action)) && p.getInt("prevCh", -1) != e.channel;
+        if (moved && prev >= 0 && !satOn) { ChannelStore.Channel cur = current; if (cur != null && cur.number == e.channel && store.byNumber(prev) != null) selectChannel(prev); }
+        if (p.getBoolean("stoppedScan", false) && !scanning()) ui.postDelayed(this::toggleScan, RETUNE_SETTLE_MS);
+        history("pkt", "\u23F0 Scheduled " + (e == null ? "operation" : e.actionName().toLowerCase(Locale.US)) + " ended" + (moved && prev >= 0 ? ": back to channel " + prev : ""));
+        Scheduler.arm(this);
+    }
 
     // ---- bench: play a WAV into the receive path as if the radio heard it (DiagReceiver, adb only) ----
     private volatile boolean injecting;

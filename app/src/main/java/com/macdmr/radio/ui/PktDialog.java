@@ -165,6 +165,11 @@ public final class PktDialog {
         body.addView(mr);
         body.addView(hint((pe.cwEnabled() ? "Morse heard on analog channels (a repeater's identification, for example) is decoded into the history. " : "The Morse decoder is off (Settings). ") + (pe.cwIdEnabled() ? "Your callsign is sent in Morse after you talk on amateur channels, at most every ten minutes." : "Settings can add your callsign in Morse after you talk on amateur channels, every ten minutes.")));
         // ---- SSTV ----
+        body.addView(section("Scheduled operations"));
+        LinearLayout sch = row();
+        int nSch = com.macdmr.radio.Scheduler.list(c).size();
+        button(sch, nSch == 0 ? "Schedules\u2026" : "Schedules (" + nSch + ")\u2026", Theme.SOFTSQ, x -> { dlg.dismiss(); ScheduleDialog.show(c, svc); });
+        body.addView(sch);
         body.addView(section("SSTV pictures"));
         body.addView(hint("\uD83D\uDD38 " + pe.sstvStatus()));
         LinearLayout s1 = row();

@@ -336,6 +336,22 @@
     <!-- SETTINGS -->
     <section id="page-settings" class="page hidden">
       <button class="btn mission-btn" id="missionBtn">★ Mission Statement</button>
+      <div class="panel" id="schedPanel">
+        <div class="row between"><span class="label">SCHEDULED OPERATIONS</span><button class="btn small-btn" id="schedAdd">Add</button></div>
+        <p class="muted small">Start something at a set time, once or every week; when the time is up the radio goes back to what it was doing. A satellite pass being tracked comes first.</p>
+        <div id="schedList" class="list small"></div>
+        <form id="schedForm" class="sched-form hidden">
+          <label>What <select id="sfAction"><option value="listen">Listen to a channel</option><option value="scan">Scan the zone</option><option value="aprs">APRS monitoring (144.390)</option><option value="sstv">SSTV receive</option><option value="beacon">Send an APRS beacon</option></select></label>
+          <label id="sfChWrap">Channel <select id="sfChannel"></select></label>
+          <label id="sfRecWrap" class="chk"><input type="checkbox" id="sfRecord"> Record it</label>
+          <div class="sf-days" id="sfDays"></div>
+          <label id="sfDateWrap">Once, on <input type="date" id="sfDate"></label>
+          <label>Starts <input type="time" id="sfTime" value="19:00" required></label>
+          <label id="sfMinWrap">Minutes <input type="number" id="sfMinutes" min="1" max="1440" value="60"></label>
+          <label>Name <input type="text" id="sfLabel" maxlength="40" placeholder="optional"></label>
+          <div class="row"><button type="submit" class="btn small-btn">Save</button><button type="button" class="btn small-btn" id="sfCancel">Cancel</button><button type="button" class="btn small-btn danger hidden" id="sfDelete">Delete</button></div>
+        </form>
+      </div>
       <div class="grid-side wide">
         <div class="panel">
           <span class="label">RADIO</span>

@@ -753,6 +753,22 @@ public final class WebHost {
                 }
                 return ok(new JSONObject().put("satellites", a).put("hasFix", me != null).put("elementsAgeH", sats.elementsAgeMs() / 3_600_000.0));
             }
+            case "/api/schedules": {                                            // GET the list; POST one {id?, action, hour, minute, days, date, minutes, channel, record, label, enabled}
+                if (post) {
+                    com.macdmr.radio.Scheduler.Entry e = new com.macdmr.radio.Scheduler.Entry();
+                    e.id = b.optInt("id", 0); e.action = b.optString("action", "listen"); e.hour = Math.max(0, Math.min(23, b.optInt("hour", 19))); e.minute = Math.max(0, Math.min(59, b.optInt("minute", 0)));
+                    e.days = b.optInt("days", 0) & 0x7F; e.date = b.optString("date", ""); e.minutes = Math.max(1, Math.min(1440, b.optInt("minutes", 60))); e.channel = b.optInt("channel", -1);
+                    e.record = b.optBoolean("record", false); e.label = b.optString("label", "").trim(); e.enabled = b.optBoolean("enabled", true);
+                    if (!java.util.Arrays.asList(com.macdmr.radio.Scheduler.ACTIONS).contains(e.action)) return WebServer.Response.error(400, "Unknown action");
+                    if (e.days != 0) e.date = ""; else if (!e.date.matches("\\d{4}-\\d{2}-\\d{2}")) return WebServer.Response.error(400, "Choose days or a date");
+                    if (e.enabled && com.macdmr.radio.Scheduler.nextStart(e, System.currentTimeMillis(), java.util.TimeZone.getDefault()) < 0) return WebServer.Response.error(400, "That time has already passed");
+                    com.macdmr.radio.Scheduler.put(svc, e);
+                    return ok("Saved");
+                }
+                long now = System.currentTimeMillis();
+                return ok(new JSONObject().put("schedules", com.macdmr.radio.Scheduler.json(svc)).put("running", com.macdmr.radio.Scheduler.runningEnd(svc) > now ? com.macdmr.radio.Scheduler.runningId(svc) : 0).put("runningEnd", com.macdmr.radio.Scheduler.runningEnd(svc)));
+            }
+            case "/api/schedules/delete": if (!post) break; { com.macdmr.radio.Scheduler.remove(svc, b.optInt("id")); return ok("Deleted"); }
             case "/api/sat/status": {                                           // AMSAT's reports of the last 4 days for one satellite (?name=SO-50_[FM])
                 String n = r.param("name"); if (n == null || !n.matches("[A-Za-z0-9 -]+_\\[[A-Z]+\\]")) return WebServer.Response.error(400, "Bad name");
                 com.macdmr.radio.ham.FmSats.Status st = com.macdmr.radio.ham.FmSats.status(n, 96);

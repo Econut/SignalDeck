@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Scheduled operations (phone and SignalDeck Web)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Roadmap #2 | `Scheduler`: listen to a channel (+ record), scan the zone, APRS monitoring, SSTV receive (144.500 or a channel), or one APRS beacon, at a time on chosen weekdays or once on a date, for N minutes. One `AlarmManager.setExactAndAllowWhileIdle` alarm for the next start or end (`SCHEDULE_EXACT_ALARM`, granted with root through appops; inexact fallback), re-armed at startup (an operation that ran out while SignalDeck was down ends then). `RadioService.runSchedule/endSchedule`: one at a time; skipped when it overlaps a tracked satellite pass (2 min before AOS to 1 min after LOS; tracking that is only waiting for a later pass does not block); waits up to 2 min while transmitting; afterwards back to the previous channel, REC/scan/APRS/SSTV switched off only if the schedule switched them on, a scan it paused resumed; history lines for start, skip and end. UI: PKT → Scheduled operations (list with next start and on/off, editor: action, channel, record, weekday chips or a date, time, minutes, name); SignalDeck Web Settings panel (`/api/schedules`, `/api/schedules/delete`). Help: Scheduled operations. | `Scheduler.java` (new), `RadioService.java`, `ui/ScheduleDialog.java` (new), `ui/PktDialog.java`, `web/WebHost.java`, `assets/web/*`, `AndroidManifest.xml`, `ui/HelpView.java`, `SchedulerTest.java` (new, 2 tests) | Host tests (weekdays, week boundary, once, disabled, labels). **Device** (owner's Armor): exact alarm armed (dumpsys: `exactAllowReason=permission`); first run was skipped because waiting ISS tracking counted as busy, so the overlap rule was added; second run started 13:15:00 on channel 38 with REC, recorded 59 s, ended 13:16:00 and stayed on the channel; web form: add (Tue 19:30), list with next start, delete with confirmation; test recording and schedules deleted. |
+
 ## 2026-10-22 — More FM satellites (AMSAT list + SatNOGS frequencies) with AMSAT live status
 
 | Backlog | Change | Files | Test |
