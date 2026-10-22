@@ -27,6 +27,27 @@ public class RecordingDecoderTest {
         long[] p = pics.get(0); assertEquals(320, p[0]); assertEquals(240, p[1]); assertTrue("lines " + p[2], p[2] >= 230);
         assertTrue("ends inside the recording", p[4] > 30_000 && p[4] <= s.length * 1000L / 8000);
     }
+    @Test public void severalPicturesInOnePassRecording() throws Exception {      // the ISS events: a picture, about 2 minutes off, the next one
+        short[] pic = RecordingDecoder.read8k(res("/sstv/r36_ref.wav"));
+        java.util.Random rnd = new java.util.Random(3); int gap = 8000 * 120;
+        short[] s = new short[pic.length * 3 + gap * 3];
+        int o = 0;
+        for (int k = 0; k < 3; k++) {
+            for (int i = 0; i < gap; i++) s[o++] = (short) (rnd.nextGaussian() * 3000);              // receiver noise between pictures
+            for (int i = 0; i < pic.length; i++) s[o++] = (short) Math.max(-32768, Math.min(32767, pic[i] + rnd.nextGaussian() * 600));
+        }
+        final List<long[]> pics = new ArrayList<>();
+        int n = new RecordingDecoder().sstv(s, new RecordingDecoder.Listener() {
+            @Override public void picture(int[] argb, int w, int h, int lines, boolean complete, long atMs) { pics.add(new long[] { lines, complete ? 1 : 0, atMs }); }
+        });
+        StringBuilder d = new StringBuilder(); for (long[] p : pics) d.append(java.util.Arrays.toString(p)).append(' ');
+        assertEquals("pictures: " + d, 3, n);
+        for (int k = 0; k < 3; k++) {
+            assertTrue("picture " + k + " complete: " + d, pics.get(k)[1] == 1);
+            long endMs = (long) (k + 1) * (gap + pic.length) * 1000 / 8000;                          // where picture k ends in the recording
+            assertTrue("picture " + k + " ends near " + endMs + ": " + d, Math.abs(pics.get(k)[2] - endMs) < 8000);
+        }
+    }
     @Test public void aprsPacketsFromARecording() throws Exception {
         short[] s = RecordingDecoder.read8k(res("/aprs/noise100_flat.wav"));
         final List<Long> at = new ArrayList<>();
