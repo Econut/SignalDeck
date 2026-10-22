@@ -238,7 +238,7 @@ $('msgForm').addEventListener('submit', async e => { e.preventDefault(); const j
 
 // ---- SSTV ----
 async function loadSstv() {
-  refreshLive(); if (!S.decLoaded) { S.decLoaded = true; loadRecordings(); }
+  refreshLive(); if (!S.decLoaded) { S.decLoaded = true; loadDecodeList(); }
   try {
     const j = await api('sstv/pictures'); S.pictures = j.pictures;
     $('gallery').innerHTML = j.pictures.map((p, i) => { const u = picUrl(p); return '<a href="' + u + '" data-i="' + i + '"><img loading="lazy" src="' + u + '" alt=""><span>' + new Date(p.ts).toLocaleString() + '</span></a>'; }).join('') || '<div class="empty">No pictures yet</div>';
@@ -246,7 +246,7 @@ async function loadSstv() {
   } catch (e) { }
 }
 // decode a recording (SSTV page): the list, start, progress
-async function loadRecordings() {
+async function loadDecodeList() {
   try {
     const j = await api('decode/recordings');
     $('decList').innerHTML = j.recordings.map((r, i) => '<div class="item"><div class="main"><b>' + (r.pass ? 'Pass recording' : esc(r.name)) + '</b><div class="sub">' + esc(r.folder) + ' · ' + new Date(r.ts).toLocaleString() + ' · ' + (r.seconds >= 60 ? Math.floor(r.seconds / 60) + ' min ' + (r.seconds % 60) + ' s' : r.seconds + ' s') + '</div></div><button class="btn small-btn" data-r="' + i + '">Decode</button></div>').join('') || '<div class="empty">No recordings yet (Satellite passes → Record each pass, or REC)</div>';
@@ -269,7 +269,7 @@ async function pollDecode() {
   if (!j.done) S.decT = setTimeout(pollDecode, 1000);
   else if (j.mode === 'sstv' && j.pictures.length && S.decShown !== j.started) { S.decShown = j.started; loadSstv(); }
 }
-$('decRefresh').onclick = loadRecordings;
+$('decRefresh').onclick = loadDecodeList;
 $('decStop').onclick = async () => { try { await api('decode/stop', {}); } catch (e) { } };
 
 // the picture viewer: a card on the page (×, ‹ ›, keys, swipe), Share through the device's share menu, Download
