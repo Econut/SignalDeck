@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Soft SQ: one 1–9 scale on the phone and the web
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner report: SignalDeck Web's Soft SQ slider ran 0–100 while the phone's runs 1–9; anything above 9 acted as 9 and the channel stored the raw number, so the web slider then sat near its bottom. The web slider is now 1–9 (as on the phone and in the channel editor) and the level is clamped to 1–9 before it is stored. | `assets/web/index.html`, `RadioService.java` | Device (owner's Armor, channel 38): web slider 1–9 showing the phone's level; 7 from the web API applied as 7; 50 applied and stored as 9; the channel left at 9, as before. |
+
 ## 2026-10-22 — Winlink gateways: step-by-step download and import
 
 | Backlog | Change | Files | Test |

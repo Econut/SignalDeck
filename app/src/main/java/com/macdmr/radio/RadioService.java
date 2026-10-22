@@ -1033,6 +1033,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     public void setSoftSqLevel(int level) {
+        level = Math.max(1, Math.min(9, level));                             // 1-9 everywhere (the web slider once sent 0-100)
         ChannelStore.Channel ch = current; if (ch == null) return;
         ch.softSqLevel = level; store.update(ch);
         softSq.configure(ch.softSq, level, ch.rxType, ch.rxSubCode);
