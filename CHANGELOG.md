@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — SignalDeck 1.0.0-beta.13 (pre-release)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | versionCode 112 / versionName 1.0.0-beta.13. Published as a pre-release on this repository only (tag `v1.0.0-beta.13`): beta.12 is the bridge from phonedmrapp. Notes: Winlink (radio and internet; marked untested with the real system, please report), the packet terminal fix, device report summary + second radio test, Xplore 1 fixes, satellites/ISS, decode a recording, SSTV picture card, schedules, conditions, band scope, POTA/SOTA, DMR roaming, message forms, the web Phone panel; APK SHA-256 743a4114… in the notes. | `app/build.gradle` | Release APK signed with the usual certificate (SHA-256 9a9a4eb2…); installed on the owner's Armor: versionName 1.0.0-beta.13, radio up, no crash. |
+
 ## 2026-10-22 — Winlink on SignalDeck Web
 
 | Backlog | Change | Files | Test |
