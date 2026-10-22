@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — SignalDeck 1.0.0-beta.12 (pre-release)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | versionCode 111 / versionName 1.0.0-beta.12. First build from this repository; published as a pre-release here (tag `v1.0.0-beta.12`) and on phonedmrapp (tag `signaldeck-v1.0.0-beta.12`, `--latest=false`) so beta.1–11 updaters find it. Notes: new home, Radio audio check verdict on the Xplore, Release/Beta update paths, real spectrum, ISS tracking after restarts, Mission Statement + About; APK SHA-256 in the notes. | `app/build.gradle` | Release build installed on the owner's Armor (versionName 1.0.0-beta.12, tracking resumed, no crash). |
+
 ## 2026-10-22 — Radio audio check: right verdict on serial-port audio phones (Xplore 1)
 
 | Backlog | Change | Files | Test |
