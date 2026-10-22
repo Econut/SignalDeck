@@ -94,7 +94,7 @@ public class AFSKDecoder {
     /** Raw (stuffed) frame bits to the frame without FCS, or null when too short or the checksum fails. */
     private static byte[] frameFromRaw(boolean[] raw) {
         boolean[] u = removeBitStuffingFromBits(raw);
-        if (u == null || u.length < 144) return null;
+        if (u == null || u.length < 136) return null;                       // 17 bytes: two addresses, control, FCS (AX.25 UA, RR, SABM, DISC)
         int nb = u.length / 8; byte[] p = new byte[nb];
         for (int i = 0; i < nb; i++) { int v = 0; for (int j = 0; j < 8; j++) if (u[i * 8 + j]) v |= 1 << j; p[i] = (byte) v; }
         if (!fcsOk(p)) return null;
@@ -111,7 +111,7 @@ public class AFSKDecoder {
             raw[i] = !raw[i];
             byte[] f = frameFromRaw(raw);
             raw[i] = !raw[i];
-            if (f != null && Ax25.plausible(f)) { fixedFrames++; return f; }
+            if (f != null && (Ax25.plausible(f) || Ax25.plausibleAddresses(f))) { fixedFrames++; return f; }
         }
         return null;
     }
@@ -165,7 +165,7 @@ public class AFSKDecoder {
                 // Remove bit stuffing (standard AX.25)
                 boolean[] unstuffedBits = removeBitStuffingFromBits(rawBits);
                 
-                if (unstuffedBits != null && unstuffedBits.length >= 144) {  // At least 18 bytes
+                if (unstuffedBits != null && unstuffedBits.length >= 136) {  // At least 17 bytes (connected-mode control frames)
                     // Convert to bytes LSB-first (per AX.25 spec)
                     // First bit received → bit 0 (LSB) of byte
                     int numBytes = unstuffedBits.length / 8;

@@ -76,6 +76,32 @@ public final class Ax25 {
      * characters A-Z / 0-9, space-padded only at the end, at least one character each; then control 0x03 and PID 0xF0.
      * Noise that happens to pass the 16-bit FCS (about 1 in 65,536 candidates on a busy noisy channel) fails this.
      */
+    /** Well-formed address fields (2..10 callsigns of letters and digits) followed by at least a control byte: any
+     *  AX.25 frame, including the connected-mode ones (SABM, UA, RR, I) that {@link #plausible} (APRS UI only) refuses. */
+    public static boolean plausibleAddresses(byte[] f) {
+        if (f == null || f.length < 15) return false;
+        int off = 0, n = 0;
+        while (true) {
+            if (off + 7 > f.length) return false;
+            boolean pad = false; int chars = 0;
+            for (int i = 0; i < 6; i++) {
+                int b = f[off + i] & 0xFF; if ((b & 1) != 0) return false;
+                char ch = (char) (b >> 1);
+                if (ch == ' ') { pad = true; continue; }
+                if (pad) return false;
+                if (!((ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))) return false;
+                chars++;
+            }
+            if (chars == 0) return false;
+            n++;
+            boolean last = (f[off + 6] & 0x01) != 0;
+            off += 7;
+            if (last) break;
+            if (n >= 10) return false;
+        }
+        return n >= 2 && off < f.length;
+    }
+
     public static boolean plausible(byte[] f) {
         if (f == null || f.length < 16) return false;
         int off = 0, n = 0;

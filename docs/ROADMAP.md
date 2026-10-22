@@ -12,7 +12,7 @@ entry and a device test.
 | 5 | POTA / SOTA | Activator spots (FM, 2 m / 70 cm) with tune-to, activation mode with park/summit reference, dupe check, ADIF | **done** 2026-10-22 |
 | 6 | DMR roaming | Switch to the nearest repeater carrying your talkgroup as you move (GPS distance with hysteresis; signal strength is not used because idle DMR repeaters are silent and every reading costs a 0.7 s retune) | **done** 2026-10-22 (not yet tested on a drive) |
 | 7 | ICS-213 / radiogram forms | Standard message forms over APRS messages or DMR text (or read on air), with a message log | **done** 2026-10-22 (over-the-air send not yet bench-tested) |
-| 8 | Winlink over packet | E-mail through a Winlink packet gateway (AX.25 connected mode, B2F), or the CMS over the internet; bench-tested against a fake CMS; radio path still to bench against a HackRF test gateway | done (radio path to bench) |
+| 8 | Winlink over packet | E-mail through a Winlink packet gateway (AX.25 connected mode, B2F), or the CMS over the internet; bench-tested against a fake CMS (internet) and a HackRF test gateway (radio, full session); not yet tested with the real Winlink system (users asked to report) | done |
 
 ## Research, later
 

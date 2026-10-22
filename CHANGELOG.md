@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Packet: connected-mode control frames were dropped (terminal and Winlink could not connect without a digipeater); Winlink tested over the radio
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R#8 | **Bug fix:** the AFSK decoder dropped frames shorter than 18 bytes (an APRS-era minimum), but on a direct link the AX.25 control frames (SABM, UA, RR, DISC) are 17 bytes with the checksum, so the packet terminal and Winlink never saw the other station's answer and gave up after six calls. Minimum now 17 bytes; the one-bit repair also accepts repaired frames with well-formed addresses (`Ax25.plausibleAddresses`), not only APRS UI frames. **Winlink marked new and untested with the real system:** a notice on the Winlink screen (tap: SignalDeck's GitHub issues) and a help section ask users to report whether it works. | `pkt/AFSKDecoder.java`, `pkt/Ax25.java`, `ui/WinlinkDialog.java`, `ui/HelpView.java` | `ConnectedFramesTest` (SABM 15 bytes through the app's modem; two sessions connect and carry text over AFSK audio): fails on the old limit, passes now; the APRS benchmark (`AfskBenchTest`) unchanged. **On the air:** a HackRF test gateway on the PC (half duplex, its own B2F server side; gateway TEST-10, not a real callsign), owner's Armor on 467.625 MHz low power at about 5 ft: before the fix the phone called six times and never heard the acknowledgement although it received it at −80 dBm; after it the whole Winlink session completed in 3 min 10 s (connect on the first call, secure login, our message delivered intact, the gateway's message received, FF/FQ, disconnect). Not tested: a real Winlink gateway or the real CMS (left for users). |
+
 ## 2026-10-22 — Winlink e-mail (radio gateway or internet)
 
 | Backlog | Change | Files | Test |

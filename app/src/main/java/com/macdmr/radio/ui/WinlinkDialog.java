@@ -33,12 +33,18 @@ import java.util.Locale;
 /** PKT → Winlink e-mail: inbox, outbox and sent mail, compose, and a session over the internet or a radio gateway. */
 public final class WinlinkDialog {
     private WinlinkDialog() { }
+    static final String ISSUES = "https://github.com/IIMacGyverII/SignalDeck/issues";
 
     public static void show(Context c, RadioService svc) {
         final Winlink w = svc.winlink();
         float d = Theme.dp(c);
         LinearLayout body = Neo.sheetBody(c, "Winlink e-mail");
         body.addView(Neo.sheetHint(c, "E-mail by radio: write messages to callsigns or internet addresses, then connect to send what is in the outbox and collect what is waiting for you. Over the radio through a Winlink packet gateway (RMS) on 2 m or 70 cm, or over the internet when you have it."));
+        LinearLayout beta = Neo.tile(c, "alert", Neo.AMBER, "New: not yet tested with the real Winlink system",
+                "Please tell us if it works for you: tap here to report it on GitHub.");
+        beta.setOnClickListener(v -> { try { c.startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse(ISSUES))); } catch (Exception e) { toast(c, ISSUES); } });
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); bl.bottomMargin = (int) (8 * d);
+        body.addView(beta, bl);
         final TextView state = Neo.label(c, "", Theme.CYAN, 14, true); body.addView(state);
         final TextView prog = Neo.label(c, "", Neo.MUTED, 12.5f, false); body.addView(prog);
         final AlertDialog[] self = { null }; final Runnable[] later = { null };
