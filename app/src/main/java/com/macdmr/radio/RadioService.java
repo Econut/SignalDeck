@@ -176,6 +176,31 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Bench (DIAG vfo): listen on a frequency through the VFO, wide, low power. */
     void diagVfo(int hz, int power) { ChannelStore.Channel a = new ChannelStore.Channel(); a.type = 1; a.rxFreq = a.txFreq = hz; a.band = 1; a.power = power; a.name = "Bench"; applyVfo(a, false); }   // power 0 = low, 1 = high
     void diagVfoOff() { if (vfo != null && "Bench".equals(vfo.name)) exitVfo(); }
+    /** Record whole passes (AOS to LOS, below the squelch too) as WAV in Download/DMR/Audio/<satellite>/…_pass.wav. */
+    public boolean satRecord() { return getSharedPreferences("radio", MODE_PRIVATE).getBoolean("satRecord", true); }
+    public void setSatRecord(boolean on) { getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("satRecord", on).apply(); }
+    private volatile WavRecorder passRec;
+    private void finishPassRecording() {
+        WavRecorder r = passRec; passRec = null; if (r == null) return;
+        try { java.io.File f = r.stop(); if (f != null) history("rec", "\uD83C\uDFA7 Pass recorded: " + f.getName()); } catch (Throwable t) { log("pass record stop: " + t); }
+    }
+    /**
+     * Fresh orbits for a pass: elements older than a day are downloaded again (call off the main thread). Returns the
+     * new elements and the same pass computed from them, or null when nothing changed (fresh enough, offline, not found).
+     */
+    private Object[] refreshForPass(com.macdmr.radio.ham.Satellites.Sat sat, com.macdmr.radio.ham.SatTrack.Pass pass, android.location.Location me) {
+        try {
+            if (satellites().elementsAgeMs() < 24 * 3_600_000L) return null;
+            String e = satellites().update(); if (e != null) { log("orbits before the pass: " + e); return null; }
+            com.macdmr.radio.ham.Sgp4 n = satellites().elements().get(sat.catalog); if (n == null) return null;
+            for (com.macdmr.radio.ham.SatTrack.Pass p : com.macdmr.radio.ham.SatTrack.passes(n, pass.aos - 30 * 60_000L, 1.5, me.getLatitude(), me.getLongitude(), me.hasAltitude() ? me.getAltitude() : 0, 0))
+                if (Math.abs(p.aos - pass.aos) < 10 * 60_000L) {
+                    log(String.format(Locale.US, "orbits refreshed before the pass: AOS moved %+d s, LOS %+d s", (p.aos - pass.aos) / 1000, (p.los - pass.los) / 1000));
+                    return new Object[] { n, p };
+                }
+        } catch (Throwable t) { log("orbits before the pass: " + t); }
+        return null;
+    }
     /** Track a pass: at AOS minus a minute the VFO takes the satellite's channel, corrected for Doppler every 2 s, until LOS. */
     public String trackSat(final com.macdmr.radio.ham.Satellites.Sat sat, final com.macdmr.radio.ham.Sgp4 el, final com.macdmr.radio.ham.SatTrack.Pass pass) {
         final android.location.Location me = lastKnownLocation();
@@ -186,16 +211,24 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (sat.mode != com.macdmr.radio.ham.Satellites.VOICE) modeSince = System.currentTimeMillis();
         final Thread t = new Thread(() -> {
             boolean tuned = false, started = false, natural = false;
+            com.macdmr.radio.ham.Sgp4 E = el; com.macdmr.radio.ham.SatTrack.Pass P = pass; boolean refreshed = false;
             try {
-                while (satThread == Thread.currentThread() && System.currentTimeMillis() < pass.aos - 60_000) Thread.sleep(1000);
+                while (satThread == Thread.currentThread()) {
+                    if (!refreshed && System.currentTimeMillis() > P.aos - 15 * 60_000L) {   // orbits a day old or more: fetch fresh ones 15 min ahead (or now, when closer)
+                        refreshed = true; Object[] f = refreshForPass(sat, P, me);
+                        if (f != null) { E = (com.macdmr.radio.ham.Sgp4) f[0]; P = (com.macdmr.radio.ham.SatTrack.Pass) f[1]; st.aos = P.aos; st.los = P.los; st.maxEl = P.maxEl; }
+                    }
+                    if (System.currentTimeMillis() >= P.aos - 60_000) break;
+                    Thread.sleep(1000);
+                }
                 history("pkt", "\uD83D\uDEF0 Tracking " + sat.name + ": tuning for the pass");
                 ChannelStore.Channel v = new ChannelStore.Channel(); v.type = 1; v.band = 1; v.power = 1; v.name = sat.name; dataModeSquelch(v);   // satellites arrive far below the radio's squelch
                 int tone = sat.toneHz > 0 ? com.macdmr.radio.ChannelPresets.ctcssIndex(sat.toneHz) : -1;
                 if (tone >= 0) { v.txType = 1; v.txSubCode = tone; }
                 long lastRx = 0;
-                while (satThread == Thread.currentThread() && System.currentTimeMillis() < pass.los + 30_000) {
+                while (satThread == Thread.currentThread() && System.currentTimeMillis() < P.los + 30_000) {
                     long now = System.currentTimeMillis();
-                    com.macdmr.radio.ham.SatTrack.Look l = com.macdmr.radio.ham.SatTrack.look(el, now, me.getLatitude(), me.getLongitude(), me.hasAltitude() ? me.getAltitude() : 0);
+                    com.macdmr.radio.ham.SatTrack.Look l = com.macdmr.radio.ham.SatTrack.look(E, now, me.getLatitude(), me.getLongitude(), me.hasAltitude() ? me.getAltitude() : 0);
                     long rx = com.macdmr.radio.ham.SatTrack.downlink(sat.downHz, l.rangeRateKmS), tx = com.macdmr.radio.ham.SatTrack.uplink(sat.upHz, l.rangeRateKmS);
                     st.look = l; st.rxHz = rx; st.txHz = tx; st.waiting = false;
                     // 2 kHz is well inside an FM channel; fewer retunes, fewer gaps. While an SSTV picture is coming in, up to
@@ -209,6 +242,10 @@ public class RadioService extends Service implements RadioEngine.Events {
                         started = true;
                         if (sat.mode == com.macdmr.radio.ham.Satellites.APRS) { aprsMonitorHz = (int) sat.downHz; packet.setMonitoring(true); pushModes(); }
                         else if (sat.mode == com.macdmr.radio.ham.Satellites.SSTV) { packet.setSstvForceContinuous(true); packet.setSstvRx(true); pushModes(); }   // ISS events are Robot 36: no VIS needed, partial pictures kept
+                        if (sat.mode != com.macdmr.radio.ham.Satellites.VOICE && satRecord()) {      // the whole pass, so a missed picture can be decoded again later
+                            try { WavRecorder r = new WavRecorder(sat.name); r.start("pass"); passRec = r; history("pkt", "\uD83D\uDEF0 Recording the pass (" + r.file().getName() + ")"); }
+                            catch (Throwable x) { log("pass record: " + x); }
+                        }
                     }
                     Thread.sleep(2000);
                 }
@@ -216,6 +253,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             } catch (InterruptedException ignored) {
             } catch (Throwable x) { log("sat track: " + x); }
             finally {
+                finishPassRecording();
                 if (started && packet != null) {
                     if (sat.mode == com.macdmr.radio.ham.Satellites.APRS) packet.setMonitoring(false);
                     else if (sat.mode == com.macdmr.radio.ham.Satellites.SSTV) { packet.setSstvRx(false); packet.setSstvForceContinuous(false); }
@@ -891,6 +929,8 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
             }
         }
+        WavRecorder pr = passRec;                                                 // satellite pass: everything, below the squelch too
+        if (pr != null) { try { pr.write(mono, n); } catch (Throwable t) { passRec = null; log("pass record: " + t); } }
         if (recordOn && receiving && open) {
             try {
                 if (recorder == null) { recorder = new WavRecorder(current != null ? current.name : null); recorder.start(lastCaller > 0 ? String.valueOf(lastCaller) : null); }

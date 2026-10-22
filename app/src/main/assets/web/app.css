@@ -86,6 +86,14 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
 .dlg-x { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; }
 .dlg-x:hover { color: var(--text); border-color: var(--cyan); }
 .mission-text { font-size: 21px; line-height: 1.45; margin: 14px 0 10px; color: var(--text); }
+.pic-card { max-width: 860px; padding: 18px 18px 14px; }
+.pic-top { margin-right: 44px; }
+.pic-stage { position: relative; display: flex; align-items: center; justify-content: center; margin: 12px 0; background: #000; border-radius: 12px; overflow: hidden; }
+.pic-stage img { display: block; max-width: 100%; max-height: 70vh; width: auto; height: auto; image-rendering: auto; touch-action: pan-y; }
+.pic-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 46px; height: 64px; border: 1px solid var(--line); border-radius: 12px; background: rgba(2,6,10,.6); color: var(--text); font-size: 34px; line-height: 1; cursor: pointer; }
+.pic-nav:hover { border-color: var(--cyan); color: var(--cyan); }
+#picPrev { left: 8px; } #picNext { right: 8px; }
+.pic-bottom { gap: 10px; flex-wrap: wrap; }
 .mission-legal { white-space: pre-line; color: var(--muted); font-size: 14px; line-height: 1.45; margin: 8px 0 0; max-height: 40vh; overflow-y: auto; }
 .mission-by { text-align: right; color: var(--violet); font-weight: 600; margin: 0; }
 .phone-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — ISS passes: fresh orbits before each pass, whole-pass recording; SSTV picture viewer in SignalDeck Web
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Prep for the SSTV event's high passes. **Orbits:** 15 min before a pass (or at once when closer), elements older than a day are downloaded again and the pass is recomputed from them (AOS/LOS/max elevation; logged with how far it moved); before, they were only refreshed from the Satellite passes sheet (the owner's were 2.5 days old). **Record each pass** (Satellite passes, default on): from tune-in to LOS + 30 s, everything the radio hears, below the squelch too, as `Download/DMR/Audio/<satellite>/yyyyMMdd_HHmmss_pass.wav` (8 kHz mono, ~1 MB/min), so a missed or torn picture/packet can be decoded again. **SignalDeck Web SSTV:** a picture opens in a card on the page instead of a new tab: ‹ › (also ← → and swipe, wrapping), × / Esc / click outside, Download, and **Share** through the device's share menu (Web Share API with the PNG; needs the https address, else it says to use Download). Help: ISS; SignalDeck Web → SSTV pictures. | `RadioService.java`, `ui/SatelliteDialog.java`, `ui/HelpView.java`, `assets/web/app.js`, `assets/web/index.html`, `assets/web/app.css` | Device (owner's Armor): fake pass (DIAG sattest iss-sstv) recorded 1.9 MB / 2 min; orbits refreshed (epoch 21 Oct 22:49 UTC), the 02:28 pass moved 1 s; real tracking resumed; test WAVs deleted. Browser: card opens, 1/2 ↔ 2/2 with wrap, Download .png, Esc closes; headless Chrome cannot share files (fallback message shown) — the share sheet itself needs a phone browser over https. |
+
 ## 2026-10-22 — Bench: the radio really tunes in 500 Hz steps (Doppler); DIAG testtone, vfo power
 
 | Backlog | Change | Files | Test |

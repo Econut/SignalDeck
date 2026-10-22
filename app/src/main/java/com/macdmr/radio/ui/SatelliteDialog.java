@@ -128,6 +128,8 @@ public final class SatelliteDialog {
             }
             if (n == 0) body.addView(Neo.sheetHint(c, "No pass above 10° in the next 24 hours."));
         }
+        final Neo.NeonSwitch recSw = new Neo.NeonSwitch(c); recSw.setChecked(svc.satRecord()); recSw.setOnChange(svc::setSatRecord);
+        body.addView(Neo.switchRow(c, "rec", Neo.RED, "Record each pass", "The whole pass as a WAV in Download/DMR/Audio/<satellite> (about 1 MB a minute), so a missed picture or packet can be decoded again", recSw));
         TextView freqs = Neo.button(c, "ISS frequencies", "radio", Neo.AMBER); body.addView(freqs);
         freqs.setOnClickListener(v -> { if (self[0] != null) self[0].dismiss(); issFrequencies(c, svc); });
         TextView upd = Neo.button(c, "Update orbits", "update", Neo.CYAN); body.addView(upd);

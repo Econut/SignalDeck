@@ -211,6 +211,13 @@
         <div id="passList" class="passgrid"></div>
       </div>
     </section>
+    <div id="picDlg" class="dlg hidden" role="dialog" aria-modal="true" aria-label="SSTV picture">
+      <div class="dlg-card pic-card"><button type="button" class="dlg-x" id="picX" aria-label="Close">×</button>
+        <div class="row between pic-top"><span class="label">SSTV PICTURE</span><span id="picCount" class="chip dim"></span></div>
+        <div class="pic-stage"><button type="button" class="pic-nav" id="picPrev" aria-label="Previous picture">‹</button><img id="picImg" alt=""><button type="button" class="pic-nav" id="picNext" aria-label="Next picture">›</button></div>
+        <div class="row between pic-bottom"><span id="picWhen" class="muted"></span><div class="row"><a class="btn small-btn" id="picDl" href="#" download>Download</a><button type="button" class="btn small-btn" id="picShare">Share</button></div></div>
+      </div>
+    </div>
     <div id="missionDlg" class="dlg hidden" role="dialog" aria-modal="true" aria-labelledby="missionTitle">
       <div class="dlg-card"><button type="button" class="dlg-x" id="missionX" aria-label="Close">×</button>
         <div class="label" id="missionTitle">MISSION STATEMENT</div>

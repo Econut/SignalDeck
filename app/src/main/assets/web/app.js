@@ -241,9 +241,47 @@ async function loadSstv() {
   refreshLive();
   try {
     const j = await api('sstv/pictures'); S.pictures = j.pictures;
-    $('gallery').innerHTML = j.pictures.map(p => { const u = '/api/sstv/picture?name=' + encodeURIComponent(p.name); return '<a href="' + u + '" target="_blank" rel="noopener"><img loading="lazy" src="' + u + '" alt=""><span>' + new Date(p.ts).toLocaleString() + '</span></a>'; }).join('') || '<div class="empty">No pictures yet</div>';
+    $('gallery').innerHTML = j.pictures.map((p, i) => { const u = picUrl(p); return '<a href="' + u + '" data-i="' + i + '"><img loading="lazy" src="' + u + '" alt=""><span>' + new Date(p.ts).toLocaleString() + '</span></a>'; }).join('') || '<div class="empty">No pictures yet</div>';
+    $('gallery').querySelectorAll('a[data-i]').forEach(a => a.onclick = e => { e.preventDefault(); openPic(+a.dataset.i); });
   } catch (e) { }
 }
+// the picture viewer: a card on the page (×, ‹ ›, keys, swipe), Share through the device's share menu, Download
+const picUrl = p => '/api/sstv/picture?name=' + encodeURIComponent(p.name);
+function openPic(i) {
+  const L = S.pictures || []; if (!L.length) return;
+  S.picIdx = (i + L.length) % L.length; const p = L[S.picIdx];
+  $('picImg').src = picUrl(p); $('picImg').alt = 'SSTV picture received ' + new Date(p.ts).toLocaleString();
+  $('picWhen').textContent = new Date(p.ts).toLocaleString();
+  $('picCount').textContent = L.length > 1 ? (S.picIdx + 1) + ' / ' + L.length : '';
+  $('picPrev').classList.toggle('hidden', L.length < 2); $('picNext').classList.toggle('hidden', L.length < 2);
+  const dl = $('picDl'); dl.href = picUrl(p); dl.download = p.name;
+  $('picDlg').classList.remove('hidden'); $('picX').focus();
+}
+const closePic = () => $('picDlg').classList.add('hidden');
+const picOpen = () => !$('picDlg').classList.contains('hidden');
+$('picX').onclick = closePic;
+$('picPrev').onclick = () => openPic(S.picIdx - 1);
+$('picNext').onclick = () => openPic(S.picIdx + 1);
+$('picDlg').onclick = e => { if (e.target === $('picDlg')) closePic(); };
+document.addEventListener('keydown', e => {
+  if (!picOpen()) return;
+  if (e.key === 'Escape') closePic(); else if (e.key === 'ArrowLeft') openPic(S.picIdx - 1); else if (e.key === 'ArrowRight') openPic(S.picIdx + 1);
+});
+(() => { let x0 = null; const el = $('picImg');
+  el.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  el.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) openPic(S.picIdx + (dx < 0 ? 1 : -1)); }, { passive: true });
+})();
+$('picShare').onclick = async () => {
+  const p = (S.pictures || [])[S.picIdx]; if (!p) return;
+  const when = new Date(p.ts).toLocaleString();
+  try {
+    const blob = await (await fetch(picUrl(p))).blob();
+    const file = new File([blob], p.name, { type: blob.type || 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'SSTV picture', text: 'SSTV picture received ' + when + ' with SignalDeck' }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  toast(window.isSecureContext ? 'This browser cannot share pictures: use Download' : 'Sharing needs the secure address (https, port 8443, see Settings): use Download here');
+};
+
 function refreshLive() {
   const s = S.status.sstv || {}; const img = $('sstvLive');
   if (!s.picture) { img.classList.add('hidden'); $('sstvEmpty').classList.remove('hidden'); return; }
