@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — SignalDeck 1.0.0-beta.14 (pre-release)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | versionCode 113 / versionName 1.0.0-beta.14, pre-release on this repository (tag `v1.0.0-beta.14`). Notes: packet finder, Winlink gateway list, Winlink detailed log (please share), forms by Winlink and scheduled mail checks, DMR talkgroup threads and names, packet frame order and the final FQ, Soft SQ web scale; APK SHA-256 ff3c6cdd… in the notes. | `app/build.gradle` | Release APK signed with the usual certificate (9a9a4eb2…); installed on the owner's Armor (1.0.0-beta.14, radio up). |
+
 ## 2026-10-22 — Winlink detailed diagnostic log; packet frames kept in air order; the final FQ is delivered
 
 | Backlog | Change | Files | Test |
