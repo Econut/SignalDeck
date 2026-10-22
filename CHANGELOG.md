@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Decode a recording: upload from anywhere, every audio format, every SSTV mode
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner's request: decode recordings made elsewhere, on the phone and from the browser, not only Robot 36. **Upload a recording…** (phone: document picker; web: Upload… on the SSTV page, `POST /api/decode/upload?name=&mode=`, bodies up to 200 MB on that path only) keeps the file in `Download/DMR/Audio/Uploaded` and decodes it. **Formats:** WAV (16-bit directly; float/24-bit and everything else) and MP3, M4A/AAC, OGG/Opus, FLAC, 3GP/AMR through Android's MediaExtractor/MediaCodec; any rate, mixed to mono; above 8 kHz a 4th-order Butterworth low-pass at 3.4 kHz before resampling (the old nearest-sample step folded hiss above 4 kHz into the tones). **SSTV, every mode:** VIS headers found on 2 s windows every 0.5 s with the live `SSTVVISDetector`, each picture decoded by its mode's `SSTVImageDecoderIQ` in sample time (16 kHz like live; ended by 3 lost lines; < 12 lines = a false header), then the continuous Robot 36 pass for pictures whose header was lost, skipping any that overlap a header-found picture; files `SSTV_<mode>_<time>_rec.png`, complete when at most 4 lines short (the last line has no sync after it). The job reports its stage. Help: PKT → Decode a recording; SignalDeck Web → Decode in the browser. | `RecordingDecodeJob.java`, `RecordingDecoder.java`, `ui/RecordingsDialog.java`, `web/WebHost.java`, `web/WebServer.java`, `assets/web/*`, `ui/HelpView.java`, `RecordingDecoderTest.java` (+1: 48 kHz filtered resampling) | Host tests pass. **Device** (owner's Armor, uploads through the web API): Martin M1 encoded at 44.1 kHz (1 min 55 s, 10 MB) → 1 complete picture in 1.5 s; Robot 36 as MP3 → 1 complete picture (found once, not twice); the APRS benchmark as a 44.1 kHz MP3 → 31 packets (32 from the WAV); pictures match the encoded test image (21 dB, a one-line offset as in live decoding); test uploads and pictures deleted. |
+
 ## 2026-10-22 — Decode a recording (SSTV pictures, APRS packets) on the phone and in SignalDeck Web
 
 | Backlog | Change | Files | Test |

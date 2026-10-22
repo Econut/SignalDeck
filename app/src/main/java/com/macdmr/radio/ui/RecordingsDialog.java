@@ -41,28 +41,28 @@ public final class RecordingsDialog {
         boolean sstv = RecordingDecodeJob.SSTV.equals(mode);
         LinearLayout box = Neo.sheetBody(c, sstv ? "Decode a recording: SSTV" : "Decode a recording: APRS");
         box.addView(Neo.sheetHint(c, sstv
-                ? "Finds the Robot 36 pictures in a recording (the ISS events' mode), whole or partial, and saves them with the received pictures. It runs in the background, faster than the recording plays, and never uses the radio."
+                ? "Finds the SSTV pictures in a recording, in every mode SignalDeck receives (Robot, Martin, Scottie, PD\u2026 from the header that starts each picture, and Robot 36 pictures whose header was lost in a fade), whole or partial, and saves them with the received pictures. It runs in the background, faster than the recording plays, and never uses the radio."
                 : "Finds the APRS packets in a recording and lists them with the time they were on the air (also saved next to the recording as a .aprs.txt file). Nothing is sent, digipeated or gated. It runs in the background and never uses the radio."));
         final AlertDialog[] self = { null };
         List<File> recs = RecordingDecodeJob.recordings(40);
         box.addView(Neo.sheetSection(c, recs.isEmpty() ? "No recordings yet" : "Recordings, newest first"));
-        if (recs.isEmpty()) box.addView(Neo.sheetHint(c, "Satellite passes → Record each pass saves every pass; REC saves what the radio receives."));
-        SimpleDateFormat when = new SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault());
-        for (File f : recs) {
-            long sec = Math.max(0, (f.length() - 44) / 16000);
-            boolean pass = f.getName().contains("_pass");
-            String sub = f.getParentFile().getName() + " · " + when.format(new Date(f.lastModified())) + " · " + (sec >= 60 ? sec / 60 + " min " + sec % 60 + " s" : sec + " s");
-            LinearLayout t = Neo.tile(c, pass ? "sstv" : "rec", pass ? Neo.CYAN : Neo.VIOLET, pass ? "Pass recording" : f.getName(), sub);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.bottomMargin = (int) (8 * d);
-            box.addView(t, lp);
-            t.setOnClickListener(v -> { if (self[0] != null) self[0].dismiss(); begin(c, svc, mode, f); });
-        }
-        TextView other = Neo.button(c, "Another WAV file…", "import", Neo.AMBER); box.addView(other);
-        other.setOnClickListener(v -> {
+        if (recs.isEmpty()) box.addView(Neo.sheetHint(c, "Satellite passes \u2192 Record each pass saves every pass; REC saves what the radio receives; Upload a recording adds one from anywhere."));
+        TextView up = Neo.button(c, "Upload a recording\u2026", "import", Neo.AMBER); box.addView(up);
+        up.setOnClickListener(v -> {
             if (!(c instanceof com.macdmr.radio.MainActivity)) return;
             if (self[0] != null) self[0].dismiss();
             ((com.macdmr.radio.MainActivity) c).pickDocument(uri -> copyAndBegin(c, svc, mode, uri));
         });
+        SimpleDateFormat when = new SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault());
+        for (File f : recs) {
+            long sec = Math.max(0, (f.length() - 44) / 16000);
+            boolean pass = f.getName().contains("_pass"), uploaded = RecordingDecodeJob.UPLOADED.equals(f.getParentFile().getName());
+            String sub = f.getParentFile().getName() + " \u00B7 " + when.format(new Date(f.lastModified())) + (f.getName().toLowerCase(Locale.US).endsWith(".wav") ? " \u00B7 " + (sec >= 60 ? sec / 60 + " min " + sec % 60 + " s" : sec + " s") : " \u00B7 " + Math.max(1, f.length() / 1024) + " kB");
+            LinearLayout t = Neo.tile(c, pass ? "sstv" : uploaded ? "import" : "rec", pass ? Neo.CYAN : uploaded ? Neo.AMBER : Neo.VIOLET, pass ? "Pass recording" : f.getName(), sub);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.bottomMargin = (int) (8 * d);
+            box.addView(t, lp);
+            t.setOnClickListener(v -> { if (self[0] != null) self[0].dismiss(); begin(c, svc, mode, f); });
+        }
         self[0] = Neo.showSheet(c, box);
     }
 
@@ -71,11 +71,8 @@ public final class RecordingsDialog {
             File out = null; String err = null;
             try {
                 String name = CodeplugDialog.displayName(c, uri); if (name == null || name.isEmpty()) name = "recording.wav";
-                out = new File(c.getCacheDir(), "decode_" + name.replaceAll("[^A-Za-z0-9._-]", "_"));
-                try (InputStream in = c.getContentResolver().openInputStream(uri); FileOutputStream o = new FileOutputStream(out)) {
-                    byte[] b = new byte[65536]; int n; while ((n = in.read(b)) > 0) o.write(b, 0, n);
-                }
-            } catch (Throwable t) { err = "Could not read the file: " + t.getMessage(); }
+                try (InputStream in = c.getContentResolver().openInputStream(uri)) { out = RecordingDecodeJob.saveUpload(name, in); }   // kept in Download/DMR/Audio/Uploaded
+            } catch (Throwable t) { err = t.getMessage() == null ? "Could not read the file" : t.getMessage(); }
             final File f = out; final String e = err;
             new Handler(Looper.getMainLooper()).post(() -> { if (e != null) Toast.makeText(c, e, Toast.LENGTH_LONG).show(); else begin(c, svc, mode, f); });
         }, "decode-copy").start();
@@ -107,7 +104,7 @@ public final class RecordingsDialog {
             int w = track.getWidth(); LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) bar.getLayoutParams(); lp.width = (int) (w * job.percent / 100.0); bar.setLayoutParams(lp);
             if (job.error != null) state.setText("Could not decode: " + job.error);
             else if (job.done) state.setText(job.summary == null ? "Done" : job.summary);
-            else state.setText(job.percent + " %");
+            else state.setText(job.percent + " %" + (job.stage.isEmpty() ? "" : " \u00B7 " + job.stage));
             StringBuilder sb = new StringBuilder();
             if (sstv) { synchronized (job.pictures) { for (String p : job.pictures) sb.append("📺 ").append(p).append('\n'); } }
             else { synchronized (job.packets) { int n = job.packets.size(); for (int i = Math.max(0, n - 60); i < n; i++) sb.append(job.packets.get(i)).append('\n'); if (n > 60) sb.insert(0, "(the last 60 of " + n + ")\n"); } }

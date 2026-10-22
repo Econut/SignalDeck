@@ -634,10 +634,18 @@ public final class WebHost {
                 }
                 com.macdmr.radio.RecordingDecodeJob j = com.macdmr.radio.RecordingDecodeJob.current();
                 if (j == null) return ok(new JSONObject().put("job", JSONObject.NULL));
-                JSONObject o = new JSONObject().put("file", j.file.getName()).put("mode", j.mode).put("percent", j.percent).put("done", j.done).put("summary", j.summary == null ? "" : j.summary).put("error", j.error == null ? "" : j.error).put("started", j.startedAt);
+                JSONObject o = new JSONObject().put("file", j.file.getName()).put("mode", j.mode).put("percent", j.percent).put("stage", j.stage).put("done", j.done).put("summary", j.summary == null ? "" : j.summary).put("error", j.error == null ? "" : j.error).put("started", j.startedAt);
                 JSONArray pics = new JSONArray(); synchronized (j.pictures) { for (String s : j.pictures) pics.put(s); }
                 JSONArray pk = new JSONArray(); synchronized (j.packets) { int n = j.packets.size(); for (int i = Math.max(0, n - 300); i < n; i++) pk.put(j.packets.get(i)); o.put("packetCount", n); }
                 return ok(new JSONObject().put("job", o.put("pictures", pics).put("packets", pk)));
+            }
+            case "/api/decode/upload": if (!post) break; {                     // body: the recording's bytes; ?name=file.mp3&mode=sstv|aprs
+                if (r.body == null || r.body.length < 100) return WebServer.Response.error(400, "Empty file");
+                File f;
+                try { f = com.macdmr.radio.RecordingDecodeJob.saveUpload(r.param("name"), new java.io.ByteArrayInputStream(r.body)); }
+                catch (java.io.IOException e) { return WebServer.Response.error(400, e.getMessage()); }
+                String e = com.macdmr.radio.RecordingDecodeJob.start(r.param("mode") == null ? "sstv" : r.param("mode"), f, svc);
+                return e == null ? ok("Uploaded " + f.getName() + "; decoding") : WebServer.Response.error(409, "Uploaded " + f.getName() + ", but: " + e);
             }
             case "/api/decode/stop": if (!post) break; { com.macdmr.radio.RecordingDecodeJob j = com.macdmr.radio.RecordingDecodeJob.current(); if (j != null) j.cancel(); return ok("Stopping"); }
             case "/api/sstv/pictures": {

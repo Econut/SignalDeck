@@ -64,6 +64,14 @@ public class RecordingDecoderTest {
         assertEquals(800, s.length); assertEquals(2000, s[100]);
         try { RecordingDecoder.read8k(new byte[100]); fail(); } catch (java.io.IOException expected) { }
     }
+    @Test public void highRatesAreFilteredBeforeResampling() {
+        int rate = 48000, n = rate; short[] lo = new short[n], hi = new short[n];
+        for (int i = 0; i < n; i++) { lo[i] = (short) (10000 * Math.sin(2 * Math.PI * 1200 * i / rate)); hi[i] = (short) (10000 * Math.sin(2 * Math.PI * 7000 * i / rate)); }
+        assertTrue("1200 Hz passes", rms(RecordingDecoder.to8k(lo, rate)) > 6500);
+        assertTrue("7 kHz must not fold to 1 kHz", rms(RecordingDecoder.to8k(hi, rate)) < 600);
+        assertEquals(8000, RecordingDecoder.to8k(lo, rate).length);
+    }
+    private static double rms(short[] s) { double q = 0; for (int i = 800; i < s.length; i++) q += (double) s[i] * s[i]; return Math.sqrt(q / (s.length - 800)); }
     @Test public void cancelStopsEarly() throws Exception {
         short[] s = RecordingDecoder.read8k(res("/sstv/r36_ref.wav"));
         final RecordingDecoder d = new RecordingDecoder();

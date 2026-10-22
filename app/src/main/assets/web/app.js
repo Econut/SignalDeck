@@ -262,14 +262,25 @@ async function pollDecode() {
   let j; try { j = (await api('decode')).job; } catch (e) { return; }
   if (!j) { $('decJob').classList.add('hidden'); return; }
   $('decJob').classList.remove('hidden');
-  $('decFile').textContent = j.file; $('decPct').textContent = j.percent + ' %'; $('decBar').style.width = j.percent + '%'; $('decBar').className = j.mode === 'aprs' ? '' : 'chg';
-  $('decState').textContent = j.error ? 'Could not decode: ' + j.error : j.done ? j.summary : (j.mode === 'aprs' ? 'Looking for APRS packets…' : 'Looking for Robot 36 pictures…');
+  $('decName').textContent = j.file; $('decPct').textContent = j.percent + ' %'; $('decBar').style.width = j.percent + '%'; $('decBar').className = j.mode === 'aprs' ? '' : 'chg';
+  $('decState').textContent = j.error ? 'Could not decode: ' + j.error : j.done ? j.summary : (j.stage ? j.stage.charAt(0).toUpperCase() + j.stage.slice(1) + '…' : 'Starting…');
   $('decOut').textContent = j.mode === 'aprs' ? (j.packetCount > j.packets.length ? '(the last ' + j.packets.length + ' of ' + j.packetCount + ')\n' : '') + j.packets.join('\n') : j.pictures.join('\n');
   $('decStop').classList.toggle('hidden', j.done);
   if (!j.done) S.decT = setTimeout(pollDecode, 1000);
   else if (j.mode === 'sstv' && j.pictures.length && S.decShown !== j.started) { S.decShown = j.started; loadSstv(); }
 }
 $('decRefresh').onclick = loadDecodeList;
+$('decUpload').onclick = () => $('decFile').click();
+$('decFile').onchange = async () => {
+  const f = $('decFile').files[0]; $('decFile').value = ''; if (!f) return;
+  if (f.size > 200 * 1024 * 1024) { toast('The file is larger than 200 MB'); return; }
+  toast('Uploading ' + f.name + '…');
+  try {
+    const r = await fetch('/api/decode/upload?name=' + encodeURIComponent(f.name) + '&mode=' + $('decMode').value, { method: 'POST', headers: { 'Content-Type': f.type || 'application/octet-stream' }, body: f });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || j.message || ('HTTP ' + r.status));
+    toast(j.message || 'Uploaded'); loadDecodeList();
+  } catch (e) { toast(e.message); }
+};
 $('decStop').onclick = async () => { try { await api('decode/stop', {}); } catch (e) { } };
 
 // the picture viewer: a card on the page (×, ‹ ›, keys, swipe), Share through the device's share menu, Download

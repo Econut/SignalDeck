@@ -54,14 +54,35 @@ public final class RecordingDecoder {
         if ((fmt != 1 && fmt != -2) || bits != 16) throw new IOException("only 16-bit PCM WAV files can be decoded");
         if (rate < 8000) throw new IOException("the sample rate is below 8 kHz");
         int frames = dataLen / (2 * ch);
-        int out = (int) ((long) frames * SR / rate);
+        short[] mono = new short[frames];
+        for (int i = 0; i < frames; i++) { int at = dataAt + i * 2 * ch, sum = 0; for (int c = 0; c < ch; c++) sum += bb.getShort(at + 2 * c); mono[i] = (short) (sum / ch); }
+        return to8k(mono, rate);
+    }
+
+    /**
+     * Mono PCM at any rate to 8 kHz. Above 8 kHz it is low-pass filtered first (4th-order Butterworth at 3.4 kHz, two
+     * biquads), so a 44.1 / 48 kHz recording does not fold its hiss above 4 kHz into the SSTV and AFSK tones, then
+     * resampled by linear interpolation. 8 kHz is returned as it is.
+     */
+    public static short[] to8k(short[] x, int rate) {
+        if (rate == SR) return x;
+        if (rate < SR) throw new IllegalArgumentException("the sample rate is below 8 kHz");
+        double[] y = new double[x.length]; for (int i = 0; i < x.length; i++) y[i] = x[i];
+        biquadLowPass(y, rate, 3400, 0.5412); biquadLowPass(y, rate, 3400, 1.3066);
+        int out = (int) ((long) x.length * SR / rate);
         short[] s = new short[out];
-        for (int o = 0; o < out; o++) {                                       // nearest-sample decimation, as the inject bench does
-            int src = (int) ((long) o * rate / SR); int at = dataAt + src * 2 * ch, sum = 0;
-            for (int c = 0; c < ch; c++) sum += bb.getShort(at + 2 * c);
-            s[o] = (short) (sum / ch);
+        for (int o = 0; o < out; o++) {
+            double t = (double) o * rate / SR; int i = (int) t; double f = t - i;
+            double v = i + 1 < y.length ? y[i] * (1 - f) + y[i + 1] * f : y[Math.min(i, y.length - 1)];
+            s[o] = (short) Math.max(-32768, Math.min(32767, Math.round(v)));
         }
         return s;
+    }
+    private static void biquadLowPass(double[] y, int rate, double fc, double q) {      // RBJ cookbook, in place
+        double w = 2 * Math.PI * fc / rate, cs = Math.cos(w), al = Math.sin(w) / (2 * q), a0 = 1 + al;
+        double b0 = (1 - cs) / 2 / a0, b1 = (1 - cs) / a0, b2 = b0, a1 = -2 * cs / a0, a2 = (1 - al) / a0;
+        double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+        for (int i = 0; i < y.length; i++) { double x0 = y[i], v = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x0; y2 = y1; y1 = v; y[i] = v; }
     }
 
     /** Robot 36 pictures in the recording (continuous receiver: no VIS needed, partial pictures kept). Returns how many. */

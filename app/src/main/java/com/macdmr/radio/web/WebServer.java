@@ -340,7 +340,7 @@ public final class WebServer {
         }
         String cl = r.headers.get("content-length");
         if (cl != null) {
-            int len = Integer.parseInt(cl.trim()); if (len < 0 || len > 8 * 1024 * 1024) return null;
+            int len = Integer.parseInt(cl.trim()); if (len < 0 || len > (r.path != null && r.path.startsWith("/api/decode/upload") ? 200 * 1024 * 1024 : 8 * 1024 * 1024)) return null;   // recordings may be large
             byte[] b = new byte[len]; int off = 0; while (off < len) { int k = in.read(b, off, len - off); if (k < 0) return null; off += k; }
             r.body = b;
         }
