@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Packet finder (find BBSs, nodes and Winlink gateways by listening)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R#8 | **Packet finder** (PKT → Packet finder, SignalDeck Web's Packet page, and a Scheduled operations action): receive only, steps the VFO through a frequency list (default the 2 m packet frequencies 144.910–145.090; editable, minutes per frequency, hours in total) with the squelch open, and lists every non-APRS packet station heard: Winlink gateways, BBSs, nodes (NET/ROM broadcasts, ID beacons), station IDs, beacons and stations in connected traffic, with frequency, best signal, count, last heard and what it said. Stops by itself on transmit, a channel change or a tracked satellite pass; puts the radio back (channel or VFO). Tap a station: tune it and open the packet terminal, or Winlink with the gateway set. Help: Packet finder topic, Scheduled operations. | `PacketFinder.java` (new), `PacketEngine.java` (frame tap), `RadioService.java`, `Scheduler.java`, `ui/PacketFinderDialog.java` (new), `ui/PktDialog.java`, `web/WebHost.java`, `assets/web/index.html`, `assets/web/pages.js`, `assets/web/app.js`, `ui/HelpView.java`, `PacketFinderTest.java` | `PacketFinderTest` (NET/ROM broadcast, ID/BBS/RMS/MAIL beacons, APRS and Mic-E ignored, a BBS's FBB prompt in an I frame, merge keeps the best kind and signal). **Device:** finder on 467.625 via the web API, the HackRF sent four ID beacons as TEST-10 ("Winlink RMS bench gateway"): listed as a Winlink gateway, −83 dBm, 4 frames; Stop put the radio back on the owner's channel (Weather 38). The phone did not transmit. |
+
 ## 2026-10-22 — Forms by Winlink, scheduled Winlink mail checks
 
 | Backlog | Change | Files | Test |

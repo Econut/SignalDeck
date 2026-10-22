@@ -369,6 +369,16 @@
         <div>
           <div class="panel"><span class="label">TOOLS</span><div id="pktTools"></div>
             <div class="row" style="margin-top:12px"><button class="btn" id="cwIdBtn">Send Morse ID</button></div></div>
+          <div class="panel" id="pfPanel"><div class="row between wrap"><span class="label">PACKET FINDER</span><div class="row"><button class="btn small-btn" id="pfGo">Start</button><button class="btn small-btn" id="pfSet">Settings</button><button class="btn small-btn danger" id="pfClear">Clear</button></div></div>
+            <p class="muted small">Listens across the packet frequencies (never transmits) and lists the Winlink gateways, BBSs and nodes it hears. Nodes identify only every 10 to 30 minutes: let it run an hour or two, or schedule it for the night. The radio goes back to its channel afterwards.</p>
+            <p class="muted small" id="pfState"></p>
+            <form id="pfForm" class="sched-form hidden" autocomplete="off">
+              <label class="wide">Frequencies (MHz, commas; empty = 144.910–145.090)<input id="pfFreqs"></label>
+              <label>Minutes on each<input id="pfDwell" inputmode="numeric"></label>
+              <label>Hours in total<input id="pfHours" inputmode="numeric"></label>
+              <div class="row" style="grid-column:1/-1"><button class="btn primary small-btn">Save</button><button class="btn small-btn" id="pfCancel" type="button">Cancel</button></div>
+            </form>
+            <div id="pfList" class="list small"></div></div>
           <div class="panel"><div class="row between wrap"><span class="label">VOICE KEYER</span><span id="idTimer" class="chip dim"></span></div><div id="keyerList"></div>
             <p class="muted small">Upload a recording (any audio file; it is converted to the radio's 8 kHz and cut at 25 s), play it here, then Send it on the current analog channel. Messages recorded on the phone show up here too.</p></div>
           <div class="panel"><span class="label">DTMF</span>
@@ -404,7 +414,7 @@
         <p class="muted small">Start something at a set time, once or every week; when the time is up the radio goes back to what it was doing. A satellite pass being tracked comes first.</p>
         <div id="schedList" class="list small"></div>
         <form id="schedForm" class="sched-form hidden">
-          <label>What <select id="sfAction"><option value="listen">Listen to a channel</option><option value="scan">Scan the zone</option><option value="aprs">APRS monitoring (144.390)</option><option value="sstv">SSTV receive</option><option value="beacon">Send an APRS beacon</option><option value="winlink">Check Winlink mail (radio gateway)</option><option value="winlinknet">Check Winlink mail (internet)</option></select></label>
+          <label>What <select id="sfAction"><option value="listen">Listen to a channel</option><option value="scan">Scan the zone</option><option value="aprs">APRS monitoring (144.390)</option><option value="sstv">SSTV receive</option><option value="beacon">Send an APRS beacon</option><option value="winlink">Check Winlink mail (radio gateway)</option><option value="winlinknet">Check Winlink mail (internet)</option><option value="finder">Packet finder (listen for BBSs, nodes, gateways)</option></select></label>
           <label id="sfChWrap">Channel <select id="sfChannel"></select></label>
           <label id="sfRecWrap" class="chk"><input type="checkbox" id="sfRecord"> Record it</label>
           <div class="sf-days" id="sfDays"></div>

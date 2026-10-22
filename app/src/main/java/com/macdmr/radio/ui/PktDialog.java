@@ -130,6 +130,13 @@ public final class PktDialog {
         button(tr, "Terminal (BBS, node)", Theme.SOFTSQ, x -> { dlg.dismiss(); TerminalDialog.show(c, svc); });
         body.addView(tr);
         body.addView(hint("Connect to a packet bulletin board or node on this channel: " + pe.terminalState() + "."));
+        // ---- packet finder ----
+        body.addView(section("Packet finder"));
+        LinearLayout pfr = row();
+        int pfn = svc.finder().stations().size();
+        button(pfr, svc.finder().running() ? "Packet finder (listening)" : "Packet finder" + (pfn > 0 ? " (" + pfn + " found)" : ""), Theme.SOFTSQ, x -> { dlg.dismiss(); PacketFinderDialog.show(c, svc); });
+        body.addView(pfr);
+        body.addView(hint("Listens across the packet frequencies and lists the BBSs, nodes and Winlink gateways it hears (receive only)."));
         // ---- Winlink ----
         body.addView(section("Winlink e-mail"));
         LinearLayout wr = row();

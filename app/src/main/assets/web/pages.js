@@ -364,6 +364,25 @@ $('fmClose').onclick = () => $('fmView').classList.add('hidden');
 $('fmDel').onclick = async () => { if (!S.fmSel || !await ask('Delete this form?')) return; try { await api('forms', { action: 'delete', id: S.fmSel.id }); $('fmView').classList.add('hidden'); loadForms(); } catch (e) { toast(e.message); } };
 $('fmReply').onclick = () => { const f = S.fmSel; if (!f) return; fmOpen(f.kind, f.kind === 'ICS213' ? { TO: f.fields.FR || '', FR: f.fields.TO || '', SU: 'Re: ' + (f.fields.SU || '') } : { TO: f.fields.SG || '' }); };
 
+// ---- packet finder (Packet page) ----
+async function loadFinder() {
+  let j; try { j = await api('finder'); } catch (e) { return; }
+  S.pf = j;
+  const until = j.endsAt ? new Date(j.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  $('pfState').textContent = j.status + (j.running ? ' · until ' + until : ' · ' + j.freqs.split(',').length + ' frequencies, ' + j.dwell + ' min each, for ' + j.hours + ' h');
+  $('pfGo').textContent = j.running ? 'Stop' : 'Start';
+  const when = t => new Date(t).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+  $('pfList').innerHTML = j.stations.length ? j.stations.map(s => '<div class="item"><div class="main"><b>' + esc(s.call) + '</b> <span class="chip">' + esc(s.kind) + '</span><div class="muted small">'
+    + (s.hz / 1e6).toFixed(3) + ' MHz' + (s.dbm > -200 ? ' · ' + s.dbm + ' dBm' : '') + ' · ' + s.count + '× · last ' + when(s.last) + (s.note ? '<br>' + esc(s.note) : '') + '</div></div></div>').join('')
+    : '<div class="empty">Nothing heard yet</div>';
+  clearTimeout(S.pfTimer); if (j.running && S.page === 'pkt') S.pfTimer = setTimeout(loadFinder, 5000);
+}
+$('pfGo').onclick = async () => { try { const r = await api('finder', { action: S.pf && S.pf.running ? 'stop' : 'start' }); toast(r.message); } catch (x) { toast(x.message); } setTimeout(loadFinder, 800); };
+$('pfSet').onclick = () => { $('pfFreqs').value = (S.pf && S.pf.freqs) || ''; $('pfDwell').value = (S.pf && S.pf.dwell) || 3; $('pfHours').value = (S.pf && S.pf.hours) || 2; $('pfForm').classList.toggle('hidden'); };
+$('pfCancel').onclick = () => $('pfForm').classList.add('hidden');
+$('pfForm').onsubmit = async e => { e.preventDefault(); try { const r = await api('finder', { action: 'settings', freqs: $('pfFreqs').value, dwell: +$('pfDwell').value, hours: +$('pfHours').value }); toast(r.message); $('pfForm').classList.add('hidden'); loadFinder(); } catch (x) { toast(x.message); } };
+$('pfClear').onclick = async () => { if (!await ask('Clear the stations found?')) return; try { await api('finder', { action: 'clear' }); loadFinder(); } catch (x) { toast(x.message); } };
+
 // ---- Winlink e-mail (Messages page) ----
 async function loadWinlink() {
   let j; try { j = await api('winlink'); } catch (e) { return; }
@@ -516,7 +535,7 @@ const sfMask = () => [...$('sfDays').children].reduce((m, b, i) => m | (b.classL
 function sfShow() {
   const a = $('sfAction').value;
   $('sfChWrap').classList.toggle('hidden', !(a === 'listen' || a === 'sstv' || a === 'winlink')); $('sfRecWrap').classList.toggle('hidden', a !== 'listen');
-  $('sfMinWrap').classList.toggle('hidden', a === 'beacon' || a === 'winlink' || a === 'winlinknet'); $('sfDateWrap').classList.toggle('hidden', sfMask() !== 0);
+  $('sfMinWrap').classList.toggle('hidden', a === 'beacon' || a === 'winlink' || a === 'winlinknet');   // the packet finder keeps its minutes $('sfDateWrap').classList.toggle('hidden', sfMask() !== 0);
   const first = $('sfChannel').options[0]; if (first) first.text = a === 'sstv' ? '144.500 MHz (SSTV calling frequency)' : 'The channel the radio is on';
 }
 $('sfAction').onchange = sfShow;

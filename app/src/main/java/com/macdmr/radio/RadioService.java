@@ -2258,6 +2258,9 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- message forms (ICS-213, radiogram) over APRS messages or DMR texts ----
     private com.macdmr.radio.ham.FormStore forms;
+    private PacketFinder finder;
+    /** The packet finder (listens for BBSs, nodes and Winlink gateways). */
+    public synchronized PacketFinder finder() { if (finder == null) finder = new PacketFinder(this); return finder; }
     private com.macdmr.radio.winlink.Winlink winlink;
     /** Winlink e-mail (internet CMS or a packet gateway on the current channel). */
     public synchronized com.macdmr.radio.winlink.Winlink winlink() {
@@ -2415,6 +2418,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 else r = sstvMonitor(true, true);
                 break;
             case Scheduler.BEACON: r = packet == null ? "the packet engine is not running" : packet.sendBeacon(); if (r == null) r = "sent"; break;
+            case Scheduler.FINDER: r = finder().start(e.minutes); if (r == null) r = "listening"; break;
             case Scheduler.WINLINK_NET: {
                 final com.macdmr.radio.winlink.Winlink w = winlink();
                 r = w.connectInternet();
@@ -2474,6 +2478,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         Scheduler.setRunning(this, 0, 0);
         if (p.getBoolean("startedRec", false) && recordOn) setRecord(false);
         if (p.getBoolean("startedScan", false) && scanning()) toggleScan();
+        if (e != null && Scheduler.FINDER.equals(e.action) && finder != null && finder.running()) finder.stop();   // it puts the radio back itself
         boolean satOn = satState != null && !satState.waiting;                // a pass that started meanwhile keeps its decoder
         if (p.getBoolean("startedAprs", false) && packet != null && packet.monitoring() && !satOn) aprsMonitor(false);
         if (p.getBoolean("startedSstv", false) && packet != null && packet.sstvRx() && !satOn) sstvMonitor(false, false);

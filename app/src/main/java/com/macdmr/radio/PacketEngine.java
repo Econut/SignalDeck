@@ -494,6 +494,10 @@ public final class PacketEngine {
         t.connect(call, path.toArray(new String[0]), System.currentTimeMillis());
         return null;
     }
+    // ---- packet finder: every decoded frame while it runs --------------------------------------------
+    private volatile java.util.function.Consumer<byte[]> finderTap;
+    public void setFinderTap(java.util.function.Consumer<byte[]> tap) { finderTap = tap; }
+
     // ---- Winlink over the packet link: the same AX.25 session carries the B2F bytes -------------------
     private volatile java.util.concurrent.LinkedBlockingQueue<Integer> wlRx;
     public com.macdmr.radio.winlink.B2fClient.Wire openWinlinkLink(String gateway, String via, com.macdmr.radio.winlink.Winlink.StatusSink status) throws java.io.IOException {
@@ -789,7 +793,7 @@ public final class PacketEngine {
                 for (int i = 0, o = 0; i + 1 < n; i += 2) { sstvBytes[o++] = mono[i]; sstvBytes[o++] = mono[i + 1]; sstvBytes[o++] = mono[i]; sstvBytes[o++] = mono[i + 1]; }   // the receiver runs at 16 kHz (each 8 kHz sample twice, exactly the module's input)
                 sstv.processAudio(sstvBytes, n * 2);
             }
-            if (!sstvRx && (monitor || kiss.isActive() || terminalActive() || (passiveWanted() && !weatherBand))) {
+            if (!sstvRx && (monitor || kiss.isActive() || terminalActive() || finderTap != null || (passiveWanted() && !weatherBand))) {
                 for (int i = 0; i + 1 < n && fill < WINDOW; i += 2) window[fill++] = (short) ((mono[i] & 0xFF) | (mono[i + 1] << 8));
                 if (fill >= WINDOW) {
                     long now = System.currentTimeMillis();
@@ -821,6 +825,7 @@ public final class PacketEngine {
         try {
             List<byte[]> frames = AFSKDecoder.decode(up6(samples));
             for (byte[] frame : frames) {
+                java.util.function.Consumer<byte[]> ft = finderTap; if (ft != null) try { ft.accept(frame); } catch (Throwable x) { Log.w(TAG, "finder: " + x); }
                 com.macdmr.radio.pkt.Ax25Session ts = terminal;
                 if (ts != null && com.macdmr.radio.pkt.Ax25Session.addressedTo(frame, callsign(), ssid())) {   // connected-mode traffic for our terminal
                     if (duplicate(frame)) continue;

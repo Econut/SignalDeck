@@ -968,6 +968,19 @@ public final class WebHost {
                 return ok(new JSONObject().put("state", w.state()).put("busy", w.busy()).put("progress", w.progress()).put("passwordSet", w.passwordSet()).put("grid", w.grid())
                         .put("gateway", w.gateway()).put("via", w.via()).put("log", w.logText()).put("folders", fo));
             }
+            case "/api/finder": {                                               // GET: state, settings, stations; POST {action: start|stop|clear|settings}
+                com.macdmr.radio.PacketFinder pf = svc.finder();
+                if (post) {
+                    switch (b.optString("action")) {
+                        case "start": { String e = onMain(() -> pf.start(0)); return e == null ? ok("Listening") : WebServer.Response.error(409, e); }
+                        case "stop": pf.stop(); return ok("Stopping");
+                        case "clear": pf.clear(); return ok("Cleared");
+                        case "settings": { String e = pf.setSettings(b.optString("freqs", ""), b.optInt("dwell", 3), b.optInt("hours", 2)); return e == null ? ok("Saved") : WebServer.Response.error(400, e); }
+                        default: return WebServer.Response.error(400, "Unknown action");
+                    }
+                }
+                return ok(pf.json());
+            }
             case "/api/winlink/file": {                                         // GET ?folder=&mid=&i=: an attachment
                 com.macdmr.radio.winlink.WinlinkStore st = svc.winlink().store(); String folder = r.param("folder"), mid = r.param("mid");
                 for (com.macdmr.radio.winlink.WinlinkStore.Item it : st.list(folder == null ? "" : folder)) if (it.m.mid.equals(mid)) {

@@ -28,9 +28,9 @@ import java.util.Locale;
  * always win: the operation is skipped (or, while talking, started 20 s later) with a history line.
  */
 public final class Scheduler {
-    public static final String LISTEN = "listen", SCAN = "scan", APRS = "aprs", SSTV = "sstv", BEACON = "beacon", WINLINK = "winlink", WINLINK_NET = "winlinknet";
-    public static final String[] ACTIONS = { LISTEN, SCAN, APRS, SSTV, BEACON, WINLINK, WINLINK_NET };
-    public static final String[] ACTION_NAMES = { "Listen to a channel", "Scan the zone", "APRS monitoring (144.390)", "SSTV receive", "Send an APRS beacon", "Check Winlink mail (radio gateway)", "Check Winlink mail (internet)" };
+    public static final String LISTEN = "listen", SCAN = "scan", APRS = "aprs", SSTV = "sstv", BEACON = "beacon", WINLINK = "winlink", WINLINK_NET = "winlinknet", FINDER = "finder";
+    public static final String[] ACTIONS = { LISTEN, SCAN, APRS, SSTV, BEACON, WINLINK, WINLINK_NET, FINDER };
+    public static final String[] ACTION_NAMES = { "Listen to a channel", "Scan the zone", "APRS monitoring (144.390)", "SSTV receive", "Send an APRS beacon", "Check Winlink mail (radio gateway)", "Check Winlink mail (internet)", "Packet finder (listen for BBSs, nodes, gateways)" };
     /** Actions that use a channel of their own (the rest work on the current one). */
     public static boolean usesChannel(String a) { return LISTEN.equals(a) || SSTV.equals(a) || WINLINK.equals(a); }
 
