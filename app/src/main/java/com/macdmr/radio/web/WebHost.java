@@ -619,6 +619,27 @@ public final class WebHost {
                 ByteArrayOutputStream o = new ByteArrayOutputStream(); bm.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, o);
                 WebServer.Response x = WebServer.Response.bytes("image/png", o.toByteArray()); x.headers.put("Cache-Control", "no-store"); return x;
             }
+            case "/api/decode/recordings": {                                    // what can be decoded: SignalDeck's recordings, newest first
+                JSONArray a = new JSONArray();
+                for (File f : com.macdmr.radio.RecordingDecodeJob.recordings(60))
+                    a.put(new JSONObject().put("folder", f.getParentFile().getName()).put("name", f.getName()).put("ts", f.lastModified()).put("seconds", Math.max(0, (f.length() - 44) / 16000)).put("pass", f.getName().contains("_pass")));
+                return ok(new JSONObject().put("recordings", a));
+            }
+            case "/api/decode": {                                               // POST {folder, name, mode: sstv|aprs} starts; GET reports the job
+                if (post) {
+                    File f = com.macdmr.radio.RecordingDecodeJob.recording(b.optString("folder", null), b.optString("name", null));
+                    if (f == null) return WebServer.Response.error(404, "Recording not found");
+                    String e = com.macdmr.radio.RecordingDecodeJob.start(b.optString("mode", "sstv"), f, svc);
+                    return e == null ? ok("Decoding " + f.getName()) : WebServer.Response.error(409, e);
+                }
+                com.macdmr.radio.RecordingDecodeJob j = com.macdmr.radio.RecordingDecodeJob.current();
+                if (j == null) return ok(new JSONObject().put("job", JSONObject.NULL));
+                JSONObject o = new JSONObject().put("file", j.file.getName()).put("mode", j.mode).put("percent", j.percent).put("done", j.done).put("summary", j.summary == null ? "" : j.summary).put("error", j.error == null ? "" : j.error).put("started", j.startedAt);
+                JSONArray pics = new JSONArray(); synchronized (j.pictures) { for (String s : j.pictures) pics.put(s); }
+                JSONArray pk = new JSONArray(); synchronized (j.packets) { int n = j.packets.size(); for (int i = Math.max(0, n - 300); i < n; i++) pk.put(j.packets.get(i)); o.put("packetCount", n); }
+                return ok(new JSONObject().put("job", o.put("pictures", pics).put("packets", pk)));
+            }
+            case "/api/decode/stop": if (!post) break; { com.macdmr.radio.RecordingDecodeJob j = com.macdmr.radio.RecordingDecodeJob.current(); if (j != null) j.cancel(); return ok("Stopping"); }
             case "/api/sstv/pictures": {
                 File[] fs = sstvDir().listFiles((d, n) -> n.endsWith(".png") || n.endsWith(".jpg"));
                 JSONArray a = new JSONArray();

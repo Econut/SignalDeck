@@ -84,6 +84,8 @@ public final class SstvScreen extends ModeScreen {
             if (iss()) { svc.endSatTracking(); toast("ISS SSTV stopped"); close(); return; }
             toast(svc.sstvMonitor(false, false)); close();
         });
+        LinearLayout r3 = buttonRow();
+        button(r3, "Decode a recording", "rec", Neo.CYAN, v -> RecordingsDialog.show(c, svc, com.macdmr.radio.RecordingDecodeJob.SSTV));
 
         if (pe.sstvLast() != null && !iss()) live.setImageBitmap(pe.sstvLast());      // an ISS session starts empty: the last picture came from elsewhere
         status.setText(nice(pe.sstvStatus()));

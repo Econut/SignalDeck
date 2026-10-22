@@ -87,6 +87,8 @@ public final class AprsScreen extends ModeScreen {
             if (svc.satMode() == com.macdmr.radio.ham.Satellites.APRS) { svc.endSatTracking(); toast("ISS APRS stopped"); close(); return; }
             toast(svc.aprsMonitor(false)); close();
         });
+        LinearLayout r3 = buttonRow();
+        button(r3, "Decode a recording", "rec", Neo.CYAN, v -> RecordingsDialog.show(c, svc, com.macdmr.radio.RecordingDecodeJob.APRS));
     }
 
     private TextView stat(LinearLayout row, String label) {

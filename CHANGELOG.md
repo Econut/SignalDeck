@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Decode a recording (SSTV pictures, APRS packets) on the phone and in SignalDeck Web
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner's request: review and decode the pass recordings on the phone. **Decode a recording** (PKT → SSTV / APRS, the SSTV and APRS pages, SignalDeck Web's SSTV page): pass recordings, REC files or any 16-bit PCM WAV (any rate, mono/stereo; "Another WAV file…" copies it in through the document picker). `RecordingDecoder` (pure Java) runs its own continuous Robot 36 receiver (64 ms blocks like live) or the live AFSK decoder with the live windows (2 s + 1 s overlap, copies within 4 s merged), as fast as the CPU allows; nothing goes to the radio, the speaker or the live decoders, and packets are never digipeated, gated, acknowledged or given to the TNC. `RecordingDecodeJob`: one job at a time, progress, pictures saved to Download/DMR/SSTV as `SSTV_Robot36_<on-air time>_rec[_partial].png` (time from the file name), packets listed "mm:ss HH:MM:SS TNC2 — description" and written to `<recording>.aprs.txt`, a history line at the end. Web: `/api/decode/recordings`, `/api/decode` (POST start, GET job), `/api/decode/stop`. Help: PKT → Decode a recording; SignalDeck Web → Decode in the browser. | `RecordingDecoder.java` (new), `RecordingDecodeJob.java` (new), `ui/RecordingsDialog.java` (new), `ui/PktDialog.java`, `ui/SstvScreen.java`, `ui/AprsScreen.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java`, `RecordingDecoderTest.java` (new, 5 tests) | Host tests: the bench Robot 36 recording → 1 complete 320×240 picture; direwolf's 100-packet benchmark → ≥ 24 (direwolf 24); WAV conversion, cancel. **Device** (owner's Armor, with ISS tracking armed): via the web API the SSTV recording (37 s) decoded in 0.98 s → 1 complete picture named for 09:00:37; APRS benchmark (77 s) in 5.4 s → 32 packets; phone sheet from the ISS SSTV page → list, progress, "1 picture (1 complete)"; zone/channel unchanged; test files deleted. |
+
 ## 2026-10-22 — ISS passes: fresh orbits before each pass, whole-pass recording; SSTV picture viewer in SignalDeck Web
 
 | Backlog | Change | Files | Test |

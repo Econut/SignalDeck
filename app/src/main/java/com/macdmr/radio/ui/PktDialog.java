@@ -74,6 +74,7 @@ public final class PktDialog {
         body.addView(r2b);
         LinearLayout rSat = row();
         button(rSat, svc.satState() != null ? "Satellites: tracking " + svc.satState().name : "Satellite passes", Theme.PKT, x -> { dlg.dismiss(); SatelliteDialog.show(c, svc); });
+        button(rSat, "Decode a recording", Theme.PKT, x -> { dlg.dismiss(); RecordingsDialog.show(c, svc, com.macdmr.radio.RecordingDecodeJob.APRS); });
         body.addView(rSat);
         LinearLayout rIss = row();
         final boolean issMon = svc.satMode() == com.macdmr.radio.ham.Satellites.APRS;
@@ -183,7 +184,11 @@ public final class PktDialog {
         LinearLayout s2 = row();
         button(s2, "Live picture", Theme.SOFTSQ, x -> sstvView());
         button(s2, "Send picture", Theme.VFO, x -> sstvSend());
+
         body.addView(s2);
+        LinearLayout s2d = row();
+        button(s2d, "Decode a recording", Theme.PKT, x -> { dlg.dismiss(); RecordingsDialog.show(c, svc, com.macdmr.radio.RecordingDecodeJob.SSTV); });
+        body.addView(s2d);
         body.addView(hint("Receives Robot, Martin, Scottie and PD modes (VIS auto-detect); pictures are saved to Download/DMR/SSTV. Sending uses Robot 24 Color, Robot 12 BW or Robot 8 BW, the modes that fit this radio's 30 s transmit limit."));
         // ---- DTMF ----
         body.addView(section("DTMF"));

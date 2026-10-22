@@ -238,13 +238,40 @@ $('msgForm').addEventListener('submit', async e => { e.preventDefault(); const j
 
 // ---- SSTV ----
 async function loadSstv() {
-  refreshLive();
+  refreshLive(); if (!S.decLoaded) { S.decLoaded = true; loadRecordings(); }
   try {
     const j = await api('sstv/pictures'); S.pictures = j.pictures;
     $('gallery').innerHTML = j.pictures.map((p, i) => { const u = picUrl(p); return '<a href="' + u + '" data-i="' + i + '"><img loading="lazy" src="' + u + '" alt=""><span>' + new Date(p.ts).toLocaleString() + '</span></a>'; }).join('') || '<div class="empty">No pictures yet</div>';
     $('gallery').querySelectorAll('a[data-i]').forEach(a => a.onclick = e => { e.preventDefault(); openPic(+a.dataset.i); });
   } catch (e) { }
 }
+// decode a recording (SSTV page): the list, start, progress
+async function loadRecordings() {
+  try {
+    const j = await api('decode/recordings');
+    $('decList').innerHTML = j.recordings.map((r, i) => '<div class="item"><div class="main"><b>' + (r.pass ? 'Pass recording' : esc(r.name)) + '</b><div class="sub">' + esc(r.folder) + ' · ' + new Date(r.ts).toLocaleString() + ' · ' + (r.seconds >= 60 ? Math.floor(r.seconds / 60) + ' min ' + (r.seconds % 60) + ' s' : r.seconds + ' s') + '</div></div><button class="btn small-btn" data-r="' + i + '">Decode</button></div>').join('') || '<div class="empty">No recordings yet (Satellite passes → Record each pass, or REC)</div>';
+    $('decList').querySelectorAll('button[data-r]').forEach(bt => bt.onclick = async () => {
+      const r = j.recordings[+bt.dataset.r];
+      try { await api('decode', { folder: r.folder, name: r.name, mode: $('decMode').value }); pollDecode(); } catch (e) { toast(e.message); }
+    });
+  } catch (e) { }
+  pollDecode();
+}
+async function pollDecode() {
+  clearTimeout(S.decT);
+  let j; try { j = (await api('decode')).job; } catch (e) { return; }
+  if (!j) { $('decJob').classList.add('hidden'); return; }
+  $('decJob').classList.remove('hidden');
+  $('decFile').textContent = j.file; $('decPct').textContent = j.percent + ' %'; $('decBar').style.width = j.percent + '%'; $('decBar').className = j.mode === 'aprs' ? '' : 'chg';
+  $('decState').textContent = j.error ? 'Could not decode: ' + j.error : j.done ? j.summary : (j.mode === 'aprs' ? 'Looking for APRS packets…' : 'Looking for Robot 36 pictures…');
+  $('decOut').textContent = j.mode === 'aprs' ? (j.packetCount > j.packets.length ? '(the last ' + j.packets.length + ' of ' + j.packetCount + ')\n' : '') + j.packets.join('\n') : j.pictures.join('\n');
+  $('decStop').classList.toggle('hidden', j.done);
+  if (!j.done) S.decT = setTimeout(pollDecode, 1000);
+  else if (j.mode === 'sstv' && j.pictures.length && S.decShown !== j.started) { S.decShown = j.started; loadSstv(); }
+}
+$('decRefresh').onclick = loadRecordings;
+$('decStop').onclick = async () => { try { await api('decode/stop', {}); } catch (e) { } };
+
 // the picture viewer: a card on the page (×, ‹ ›, keys, swipe), Share through the device's share menu, Download
 const picUrl = p => '/api/sstv/picture?name=' + encodeURIComponent(p.name);
 function openPic(i) {
