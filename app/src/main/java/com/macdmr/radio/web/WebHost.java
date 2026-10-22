@@ -657,6 +657,16 @@ public final class WebHost {
                 }
                 return ok(new JSONObject().put("pictures", a));
             }
+            case "/api/sstv/delete": if (!post) break; {                         // {names: [...]}: received pictures in Download/DMR/SSTV only
+                JSONArray names = b.optJSONArray("names"); if (names == null || names.length() == 0) return WebServer.Response.error(400, "No pictures given");
+                int gone = 0;
+                for (int i = 0; i < names.length(); i++) {
+                    String n = names.optString(i, "");
+                    if (n.isEmpty() || n.contains("/") || n.contains("\\") || n.contains("..") || !(n.toLowerCase(java.util.Locale.US).endsWith(".png") || n.toLowerCase(java.util.Locale.US).endsWith(".jpg"))) continue;
+                    File f = new File(sstvDir(), n); if (f.isFile() && f.delete()) gone++;
+                }
+                return ok(new JSONObject().put("deleted", gone));
+            }
             case "/api/sstv/picture": {
                 String n = r.param("name");
                 if (n == null || n.contains("/") || n.contains("\\") || n.contains("..")) return WebServer.Response.error(400, "Bad name");

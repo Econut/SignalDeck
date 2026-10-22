@@ -242,7 +242,11 @@ async function loadSstv() {
   try {
     const j = await api('sstv/pictures'); S.pictures = j.pictures;
     $('gallery').innerHTML = j.pictures.map((p, i) => { const u = picUrl(p); return '<a href="' + u + '" data-i="' + i + '"><img loading="lazy" src="' + u + '" alt=""><span>' + new Date(p.ts).toLocaleString() + '</span></a>'; }).join('') || '<div class="empty">No pictures yet</div>';
-    $('gallery').querySelectorAll('a[data-i]').forEach(a => a.onclick = e => { e.preventDefault(); openPic(+a.dataset.i); });
+    $('gallery').querySelectorAll('a[data-i]').forEach(a => {
+      a.classList.toggle('sel', !!(S.sel && S.sel.has(j.pictures[+a.dataset.i].name)));
+      a.onclick = e => { e.preventDefault(); if (S.sel) toggleSel(a); else openPic(+a.dataset.i); };
+    });
+    if (S.sel) { for (const n of [...S.sel]) if (!j.pictures.some(p => p.name === n)) S.sel.delete(n); selCount(); }
   } catch (e) { }
 }
 // decode a recording (SSTV page): the list, start, progress
@@ -283,6 +287,45 @@ $('decFile').onchange = async () => {
 };
 $('decStop').onclick = async () => { try { await api('decode/stop', {}); } catch (e) { } };
 
+// confirmation card (deleting); resolves true on the red button
+function ask(text, yes) {
+  return new Promise(res => {
+    $('askText').textContent = text; $('askYes').textContent = yes || 'Delete'; $('askDlg').classList.remove('hidden'); $('askNo').focus();
+    const done = v => { $('askDlg').classList.add('hidden'); document.removeEventListener('keydown', key, true); res(v); };
+    const key = e => { if (e.key === 'Escape') { e.stopPropagation(); done(false); } };
+    document.addEventListener('keydown', key, true);
+    $('askYes').onclick = () => done(true); $('askNo').onclick = () => done(false);
+    $('askDlg').onclick = e => { if (e.target === $('askDlg')) done(false); };
+  });
+}
+async function deletePics(names) {
+  const j = await api('sstv/delete', { names });
+  toast(j.deleted === 1 ? '1 picture deleted' : j.deleted + ' pictures deleted'); return j.deleted;
+}
+async function sharePics(list) {
+  try {
+    const files = await Promise.all(list.map(async p => { const b = await (await fetch(picUrl(p))).blob(); return new File([b], p.name, { type: b.type || 'image/png' }); }));
+    if (navigator.canShare && navigator.canShare({ files })) { await navigator.share({ files, title: files.length > 1 ? files.length + ' SSTV pictures' : 'SSTV picture', text: (files.length > 1 ? files.length + ' SSTV pictures' : 'An SSTV picture') + ' received with SignalDeck' }); return; }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  toast(window.isSecureContext ? 'This browser cannot share pictures: use Download' : 'Sharing needs the secure address (https, port 8443, see Settings): use Download here');
+}
+// selecting several pictures (Select on the gallery)
+function selCount() { const n = S.sel ? S.sel.size : 0; $('selCount').textContent = n + ' selected'; $('selShare').disabled = $('selDel').disabled = n === 0; }
+function toggleSel(a) { const n = S.pictures[+a.dataset.i].name; if (S.sel.has(n)) S.sel.delete(n); else S.sel.add(n); a.classList.toggle('sel', S.sel.has(n)); selCount(); }
+function setSelecting(on) {
+  S.sel = on ? new Set() : null; $('gallery').classList.toggle('selecting', on); $('selBar').classList.toggle('hidden', !on); $('picSelect').classList.toggle('hidden', on);
+  $('gallery').querySelectorAll('a.sel').forEach(a => a.classList.remove('sel')); selCount();
+}
+$('picSelect').onclick = () => setSelecting(true);
+$('selDone').onclick = () => setSelecting(false);
+$('selAll').onclick = () => { const all = (S.pictures || []).length && S.sel.size === S.pictures.length; S.sel = new Set(all ? [] : (S.pictures || []).map(p => p.name)); $('gallery').querySelectorAll('a[data-i]').forEach(a => a.classList.toggle('sel', S.sel.has(S.pictures[+a.dataset.i].name))); selCount(); };
+$('selShare').onclick = () => sharePics((S.pictures || []).filter(p => S.sel.has(p.name)));
+$('selDel').onclick = async () => {
+  const names = [...S.sel]; if (!names.length) return;
+  if (!await ask(names.length === 1 ? 'Delete this picture from the phone? This cannot be undone.' : 'Delete these ' + names.length + ' pictures from the phone? This cannot be undone.')) return;
+  try { await deletePics(names); setSelecting(false); loadSstv(); } catch (e) { toast(e.message); }
+};
+
 // the picture viewer: a card on the page (×, ‹ ›, keys, swipe), Share through the device's share menu, Download
 const picUrl = p => '/api/sstv/picture?name=' + encodeURIComponent(p.name);
 function openPic(i) {
@@ -302,13 +345,23 @@ $('picPrev').onclick = () => openPic(S.picIdx - 1);
 $('picNext').onclick = () => openPic(S.picIdx + 1);
 $('picDlg').onclick = e => { if (e.target === $('picDlg')) closePic(); };
 document.addEventListener('keydown', e => {
-  if (!picOpen()) return;
+  if (!picOpen() || !$('askDlg').classList.contains('hidden')) return;
   if (e.key === 'Escape') closePic(); else if (e.key === 'ArrowLeft') openPic(S.picIdx - 1); else if (e.key === 'ArrowRight') openPic(S.picIdx + 1);
 });
 (() => { let x0 = null; const el = $('picImg');
   el.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
   el.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 50) openPic(S.picIdx + (dx < 0 ? 1 : -1)); }, { passive: true });
 })();
+$('picDel').onclick = async () => {
+  const p = (S.pictures || [])[S.picIdx]; if (!p) return;
+  if (!await ask('Delete this picture (' + new Date(p.ts).toLocaleString() + ') from the phone? This cannot be undone.')) return;
+  try {
+    await deletePics([p.name]);
+    S.pictures.splice(S.picIdx, 1);
+    if (S.pictures.length) openPic(Math.min(S.picIdx, S.pictures.length - 1)); else closePic();
+    loadSstv();
+  } catch (e) { toast(e.message); }
+};
 $('picShare').onclick = async () => {
   const p = (S.pictures || [])[S.picIdx]; if (!p) return;
   const when = new Date(p.ts).toLocaleString();

@@ -35,6 +35,9 @@ public final class SstvScreen extends ModeScreen {
     private final ProgressBar progress;
     private final LinearLayout gallery;
     private long galleryStamp = -1;
+    private java.util.Set<String> selected;                                    // non-null while selecting (long-press a picture)
+    private LinearLayout selBar; private TextView selCount;
+    private final java.util.Map<String, ImageView> thumbs = new java.util.HashMap<>();
     private final TextView switchBtn;
     private final PassCard passCard;
     private TextView sendBtn, decoderBtn;
@@ -62,6 +65,14 @@ public final class SstvScreen extends ModeScreen {
 
         galleryTitle = Neo.caps(c, "RECEIVED"); galleryTitle.setPadding(0, dp(14), 0, dp(6));
         body.addView(galleryTitle);
+        selBar = new LinearLayout(c); selBar.setGravity(Gravity.CENTER_VERTICAL); selBar.setVisibility(GONE); selBar.setPadding(0, 0, 0, dp(8));
+        selCount = Neo.text(c, "", Neo.CYAN_LIGHT, 15, Neo.uiMedium(c)); selBar.addView(selCount, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        TextView sShare = Neo.button(c, "Share", "send", Neo.CYAN), sDel = Neo.button(c, "Delete", "stop", Neo.RED), sDone = Neo.button(c, "Done", "check", Neo.MUTED);
+        for (TextView t : new TextView[] { sShare, sDel, sDone }) { LayoutParams l = new LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)); l.leftMargin = dp(6); selBar.addView(t, l); }
+        sShare.setOnClickListener(v -> { java.util.List<File> fs = selectedFiles(); if (fs.isEmpty()) toast("Tap pictures to select them"); else share(fs); });
+        sDel.setOnClickListener(v -> { java.util.List<File> fs = selectedFiles(); if (fs.isEmpty()) toast("Tap pictures to select them"); else delete(fs, null); });
+        sDone.setOnClickListener(v -> endSelect());
+        body.addView(selBar);
         HorizontalScrollView hs = new HorizontalScrollView(c); hs.setHorizontalScrollBarEnabled(false);
         gallery = new LinearLayout(c); hs.addView(gallery);
         body.addView(hs);
@@ -134,8 +145,8 @@ public final class SstvScreen extends ModeScreen {
         long stamp = fs == null ? 0 : fs.length + dir.lastModified();
         if (stamp == galleryStamp) return;
         galleryStamp = stamp;
-        gallery.removeAllViews();
-        if (fs == null || fs.length == 0) { galleryTitle.setText("RECEIVED  ·  none yet"); return; }
+        gallery.removeAllViews(); thumbs.clear();
+        if (fs == null || fs.length == 0) { galleryTitle.setText("RECEIVED  ·  none yet"); endSelect(); return; }
         Arrays.sort(fs, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
         galleryTitle.setText("RECEIVED  ·  " + fs.length);
         for (int i = 0; i < Math.min(24, fs.length); i++) {
@@ -147,7 +158,9 @@ public final class SstvScreen extends ModeScreen {
             iv.setBackground(Neo.card(c, Neo.LINE, 8)); iv.setPadding(dp(2), dp(2), dp(2), dp(2)); iv.setClipToOutline(true);
             cell.addView(iv, new LayoutParams(dp(120), dp(96)));
             TextView t = Neo.text(c, ago(f.lastModified()), Neo.DIM, 11, Neo.uiMedium(c)); t.setPadding(0, dp(3), 0, 0); cell.addView(t);
-            cell.setOnClickListener(v -> view(f));
+            thumbs.put(f.getName(), iv); mark(iv, selected != null && selected.contains(f.getName()));
+            cell.setOnClickListener(v -> { if (selected != null) toggle(f); else view(f); });
+            cell.setOnLongClickListener(v -> { if (selected == null) { selected = new java.util.LinkedHashSet<>(); selBar.setVisibility(VISIBLE); } toggle(f); return true; });
             LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); lp.rightMargin = dp(8);
             gallery.addView(cell, lp);
         }
@@ -169,6 +182,59 @@ public final class SstvScreen extends ModeScreen {
             } catch (Throwable t) { toast("Could not share: " + t.getMessage()); }
         });
         body.addView(share, new LayoutParams(LayoutParams.MATCH_PARENT, dp(48)));
-        Neo.showSheet(c, body);
+        TextView del = Neo.button(c, "Delete", "stop", Neo.RED);
+        LayoutParams dl = new LayoutParams(LayoutParams.MATCH_PARENT, dp(48)); dl.topMargin = dp(8);
+        body.addView(del, dl);
+        final android.app.AlertDialog[] sheet = { null };
+        del.setOnClickListener(v -> delete(java.util.Collections.singletonList(f), () -> { if (sheet[0] != null) sheet[0].dismiss(); }));
+        sheet[0] = Neo.showSheet(c, body);
+    }
+
+    // ---- selecting several pictures: long-press one, tap the others, then Share or Delete ----
+    private void mark(ImageView iv, boolean on) { iv.setBackground(on ? Neo.outline(c, Neo.CYAN, 0x40, 8, 3) : Neo.card(c, Neo.LINE, 8)); iv.setAlpha(selected != null && !on ? 0.6f : 1f); }
+    private void toggle(File f) {
+        if (selected == null) return;
+        if (!selected.remove(f.getName())) selected.add(f.getName());
+        for (java.util.Map.Entry<String, ImageView> e : thumbs.entrySet()) mark(e.getValue(), selected.contains(e.getKey()));
+        selCount.setText(selected.size() == 1 ? "1 selected" : selected.size() + " selected");
+    }
+    private void endSelect() {
+        selected = null; if (selBar != null) selBar.setVisibility(GONE);
+        for (ImageView iv : thumbs.values()) mark(iv, false);
+    }
+    private File sstvDir() { return new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "DMR/SSTV"); }
+    private java.util.List<File> selectedFiles() {
+        java.util.List<File> out = new java.util.ArrayList<>(); if (selected == null) return out;
+        for (String n : selected) { File f = new File(sstvDir(), n); if (f.isFile()) out.add(f); }
+        return out;
+    }
+    /** One picture through ACTION_SEND, several through ACTION_SEND_MULTIPLE (copies in the shared cache folder). */
+    private void share(java.util.List<File> fs) {
+        try {
+            File dir = new File(c.getCacheDir(), "share"); dir.mkdirs();       // the provider shares the cache's share/ folder only
+            java.util.ArrayList<android.net.Uri> us = new java.util.ArrayList<>();
+            for (File f : fs) {
+                File copy = new File(dir, f.getName());
+                try (java.io.InputStream in = new java.io.FileInputStream(f); java.io.OutputStream out = new java.io.FileOutputStream(copy)) { byte[] b = new byte[65536]; int n; while ((n = in.read(b)) > 0) out.write(b, 0, n); }
+                us.add(androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName() + ".files", copy));
+            }
+            android.content.Intent i = us.size() == 1
+                    ? new android.content.Intent(android.content.Intent.ACTION_SEND).setType("image/*").putExtra(android.content.Intent.EXTRA_STREAM, us.get(0))
+                    : new android.content.Intent(android.content.Intent.ACTION_SEND_MULTIPLE).setType("image/*").putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, us);
+            i.putExtra(android.content.Intent.EXTRA_TEXT, (us.size() == 1 ? "An SSTV picture" : us.size() + " SSTV pictures") + " received with SignalDeck").addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            c.startActivity(android.content.Intent.createChooser(i, us.size() == 1 ? "Share the picture" : "Share " + us.size() + " pictures"));
+        } catch (Throwable t) { toast("Could not share: " + t.getMessage()); }
+    }
+    /** Delete after a confirmation; {@code after} runs once they are gone (closes the viewer). */
+    private void delete(java.util.List<File> fs, Runnable after) {
+        String what = fs.size() == 1 ? "this picture" : "these " + fs.size() + " pictures";
+        new android.app.AlertDialog.Builder(c).setTitle("Delete " + what + "?").setMessage("They are removed from Download/DMR/SSTV on this phone. This cannot be undone.")
+                .setPositiveButton("Delete", (d, w) -> {
+                    int gone = 0; for (File f : fs) if (f.delete()) gone++;
+                    toast(gone == 1 ? "1 picture deleted" : gone + " pictures deleted");
+                    endSelect(); galleryStamp = -1; refresh();
+                    if (after != null) after.run();
+                })
+                .setNegativeButton("Cancel", null).show();
     }
 }

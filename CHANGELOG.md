@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — SSTV pictures: Delete with confirmation, select several to share or delete (web and phone)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner's request. **SignalDeck Web:** the picture card has **Delete** (an on-page confirmation card: Cancel / Delete, Esc or a click outside cancels); the PICTURES panel has **Select**: tap pictures to tick them (✓ badge), a bar with "N selected", All, **Share** (every ticked picture in one Web Share call) and **Delete** (confirmation), Done. `POST /api/sstv/delete {names}` deletes plain file names in Download/DMR/SSTV only (PNG/JPG, no paths). **Phone (SSTV page):** the picture viewer has Delete (themed confirmation); a long-press on a thumbnail starts selecting (others dim, ticked ones get a cyan frame), a bar with the count, Share (one picture: ACTION_SEND; several: ACTION_SEND_MULTIPLE) and Delete (confirmation), Done. Help: PKT → SSTV; SignalDeck Web → SSTV pictures. | `web/WebHost.java`, `assets/web/index.html`, `assets/web/app.js`, `assets/web/app.css`, `ui/SstvScreen.java`, `ui/HelpView.java` | **Device + browser** (owner's Armor) with test pictures made by decoding the bench recording (the owner's own pictures untouched): web: 2 ticked → "2 selected" → Delete → confirmation → Cancel kept all 5 → Delete removed exactly the 2; card Delete on the third after confirming; phone: long-press → "1 selected", Share opened the system chooser, Delete → Cancel kept it → Delete removed it; zone/channel unchanged; test files deleted. |
+
 ## 2026-10-22 — Decode a recording: upload from anywhere, every audio format, every SSTV mode
 
 | Backlog | Change | Files | Test |
