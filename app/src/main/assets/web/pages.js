@@ -364,6 +364,66 @@ $('fmClose').onclick = () => $('fmView').classList.add('hidden');
 $('fmDel').onclick = async () => { if (!S.fmSel || !await ask('Delete this form?')) return; try { await api('forms', { action: 'delete', id: S.fmSel.id }); $('fmView').classList.add('hidden'); loadForms(); } catch (e) { toast(e.message); } };
 $('fmReply').onclick = () => { const f = S.fmSel; if (!f) return; fmOpen(f.kind, f.kind === 'ICS213' ? { TO: f.fields.FR || '', FR: f.fields.TO || '', SU: 'Re: ' + (f.fields.SU || '') } : { TO: f.fields.SG || '' }); };
 
+// ---- Winlink e-mail (Messages page) ----
+async function loadWinlink() {
+  let j; try { j = await api('winlink'); } catch (e) { return; }
+  S.wl = j;
+  $('wlState').textContent = j.state + (j.busy && j.progress ? ' · ' + j.progress : '') + (j.passwordSet ? '' : ' · no Winlink password set yet (Settings)');
+  $('wlNet').textContent = j.busy ? 'Stop' : 'Connect: internet'; $('wlRf').disabled = j.busy;
+  if (!$('wlLog').classList.contains('hidden')) $('wlLog').textContent = j.log || 'No session yet.';
+  const when = t => t ? new Date(t).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  const sec = (key, title) => {
+    const l = j.folders[key] || [];
+    return '<div class="label wl-head">' + title + (l.length ? ' (' + l.length + ')' : ': empty') + '</div>' + l.map((m, i) => '<div class="item click" data-f="' + key + '" data-i="' + i + '"><div class="main"><b>' + (m.unread ? '● ' : '') + esc(m.subject) + '</b><div class="muted small">'
+      + esc(key === 'inbox' ? 'From ' + m.from : 'To ' + m.to.join(', ')) + ' · ' + when(m.time) + (m.files.length ? ' · 📎 ' + m.files.length : '') + '</div></div></div>').join('');
+  };
+  $('wlList').innerHTML = sec('inbox', 'INBOX') + sec('outbox', 'OUTBOX · GOES OUT AT THE NEXT CONNECTION') + sec('sent', 'SENT');
+  clearTimeout(S.wlTimer); if (j.busy && S.page === 'messages') S.wlTimer = setTimeout(loadWinlink, 1500);
+}
+function wlOnly(id) { ['wlCompose', 'wlRfForm', 'wlSetForm', 'wlView', 'wlLog'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
+function wlCompose(to, subj, text) { $('wlTo').value = to || ''; $('wlCc').value = ''; $('wlSubj').value = subj || ''; $('wlText').value = text || ''; wlOnly('wlCompose'); $(to ? 'wlText' : 'wlTo').focus(); }
+$('wlNew').onclick = () => wlCompose();
+$('wlCancelC').onclick = () => wlOnly('');
+$('wlCompose').onsubmit = async e => {
+  e.preventDefault();
+  try { const r = await api('winlink', { action: 'compose', to: $('wlTo').value, cc: $('wlCc').value, subject: $('wlSubj').value, text: $('wlText').value }); toast(r.message); wlOnly(''); loadWinlink(); } catch (x) { toast(x.message); }
+};
+$('wlNet').onclick = async () => {
+  try { const r = await api('winlink', { action: S.wl && S.wl.busy ? 'cancel' : 'connect', how: 'internet' }); toast(r.message); } catch (x) { toast(x.message); }
+  setTimeout(loadWinlink, 400);
+};
+$('wlRf').onclick = () => { $('wlGw').value = (S.wl && S.wl.gateway) || ''; $('wlVia').value = (S.wl && S.wl.via) || ''; wlOnly('wlRfForm'); };
+$('wlRfCancel').onclick = () => wlOnly('');
+$('wlRfForm').onsubmit = async e => {
+  e.preventDefault();
+  try { const r = await api('winlink', { action: 'connect', how: 'radio', gateway: $('wlGw').value, via: $('wlVia').value }); toast(r.message); wlOnly(''); } catch (x) { toast(x.message); }
+  setTimeout(loadWinlink, 400);
+};
+$('wlSet').onclick = () => { $('wlPw').value = ''; $('wlPw').placeholder = S.wl && S.wl.passwordSet ? 'set (leave empty to keep)' : ''; $('wlGrid').value = (S.wl && S.wl.grid) || ''; wlOnly('wlSetForm'); };
+$('wlSetCancel').onclick = () => wlOnly('');
+$('wlSetForm').onsubmit = async e => {
+  e.preventDefault();
+  try { const r = await api('winlink', { action: 'settings', password: $('wlPw').value, grid: $('wlGrid').value }); $('wlPw').value = ''; toast(r.message); wlOnly(''); loadWinlink(); } catch (x) { toast(x.message); }
+};
+$('wlLogB').onclick = () => { if (!$('wlLog').classList.contains('hidden')) { wlOnly(''); return; } wlOnly('wlLog'); $('wlLog').textContent = (S.wl && S.wl.log) || 'No session yet.'; };
+$('wlList').onclick = async e => {
+  const it = e.target.closest('[data-f]'); if (!it) return;
+  const f = it.dataset.f, m = S.wl.folders[f][+it.dataset.i]; S.wlSel = { f, m };
+  $('wlHead').textContent = 'From ' + m.from + ' · To ' + m.to.join(', ') + (m.cc.length ? ' · Cc ' + m.cc.join(', ') : '') + ' · ' + new Date(m.time).toLocaleString() + ' · ' + m.subject;
+  $('wlBody').textContent = m.text;
+  $('wlFiles').innerHTML = m.files.map((a, i) => { const u = 'api/winlink/file?folder=' + f + '&mid=' + encodeURIComponent(m.mid) + '&i=' + i; return '<a class="btn small-btn" target="_blank" rel="noopener" href="' + u + '">📎 ' + esc(a.name) + ' (' + (a.size < 1024 ? a.size + ' bytes' : Math.ceil(a.size / 1024) + ' KB') + ')</a><a class="btn small-btn" href="' + u + '&download=1">Download</a>'; }).join('');
+  $('wlReply').classList.toggle('hidden', f !== 'inbox');
+  wlOnly('wlView');
+  if (m.unread) { try { await api('winlink', { action: 'read', mid: m.mid }); m.unread = false; loadWinlink(); } catch (x) { } }
+};
+$('wlClose').onclick = () => wlOnly('');
+$('wlReply').onclick = () => { const m = S.wlSel.m; wlCompose(m.from, /^Re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject, '\n\n--- ' + m.from + ' wrote:\n' + m.text); };
+$('wlFwd').onclick = () => { const m = S.wlSel.m; wlCompose('', 'Fw: ' + m.subject, '\n\n--- Forwarded message from ' + m.from + ':\n' + m.text); $('wlTo').focus(); };
+$('wlDel').onclick = async () => {
+  const s = S.wlSel; if (!s || !await ask(s.f === 'outbox' ? 'Delete this message? It will not be sent.' : 'Delete this message?')) return;
+  try { await api('winlink', { action: 'delete', folder: s.f, mid: s.m.mid }); wlOnly(''); loadWinlink(); } catch (x) { toast(x.message); }
+};
+
 // ---- POTA / SOTA (Logbook page) ----
 async function loadPota() {
   $('potaSpots').innerHTML = '<div class="empty">Loading the spots…</div>';

@@ -931,6 +931,55 @@ public final class WebHost {
                 JSONArray cs = new JSONArray(); for (ChannelStore.Contact ct : svc.store().contacts()) cs.put(new JSONObject().put("id", ct.id).put("name", ct.name).put("number", ct.number).put("type", ct.type));
                 return ok(new JSONObject().put("forms", rows).put("kinds", kinds).put("contacts", cs));
             }
+            case "/api/winlink": {                                              // GET: mailbox, state, log; POST {action: compose|connect|cancel|delete|read|settings}
+                com.macdmr.radio.winlink.Winlink w = svc.winlink(); com.macdmr.radio.winlink.WinlinkStore st = w.store();
+                if (post) {
+                    switch (b.optString("action")) {
+                        case "compose": { String e = w.compose(b.optString("to"), b.optString("cc"), b.optString("subject"), b.optString("text")); return e == null ? ok("In the outbox") : WebServer.Response.error(400, e); }
+                        case "connect": {
+                            String e = "radio".equals(b.optString("how")) ? onMain(() -> w.connectRadio(b.optString("gateway"), b.optString("via"))) : w.connectInternet();
+                            return e == null ? ok("Connecting") : WebServer.Response.error(409, e);
+                        }
+                        case "cancel": w.cancel(); return ok("Stopping");
+                        case "delete": st.delete(b.optString("folder"), b.optString("mid")); return ok("Deleted");
+                        case "read": st.markRead(b.optString("mid")); return ok("ok");
+                        case "settings": {
+                            String g = b.optString("grid", "").trim();
+                            if (!g.isEmpty() && !g.matches("(?i)[A-R]{2}[0-9]{2}([A-X]{2})?")) return WebServer.Response.error(400, "Grid square like JO01 or JO01ab");
+                            if (b.has("password") && !b.optString("password").isEmpty()) w.setPassword(b.optString("password"));   // write-only
+                            w.setGrid(g); return ok("Saved");
+                        }
+                        default: return WebServer.Response.error(400, "Unknown action");
+                    }
+                }
+                JSONObject fo = new JSONObject();
+                for (String folder : new String[] { com.macdmr.radio.winlink.WinlinkStore.INBOX, com.macdmr.radio.winlink.WinlinkStore.OUTBOX, com.macdmr.radio.winlink.WinlinkStore.SENT }) {
+                    JSONArray arr = new JSONArray();
+                    for (com.macdmr.radio.winlink.WinlinkStore.Item it : st.list(folder)) {
+                        com.macdmr.radio.winlink.B2Message m = it.m; JSONArray to = new JSONArray(), cc = new JSONArray(), files = new JSONArray();
+                        for (String a : m.to) to.put(com.macdmr.radio.winlink.B2Message.shown(a)); for (String a : m.cc) cc.put(com.macdmr.radio.winlink.B2Message.shown(a));
+                        for (com.macdmr.radio.winlink.B2Message.Attachment at : m.files) files.put(new JSONObject().put("name", at.name).put("size", at.data.length));
+                        arr.put(new JSONObject().put("mid", m.mid).put("subject", m.subject).put("from", com.macdmr.radio.winlink.B2Message.shown(m.from)).put("to", to).put("cc", cc)
+                                .put("time", m.time()).put("unread", folder.equals(com.macdmr.radio.winlink.WinlinkStore.INBOX) && !st.isRead(m.mid)).put("text", m.bodyText().replace("\r\n", "\n")).put("files", files));
+                    }
+                    fo.put(folder, arr);
+                }
+                return ok(new JSONObject().put("state", w.state()).put("busy", w.busy()).put("progress", w.progress()).put("passwordSet", w.passwordSet()).put("grid", w.grid())
+                        .put("gateway", w.gateway()).put("via", w.via()).put("log", w.logText()).put("folders", fo));
+            }
+            case "/api/winlink/file": {                                         // GET ?folder=&mid=&i=: an attachment
+                com.macdmr.radio.winlink.WinlinkStore st = svc.winlink().store(); String folder = r.param("folder"), mid = r.param("mid");
+                for (com.macdmr.radio.winlink.WinlinkStore.Item it : st.list(folder == null ? "" : folder)) if (it.m.mid.equals(mid)) {
+                    int i = parse(r.param("i"), -1); if (i < 0 || i >= it.m.files.size()) break;
+                    com.macdmr.radio.winlink.B2Message.Attachment at = it.m.files.get(i);
+                    String ext = at.name.contains(".") ? at.name.substring(at.name.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.US) : "";
+                    String type = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext); if (type == null) type = "application/octet-stream";
+                    WebServer.Response x = WebServer.Response.bytes(type, at.data);
+                    x.headers.put("Content-Disposition", ("1".equals(r.param("download")) ? "attachment" : "inline") + "; filename=\"" + at.name.replaceAll("[\"\\\\\r\n]", "_") + "\"");
+                    x.headers.put("Cache-Control", "no-store"); return x;
+                }
+                return WebServer.Response.error(404, "No such attachment");
+            }
             case "/api/logbook/delete": if (!post) break; { svc.logbook().delete(b.optLong("id", 0)); return ok("Deleted"); }
             case "/api/settings": {
                 if (post) {

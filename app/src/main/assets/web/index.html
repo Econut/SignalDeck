@@ -139,6 +139,34 @@
         <div id="fmView" class="hidden"><pre id="fmText" class="dec-out" style="font-size:16px"></pre><div class="row"><button class="btn small-btn" id="fmReply" type="button">Reply</button><button class="btn small-btn danger" id="fmDel" type="button">Delete</button><button class="btn small-btn" id="fmClose" type="button">Close</button></div></div>
         <div id="fmList" class="list small"></div>
       </div>
+      <div class="panel" id="wlPanel">
+        <div class="row between wrap"><span class="label">WINLINK E-MAIL</span><div class="row"><button class="btn small-btn" id="wlNew">New message</button><button class="btn small-btn" id="wlNet">Connect: internet</button><button class="btn small-btn" id="wlRf">Connect: radio</button><button class="btn small-btn" id="wlSet">Settings</button><button class="btn small-btn" id="wlLogB">Session log</button></div></div>
+        <p class="wl-beta" id="wlBeta">New: not yet tested with the real Winlink system. Please tell us if it works for you: <a href="https://github.com/IIMacGyverII/SignalDeck/issues" target="_blank" rel="noopener">report it on GitHub</a>.</p>
+        <p class="muted small" id="wlState"></p>
+        <form id="wlCompose" class="sched-form hidden" autocomplete="off">
+          <label>To (callsigns or e-mail addresses, commas)<input id="wlTo" required></label>
+          <label>Cc (optional)<input id="wlCc"></label>
+          <label class="wide">Subject<input id="wlSubj" maxlength="128"></label>
+          <label class="wide">Message<textarea id="wlText" rows="6"></textarea></label>
+          <div class="row" style="grid-column:1/-1"><button class="btn primary small-btn">Put in the outbox</button><button class="btn small-btn" id="wlCancelC" type="button">Cancel</button><span class="muted small">It goes out at the next connection.</span></div>
+        </form>
+        <form id="wlRfForm" class="sched-form hidden" autocomplete="off">
+          <label>Gateway callsign (e.g. N0ABC-10)<input id="wlGw"></label>
+          <label>Via digipeaters (optional)<input id="wlVia"></label>
+          <p class="muted small" style="grid-column:1/-1">Tune the gateway's channel first (an analog channel). A session takes minutes: every transmission starts with a 1.6-second lead-in.</p>
+          <div class="row" style="grid-column:1/-1"><button class="btn primary small-btn">Connect</button><button class="btn small-btn" id="wlRfCancel" type="button">Cancel</button></div>
+        </form>
+        <form id="wlSetForm" class="sched-form hidden" autocomplete="off">
+          <label>Winlink password<input id="wlPw" type="password" autocomplete="new-password"></label>
+          <label>Grid square (optional, e.g. JO01)<input id="wlGrid"></label>
+          <p class="muted small" style="grid-column:1/-1">Your callsign comes from the PKT settings. The password is write-only here: it is kept in SignalDeck's private settings and never shown, logged or backed up. Leave it empty to keep the saved one; "-" clears it.</p>
+          <div class="row" style="grid-column:1/-1"><button class="btn primary small-btn">Save</button><button class="btn small-btn" id="wlSetCancel" type="button">Cancel</button></div>
+        </form>
+        <pre id="wlLog" class="dec-out hidden"></pre>
+        <div id="wlView" class="hidden"><div id="wlHead" class="muted small"></div><pre id="wlBody" class="dec-out" style="font-size:15px;white-space:pre-wrap"></pre><div id="wlFiles" class="row wrap"></div>
+          <div class="row"><button class="btn small-btn" id="wlReply" type="button">Reply</button><button class="btn small-btn" id="wlFwd" type="button">Forward</button><button class="btn small-btn danger" id="wlDel" type="button">Delete</button><button class="btn small-btn" id="wlClose" type="button">Close</button></div></div>
+        <div id="wlList" class="list small"></div>
+      </div>
       <div class="grid-side">
         <div class="panel"><div class="row between"><span class="label">CONVERSATIONS</span><button class="btn small-btn" id="newMsg">New</button></div><div id="convList" class="list"></div></div>
         <div class="panel thread">
