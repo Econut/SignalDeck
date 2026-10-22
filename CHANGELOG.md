@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Winlink on SignalDeck Web
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R#8 | SignalDeck Web, Messages page: a Winlink panel with the same mailbox as the phone (inbox, outbox, sent; unread marks; read, reply, forward, delete; attachments open or download), New message, Connect: internet / radio (gateway and digipeaters; Stop while running; state and progress refresh every 1.5 s during a session), Settings (password write-only, grid square), Session log, and the "not yet tested with the real Winlink system, please report" notice linking to the GitHub issues. API `/api/winlink` (GET; POST compose, connect, cancel, delete, read, settings) and `/api/winlink/file`. Help: the Winlink topic mentions the web page. | `web/WebHost.java`, `assets/web/index.html`, `assets/web/pages.js`, `assets/web/app.js`, `assets/web/app.css`, `ui/HelpView.java` | Headless Chrome against the owner's Armor: a message written through the API went out when the panel's Connect: internet was clicked (fake CMS on the PC via adb reverse) and the CMS's message with an attachment came back; list, message view and attachment download (right name and type) checked; no console errors; bench messages deleted through the API, test password cleared. |
+
 ## 2026-10-22 — Packet: connected-mode control frames were dropped (terminal and Winlink could not connect without a digipeater); Winlink tested over the radio
 
 | Backlog | Change | Files | Test |
