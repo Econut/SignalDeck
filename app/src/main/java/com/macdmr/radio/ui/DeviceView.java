@@ -35,7 +35,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     private final ImageView heroIcon;
     private final TextView takeOver, handBack, reportNow;
     private Neo.NeonSwitch customPttSw; private TextView customPttSub;
-    private final Neo.NeonSwitch ownAtBoot, voiceSw, hwPttSw, volPttSw, scanSqSw, styleSw, animSw, covSw, carMicSw, carCovSw, wheelSw, carScreenSw;
+    private final Neo.NeonSwitch ownAtBoot, voiceSw, hwPttSw, volPttSw, scanSqSw, styleSw, animSw, covSw, carMicSw, carCovSw, wheelSw, carScreenSw, roamSw;
     private TextView nextTalkValue, wheelMicValue, voxValue;
     private final LinearLayout radioIdTile;
     private RadioService svc;
@@ -115,6 +115,9 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         addRow(set, Neo.switchRow(c, "intercom", Neo.CYAN, "New intercom look", "Off: the classic intercom page", styleSw));
         addRow(set, Neo.switchRow(c, "diag", Neo.CYAN, "Animated panel when quiet", "Falling lines on an idle channel (uses a little battery)", animSw));
         addRow(set, Neo.switchRow(c, "signal", Neo.VIOLET, "Coverage logging", "Records signal and key-ups with GPS for the coverage maps (Map → Coverage)", covSw));
+        roamSw = sw();
+        addRow(set, Neo.switchRow(c, "repeaters", Neo.GREEN, "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup", roamSw));
+        roamSw.setOnChange(on -> { if (svc != null) { svc.setRoaming(on); android.widget.Toast.makeText(c, on ? "DMR roaming is on: it checks every 30 s while you move" : "DMR roaming is off", android.widget.Toast.LENGTH_SHORT).show(); } });
         addRow(set, Neo.switchRow(c, "ptt", Neo.AMBER, "Car microphone in Android Auto", "Talk uses the car's microphone through its hands-free link", carMicSw));
         carMicSw.setOnChange(on -> { if (svc != null) svc.setCarMic(on); });
         autoWarn = Neo.switchRow(c, "alert", Neo.AMBER, "Android Auto is hiding this app", "Unknown sources is off, so the car does not list SignalDeck. Tap for the fix", null);
@@ -834,7 +837,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         ownAtBoot.setChecked(svc.ownAtBoot()); voiceSw.setChecked(svc.voiceOn()); hwPttSw.setChecked(svc.hwPtt()); scanSqSw.setChecked(svc.scanSoftSq());
         volPttSw.setChecked(c.getSharedPreferences("radio", Context.MODE_PRIVATE).getBoolean("volPtt", false));
         refreshCustomPtt();
-        styleSw.setChecked(IntercomView.newLook(c)); animSw.setChecked(IntercomView.animatedPanel(c)); covSw.setChecked(svc.coverage().enabled()); carMicSw.setChecked(svc.carMic()); carCovSw.setChecked(svc.coverageInCar()); wheelSw.setChecked(svc.wheelTalk()); nextTalkValue.setText(com.macdmr.radio.RadioService.NEXT_TALK_NAMES[svc.nextTalkMode()]);
+        styleSw.setChecked(IntercomView.newLook(c)); animSw.setChecked(IntercomView.animatedPanel(c)); covSw.setChecked(svc.coverage().enabled()); roamSw.setChecked(svc.roaming()); carMicSw.setChecked(svc.carMic()); carCovSw.setChecked(svc.coverageInCar()); wheelSw.setChecked(svc.wheelTalk()); nextTalkValue.setText(com.macdmr.radio.RadioService.NEXT_TALK_NAMES[svc.nextTalkMode()]);
         wheelMicValue.setText(com.macdmr.radio.RadioService.WHEEL_MIC_NAMES[Math.max(0, Math.min(1, svc.wheelMic()))]); voxValue.setText(com.macdmr.radio.RadioService.VOX_NAMES[Math.max(0, Math.min(3, svc.voxStop()))]); carScreenSw.setChecked(svc.carControlsScreen());
         ((TextView) radioIdTile.findViewWithTag("sub")).setText(svc.radioId().status());
         updateWeb();

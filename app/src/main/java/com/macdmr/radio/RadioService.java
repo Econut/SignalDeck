@@ -848,6 +848,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 setLink("ready");
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
+                if (roaming()) ui.post(() -> startRoaming());
             } catch (Throwable t) {
                 log("bring-up failed: " + t);
                 if (pausedStock) {                            // never leave the phone with no working radio app
@@ -2222,6 +2223,48 @@ public class RadioService extends Service implements RadioEngine.Events {
     public boolean isScanHolding() { return scanner != null && scanner.isHolding(); }
     /** Something is actually heard: the Soft SQ gate on Soft SQ channels, the radio's own report otherwise. */
     public boolean hearing() { return injecting || (softSq != null && softSq.isEnabled() ? squelchOpen : receiving && rxCounts); }
+
+    // ---- DMR roaming (Roaming): the nearest repeater with the same talkgroup, while moving ----
+    public boolean roaming() { return getSharedPreferences("radio", MODE_PRIVATE).getBoolean("roaming", false); }
+    public void setRoaming(boolean on) { getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("roaming", on).apply(); if (on) startRoaming(); else stopRoaming(); }
+    private android.location.LocationListener roamGps; private volatile long lastRoam; private String lastRoamNote = "";
+    private final Runnable roamTick = new Runnable() { @Override public void run() { try { roamCheck(); } catch (Throwable t) { log("roaming: " + t); } if (roamGps != null) ui.postDelayed(this, 30_000); } };
+    private void startRoaming() {
+        if (roamGps != null) return;
+        android.location.LocationManager lm = (android.location.LocationManager) getSystemService(LOCATION_SERVICE); if (lm == null) return;
+        roamGps = l -> { };                                                   // keeps fixes coming; the check reads the newest one
+        try { lm.requestLocationUpdates(android.location.LocationManager.GPS_PROVIDER, 15_000, 100, roamGps, android.os.Looper.getMainLooper()); }
+        catch (Throwable t) { log("roaming GPS: " + t); }
+        ui.removeCallbacks(roamTick); ui.postDelayed(roamTick, 5_000);
+        log("DMR roaming on");
+    }
+    private void stopRoaming() {
+        ui.removeCallbacks(roamTick);
+        android.location.LocationManager lm = (android.location.LocationManager) getSystemService(LOCATION_SERVICE);
+        if (lm != null && roamGps != null) try { lm.removeUpdates(roamGps); } catch (Throwable ignored) { }
+        roamGps = null; log("DMR roaming off");
+    }
+    /** What roaming last did or why it waits (logged whenever it changes, so a drive can be checked afterwards). */
+    public String roamingNote() { return lastRoamNote; }
+    private void roamCheck() { String before = lastRoamNote; roamCheck0(); if (!lastRoamNote.equals(before)) log("roaming: " + lastRoamNote); }
+    private void roamCheck0() {
+        long now = System.currentTimeMillis();
+        ChannelStore.Channel cur = current;
+        if (cur == null || vfo != null || !cur.isDigital()) { lastRoamNote = "waiting: the radio is not on a DMR repeater channel"; return; }
+        if (cur.lat == 0 && cur.lon == 0) { lastRoamNote = "waiting: " + cur.name + " has no location (Nearby Repeaters adds one)"; return; }
+        if (pttDown || receiving || scanning() || scope.running() || satBusy(now, now + 60_000)) return;      // never during a call, a scan, the scope or a pass
+        if (now - lastRoam < 120_000) return;                                 // at most one switch every two minutes
+        android.location.Location me = lastKnownLocation();
+        if (me == null || now - me.getTime() > 3 * 60_000L) { lastRoamNote = "waiting for a GPS fix"; return; }
+        ChannelStore.Channel to = Roaming.choose(cur, zoneChannels(), me.getLatitude(), me.getLongitude());
+        double here = Roaming.km(me.getLatitude(), me.getLongitude(), cur.lat, cur.lon);
+        if (to == null) { lastRoamNote = String.format(Locale.US, "on the nearest repeater for this talkgroup (%s, %.0f km)", cur.name, here); return; }
+        double there = Roaming.km(me.getLatitude(), me.getLongitude(), to.lat, to.lon);
+        lastRoam = now;
+        selectChannel(to.number);
+        lastRoamNote = String.format(Locale.US, "switched to %s (%.0f km; %s was %.0f km)", to.name, there, cur.name, here);
+        history("chan", "\uD83D\uDE97 Roaming: " + lastRoamNote);
+    }
 
     // ---- band scope (BandScope): receive-only sweeps ----
     final BandScope scope = new BandScope(new BandScope.Hooks() {

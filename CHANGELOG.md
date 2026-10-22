@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — DMR roaming
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Roadmap #6 | `Roaming.choose` (pure): among the zone's DMR channels with a location that carry the current channel's talkgroup (same TX contact and call type, or the TG in their RX list), the nearest, only when ≥ 5 km and ≥ 30 % nearer than the current repeater (no flip-flopping). `RadioService`: GPS updates (15 s / 100 m) while on, a check every 30 s, at most one switch every 2 min, never while receiving, transmitting, scanning, sweeping or near a tracked satellite pass, not in VFO; history line per switch, the reason it waits logged when it changes; resumes at startup. Switch: Device → DMR roaming; SignalDeck Web Settings → DMR roaming. Help: Device → DMR roaming. | `Roaming.java` (new), `RadioService.java`, `ui/DeviceView.java`, `web/WebHost.java`, `ui/HelpView.java`, `RoamingTest.java` (new) | Host test (switch when clearly nearer, stay half way, another talkgroup ignored, TG in an RX list counts, no location → never). **Device** (owner's Armor): on via the web setting → "DMR roaming on", then "waiting: the radio is not on a DMR repeater channel" (the owner is on NOAA), off again. **Not yet tested on a drive.** |
+
 ## 2026-10-22 — POTA / SOTA: activator spots, your activation, duplicate check, ADIF (phone and SignalDeck Web)
 
 | Backlog | Change | Files | Test |
