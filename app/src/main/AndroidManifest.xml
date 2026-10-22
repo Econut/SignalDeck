@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />   <!-- localhost socket to the companion recognizer, elevation lookup -->
+    <!-- SignalDeck Web's Phone panel: the Wi-Fi link (signal, speed, band) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- steering-wheel talk as a self-managed call: the car's microphone, stopped by the car's hang-up / End -->

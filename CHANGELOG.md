@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — SignalDeck Web: Phone panel (battery, cell, Wi-Fi)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner's request: the phone's own stats in the browser. A full-width **PHONE** panel on the web Intercom page: **battery** (level bar, charging/on battery and plug type, current in mA signed by the charging state with µA/mA detected, %/h by least squares over the last 30 min of one-minute samples taken while the web server runs, time to full / empty, temperature, voltage, charge counter only when plausible, health when not good), **cell** (dBm, bars, carrier, 2G–5G, LTE RSRQ/SNR, no SIM / airplane mode), **Wi-Fi** (dBm, bars, network name, band, link speed). SSE `phone` every 4 s, `/api/phone`; NOT UPDATING after 15 s without data. New normal permission ACCESS_WIFI_STATE (no prompt). Help: SignalDeck Web → Phone panel. | `web/PhoneStats.java` (new), `web/WebHost.java`, `AndroidManifest.xml`, `assets/web/index.html`, `assets/web/pages.js`, `assets/web/app.js`, `assets/web/app.css`, `ui/HelpView.java`, `PhoneStatsTest.java` (new, 3 tests) | Host tests pass. **Device + browser** (owner's Armor): 93 % charging +1586 mA, 31.1 °C, 4.36 V; no SIM shown; Wi-Fi −80 dBm 5 GHz with 1 bar; the phone's charge counter reads 6 (wrong unit), so it is hidden; LIVE updates. |
+
 ## 2026-10-22 — SignalDeck 1.0.0-beta.12 (pre-release)
 
 | Backlog | Change | Files | Test |

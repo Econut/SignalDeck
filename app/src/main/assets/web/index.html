@@ -86,6 +86,14 @@
           <div id="history" class="history mono"></div>
         </div>
       </div>
+      <div class="panel" id="phonePanel">
+        <div class="row between"><span class="label">PHONE</span><span id="phoneAge" class="chip dim"></span></div>
+        <div class="phone-grid">
+          <div class="ptile" id="pBat"><div class="pt-h">BATTERY</div><div class="pt-v mono" id="pBatV">--</div><div class="pbar"><i id="pBatBar"></i></div><div class="pt-s" id="pBatS"></div></div>
+          <div class="ptile" id="pCell"><div class="pt-h">CELL</div><div class="pt-v"><span class="mono" id="pCellV">--</span><span class="sbars" id="pCellBars"><i></i><i></i><i></i><i></i></span></div><div class="pt-s" id="pCellS"></div></div>
+          <div class="ptile" id="pWifi"><div class="pt-h">WI-FI</div><div class="pt-v"><span class="mono" id="pWifiV">--</span><span class="sbars" id="pWifiBars"><i></i><i></i><i></i><i></i></span></div><div class="pt-s" id="pWifiS"></div></div>
+        </div>
+      </div>
       <div class="grid2">
         <div class="panel"><div class="row between"><span class="label">LAST HEARD</span><button class="btn small-btn" id="heardRefresh">Refresh</button></div><div id="heardList" class="list small"></div></div>
         <div class="panel"><span class="label">ALERTS AND EVENTS · 7 DAYS</span><div id="eventList" class="list small"></div></div>

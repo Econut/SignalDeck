@@ -51,6 +51,9 @@ public final class WebHost {
 
     public WebHost(RadioService svc) { this.svc = svc; }
 
+    private volatile PhoneStats phone;
+    private PhoneStats phone() { PhoneStats p = phone; if (p == null) phone = p = new PhoneStats(svc); return p; }
+
     private SharedPreferences prefs() { return svc.getSharedPreferences("web", Context.MODE_PRIVATE); }
     public boolean enabled() { return prefs().getBoolean("enabled", false); }
     public boolean allowTx() { return prefs().getBoolean("tx", false); }
@@ -215,10 +218,12 @@ public final class WebHost {
 
     /** Every 2 s while a browser is connected: the S-meter poll, the satellite card, mode state and new packets. */
     private void tick() {
-        long aprsSeen = -1; String sstvSeen = null;
+        long aprsSeen = -1; String sstvSeen = null; int n = 0;
         while (Thread.currentThread() == ticker) {
             try { Thread.sleep(2000); } catch (InterruptedException e) { return; }
+            try { phone().sampleIfDue(); } catch (Throwable ignored) { }      // battery history for the rate, browser or not
             if (clients() == 0) continue;
+            if (n++ % 2 == 0) try { pub("phone", phone().json().toString()); } catch (Throwable ignored) { }
             try {
                 svc.pollRssi();
                 pub("sat", satJson().toString());
@@ -482,6 +487,7 @@ public final class WebHost {
         final JSONObject b = post ? body(r) : new JSONObject();
         switch (p) {
             case "/api/status": return ok(statusJson());
+            case "/api/phone": return ok(phone().json());                       // battery, cell and Wi-Fi of the phone itself
             case "/api/captions": {                                             // finished caption sentences, newest first (q: only those containing it)
                 int lim = Math.max(1, Math.min(5000, parse(r.param("limit"), 200)));
                 java.util.Map<Integer, String> names = new java.util.HashMap<>();

@@ -62,6 +62,7 @@ window.addEventListener('hashchange', route);
 // ---- start / live events ----
 async function start() {
   try { S.status = await api('status'); } catch (e) { return; }
+  api('phone').then(renderPhone).catch(() => { });
   $('login').classList.add('hidden'); $('app').classList.remove('hidden');
   renderStatus(); loadHistory(); route(); connect();
 }
@@ -75,6 +76,7 @@ function connect() {
   on('rx', d => { S.status.hearing = d.on; renderState(); });
   on('tx', d => { S.status.transmitting = d.on; renderState(); });
   on('rssi', d => { S.status.rssi = d.dbm; renderMeter(); });
+  on('phone', d => renderPhone(d));
   on('spectrum', d => { S.specTarget = d.b; if (!S.specRaf) S.specRaf = requestAnimationFrame(drawSpectrum); });
   on('level', d => { $('vuFill').style.width = Math.min(100, Math.round(Math.sqrt(d.amp / 32767) * 100)) + '%'; clearTimeout(S.vuT); S.vuT = setTimeout(() => { $('vuFill').style.width = '0'; }, 400); });
   on('history', d => addHistory(d.line));

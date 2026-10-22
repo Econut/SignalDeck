@@ -287,6 +287,52 @@ function showMark(m) {
   window.addEventListener('resize', () => { if (S.page === 'map') drawMap(); });
 })();
 
+// ---- the phone itself (Intercom): battery, cell, Wi-Fi ----
+function bars(id, n, of) { const k = of === 5 ? Math.round(n * 4 / 4) : n; [...$(id).children].forEach((b, i) => b.classList.toggle('on', i < Math.min(4, k))); }
+function hm(min) { if (min == null || min < 0) return ''; const h = Math.floor(min / 60), m = min % 60; return h ? h + ' h ' + String(m).padStart(2, '0') + ' min' : m + ' min'; }
+function renderPhone(d) {
+  if (!d) return; S.phone = d; S.phoneAt = Date.now();
+  const b = d.battery || {};
+  if (b.ok) {
+    const chg = b.state === 'charging' || b.state === 'full';
+    $('pBatV').textContent = b.level + ' %';
+    const bar = $('pBatBar'); bar.style.width = Math.max(0, Math.min(100, b.level)) + '%';
+    bar.className = chg ? 'chg' : b.level <= 15 ? 'low' : b.level <= 35 ? 'mid' : '';
+    const s = [];
+    s.push('<b>' + esc(b.state) + '</b>' + (b.plug ? ' · ' + esc(b.plug) : ''));
+    const parts = [];
+    if (b.currentMa != null) parts.push((b.currentMa > 0 ? '+' : '') + b.currentMa + ' mA');
+    if (b.ratePerHour != null) parts.push((b.ratePerHour > 0 ? '+' : '') + b.ratePerHour.toFixed(1) + ' %/h');
+    else parts.push('rate after a few minutes');
+    s.push(parts.join(' · '));
+    if (b.minutesToFull != null) s.push('full in ' + hm(b.minutesToFull));
+    if (b.minutesToEmpty != null) s.push('empty in about ' + hm(b.minutesToEmpty));
+    const t = []; if (b.tempC != null) t.push(b.tempC.toFixed(1) + ' °C'); if (b.volts != null) t.push(b.volts.toFixed(2) + ' V'); if (b.chargeMah != null) t.push(b.chargeMah + ' mAh left'); if (b.health && b.health !== 'good') t.push(esc(b.health));
+    if (t.length) s.push(t.join(' · '));
+    $('pBatS').innerHTML = s.join('<br>');
+  }
+  const c = d.cell || {};
+  if (c.airplane) { $('pCellV').textContent = 'off'; bars('pCellBars', 0); $('pCellS').innerHTML = '<b>airplane mode</b>'; }
+  else if (!c.ok || c.dbm == null) { $('pCellV').textContent = '--'; bars('pCellBars', 0); $('pCellS').innerHTML = esc(c.sim === 'ready' ? 'no service' : (c.sim || 'no signal')); }
+  else {
+    $('pCellV').textContent = c.dbm + ' dBm'; bars('pCellBars', c.bars);
+    const s = ['<b>' + esc([c.operator, c.tech].filter(Boolean).join(' · ') || 'cell') + '</b>'];
+    const q = []; if (c.rsrq != null) q.push('RSRQ ' + c.rsrq + ' dB'); if (c.snr != null) q.push('SNR ' + c.snr + ' dB'); if (q.length) s.push(q.join(' · '));
+    $('pCellS').innerHTML = s.join('<br>');
+  }
+  const w = d.wifi || {};
+  if (!w.enabled) { $('pWifiV').textContent = 'off'; bars('pWifiBars', 0); $('pWifiS').innerHTML = '<b>Wi-Fi is off</b>'; }
+  else if (!w.connected) { $('pWifiV').textContent = '--'; bars('pWifiBars', 0); $('pWifiS').innerHTML = 'not connected'; }
+  else {
+    $('pWifiV').textContent = w.dbm + ' dBm'; bars('pWifiBars', w.bars);
+    const s = ['<b>' + esc(w.ssid || 'connected') + '</b>']; const q = [];
+    if (w.band) q.push(w.band); if (w.mbps) q.push(w.mbps + ' Mbit/s'); if (q.length) s.push(q.join(' · '));
+    $('pWifiS').innerHTML = s.join('<br>');
+  }
+  $('phoneAge').textContent = 'LIVE';
+}
+setInterval(() => { if (S.phoneAt && Date.now() - S.phoneAt > 15000) $('phoneAge').textContent = 'NOT UPDATING'; }, 5000);
+
 // ---- mission statement (Settings) ----
 $('missionBtn').onclick = async () => {
   try { const j = await api('mission'); $('missionText').textContent = '\u201C' + j.text + '\u201D'; $('missionBy').textContent = '\u2014 ' + j.by; $('missionLegal').textContent = j.legal || ''; $('missionDlg').classList.remove('hidden'); $('missionX').focus(); } catch (e) { toast(e.message); }

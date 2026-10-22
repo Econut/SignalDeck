@@ -88,6 +88,20 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
 .mission-text { font-size: 21px; line-height: 1.45; margin: 14px 0 10px; color: var(--text); }
 .mission-legal { white-space: pre-line; color: var(--muted); font-size: 14px; line-height: 1.45; margin: 8px 0 0; max-height: 40vh; overflow-y: auto; }
 .mission-by { text-align: right; color: var(--violet); font-weight: 600; margin: 0; }
+.phone-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+@media (max-width: 760px) { .phone-grid { grid-template-columns: 1fr; } }
+.ptile { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: rgba(25,211,255,.03); min-width: 0; }
+.pt-h { font: 600 12px Orbitron, sans-serif; letter-spacing: .14em; color: var(--muted); }
+.pt-v { display: flex; align-items: center; gap: 12px; font-size: 30px; color: var(--text); margin: 4px 0 6px; }
+.pt-s { color: var(--muted); font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.pt-s b { color: var(--text); font-weight: 600; }
+.pbar { height: 8px; border-radius: 99px; background: rgba(255,255,255,.07); overflow: hidden; margin-bottom: 8px; }
+.pbar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--green); transition: width .4s; }
+.pbar i.mid { background: var(--amber); } .pbar i.low { background: var(--red); } .pbar i.chg { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+.sbars { display: inline-flex; align-items: flex-end; gap: 3px; height: 22px; }
+.sbars i { width: 6px; border-radius: 2px; background: var(--off); }
+.sbars i:nth-child(1) { height: 25%; } .sbars i:nth-child(2) { height: 50%; } .sbars i:nth-child(3) { height: 75%; } .sbars i:nth-child(4) { height: 100%; }
+.sbars i.on { background: var(--cyan); }
 .spec { display: block; width: 100%; height: 64px; margin: 10px 0 4px; }
 .vu div { height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--amber), var(--red)); transition: width .1s; }
 .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
