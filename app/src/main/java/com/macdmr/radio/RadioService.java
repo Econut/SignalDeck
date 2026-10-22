@@ -82,6 +82,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         @Override public void tune(ChannelStore.Channel ch) { selectChannel(ch.number); }
         @Override public boolean receiving() { return softSq.isEnabled() ? squelchOpen : receiving; }   // with Soft SQ on the module's squelch is open and it reports a reception all the time: the soft gate is the activity signal
         @Override public boolean softGated() { return softSq.isEnabled(); }
+        @Override public long dwellMs() { return profile.scanDwellMs; }
         @Override public ChannelStore.Channel priority() { int n = scanPriority(); return n > 0 ? store.byNumber(n) : null; }
         @Override public void status(boolean s, boolean h, ChannelStore.Channel on) {
             if (voiceOn()) {
@@ -1038,8 +1039,11 @@ public class RadioService extends Service implements RadioEngine.Events {
         pushModes();
     }
 
+    private volatile int monRetries; private volatile long monRefusedAt;
+    /** When the radio last refused MON after the retries (0 = never): the radio audio check reports it. */
+    public long monRefusedAt() { return monRefusedAt; }
     public void setMonitor(final boolean on) {
-        monitorOn = on;
+        monitorOn = on; monRetries = 0;
         worker.execute(() -> { try { engine.setMonitor(on); } catch (IOException e) { log("monitor: " + e); } });
         pushModes();
     }
@@ -1638,6 +1642,10 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     @Override public void ack(int cmd, boolean ok) {
         if (!ok) log(String.format(Locale.US, "MCU rejected 0x%02X", cmd));
+        if (cmd == RadioEngine.CMD_MONITOR && !ok) {                          // seen on the Xplore 1 right after a burst of channel changes: try again
+            if (monRetries < 3) { monRetries++; final boolean want = monitorOn; ui.postDelayed(() -> { if (monitorOn == want) worker.execute(() -> { try { engine.setMonitor(want); } catch (IOException e) { log("monitor: " + e); } }); }, 1500); log("MON refused, retry " + monRetries); }
+            else { monRefusedAt = System.currentTimeMillis(); history("warn", "\u26A0 The radio refused MON (busy after channel changes?): wait a few seconds and switch it again"); }
+        }
         if (cmd != RadioEngine.CMD_SET_ANALOG && cmd != RadioEngine.CMD_SET_DIGITAL) return;
         Object[] t; synchronized (tunes) { t = tunes.pollFirst(); }
         if (t == null) return;

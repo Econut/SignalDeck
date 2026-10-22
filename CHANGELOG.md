@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Xplore 1 tester's report: MON refusals retried, longer scan dwell, no false "-7 dBm"
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | Xplore 1 report (beta.12, owner's tester): voice clear, channel changes right, staying power fine; but MON produced no audio until a reboot, and the first scan stepped past an active channel. The log shows the module **refusing MON** (0x2F answered sr=1, 3.7 s late) right after a dozen quick channel writes. Now a refused MON (on or off) is retried up to 3 times 1.5 s apart, with a history warning if it still refuses, and the Radio audio check reports a refusal instead of blaming the audio path. **Scan dwell** is per profile (`DeviceProfile.scanDwellMs`, default 1.5 s; Xplore 1 2.5 s, profile revision 2): its receive report comes later. RSSI readings above −20 dBm (the Xplore's raw 226 = "−7 dBm") are treated as no reading (S-meter, band scope). Help: Scan; Radio audio check. | `RadioService.java`, `DmrAudioCheck.java`, `DeviceProfile.java`, `Scanner.java`, `RadioEngine.java`, `BandScope.java`, `ui/HelpView.java`, `DmrAudioCheckTest.java`, `BandScopeTest.java` | Host tests (MON refused verdict, raw 226 = no reading). Built and installed on the owner's Armor (profile unchanged there). Needs the Xplore tester to confirm. |
+
 ## 2026-10-22 — Message forms: ICS-213 and ARRL radiogram over APRS or DMR text
 
 | Backlog | Change | Files | Test |

@@ -194,7 +194,7 @@ public final class RadioEngine implements UartPort.Listener {
                 break;
             }
             case CMD_RSSI:
-                if (f.rw == 0 && b.length >= 1) { int raw = b[0] & 0xFF; ev.rssi(raw, raw > 0 ? -(120 - raw / 2.0) : -999); }
+                if (f.rw == 0 && b.length >= 1) { int raw = b[0] & 0xFF; double dbm = raw > 0 ? -(120 - raw / 2.0) : -999; if (dbm > -20) dbm = -999; ev.rssi(raw, dbm); }   // above -20 dBm is not a reading (the Xplore 1 reports raw 226, "-7")
                 break;
             case CMD_VERSION:
                 if (b.length >= 4) ev.version(ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN).getInt(), new String(b).trim());

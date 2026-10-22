@@ -27,6 +27,8 @@ public final class Scanner {
         /** The scan priority channel, or null: looked at again after every {@link #PRIORITY_EVERY} other channels. */
         ChannelStore.Channel priority();                                 // Soft SQ decides: allow for its blackout + first detector window before stepping
         void status(boolean scanning, boolean holding, ChannelStore.Channel on);
+        /** Listening time per channel (the phone's profile). */
+        default long dwellMs() { return DWELL_MS; }
     }
 
     static final long DWELL_MS = 1500, DWELL_SOFT_MS = 2000, HANG_MS = 2500, SETTLE_MS = 700, TICK_MS = 150;
@@ -102,7 +104,7 @@ public final class Scanner {
                 landedAt = now; host.tune(prio); host.status(true, false, prio);
             } else if (holding) {
                 if (!rx && now - lastActivityAt > HANG_MS) { holding = false; step(); }
-            } else if ((idx < 0 && !onPriority) || now - landedAt > (host.softGated() ? DWELL_SOFT_MS : DWELL_MS)) step();
+            } else if ((idx < 0 && !onPriority) || now - landedAt > (host.softGated() ? Math.max(DWELL_SOFT_MS, host.dwellMs()) : host.dwellMs())) step();
             handler.postDelayed(this, TICK_MS);
         }
     };

@@ -28,6 +28,10 @@ public class DmrAudioCheckTest {
         f.monPcm = 0; s = v(f); assertTrue(s, s.contains("audio serial port (/dev/ttyS1)") && !s.contains("tinyservice"));
         f.monPcm = 168169; f.pcmDuringCalls = 0; s = v(f); assertTrue(s, s.contains("audio serial port") && !s.contains("vendor audio service"));
     }
+    @Test public void monRefusedByTheRadioIsNotBlamedOnTheAudioPath() {         // Xplore 1 report 2026-10-22: MON refused after quick channel changes
+        DmrAudioCheck.Facts f = ok(); f.uartPcm = true; f.digitalChannel = false; f.monTested = true; f.monPcm = 0; f.monRefused = true;
+        String s = v(f); assertTrue(s, s.contains("refused to switch MON on") && !s.contains("not sending audio")); assertEquals(1, DmrAudioCheck.verdict(f).size());
+    }
     @Test public void radioNeverReportedACall() {
         DmrAudioCheck.Facts f = ok(); f.receptions = 0; f.callerReports = 0; f.pcmDuringCalls = 0;
         assertTrue(v(f).contains("RX group list"));

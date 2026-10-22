@@ -43,7 +43,7 @@ public final class DmrAudioCheck {
         public boolean squelchStuck; public int closedBy = -1;      // after MON off the squelch stayed open with no signal; which step closed it (0 none)   // analog: 10 s with the squelch held open (MON): receiver noise must arrive
         public int musicVolume = -1, musicMax = -1;
         public String output = "";                      // where media plays (speaker, Bluetooth …)
-        public boolean uartPcm; public String pcmPort = "";   // the profile's audio comes over a second serial port (Xplore 1), not PrizeTinyService
+        public boolean uartPcm; public String pcmPort = ""; public boolean monRefused;   // the radio refused MON during the test (after retries)   // the profile's audio comes over a second serial port (Xplore 1), not PrizeTinyService
     }
 
     /** Where receive audio comes from on this phone, for the verdict's sentences. */
@@ -62,6 +62,11 @@ public final class DmrAudioCheck {
         if (f.audioError != null) { v.add("Receive audio did not start: " + f.audioError + ". Please send this report."); return v; }
         String rx = f.digitalChannel ? "call" : "reception";
         if (f.monTested) {                                         // analog: the squelch was held open, so receiver noise had to arrive whatever was on the air
+            if (f.monPcm == 0 && f.monRefused) {
+                v.add("The radio refused to switch MON on (it answered the request with a refusal, also after three retries), so the squelch never opened for the first part. "
+                        + "This happens right after many quick channel changes: wait a few seconds on the channel and run the check again. Please send this report if it keeps happening.");
+                return v;
+            }
             if (f.monPcm == 0) {
                 v.add("With the squelch held open (MON) for 10 seconds, no audio at all arrived from " + source(f) + ". "
                         + below(f) + ", so nothing can be heard on any channel. Please send this report.");
@@ -179,6 +184,7 @@ public final class DmrAudioCheck {
             File monFile = new File(c.getCacheDir(), "audio_check_static.wav");
             ClipRecorder mc = null;
             try {
+                long monAsked = System.currentTimeMillis();
                 if (!wasMon) svc.setMonitor(true);
                 Thread.sleep(800);                                                // the squelch opens
                 try { mc = new ClipRecorder(monFile, 10_000); svc.recordClip(mc, false); } catch (Throwable ignored) { }
@@ -188,6 +194,7 @@ public final class DmrAudioCheck {
                     p.step(String.format(Locale.US, "Part 1 of 2: squelch held open (MON), %d of 10 s: the speaker should hiss (receiver noise) or play a station.", (System.currentTimeMillis() - mt) / 1000));
                 }
                 f.monPcm = svc.rxAudioBytes() - m0;
+                f.monRefused = svc.monRefusedAt() >= monAsked;
             } finally {
                 if (mc != null) { svc.recordClip(null, false); mc.finish(); monStats = mc.stats(); f.monRms = mc.rms(); }
                 monFile.delete();

@@ -17,7 +17,7 @@ public class BandScopeTest {
         assertEquals(161, BandScope.steps(144_000_000, 148_000_000, 25_000));
         assertEquals(0, BandScope.steps(148_000_000, 144_000_000, 25_000));
         assertTrue(BandScope.tunable(146_520_000)); assertFalse(BandScope.tunable(220_000_000)); assertTrue(BandScope.tunable(446_000_000));
-        assertEquals(-79.0f, BandScope.dbm(82), 0.01f); assertTrue(Float.isNaN(BandScope.dbm(0)));
+        assertEquals(-79.0f, BandScope.dbm(82), 0.01f); assertTrue(Float.isNaN(BandScope.dbm(0))); assertTrue("raw 226 (\"-7 dBm\") is no reading", Float.isNaN(BandScope.dbm(226)));
         for (BandScope.Preset p : BandScope.PRESETS) {                         // every preset is a sweep the radio can do
             assertTrue(p.name, BandScope.tunable(p.from) && BandScope.tunable(p.to));
             int n = BandScope.steps(p.from, p.to, p.step); assertTrue(p.name + " " + n, n >= 2 && n <= BandScope.MAX_STEPS);

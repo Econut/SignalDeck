@@ -74,7 +74,7 @@ public final class BandScope {
     public static int steps(int from, int to, int step) { return step <= 0 || to < from ? 0 : (to - from) / step + 1; }
     public static boolean tunable(int hz) { return (hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000); }
     /** Raw RSSI byte to dBm, as the module reports it (0 = no reading). */
-    public static float dbm(int raw) { return raw > 0 ? -(120f - raw / 2f) : Float.NaN; }
+    public static float dbm(int raw) { return raw > 0 && raw < 200 ? -(120f - raw / 2f) : Float.NaN; }   // 200+ (above -20 dBm) is the module's "no reading"
 
     /** Start sweeping (null), or why not. */
     public synchronized String start(int from, int to, int step, int settleMs) {
