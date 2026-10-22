@@ -31,6 +31,24 @@ public class FormsTest {
         assertNotNull(got); assertEquals(Forms.ICS213, got.kind); assertEquals("K7", got.id);
         for (String k : f.f.keySet()) assertEquals(k, f.f.get(k), got.f.get(k));      // "|" and "\" survive
     }
+    /** By Winlink: one message, readable as text, with a code line SignalDeck turns back into the form (through a real B2 message). */
+    @Test public void roundTripThroughWinlink() throws Exception {
+        Forms.Form f = ics();
+        String[] m = Forms.winlink(f);
+        assertEquals("ICS-213: Water supply", m[0]);
+        assertTrue(m[1], m[1].startsWith("ICS-213 GENERAL MESSAGE") && m[1].contains("Need 200 gallons"));
+        com.macdmr.radio.winlink.B2Message msg = com.macdmr.radio.winlink.B2Message.create("N0CALL", m[0], m[1]); msg.to.add("N0ABC");
+        com.macdmr.radio.winlink.B2Message back = com.macdmr.radio.winlink.B2Message.parse(com.macdmr.radio.winlink.Lzhuf.decompressB2(com.macdmr.radio.winlink.Lzhuf.compressB2(msg.toBytes())));
+        String line = Forms.winlinkPart(back.bodyText());
+        assertNotNull(back.bodyText(), line);
+        Forms.Form got = new Forms.Assembler().add("N0CALL", line, 0);
+        assertNotNull(got);
+        for (String k : f.f.keySet()) assertEquals(k, f.f.get(k), got.f.get(k));
+        assertNull(Forms.winlinkPart("Just an ordinary e-mail.\nNothing to see."));
+        Forms.Form r = new Forms.Form(); r.kind = Forms.RADIOGRAM; r.id = "AB"; r.f.put("NR", "12"); r.f.put("MS", "ARRIVED SAFELY ALL WELL LOVE AND KISSES TO EVERYONE AT HOME SEE YOU NEXT WEEK");
+        String subj = Forms.winlink(r)[0];
+        assertTrue(subj, subj.startsWith("Radiogram 12: ARRIVED") && subj.endsWith("...") && subj.length() < 80);
+    }
     @Test public void radiogramAndText() {
         Forms.Form r = new Forms.Form(); r.kind = Forms.RADIOGRAM; r.id = "AB"; r.f.put("NR", "12"); r.f.put("PR", "R"); r.f.put("MS", "ARRIVED SAFELY ALL WELL LOVE"); r.f.put("CK", String.valueOf(Forms.words("ARRIVED SAFELY ALL WELL LOVE")));
         assertEquals("5", r.f.get("CK"));

@@ -920,6 +920,7 @@ public final class WebHost {
                     if (com.macdmr.radio.ham.Forms.RADIOGRAM.equals(f.kind)) f.f.put("CK", String.valueOf(com.macdmr.radio.ham.Forms.words(f.f.get("MS"))));
                     String via = b.optString("via", "save"); ChannelStore.Contact to = null;
                     if (via.equals("dmr")) { long cid = b.optLong("contact", -1); for (ChannelStore.Contact ct : svc.store().contacts()) if (ct.id == cid) to = ct; }
+                    if (via.equals("winlink")) { String e0 = svc.sendForm(f, "winlink", b.optString("to", ""), null); return e0 == null ? ok("In the Winlink outbox") : WebServer.Response.error(409, e0); }
                     final ChannelStore.Contact toF = to; final String via0 = via;
                     String e = onMain(() -> svc.sendForm(f, via0, b.optString("to", ""), toF));
                     return e == null ? ok(via.equals("save") ? "Saved" : "Sending") : WebServer.Response.error(409, e);

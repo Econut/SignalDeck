@@ -70,6 +70,22 @@ public final class Forms {
         return out;
     }
 
+    /** A Winlink message for this form: subject and body (the form to read, then its one-line code for SignalDeck). */
+    public static String[] winlink(Form form) {
+        String su = form.f.get("SU"), nr = form.f.get("NR");
+        String subject = RADIOGRAM.equals(form.kind) ? "Radiogram" + (nr == null || nr.trim().isEmpty() ? "" : " " + nr.trim()) + (form.f.get("MS") == null ? "" : ": " + first(form.f.get("MS"), 60))
+                : "ICS-213: " + (su == null || su.trim().isEmpty() ? "General Message" : su.trim());
+        String body = text(form) + "\n\n--\nSignalDeck form (SignalDeck puts it back in Message forms):\n" + split(form, 100_000).get(0) + "\n";
+        return new String[] { subject, body };
+    }
+    private static String first(String s, int n) { s = s.trim().replace('\n', ' '); return s.length() <= n ? s : s.substring(0, n - 3) + "..."; }     // ASCII: Winlink subjects are ISO-8859-1
+    /** The form code line in a Winlink message body, or null. */
+    public static String winlinkPart(String body) {
+        if (body == null) return null;
+        for (String line : body.split("\r?\n")) { String[] p = part(line); if (p != null && "1".equals(p[2]) && "1".equals(p[3])) return line.trim(); }
+        return null;
+    }
+
     /** Does this text look like a form part? Returns {kind, id, part, count, chunk} or null. */
     public static String[] part(String text) {
         if (text == null) return null;

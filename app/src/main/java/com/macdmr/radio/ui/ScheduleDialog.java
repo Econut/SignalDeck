@@ -58,7 +58,7 @@ public final class ScheduleDialog {
 
     private static String icon(String a) { return Scheduler.SCAN.equals(a) ? "scan" : Scheduler.APRS.equals(a) || Scheduler.BEACON.equals(a) ? "packet" : Scheduler.SSTV.equals(a) ? "sstv" : "radio"; }
     private static String channelSuffix(RadioService svc, Scheduler.Entry e) {
-        if (e.channel < 0 || !(Scheduler.LISTEN.equals(e.action) || Scheduler.SSTV.equals(e.action))) return "";
+        if (e.channel < 0 || !Scheduler.usesChannel(e.action)) return "";
         ChannelStore.Channel ch = svc.store().byNumber(e.channel); return " · " + (ch == null ? "channel " + e.channel : ch.name);
     }
 
@@ -77,7 +77,7 @@ public final class ScheduleDialog {
         body.addView(recRow);
         final List<ChannelStore.Channel> chans = svc.store().all();
         final Runnable showCh = () -> {
-            boolean need = Scheduler.LISTEN.equals(e.action) || Scheduler.SSTV.equals(e.action);
+            boolean need = Scheduler.usesChannel(e.action);
             chRow.setVisibility(need ? android.view.View.VISIBLE : android.view.View.GONE);
             recRow.setVisibility(Scheduler.LISTEN.equals(e.action) ? android.view.View.VISIBLE : android.view.View.GONE);
             ChannelStore.Channel ch = e.channel >= 0 ? svc.store().byNumber(e.channel) : null;
@@ -120,7 +120,7 @@ public final class ScheduleDialog {
         final Runnable showT = () -> time.setText(android.text.format.DateFormat.getTimeFormat(c).format(at(e.hour, e.minute)) + "  ·  tap to change");
         showT.run();
         time.setOnClickListener(v -> new android.app.TimePickerDialog(c, (tp, h, mi) -> { e.hour = h; e.minute = mi; showT.run(); }, e.hour, e.minute, android.text.format.DateFormat.is24HourFormat(c)).show());
-        final android.widget.EditText len = field(c, body, "For how many minutes (not for a beacon)", String.valueOf(e.minutes));
+        final android.widget.EditText len = field(c, body, "For how many minutes (not for a beacon or a mail check)", String.valueOf(e.minutes));
         len.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         final android.widget.EditText label = field(c, body, "Name (optional)", e.label);
         LinearLayout btns = new LinearLayout(c);
@@ -131,7 +131,7 @@ public final class ScheduleDialog {
         save.setOnClickListener(v -> {
             try { e.minutes = Math.max(1, Math.min(24 * 60, Integer.parseInt(len.getText().toString().trim()))); } catch (NumberFormatException x) { e.minutes = 60; }
             e.label = label.getText().toString().trim(); e.record = rec.isChecked() && Scheduler.LISTEN.equals(e.action); e.enabled = true;
-            if (!(Scheduler.LISTEN.equals(e.action) || Scheduler.SSTV.equals(e.action))) e.channel = -1;
+            if (!Scheduler.usesChannel(e.action)) e.channel = -1;
             if (e.days != 0) e.date = "";
             long next = Scheduler.nextStart(e, System.currentTimeMillis(), java.util.TimeZone.getDefault());
             if (next < 0) { Toast.makeText(c, "That time has already passed: choose a later date or tick some days", Toast.LENGTH_LONG).show(); return; }

@@ -2269,6 +2269,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             @Override public void close() { PacketEngine pe = packet(); if (pe != null) pe.closeWinlinkLink(); }
             @Override public String callsign() { PacketEngine pe = packet(); if (pe != null) return pe.callsignSet() ? pe.callsign() : ""; String c = getSharedPreferences("packet", MODE_PRIVATE).getString("callsign", "").trim().toUpperCase(java.util.Locale.US).replaceAll("-.*", ""); return "N0CALL".equals(c) ? "" : c; }
             @Override public void notifyUser(String title, String text) { RadioService.this.notifyUser(title, text, false); }
+            @Override public void formText(String from, String line) { ui.post(() -> onFormText(from, line, "Winlink")); }
         });
         return winlink;
     }
@@ -2304,6 +2305,11 @@ public class RadioService extends Service implements RadioEngine.Events {
             final java.util.List<String> parts = com.macdmr.radio.ham.Forms.split(f, 120);
             for (int k = 0; k < parts.size(); k++) { final String p = parts.get(k); ui.postDelayed(() -> sendSms(toContact, p), k * 4_000L); }
             r.peer = toContact.name.isEmpty() ? String.valueOf(toContact.number) : toContact.name; r.via = "DMR"; r.status = "sent in " + parts.size() + " text" + (parts.size() == 1 ? "" : "s");
+        } else if ("winlink".equals(via)) {
+            if (toCall == null || toCall.trim().isEmpty()) return "Enter the callsign or e-mail address to send it to";
+            String[] m = com.macdmr.radio.ham.Forms.winlink(f);
+            String e = winlink().compose(toCall, "", m[0], m[1]); if (e != null) return e;
+            r.peer = toCall.trim(); r.via = "Winlink"; r.status = "in the Winlink outbox";
         } else { r.peer = ""; r.via = "saved"; r.status = "saved"; }
         forms().save(r);
         return null;
@@ -2383,7 +2389,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void endSchedule(int id) { ui.post(() -> endScheduleNow(id)); }
     private void runScheduleNow(final int id, final int tries) {
         Scheduler.Entry e = Scheduler.byId(this, id); if (e == null) return;
-        String what = "\u23F0 Scheduled " + e.actionName().toLowerCase(Locale.US) + (e.label.isEmpty() ? "" : " (" + e.label + ")");
+        String what = "\u23F0 Scheduled: " + e.actionName() + (e.label.isEmpty() ? "" : " (" + e.label + ")");
         long t0 = System.currentTimeMillis(), t1 = t0 + (e.hasDuration() ? e.minutes * 60_000L : 60_000L);
         if (satBusy(t0, t1)) { history("pkt", what + " skipped: it overlaps the satellite pass being tracked"); return; }
         if (pttDown) { if (tries < 6) ui.postDelayed(() -> runScheduleNow(id, tries + 1), 20_000); else history("pkt", what + " skipped: the radio was transmitting"); return; }
@@ -2409,6 +2415,43 @@ public class RadioService extends Service implements RadioEngine.Events {
                 else r = sstvMonitor(true, true);
                 break;
             case Scheduler.BEACON: r = packet == null ? "the packet engine is not running" : packet.sendBeacon(); if (r == null) r = "sent"; break;
+            case Scheduler.WINLINK_NET: {
+                final com.macdmr.radio.winlink.Winlink w = winlink();
+                r = w.connectInternet();
+                if (r == null) {
+                    r = "connecting to the CMS";
+                    final long until = System.currentTimeMillis() + 10 * 60_000L;
+                    ui.postDelayed(new Runnable() { @Override public void run() {
+                        if (w.busy() && System.currentTimeMillis() < until) { ui.postDelayed(this, 5_000); return; }
+                        if (w.busy()) w.cancel();
+                        history("pkt", "\u23F0 Scheduled Winlink check: " + w.lastResult());
+                    } }, 5_000);
+                }
+                break;
+            }
+            case Scheduler.WINLINK: {
+                final com.macdmr.radio.winlink.Winlink w = winlink();
+                if (w.gateway().isEmpty()) { r = "skipped: no gateway yet (connect once with Winlink \u2192 Connect: radio)"; break; }
+                if (w.busy()) { r = "skipped: a Winlink session is already running"; break; }
+                if (e.channel >= 0 && store.byNumber(e.channel) == null) { r = "skipped: channel " + e.channel + " no longer exists"; break; }
+                final boolean move = e.channel >= 0 && e.channel != prevCh; final int back = prevCh;
+                if (wasScan) toggleScan();
+                if (move) selectChannel(e.channel);
+                ui.postDelayed(() -> {
+                    String err = w.connectRadio(w.gateway(), w.via());
+                    if (err != null) { history("pkt", "\u23F0 Scheduled Winlink check: " + err); if (move && back >= 0) selectChannel(back); return; }
+                    final long until = System.currentTimeMillis() + 20 * 60_000L;   // never hold the radio longer than 20 minutes
+                    ui.postDelayed(new Runnable() { @Override public void run() {
+                        if (w.busy() && System.currentTimeMillis() < until) { ui.postDelayed(this, 5_000); return; }
+                        if (w.busy()) w.cancel();
+                        history("pkt", "\u23F0 Scheduled Winlink check: " + w.lastResult() + (move && back >= 0 ? ", back to channel " + back : ""));
+                        if (move && back >= 0 && store.byNumber(back) != null) selectChannel(back);
+                        if (wasScan) ui.postDelayed(RadioService.this::toggleScan, RETUNE_SETTLE_MS);
+                    } }, 5_000);
+                }, move ? RETUNE_SETTLE_MS : 0);
+                r = "calling " + w.gateway() + (move ? " on channel " + e.channel : "");
+                break;
+            }
         }
         history("pkt", what + (r == null ? "" : ": " + r) + (e.hasDuration() ? " for " + e.minutes + " min" : ""));
         if (!e.hasDuration()) return;
@@ -2438,7 +2481,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         boolean moved = e != null && e.channel >= 0 && (Scheduler.LISTEN.equals(e.action) || Scheduler.SSTV.equals(e.action)) && p.getInt("prevCh", -1) != e.channel;
         if (moved && prev >= 0 && !satOn) { ChannelStore.Channel cur = current; if (cur != null && cur.number == e.channel && store.byNumber(prev) != null) selectChannel(prev); }
         if (p.getBoolean("stoppedScan", false) && !scanning()) ui.postDelayed(this::toggleScan, RETUNE_SETTLE_MS);
-        history("pkt", "\u23F0 Scheduled " + (e == null ? "operation" : e.actionName().toLowerCase(Locale.US)) + " ended" + (moved && prev >= 0 ? ": back to channel " + prev : ""));
+        history("pkt", "\u23F0 Scheduled: " + (e == null ? "operation" : e.actionName()) + " ended" + (moved && prev >= 0 ? ": back to channel " + prev : ""));
         Scheduler.arm(this);
     }
 

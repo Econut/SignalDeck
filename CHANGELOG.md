@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Forms by Winlink, scheduled Winlink mail checks
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R#8 | **Send a form by Winlink**: ICS-213 / radiogram → *Send by Winlink* (phone) or *Send by Winlink (outbox)* (SignalDeck Web): one e-mail to callsigns or addresses, subject "ICS-213: <subject>" / "Radiogram <nr>: <text…>", body = the form laid out to read plus SignalDeck's one-line form code; a SignalDeck that receives it rebuilds the form into Message forms (history line, notification) as with APRS/DMR. **Scheduled operations**: *Check Winlink mail (radio gateway)* (the last gateway, on the chosen channel; radio goes back afterwards; at most 20 min) and *Check Winlink mail (internet)*; both log the result. History wording "⏰ Scheduled: <action>" keeps the action's capitals. Help: Message forms, Scheduled operations, Winlink → *Trying a real gateway* (what to report). Roadmap: owner notes for later (DMR message threads, Soft SQ web scale). | `ham/Forms.java`, `winlink/Winlink.java`, `RadioService.java`, `Scheduler.java`, `ui/FormsDialog.java`, `ui/ScheduleDialog.java`, `web/WebHost.java`, `assets/web/index.html`, `assets/web/pages.js`, `ui/HelpView.java`, `FormsTest.java`, `docs/ROADMAP.md` | `FormsTest.roundTripThroughWinlink` (form → B2 message → LZHUF → parsed → rebuilt, every field). Device (owner's Armor, fake CMS via adb reverse): an ICS-213 sent by Winlink from the web API arrived at the CMS readable; the CMS's form message was rebuilt into Message forms ("ICS-213 General Message from BENCH", via Winlink); two scheduled internet checks connected on the minute (17:00:00 → 16:59:59, 17:03:00 → 17:02:59) with start and result in the history. The radio-gateway check reuses the RF-tested session path (not run on the air again). Bench schedules, forms, mail and the test password removed. |
+
 ## 2026-10-22 — SignalDeck 1.0.0-beta.13 (pre-release)
 
 | Backlog | Change | Files | Test |

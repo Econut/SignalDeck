@@ -38,6 +38,8 @@ public final class Winlink {
         String callsign();
         /** Tell the user (new mail). */
         void notifyUser(String title, String text);
+        /** A received message carried a SignalDeck form code line (the host rebuilds the form). */
+        default void formText(String from, String line) { }
     }
     public interface StatusSink { void status(String s); }
     public interface Listener { void changed(); }
@@ -182,7 +184,11 @@ public final class Winlink {
         B2fClient.Mailbox box = new B2fClient.Mailbox() {
             @Override public List<B2Message> outbox() { List<B2Message> l = new ArrayList<>(); List<WinlinkStore.Item> items = store.list(WinlinkStore.OUTBOX); for (int i = items.size() - 1; i >= 0; i--) l.add(items.get(i).m); return l; }
             @Override public boolean have(String mid) { return store.has(WinlinkStore.INBOX, mid); }
-            @Override public void received(B2Message m) throws IOException { store.save(WinlinkStore.INBOX, m); got[0]++; changed(); }
+            @Override public void received(B2Message m) throws IOException {
+                store.save(WinlinkStore.INBOX, m); got[0]++; changed();
+                String form = com.macdmr.radio.ham.Forms.winlinkPart(m.bodyText());
+                if (form != null) try { radio.formText(B2Message.shown(m.from), form); } catch (Throwable ignored) { }
+            }
             @Override public void sent(String mid) { store.markSent(mid); changed(); }
             @Override public void log(String line) { note(line); }
             @Override public void progress(String what, int done, int total) { progress = what + " · " + done + " of " + total + " bytes"; changed(); }

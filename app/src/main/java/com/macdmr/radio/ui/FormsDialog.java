@@ -111,10 +111,19 @@ public final class FormsDialog {
         final AlertDialog dlg;
         final Runnable collect = () -> { for (Map.Entry<String, EditText> e : in.entrySet()) form.f.put(e.getKey(), e.getValue().getText().toString().trim()); if (Forms.RADIOGRAM.equals(form.kind)) form.f.put("CK", String.valueOf(Forms.words(form.f.get("MS")))); };
         TextView aprs = Neo.button(c, "Send by APRS", "packet", Neo.GREEN), dmr = Neo.button(c, "Send by DMR text", "messages", Neo.CYAN), save = Neo.button(c, "Save", "check", Neo.MUTED);
+        TextView wl = Neo.button(c, "Send by Winlink", "mail", Neo.VIOLET);
         for (TextView b : new TextView[] { aprs, dmr }) { b.setTextSize(14); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, (int) (48 * d), 1f); lp.setMargins((int) (3 * d), (int) (12 * d), (int) (3 * d), 0); r.addView(b, lp); }
+        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d)); wlp.topMargin = (int) (8 * d); body.addView(wl, wlp);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d)); sl.topMargin = (int) (8 * d); body.addView(save, sl);
         dlg = Neo.showSheet(c, body);
         save.setOnClickListener(v -> { collect.run(); String e = svc.sendForm(form, "save", null, null); toast(c, e == null ? "Saved" : e); if (e == null) { dlg.dismiss(); show(c, svc); } });
+        wl.setOnClickListener(v -> {
+            collect.run();
+            final EditText to = new EditText(c); to.setHint("Callsign or e-mail address (commas for several)"); to.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+            new AlertDialog.Builder(c).setTitle("Send by Winlink").setMessage("The form goes to the Winlink outbox as an e-mail anyone can read (SignalDeck puts it back together as a form). It is sent at your next Winlink connection.").setView(to)
+                .setPositiveButton("Put in the outbox", (dd, w) -> { String e = svc.sendForm(form, "winlink", to.getText().toString(), null); toast(c, e == null ? "In the Winlink outbox" : e); if (e == null) { dlg.dismiss(); show(c, svc); } })
+                .setNegativeButton("Cancel", null).show();
+        });
         aprs.setOnClickListener(v -> {
             collect.run();
             final EditText to = new EditText(c); to.setHint("Callsign, e.g. N0CALL-7"); to.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);

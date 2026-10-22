@@ -28,9 +28,11 @@ import java.util.Locale;
  * always win: the operation is skipped (or, while talking, started 20 s later) with a history line.
  */
 public final class Scheduler {
-    public static final String LISTEN = "listen", SCAN = "scan", APRS = "aprs", SSTV = "sstv", BEACON = "beacon";
-    public static final String[] ACTIONS = { LISTEN, SCAN, APRS, SSTV, BEACON };
-    public static final String[] ACTION_NAMES = { "Listen to a channel", "Scan the zone", "APRS monitoring (144.390)", "SSTV receive", "Send an APRS beacon" };
+    public static final String LISTEN = "listen", SCAN = "scan", APRS = "aprs", SSTV = "sstv", BEACON = "beacon", WINLINK = "winlink", WINLINK_NET = "winlinknet";
+    public static final String[] ACTIONS = { LISTEN, SCAN, APRS, SSTV, BEACON, WINLINK, WINLINK_NET };
+    public static final String[] ACTION_NAMES = { "Listen to a channel", "Scan the zone", "APRS monitoring (144.390)", "SSTV receive", "Send an APRS beacon", "Check Winlink mail (radio gateway)", "Check Winlink mail (internet)" };
+    /** Actions that use a channel of their own (the rest work on the current one). */
+    public static boolean usesChannel(String a) { return LISTEN.equals(a) || SSTV.equals(a) || WINLINK.equals(a); }
 
     public static final class Entry {
         public int id; public String action = LISTEN, label = ""; public int hour = 19, minute = 0;
@@ -40,7 +42,7 @@ public final class Scheduler {
         JSONObject json() throws Exception { return new JSONObject().put("id", id).put("action", action).put("label", label).put("hour", hour).put("minute", minute).put("days", days).put("date", date).put("minutes", minutes).put("channel", channel).put("record", record).put("enabled", enabled); }
         static Entry of(JSONObject o) { Entry e = new Entry(); e.id = o.optInt("id"); e.action = o.optString("action", LISTEN); e.label = o.optString("label", ""); e.hour = o.optInt("hour", 19); e.minute = o.optInt("minute"); e.days = o.optInt("days"); e.date = o.optString("date", ""); e.minutes = o.optInt("minutes", 60); e.channel = o.optInt("channel", -1); e.record = o.optBoolean("record"); e.enabled = o.optBoolean("enabled", true); return e; }
         public boolean oneShot() { return days == 0; }
-        public boolean hasDuration() { return !BEACON.equals(action); }
+        public boolean hasDuration() { return !BEACON.equals(action) && !WINLINK.equals(action) && !WINLINK_NET.equals(action); }
         public String actionName() { for (int i = 0; i < ACTIONS.length; i++) if (ACTIONS[i].equals(action)) return ACTION_NAMES[i]; return action; }
         /** "Tue, Thu 19:00 for 60 min" / "23 Oct 19:00". */
         public String when() {

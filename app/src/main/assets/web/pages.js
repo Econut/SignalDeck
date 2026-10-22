@@ -348,7 +348,7 @@ function fmOpen(kind, pre) {
   $('fmFields').innerHTML = fl.filter(k => !(kind === 'RADIOGRAM' && k[0] === 'CK')).map(k => '<label' + (k[0] === 'MS' ? ' class="wide"' : '') + '>' + esc(k[1]) + (k[0] === 'MS' ? '<textarea data-k="MS">' + esc(def.MS || '') + '</textarea>' : '<input data-k="' + k[0] + '" value="' + esc(def[k[0]] || '') + '">') + '</label>').join('');
   $('fmEdit').classList.remove('hidden'); $('fmView').classList.add('hidden'); $('fmVia').value = 'save'; fmVia(); const first = $('fmFields').querySelector('input,textarea'); if (first) first.focus();
 }
-function fmVia() { const v = $('fmVia').value; $('fmTo').classList.toggle('hidden', v !== 'aprs'); $('fmContact').classList.toggle('hidden', v !== 'dmr'); }
+function fmVia() { const v = $('fmVia').value; $('fmTo').classList.toggle('hidden', v !== 'aprs' && v !== 'winlink'); $('fmTo').placeholder = v === 'winlink' ? 'Callsign or e-mail address' : 'Callsign, e.g. N0CALL-7'; $('fmContact').classList.toggle('hidden', v !== 'dmr'); }
 $('fmVia').onchange = fmVia;
 $('fmNew213').onclick = async () => { if (!S.forms) await loadForms(); fmOpen('ICS213'); };
 $('fmNewRg').onclick = async () => { if (!S.forms) await loadForms(); fmOpen('RADIOGRAM'); };
@@ -515,8 +515,8 @@ $('sfDays').onclick = e => { const b = e.target.closest('button'); if (!b) retur
 const sfMask = () => [...$('sfDays').children].reduce((m, b, i) => m | (b.classList.contains('on') ? 1 << i : 0), 0);
 function sfShow() {
   const a = $('sfAction').value;
-  $('sfChWrap').classList.toggle('hidden', !(a === 'listen' || a === 'sstv')); $('sfRecWrap').classList.toggle('hidden', a !== 'listen');
-  $('sfMinWrap').classList.toggle('hidden', a === 'beacon'); $('sfDateWrap').classList.toggle('hidden', sfMask() !== 0);
+  $('sfChWrap').classList.toggle('hidden', !(a === 'listen' || a === 'sstv' || a === 'winlink')); $('sfRecWrap').classList.toggle('hidden', a !== 'listen');
+  $('sfMinWrap').classList.toggle('hidden', a === 'beacon' || a === 'winlink' || a === 'winlinknet'); $('sfDateWrap').classList.toggle('hidden', sfMask() !== 0);
   const first = $('sfChannel').options[0]; if (first) first.text = a === 'sstv' ? '144.500 MHz (SSTV calling frequency)' : 'The channel the radio is on';
 }
 $('sfAction').onchange = sfShow;

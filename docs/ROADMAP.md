@@ -14,6 +14,11 @@ entry and a device test.
 | 7 | ICS-213 / radiogram forms | Standard message forms over APRS messages or DMR text (or read on air), with a message log | **done** 2026-10-22 (over-the-air send not yet bench-tested) |
 | 8 | Winlink over packet | E-mail through a Winlink packet gateway (AX.25 connected mode, B2F), or the CMS over the internet; bench-tested against a fake CMS (internet) and a HackRF test gateway (radio, full session); not yet tested with the real Winlink system (users asked to report) | done |
 
+## Later (owner notes)
+
+- **Soft SQ scale**: the phone shows 1-9, SignalDeck Web 1-100 (values above 9 pin the phone at 9); make them one scale.
+- **DMR message threads**: texts sent to and received from a contact stay together as one conversation chain (phone and SignalDeck Web).
+
 ## Research, later
 
 - **M17 and other digital voice**: after deeper work on the radio module's firmware and on other phones. Today the
