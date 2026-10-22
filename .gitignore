@@ -3,3 +3,9 @@ build/
 local.properties
 *.iml
 .idea/
+
+# signing keys and their passwords never go to GitHub
+*.keystore
+*.jks
+*.pem
+keystore.properties

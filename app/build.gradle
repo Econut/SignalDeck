@@ -2,6 +2,14 @@ plugins {
     id 'com.android.application'
 }
 
+// The release key stays off GitHub: its location and passwords come from local.properties (never committed) or the
+// environment. Without them the build falls back to the Android debug key, which cannot update an official install.
+def signingProps = new Properties()
+def localProps = rootProject.file('local.properties')
+if (localProps.exists()) localProps.withInputStream { signingProps.load(it) }
+def signingValue = { String key, String env -> signingProps.getProperty(key) ?: System.getenv(env) }
+def releaseStore = signingValue('signaldeck.storeFile', 'SIGNALDECK_STORE_FILE')
+
 android {
     testOptions { unitTests.returnDefaultValues = true }   // host tests: android.util.Log calls in shared DSP code are no-ops
     namespace 'com.macdmr.radio'
@@ -17,21 +25,23 @@ android {
     }
 
     buildFeatures { buildConfig true }
-    // One key for debug and release (the DMRModHooks release key, like the companion app): adb install -r keeps
-    // working across both and users can move from a test build to a release without uninstalling.
+    // One key for debug and release (the project's release key): adb install -r keeps working across both and users
+    // can move from a test build to a release without uninstalling. Official builds are signed with it.
     signingConfigs {
-        release {
-            storeFile file('../../DMRModHooks/release.keystore')
-            storePassword 'android'
-            keyAlias 'dmrmodhooks'
-            keyPassword 'android'
+        if (releaseStore) {
+            release {
+                storeFile file(releaseStore)
+                storePassword signingValue('signaldeck.storePassword', 'SIGNALDECK_STORE_PASSWORD')
+                keyAlias signingValue('signaldeck.keyAlias', 'SIGNALDECK_KEY_ALIAS')
+                keyPassword signingValue('signaldeck.keyPassword', 'SIGNALDECK_KEY_PASSWORD')
+            }
         }
     }
     buildTypes {
-        debug { signingConfig signingConfigs.release }
+        debug { if (releaseStore) signingConfig signingConfigs.release }
         release {
             minifyEnabled false
-            signingConfig signingConfigs.release
+            signingConfig releaseStore ? signingConfigs.release : signingConfigs.debug
         }
     }
 

@@ -30,7 +30,7 @@ import java.util.Locale;
  * releases). Download through DownloadManager, then hand the file to the package installer.
  */
 public final class Updater {
-    private static final String LATEST = "https://api.github.com/repos/IIMacGyverII/phonedmrapp/releases";
+    private static final String LATEST = "https://api.github.com/repos/IIMacGyverII/SignalDeck/releases";
     private static final String[] ASSET_PREFIXES = { "SignalDeck", "DMRRadio" };   // the app was called DMR Radio before 2026-10-20
 
     public static final class Release { public String tag, version, name, notes = "", apkUrl, apkName, published = ""; public long apkSize; public boolean prerelease; }

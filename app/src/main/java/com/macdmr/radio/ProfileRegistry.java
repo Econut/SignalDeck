@@ -40,7 +40,7 @@ import java.util.function.Predicate;
  * fetched profiles altogether.
  */
 public final class ProfileRegistry {
-    public static final String LIST_URL = "https://raw.githubusercontent.com/IIMacGyverII/phonedmrapp/main/profiles/profiles.json";
+    public static final String LIST_URL = "https://raw.githubusercontent.com/IIMacGyverII/SignalDeck/main/profiles/profiles.json";
     /** ECDSA P-256 public key of the profile list's signing key (the private key never leaves the maintainer's PC). */
     static final String PUBLIC_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESoOXZsfoRfdkCfyCAdZjNm6gL6MOU42q08UQGUYonPEgZruRBwTh1uo+9toFUqopphqIb9i7WV2zuSBRZRB6GQ==";
 

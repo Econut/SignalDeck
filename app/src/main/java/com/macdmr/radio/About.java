@@ -14,7 +14,7 @@ package com.macdmr.radio;
 public final class About {
     private About() { }
 
-    public static final String SOURCE = "https://github.com/IIMacGyverII/phonedmrapp";
+    public static final String SOURCE = "https://github.com/IIMacGyverII/SignalDeck";
 
     public static String legal() {
         return "SignalDeck " + BuildConfig.VERSION_NAME + "\n"
