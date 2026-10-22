@@ -16,6 +16,7 @@ entry and a device test.
 
 ## Later (owner notes)
 
+- **Winlink gateway list, automatic**: ask Winlink for an API access key so SignalDeck can refresh the gateway list itself (today: the user downloads the CSV in the browser and imports it; winlink.org is behind a Cloudflare bot check, which SignalDeck never works around).
 - **Soft SQ scale**: the phone shows 1-9, SignalDeck Web 1-100 (values above 9 pin the phone at 9); make them one scale.
 - **DMR message threads**: texts sent to and received from a contact stay together as one conversation chain (phone and SignalDeck Web).
 

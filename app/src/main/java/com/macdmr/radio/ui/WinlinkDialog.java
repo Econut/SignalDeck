@@ -115,7 +115,7 @@ public final class WinlinkDialog {
         final Winlink w = svc.winlink();
         float d = Theme.dp(c);
         LinearLayout body = Neo.sheetBody(c, "Winlink gateways");
-        body.addView(Neo.sheetHint(c, "Winlink publishes its gateways at winlink.org (RMS Channels). There, choose Packet, download the CSV file, then Import it here. SignalDeck keeps the 1200-baud packet gateways this radio can tune and sorts them by distance from the phone's last known position (worked out on the phone; it is not sent anywhere). Tap one to tune it and connect."));
+        body.addView(Neo.sheetHint(c, "1. Open winlink.org opens Winlink's gateway list in your browser: tap RMS List, choose Packet, then CSV File to download it (if the buttons are cut off, turn on the browser's Desktop site). 2. Come back and tap Import the CSV: the file you just downloaded is at the top of Recent, or in Downloads. SignalDeck keeps the 1200-baud packet gateways this radio can tune and sorts them by distance from the phone's last known position (worked out on the phone; it is not sent anywhere). Tap one to tune it and connect."));
         LinearLayout r = new LinearLayout(c); body.addView(r);
         btn(c, r, "Open winlink.org", "globe", Neo.CYAN).setOnClickListener(v -> { try { c.startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://winlink.org/RMSChannels"))); } catch (Exception e) { toast(c, "https://winlink.org/RMSChannels"); } });
         btn(c, r, "Import the CSV", "import", Neo.GREEN).setOnClickListener(v -> {

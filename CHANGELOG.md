@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Winlink gateways: step-by-step download and import
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R#8 | Owner's choice: no in-app browser (winlink.org sits behind a Cloudflare bot check, and an embedded copy of its desktop page clipped the CSV button). Winlink → Gateways now spells out the two steps: *Open winlink.org* (the phone's browser: RMS List → Packet → CSV File; Desktop site if the buttons are cut off), then *Import the CSV*, which opens Android's file picker on Recent, where the download is at the top. Help updated; roadmap note for an official Winlink API key later. | `ui/WinlinkDialog.java`, `ui/HelpView.java`, `MainActivity.java`, `docs/ROADMAP.md` | Owner's Armor: Open winlink.org opened the phone's browser and Back returned; a CSV placed in Download (then removed) showed at the top of the picker's Recent files and imported (import time updated, 1,210 gateways). |
+
 ## 2026-10-22 — Winlink gateways: import winlink.org's list, nearest first
 
 | Backlog | Change | Files | Test |

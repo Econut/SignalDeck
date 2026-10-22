@@ -312,7 +312,7 @@ public class MainActivity extends AppCompatActivity {
         try { startActivityForResult(i, 77); } catch (Throwable t) { android.widget.Toast.makeText(this, "No picture app available", android.widget.Toast.LENGTH_LONG).show(); }
     }
     private java.util.function.Consumer<android.net.Uri> docPick;
-    /** Any file (shared channels: a SignalDeck file or a CHIRP CSV). */
+    /** Any file (shared channels: a SignalDeck file or a CHIRP CSV; the Winlink gateway CSV). The picker opens on Recent. */
     public void pickDocument(java.util.function.Consumer<android.net.Uri> cb) {
         docPick = cb;
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
