@@ -89,6 +89,11 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
 .dec-job { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 10px 0; }
 .dec-out { white-space: pre-wrap; overflow-wrap: anywhere; font: 13px ShareTech, ui-monospace, monospace; color: var(--text); max-height: 260px; overflow-y: auto; margin: 8px 0; }
 .dec-out:empty { display: none; }
+.cond-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+@media (max-width: 900px) { .cond-grid { grid-template-columns: 1fr; } }
+.cond-v { font-size: 19px; line-height: 1.3; }
+.tropo-strip { display: flex; gap: 1px; height: 18px; margin: 6px 0 8px; }
+.tropo-strip i { flex: 1; border-radius: 2px; }
 .sched-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 14px; margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
 .sched-form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 13px; }
 .sched-form label.chk { flex-direction: row; align-items: center; gap: 8px; color: var(--text); }

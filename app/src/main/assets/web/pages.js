@@ -494,6 +494,21 @@ async function loadPasses() {
     loadSatStatus();
   } catch (e) { }
 }
+const COND_COL = ['#2A3C50', 'var(--cyan)', 'var(--green)', 'var(--amber)'];
+async function loadConditions() {
+  try {
+    const j = await api('conditions');
+    const fmt = t => new Date(t).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    $('condTropo').textContent = !j.tropo.length ? 'No forecast' : j.best ? j.best.name + ', ' + fmt(j.best.from) + '–' + new Date(j.best.to).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Normal: no enhancement expected';
+    $('condTropo').style.color = j.best ? COND_COL[j.best.c] : '';
+    $('condStrip').innerHTML = j.tropo.map(s => '<i style="background:' + COND_COL[s.c] + '" title="' + fmt(s.t) + ': ' + esc(j.classNames[s.c]) + ' (' + s.g + ' N/km)"></i>').join('');
+    $('condKp').textContent = j.kpNow < 0 ? 'Kp unavailable' : 'Kp ' + j.kpNow.toFixed(1) + ' · ' + j.kpWords;
+    $('condAur').textContent = (j.kpMax >= 0 ? 'Forecast up to Kp ' + j.kpMax.toFixed(1) + ' (' + fmt(j.kpMaxAt) + '). ' : '') + (j.aurora >= 0 ? 'Aurora chance overhead now: ' + j.aurora + ' %. ' : '') + 'VHF aurora needs Kp 5+ at mid latitudes: antenna north, a buzzing sound (better for CW/SSB than FM).';
+    $('condMet').innerHTML = j.showers.length ? j.showers.map(s => { const d = Math.round((s.peak - Date.now()) / 864e5); return '<b>' + esc(s.name) + '</b> · ' + (d <= 0 ? 'active now' : 'peak ' + new Date(s.peak).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }) + ' (in ' + d + ' d)') + ', up to ' + s.zhr + '/h' + (s.note ? ', ' + esc(s.note) : ''); }).join('<br>') + '<br>Trails reflect 2 m for moments (pings), 800–2000 km; best before dawn.' : 'No major shower in the next six weeks.';
+    $('condProb').textContent = j.problems.join(' · ');
+    $('condAge').textContent = 'UPDATED ' + new Date(j.fetched).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) { $('condTropo').textContent = 'Could not load'; }
+}
 async function loadSatStatus() {                                           // AMSAT reports, one satellite after another
   for (const el of [...$('passList').querySelectorAll('.sat-st')]) {
     try { const j = await api('sat/status?name=' + encodeURIComponent(el.dataset.amsat)); el.textContent = j.line; el.style.color = j.heard > 0 ? 'var(--green)' : j.telemetry > 0 ? 'var(--amber)' : ''; } catch (e) { el.textContent = 'AMSAT status: offline'; }

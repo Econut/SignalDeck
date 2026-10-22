@@ -74,6 +74,9 @@ public final class PktDialog {
         body.addView(r2b);
         LinearLayout rSat = row();
         button(rSat, svc.satState() != null ? "Satellites: tracking " + svc.satState().name : "Satellite passes", Theme.PKT, x -> { dlg.dismiss(); SatelliteDialog.show(c, svc); });
+        body.addView(rSat);
+        rSat = row();
+        button(rSat, "VHF/UHF conditions", Theme.PKT, x -> { dlg.dismiss(); ConditionsDialog.show(c, svc); });
         button(rSat, "Decode a recording", Theme.PKT, x -> { dlg.dismiss(); RecordingsDialog.show(c, svc, com.macdmr.radio.RecordingDecodeJob.APRS); });
         body.addView(rSat);
         LinearLayout rIss = row();

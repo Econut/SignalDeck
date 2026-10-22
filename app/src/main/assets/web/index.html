@@ -213,7 +213,16 @@
         <div class="row wrap"><button class="btn" data-iss="aprs">ISS APRS 437.825</button><button class="btn" data-iss="sstv">ISS SSTV 437.550</button><button class="btn danger" data-iss="stop">Stop tracking</button></div>
         <p class="muted small">Tracking follows every pass: the radio tunes a few minutes before it, corrects the Doppler shift and listens only.</p>
       </div>
-      <div class="panel">
+      <div class="panel" id="condPanel">
+          <div class="row between"><span class="label">VHF/UHF CONDITIONS</span><span id="condAge" class="chip dim"></span></div>
+          <div class="cond-grid">
+            <div class="ptile"><div class="pt-h">TROPO · 48 H</div><div class="pt-v cond-v" id="condTropo">--</div><div class="tropo-strip" id="condStrip"></div><div class="pt-s">Grey normal · cyan slightly enhanced · green super-refraction · amber ducting likely. From the weather forecast's lowest layers (Open-Meteo, position rounded to about 50 km); thin ducts near the ground are underestimated.</div></div>
+            <div class="ptile"><div class="pt-h">AURORA</div><div class="pt-v cond-v" id="condKp">--</div><div class="pt-s" id="condAur"></div></div>
+            <div class="ptile"><div class="pt-h">METEOR SHOWERS</div><div class="pt-s" id="condMet"></div></div>
+          </div>
+          <div class="muted small" id="condProb"></div>
+        </div>
+        <div class="panel">
         <div class="row between wrap"><span class="label">PASSES · NEXT 24 HOURS</span><div class="row"><span id="passNote" class="chip dim"></span><button class="btn small-btn" id="satUpdate">Update orbits</button></div></div>
         <div id="passList" class="passgrid"></div>
       </div>

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — VHF/UHF conditions: tropo ducting forecast, aurora, meteor showers, next passes
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Roadmap #3 | `ham/Conditions`: **tropo** from Open-Meteo hourly forecasts (2 m and 1000–850 hPa temperature, humidity, geopotential height; position rounded to 0.5°): ITU-R P.453 refractivity, the steepest dN/dh between the ground and the levels above it in the lowest 1.5 km, classed normal / slightly enhanced (≤ −55) / super-refraction (≤ −79) / ducting (≤ −157 N/km), 48 h, best window; **aurora**: NOAA SWPC Kp (observed + forecast max) and the OVATION probability at the phone's position read from the whole downloaded grid (no position sent); **meteor showers**: built-in calendar of the major showers within 45 days; cached 20 min. Phone: PKT → VHF/UHF conditions (cards with a 48-hour colour strip, explanations, the next satellite passes above 20°); SignalDeck Web: a conditions panel on the Satellites page (`/api/conditions`). Help: VHF/UHF conditions. | `ham/Conditions.java` (new), `ui/ConditionsDialog.java` (new), `ui/PktDialog.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java`, `ConditionsTest.java` (new, 3 tests) | Host tests (refractivity of standard air, an inversion under dry air → duct, a mixed afternoon → normal, showers, Kp words, OVATION lookup). **Device + browser** (owner's Armor): Kp 2.7 quiet (max 3.0 Sat), aurora 0 %, 49 tropo hours (29 normal, 14 enhanced, 6 super-refraction), Orionids active, Leonids next; phone sheet and web panel render; radio state unchanged. The tropo model is not validated against Hepburn's maps: the help calls it a guide. |
+
 ## 2026-10-22 — Scheduled operations (phone and SignalDeck Web)
 
 | Backlog | Change | Files | Test |

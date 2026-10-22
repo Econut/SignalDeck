@@ -769,6 +769,11 @@ public final class WebHost {
                 return ok(new JSONObject().put("schedules", com.macdmr.radio.Scheduler.json(svc)).put("running", com.macdmr.radio.Scheduler.runningEnd(svc) > now ? com.macdmr.radio.Scheduler.runningId(svc) : 0).put("runningEnd", com.macdmr.radio.Scheduler.runningEnd(svc)));
             }
             case "/api/schedules/delete": if (!post) break; { com.macdmr.radio.Scheduler.remove(svc, b.optInt("id")); return ok("Deleted"); }
+            case "/api/conditions": {                                           // tropo / aurora / meteors (the phone fetches; the browser gets the result)
+                android.location.Location me = svc.lastKnownLocation();
+                com.macdmr.radio.ham.Conditions.Report rep = com.macdmr.radio.ham.Conditions.get(me == null ? 0 : me.getLatitude(), me == null ? 0 : me.getLongitude(), me != null);
+                return ok(com.macdmr.radio.ham.Conditions.json(rep));
+            }
             case "/api/sat/status": {                                           // AMSAT's reports of the last 4 days for one satellite (?name=SO-50_[FM])
                 String n = r.param("name"); if (n == null || !n.matches("[A-Za-z0-9 -]+_\\[[A-Z]+\\]")) return WebServer.Response.error(400, "Bad name");
                 com.macdmr.radio.ham.FmSats.Status st = com.macdmr.radio.ham.FmSats.status(n, 96);
