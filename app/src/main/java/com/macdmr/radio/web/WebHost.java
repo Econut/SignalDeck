@@ -739,6 +739,7 @@ public final class WebHost {
                 for (com.macdmr.radio.ham.Satellites.Sat s : com.macdmr.radio.ham.Satellites.all(svc)) {
                     JSONObject o = new JSONObject().put("key", s.key).put("name", s.name).put("about", s.about).put("downHz", s.downHz).put("upHz", s.upHz)
                             .put("toneHz", s.toneHz).put("mode", s.mode).put("listenOnly", s.listenOnly());
+                    String an = com.macdmr.radio.ham.FmSats.amsatName(s); if (an != null && !(s.catalog == com.macdmr.radio.ham.Satellites.ISS_CATALOG && s.mode == com.macdmr.radio.ham.Satellites.APRS)) o.put("amsat", an);
                     JSONArray ps = new JSONArray(); com.macdmr.radio.ham.Sgp4 e = el.get(s.catalog);
                     if (e == null) o.put("problem", "No orbit for it in the download");
                     else if (me != null) {
@@ -752,6 +753,12 @@ public final class WebHost {
                 }
                 return ok(new JSONObject().put("satellites", a).put("hasFix", me != null).put("elementsAgeH", sats.elementsAgeMs() / 3_600_000.0));
             }
+            case "/api/sat/status": {                                           // AMSAT's reports of the last 4 days for one satellite (?name=SO-50_[FM])
+                String n = r.param("name"); if (n == null || !n.matches("[A-Za-z0-9 -]+_\\[[A-Z]+\\]")) return WebServer.Response.error(400, "Bad name");
+                com.macdmr.radio.ham.FmSats.Status st = com.macdmr.radio.ham.FmSats.status(n, 96);
+                return ok(new JSONObject().put("line", com.macdmr.radio.ham.FmSats.describe(st, System.currentTimeMillis())).put("heard", st == null ? -1 : st.heard + st.crew).put("telemetry", st == null ? 0 : st.telemetry));
+            }
+            case "/api/sat/update": if (!post) break; { String e = svc.satellites().updateAll(); return e == null ? ok("Orbits and the FM satellite list updated") : WebServer.Response.error(502, e); }
             case "/api/sat/track": if (!post) break; {                          // track one pass {key, aos}
                 android.location.Location me = svc.lastKnownLocation(); if (me == null) return WebServer.Response.error(409, "No position fix on the phone yet");
                 String key = b.optString("key", ""); long aos = b.optLong("aos", 0);

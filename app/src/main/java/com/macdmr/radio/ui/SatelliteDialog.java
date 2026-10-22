@@ -100,8 +100,23 @@ public final class SatelliteDialog {
         Map<Integer, Sgp4> el = sats.elements();
         SimpleDateFormat f = new SimpleDateFormat("EEE HH:mm", Locale.US);
         long now = System.currentTimeMillis();
-        for (Satellites.Sat s : Satellites.all(c)) {
+        final Map<TextView, String> statusViews = new java.util.LinkedHashMap<>();
+        List<Satellites.Sat> order = new java.util.ArrayList<>(java.util.Arrays.asList(Satellites.all(c)));
+        if (me != null) {                                                     // the FM satellites from AMSAT's list: soonest pass first
+            final Map<String, Long> next = new java.util.HashMap<>();
+            for (Satellites.Sat s : order) {
+                if (!s.key.startsWith("fm-")) continue;
+                Sgp4 e = el.get(s.catalog); long t = Long.MAX_VALUE;
+                if (e != null) for (SatTrack.Pass p : SatTrack.passes(e, now - 15 * 60_000L, 24, me.getLatitude(), me.getLongitude(), me.hasAltitude() ? me.getAltitude() : 0, 10)) if (p.los > now) { t = p.aos; break; }
+                next.put(s.key, t);
+            }
+            List<Satellites.Sat> fm = new java.util.ArrayList<>(); for (Satellites.Sat s : order) if (s.key.startsWith("fm-")) fm.add(s);
+            order.removeAll(fm); fm.sort((a, b) -> Long.compare(next.get(a.key), next.get(b.key))); order.addAll(fm);
+        }
+        for (Satellites.Sat s : order) {
             body.addView(Neo.sheetSection(c, s.name));
+            String an = com.macdmr.radio.ham.FmSats.amsatName(s);
+            if (an != null && !(s.catalog == Satellites.ISS_CATALOG && s.mode == Satellites.APRS)) { TextView st = Neo.label(c, "AMSAT status \u2026", Neo.DIM, 12.5f, false); body.addView(st); statusViews.put(st, an); }
             body.addView(Neo.sheetHint(c, s.listenOnly() ? String.format(Locale.US, "Listen %.3f MHz (receive only). %s", s.downHz / 1e6, s.about)
                     : String.format(Locale.US, "Listen %.3f, talk %.3f MHz%s. %s", s.downHz / 1e6, s.upHz / 1e6, s.toneHz > 0 ? String.format(Locale.US, " with %.1f Hz", s.toneHz) : "", s.about)));
             Sgp4 e = el.get(s.catalog);
@@ -133,7 +148,7 @@ public final class SatelliteDialog {
         TextView freqs = Neo.button(c, "ISS frequencies", "radio", Neo.AMBER); body.addView(freqs);
         freqs.setOnClickListener(v -> { if (self[0] != null) self[0].dismiss(); issFrequencies(c, svc); });
         TextView upd = Neo.button(c, "Update orbits", "update", Neo.CYAN); body.addView(upd);
-        upd.setOnClickListener(v -> new Thread(() -> { String e = sats.update(); new Handler(Looper.getMainLooper()).post(() -> { Toast.makeText(c, e == null ? "Orbits updated" : e, Toast.LENGTH_LONG).show(); if (e == null) { if (self[0] != null) self[0].dismiss(); open(c, svc); } }); }, "tle").start());
+        upd.setOnClickListener(v -> new Thread(() -> { String e = sats.updateAll(); new Handler(Looper.getMainLooper()).post(() -> { Toast.makeText(c, e == null ? "Orbits updated" : e, Toast.LENGTH_LONG).show(); if (e == null) { if (self[0] != null) self[0].dismiss(); open(c, svc); } }); }, "tle").start());
         final Handler h = new Handler(Looper.getMainLooper());
         final Runnable tick = new Runnable() { @Override public void run() {
             RadioService.SatState st = svc.satState();
@@ -145,6 +160,14 @@ public final class SatelliteDialog {
         } };
         h.post(tick);
         self[0] = Neo.showSheet(c, body);
+        new Thread(() -> {                                                    // AMSAT's reports of the last days, one satellite at a time
+            for (Map.Entry<TextView, String> e : statusViews.entrySet()) {
+                com.macdmr.radio.ham.FmSats.Status st = com.macdmr.radio.ham.FmSats.status(e.getValue(), 96);
+                final String line = com.macdmr.radio.ham.FmSats.describe(st, System.currentTimeMillis());
+                final int col = st == null ? Neo.DIM : st.heard + st.crew > 0 ? Neo.GREEN_LIGHT : st.telemetry > 0 ? Neo.AMBER : Neo.MUTED;
+                h.post(() -> { e.getKey().setText(line); e.getKey().setTextColor(col); });
+            }
+        }, "amsat-status").start();
         self[0].setOnDismissListener(x -> h.removeCallbacks(tick));
     }
 }

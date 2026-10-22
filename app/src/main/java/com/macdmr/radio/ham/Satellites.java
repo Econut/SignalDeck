@@ -47,8 +47,13 @@ public final class Satellites {
     public static void setIssRptrTone(Context c, double t) { prefs(c).edit().putLong("issRptrTone", Double.doubleToLongBits(t)).apply(); }
     public static void resetIss(Context c) { prefs(c).edit().clear().apply(); }
 
-    /** The satellites this radio can work, with the ISS frequencies from the settings. */
+    /** The satellites this radio can work: the built-in ones (ISS frequencies from the settings), then the FM satellites from AMSAT's list ({@link FmSats}). */
     public static Sat[] all(Context c) {
+        List<Sat> l = new ArrayList<>(java.util.Arrays.asList(builtIn(c)));
+        for (FmSats.Entry e : FmSats.load(c)) l.add(new Sat("fm-" + e.amsat.toLowerCase(java.util.Locale.US), e.name, e.name, e.norad, e.downHz, e.upHz, e.toneHz, e.about));
+        return l.toArray(new Sat[0]);
+    }
+    private static Sat[] builtIn(Context c) {
         return new Sat[] {
             new Sat("iss-aprs", "ISS APRS", "ISS", ISS_CATALOG, issHz(c, "issAprs", ISS_APRS_HZ), issHz(c, "issAprs", ISS_APRS_HZ), 0, "Packet digipeater: the pass is monitored on the APRS page; PKT \u2192 Beacon via ISS sends your position through it", APRS),
             new Sat("iss-sstv", "ISS SSTV", "ISS", ISS_CATALOG, issHz(c, "issSstv", ISS_SSTV_HZ), 0, 0, "Picture events (Robot 36): pictures are decoded on the SSTV page. Only during announced events", SSTV),
@@ -74,14 +79,18 @@ public final class Satellites {
             body = sb.length() > 0 ? sb.toString() : null;
         }
         if (body == null) return "Could not download satellite orbits (AMSAT and CelesTrak unreachable)";
-        try { Files.write(file().toPath(), body.getBytes(StandardCharsets.US_ASCII)); return null; } catch (Throwable t) { return "Could not save: " + t.getMessage(); }
+        try { Files.write(file().toPath(), body.getBytes(StandardCharsets.US_ASCII)); } catch (Throwable t) { return "Could not save: " + t.getMessage(); }
+        FmSats.updateIfOld(ctx, 3 * 86_400_000L);                               // the FM satellite list: every few days is plenty
+        return null;
     }
+    /** Orbits and the FM satellite list now (the Update orbits button). */
+    public String updateAll() { String e = update(); String f = FmSats.update(ctx); return e != null ? e : f; }
 
     /** Elements by catalog number from the saved file. */
     public Map<Integer, Sgp4> elements() {
         Map<Integer, Sgp4> out = new LinkedHashMap<>();
-        try {
-            String[] l = new String(Files.readAllBytes(file().toPath()), StandardCharsets.US_ASCII).split("\\r?\\n");
+        for (File src : new File[] { file(), FmSats.tleFile(ctx) }) try {
+            String[] l = new String(Files.readAllBytes(src.toPath()), StandardCharsets.US_ASCII).split("\\r?\\n");
             for (int i = 0; i + 1 < l.length; i++) {
                 if (l[i].startsWith("1 ") && l[i + 1].startsWith("2 ")) {
                     String name = i > 0 && !l[i - 1].startsWith("2 ") ? l[i - 1].trim() : "";

@@ -439,16 +439,26 @@ const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', '
 const compass = az => COMPASS[Math.round(((az % 360) + 360) % 360 / 22.5) % 16];
 async function loadPasses() {
   try {
-    const j = await api('sat/passes'); S.sats = j.satellites;
+    const j = await api('sat/passes');
+    const first = s => (s.passes[0] || {}).aos || Infinity;                   // the FM satellites from AMSAT's list: soonest pass first
+    j.satellites = j.satellites.filter(s => !s.key.startsWith('fm-')).concat(j.satellites.filter(s => s.key.startsWith('fm-')).sort((a, b) => first(a) - first(b)));
+    S.sats = j.satellites;
     $('passNote').textContent = !j.hasFix ? 'NO POSITION FIX ON THE PHONE' : j.elementsAgeH > 72 ? 'ORBITS ' + Math.round(j.elementsAgeH / 24) + ' DAYS OLD' : '';
     const now = Date.now(); const day = ts => new Date(ts).toLocaleDateString([], { weekday: 'short' }) + ' ' + hhmm(ts);
     $('passList').innerHTML = j.satellites.map((s, si) => '<div class="satbox"><h4>' + esc(s.name) + '</h4><div class="about">'
       + (s.listenOnly ? 'Listen ' + mhz(s.downHz) + ' MHz (receive only)' : 'Listen ' + mhz(s.downHz) + ', talk ' + mhz(s.upHz) + ' MHz' + (s.toneHz > 0 ? ' with ' + s.toneHz.toFixed(1) + ' Hz' : ''))
-      + '. ' + esc(s.about) + '</div>'
+      + '. ' + esc(s.about) + '</div>' + (s.amsat ? '<div class="sat-st muted small" data-amsat="' + esc(s.amsat) + '">AMSAT status…</div>' : '')
       + (s.problem ? '<div class="empty">' + esc(s.problem) + '</div>' : s.passes.length ? s.passes.map(p => '<div class="pass' + (p.aos <= now ? ' up' : '') + '" data-s="' + si + '" data-aos="' + p.aos + '"><div><b>' + (p.aos <= now ? 'Up now' : day(p.aos)) + '</b><div class="sub">rises ' + compass(p.aosAz) + ', sets ' + compass(p.losAz) + ' · ' + Math.round((p.los - p.aos) / 60000) + ' min</div></div><span class="chip">' + Math.round(p.maxEl) + '°</span></div>').join('') : '<div class="empty">No pass above 10° in the next 24 hours</div>')
       + '</div>').join('');
+    loadSatStatus();
   } catch (e) { }
 }
+async function loadSatStatus() {                                           // AMSAT reports, one satellite after another
+  for (const el of [...$('passList').querySelectorAll('.sat-st')]) {
+    try { const j = await api('sat/status?name=' + encodeURIComponent(el.dataset.amsat)); el.textContent = j.line; el.style.color = j.heard > 0 ? 'var(--green)' : j.telemetry > 0 ? 'var(--amber)' : ''; } catch (e) { el.textContent = 'AMSAT status: offline'; }
+  }
+}
+$('satUpdate').onclick = async () => { toast('Updating orbits and the FM satellite list…'); try { const j = await api('sat/update', {}); toast(j.message || 'Updated'); loadPasses(); } catch (e) { toast(e.message); } };
 $('passList').onclick = async e => {
   const p = e.target.closest('.pass'); if (!p) return; const s = S.sats[+p.dataset.s];
   const sat = S.status.sat || {};

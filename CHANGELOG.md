@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — More FM satellites (AMSAT list + SatNOGS frequencies) with AMSAT live status
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Roadmap #1 | `ham/FmSats`: the FM satellites besides ISS / SO-50 / PO-101, never hard-coded: AMSAT's status page "[FM]" list (built-in fallback), each matched to SatNOGS by name or alias ("in orbit" only), the FM voice transceiver/transponder in this radio's bands (linear, DSB, digipeater and beacon entries skipped), its CTCSS tone parsed from the description, orbits from SatNOGS; cached in `fmsats.json` / `fmsats.tle`, refreshed with the orbits every 3 days and by Update orbits (`Satellites.updateAll`). They join `Satellites.all` (passes, tracking with Doppler, SignalDeck Web) after the built-in ones, sorted by the next pass. **Status:** AMSAT's reports of the last 4 days per satellite (heard / telemetry only / not heard, last heard; reporters' callsigns are not shown), cached 30 min, colour-coded on the phone sheet and the web page. Web: `/api/sat/status`, `POST /api/sat/update`, Update orbits button. Help: Satellite passes; Is it working? | `ham/FmSats.java` (new), `ham/Satellites.java`, `ui/SatelliteDialog.java`, `web/WebHost.java`, `assets/web/pages.js`, `assets/web/index.html`, `ui/HelpView.java`, `FmSatsTest.java` (new, 3 tests) | Host tests (transmitter choice, tones, AMSAT list and reports). **Device** (owner's Armor, ISS tracking armed and untouched): update in 24 s → 11 new satellites (AO-123, AO-91, IO-86, RS95S, TEVEL2-1/3/4/5/6/7/9) with tones (IO-86 88.5, RS95S 67), passes computed (IO-86 never rises here, as expected); CAS-3H, RS83S, TEVEL2-2/8 have no usable SatNOGS FM entry; status lines: SO-50 heard 62× (4 h ago), AO-91 not heard, AO-123 mostly telemetry, ISS SSTV heard within the hour. |
+
 ## 2026-10-22 — SSTV pictures: Delete with confirmation, select several to share or delete (web and phone)
 
 | Backlog | Change | Files | Test |
