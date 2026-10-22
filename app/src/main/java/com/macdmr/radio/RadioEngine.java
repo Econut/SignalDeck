@@ -37,6 +37,34 @@ public final class RadioEngine implements UartPort.Listener {
     private final DeviceProfile profile;
     private final Events ev;
     private final UartPort port;
+
+    /** Per command: how many were sent, answered, refused, and how long the answers took (the device report's summary). */
+    public static final class CommandStats {
+        public int sent, answered, refused, slow; public long sumMs, maxMs;
+        final java.util.ArrayDeque<Long> pending = new java.util.ArrayDeque<>();
+    }
+    private final java.util.Map<Integer, CommandStats> stats = new java.util.TreeMap<>();
+    private volatile int rssiNoReading, rssiReadings;
+    private void send(Frame fr) throws IOException {
+        if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
+        port.send(fr);
+    }
+    private void answered(Frame f) {
+        if (f.rw != 0) return;
+        synchronized (stats) {
+            CommandStats c = stats.get(f.cmd); if (c == null) return;
+            Long t = c.pending.pollFirst(); c.answered++; if (f.sr != 0) c.refused++;
+            if (t != null) { long ms = System.currentTimeMillis() - t; c.sumMs += ms; if (ms > c.maxMs) c.maxMs = ms; if (ms > 1000) c.slow++; }
+        }
+    }
+    /** A copy of the statistics, command byte to stats. */
+    public java.util.Map<Integer, CommandStats> stats() {
+        java.util.Map<Integer, CommandStats> out = new java.util.TreeMap<>();
+        synchronized (stats) { for (java.util.Map.Entry<Integer, CommandStats> e : stats.entrySet()) { CommandStats c = new CommandStats(); CommandStats o = e.getValue(); c.sent = o.sent; c.answered = o.answered; c.refused = o.refused; c.slow = o.slow; c.sumMs = o.sumMs; c.maxMs = o.maxMs; out.put(e.getKey(), c); } }
+        return out;
+    }
+    /** RSSI replies, and how many of them were the module's "no reading" value (above -20 dBm). */
+    public int[] rssiCounts() { return new int[] { rssiReadings, rssiNoReading }; }
     private final SysfsGpio power;
     private final StringBuilder banner = new StringBuilder();
     private volatile java.util.concurrent.CountDownLatch bootLatch = new java.util.concurrent.CountDownLatch(1);
@@ -79,22 +107,22 @@ public final class RadioEngine implements UartPort.Listener {
 
     // ---- commands ----------------------------------------------------------------------------------
 
-    public void queryVersion() throws IOException { port.send(Frame.request(CMD_VERSION, (byte) 1)); }
-    public void queryRssi() throws IOException { port.send(Frame.request(CMD_RSSI, (byte) 1)); }
-    public void queryCallerInfo() throws IOException { port.send(Frame.request(CMD_CALLER_INFO, (byte) 1)); }
-    public void setTot(int seconds) throws IOException { port.send(Frame.request(CMD_TOT, (byte) seconds)); }
-    public void setVolume(int v) throws IOException { port.send(Frame.request(CMD_VOLUME, (byte) v)); }
-    public void setMic(int gain) throws IOException { port.send(Frame.request(CMD_MIC, (byte) gain)); }
+    public void queryVersion() throws IOException { send(Frame.request(CMD_VERSION, (byte) 1)); }
+    public void queryRssi() throws IOException { send(Frame.request(CMD_RSSI, (byte) 1)); }
+    public void queryCallerInfo() throws IOException { send(Frame.request(CMD_CALLER_INFO, (byte) 1)); }
+    public void setTot(int seconds) throws IOException { send(Frame.request(CMD_TOT, (byte) seconds)); }
+    public void setVolume(int v) throws IOException { send(Frame.request(CMD_VOLUME, (byte) v)); }
+    public void setMic(int gain) throws IOException { send(Frame.request(CMD_MIC, (byte) gain)); }
     /** Monitor: 1 = hear every decodable digital call, 2 = normal filtering (enum 1/2 like the rest). */
     /** Global squelch level (0 open … 9), the same scale as a channel's sq byte. */
-    public void setSquelch(int level) throws IOException { port.send(Frame.request(CMD_SQUELCH, (byte) Math.max(0, Math.min(9, level)))); }
-    public void setMonitor(boolean on) throws IOException { port.send(Frame.request(CMD_MONITOR, (byte) (on ? 1 : 2))); }
+    public void setSquelch(int level) throws IOException { send(Frame.request(CMD_SQUELCH, (byte) Math.max(0, Math.min(9, level)))); }
+    public void setMonitor(boolean on) throws IOException { send(Frame.request(CMD_MONITOR, (byte) (on ? 1 : 2))); }
     /** The monitor byte as given (the radio audio check tries 0 on a module whose squelch stays open after 2). */
-    public void setMonitorRaw(int v) throws IOException { port.send(Frame.request(CMD_MONITOR, (byte) v)); }
-    public void setSpkEn(boolean on) throws IOException { port.send(Frame.request(CMD_SPK_EN, (byte) (on ? 1 : 0))); }
+    public void setMonitorRaw(int v) throws IOException { send(Frame.request(CMD_MONITOR, (byte) v)); }
+    public void setSpkEn(boolean on) throws IOException { send(Frame.request(CMD_SPK_EN, (byte) (on ? 1 : 0))); }
 
-    public void setInterrupt(boolean on) throws IOException { port.send(Frame.request(CMD_INTERRUPT, (byte) (on ? 1 : 2))); }
-    public void queryInit() throws IOException { port.send(Frame.request(CMD_QUERY_INIT, (byte) 1)); }
+    public void setInterrupt(boolean on) throws IOException { send(Frame.request(CMD_INTERRUPT, (byte) (on ? 1 : 2))); }
+    public void queryInit() throws IOException { send(Frame.request(CMD_QUERY_INIT, (byte) 1)); }
 
     /**
      * The OEM's cold-start handshake after the module boots (docs/deep-dive/03 §7a): version → channel →
@@ -127,13 +155,13 @@ public final class RadioEngine implements UartPort.Listener {
         b.put((byte) msgType).putInt(callNumber);
         if (msgType == 3) b.putInt(groupNumber); else if (msgType == 1) b.putInt(callNumber);
         b.put(t);
-        port.send(Frame.request(CMD_SEND_SMS, b.array()));
+        send(Frame.request(CMD_SEND_SMS, b.array()));
     }
 
-    public void fetchSms() throws IOException { port.send(Frame.request(CMD_FETCH_SMS, (byte) 1)); }
+    public void fetchSms() throws IOException { send(Frame.request(CMD_FETCH_SMS, (byte) 1)); }
 
     /** PTT: launch=1 keys the transmitter, 2 releases (enum 1/2 again — 0 is NAKed and the TX keeps running; firmware caps a keyed TX at 30 s). */
-    public void ptt(boolean down) throws IOException { port.send(Frame.request(CMD_LAUNCH, (byte) (down ? 1 : 2))); }
+    public void ptt(boolean down) throws IOException { send(Frame.request(CMD_LAUNCH, (byte) (down ? 1 : 2))); }
 
     /**
      * Analog channel, 19-byte body (little-endian ints): rxFreq, txFreq, band, power, sq, rxType, rxSubCode,
@@ -147,7 +175,7 @@ public final class RadioEngine implements UartPort.Listener {
         b.putInt(rxHz).putInt(txHz).put((byte) band).put((byte) power).put((byte) sq).put((byte) rxType).put((byte) rxSub)
                 .put((byte) txType).put((byte) txSub).put((byte) 2 /* pwrSave: 1 on, 2 off (OEM default 2; 0 is NAKed) */)
                 .put((byte) volume).put((byte) (monitor == 1 ? 1 : 2) /* monitor: 1 on, 2 off */).put((byte) 2 /* relay normal */);
-        port.send(Frame.request(CMD_SET_ANALOG, b.array()));
+        send(Frame.request(CMD_SET_ANALOG, b.array()));
     }
 
     /**
@@ -167,7 +195,7 @@ public final class RadioEngine implements UartPort.Listener {
         b.putInt(txContact).put((byte) contactType).put((byte) power).put((byte) cc).put((byte) inSlot).put((byte) outSlot)
                 .put((byte) 0 /* channelMode direct */).put((byte) 2 /* encrypt off */).put(new byte[8])
                 .put((byte) 1).put((byte) volume).put((byte) mic).put((byte) 2);
-        port.send(Frame.request(CMD_SET_DIGITAL, b.array()));
+        send(Frame.request(CMD_SET_DIGITAL, b.array()));
     }
 
     // ---- inbound ----------------------------------------------------------------------------------
@@ -185,16 +213,17 @@ public final class RadioEngine implements UartPort.Listener {
 
     @Override public void onFrame(Frame f) {
         ev.log("RX " + f);
+        answered(f);
         byte[] b = f.body;
         switch (f.cmd) {
             case CMD_STATUS: {
                 int code = b.length > 0 ? b[0] & 0xFF : -1;
-                try { port.send(new Frame(CMD_STATUS, 1, 1, new byte[] { 1 })); } catch (IOException ignored) { }   // the OEM acks every push
+                try { send(new Frame(CMD_STATUS, 1, 1, new byte[] { 1 })); } catch (IOException ignored) { }   // the OEM acks every push
                 ev.status(code, statusName(code));
                 break;
             }
             case CMD_RSSI:
-                if (f.rw == 0 && b.length >= 1) { int raw = b[0] & 0xFF; double dbm = raw > 0 ? -(120 - raw / 2.0) : -999; if (dbm > -20) dbm = -999; ev.rssi(raw, dbm); }   // above -20 dBm is not a reading (the Xplore 1 reports raw 226, "-7")
+                if (f.rw == 0 && b.length >= 1) { int raw = b[0] & 0xFF; double dbm = raw > 0 ? -(120 - raw / 2.0) : -999; rssiReadings++; if (dbm > -20) { dbm = -999; rssiNoReading++; } ev.rssi(raw, dbm); }   // above -20 dBm is not a reading (the Xplore 1 reports raw 226, "-7")
                 break;
             case CMD_VERSION:
                 if (b.length >= 4) ev.version(ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN).getInt(), new String(b).trim());

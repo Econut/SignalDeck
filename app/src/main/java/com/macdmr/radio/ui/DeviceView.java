@@ -361,8 +361,9 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     private void reportMenu() {
         final Context c = getContext();
         new android.app.AlertDialog.Builder(c).setTitle("Device report")
-                .setItems(new String[] { "Help support this phone (step by step)", "Generate device report", "Share last report", "Capture the PTT key (10 s)", "Radio probe (root)", "Open a GitHub issue with the facts filled in", "What is in it?", "Radio audio check (no sound, DMR or analog)" }, (dd, w) -> {
+                .setItems(new String[] { "Help support this phone (step by step)", "Generate device report", "Share last report", "Capture the PTT key (10 s)", "Radio probe (root)", "Open a GitHub issue with the facts filled in", "What is in it?", "Radio audio check (no sound, DMR or analog)" , "Second radio test (guided)"}, (dd, w) -> {
                     if (w == 7) { dmrAudioCheckIntro(); return; }
+                    if (w == 8) { secondRadioIntro(); return; }
                     if (w == 0) supportMenu();
                     else if (w == 1) generateReport();
                     else if (w == 2) shareReport();
@@ -383,14 +384,16 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         final boolean s1 = sp.getLong("supportChecks", 0) > 0, s2 = sp.getLong("supportListen", 0) > 0;
         String[] rows = {
                 (s1 ? "✓ " : "") + "1  Run all checks\nAbout two minutes, only listens; needs Magisk root",
-                (s2 ? "✓ " : s1 ? "" : "🔒 ") + "2  Listen check\nTake over the radio, pick a channel where stations are heard, then static (10 s) and the station (50 s)",
-                ((s1 || s2) ? "" : "🔒 ") + "3  Send the results\nShare the report zip, or open a GitHub issue",
+                (sp.getLong("supportSecond", 0) > 0 ? "✓ " : s1 ? "" : "🔒 ") + "2  Second radio test (best)\nAny other FM radio: key it when asked; SignalDeck measures reception, the squelch, MON and tone squelch itself",
+                (s2 ? "✓ " : s1 ? "" : "🔒 ") + "2b Listen check (no other radio)\nTake over the radio, pick a channel where stations are heard, then static (10 s) and the station (50 s)",
+                ((s1 || s2 || sp.getLong("supportSecond", 0) > 0) ? "" : "🔒 ") + "3  Send the results\nShare the report zip (it starts with a summary), or open a GitHub issue",
                 "What is this?" };
         new android.app.AlertDialog.Builder(c).setTitle("Help support this phone — " + svc.profile().name)
                 .setItems(rows, (dd, w) -> {
                     if (w == 0) offerChecks(false);
-                    else if (w == 1) { if (s1) listenCheckIntro(); else locked("Run all checks first."); }
-                    else if (w == 2) { if (s1 || s2) shareReport(); else locked("Run all checks first, then the listen check."); }
+                    else if (w == 1) { if (s1) secondRadioIntro(); else locked("Run all checks first."); }
+                    else if (w == 2) { if (s1) listenCheckIntro(); else locked("Run all checks first."); }
+                    else if (w == 3) { if (s1 || s2 || sp.getLong("supportSecond", 0) > 0) shareReport(); else locked("Run all checks first, then a test."); }
                     else new android.app.AlertDialog.Builder(c).setTitle("Help support this phone")
                             .setMessage("Each step tells us something about how this phone's radio works. After each one, send the results (step 3): we write or fix this phone's profile from them, and you get a new version through Device → Updates. The steps only listen: nothing is transmitted.")
                             .setPositiveButton("OK", null).show();
@@ -536,6 +539,43 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                         .setPositiveButton("Share the report", (d2, w2) -> shareReport()).setNegativeButton("Close", null).show();
             });
         }, "dmr-audio-check").start();
+    }
+
+    /** The guided second-radio test (SecondRadioTest): instructions, then a step at a time with Ready / Cancel. */
+    private void secondRadioIntro() {
+        final Context c = getContext(); if (svc == null) return;
+        if (!svc.isReady()) { locked("Take over the radio first (Device page)."); return; }
+        new android.app.AlertDialog.Builder(c).setTitle("Second radio test")
+                .setMessage("You need any other FM radio (a cheap handheld is fine) and about five minutes.\n\n1. On the Intercom page, choose an analog (FM) channel nobody uses.\n2. Set the other radio to the same frequency, no tone, low power, a few metres from this phone.\n3. Tap Start, then do what each step asks: SignalDeck measures everything itself.\n\nThis phone only listens: nothing is transmitted from it. The tone squelch part uses a temporary copy of the channel; your channel is not changed.")
+                .setPositiveButton("Start", (dd, w) -> runSecondRadioTest()).setNegativeButton("Later", null).show();
+    }
+    private void runSecondRadioTest() {
+        final Context c = getContext(); final com.macdmr.radio.RadioService s = svc; if (s == null) return;
+        final android.app.AlertDialog pd = new android.app.AlertDialog.Builder(c).setTitle("Second radio test").setMessage("Starting\u2026").setCancelable(false).create(); pd.show();
+        final boolean[] cancelled = { false };
+        com.macdmr.radio.SecondRadioTest.Ui ui = new com.macdmr.radio.SecondRadioTest.Ui() {
+            @Override public boolean ask(String title, String text) throws InterruptedException {
+                final java.util.concurrent.CountDownLatch l = new java.util.concurrent.CountDownLatch(1); final boolean[] go = { false };
+                post(() -> new android.app.AlertDialog.Builder(c).setTitle(title).setMessage(text).setCancelable(false)
+                        .setPositiveButton("Ready", (d2, w2) -> { go[0] = true; l.countDown(); }).setNegativeButton("Cancel the test", (d2, w2) -> { cancelled[0] = true; l.countDown(); }).show());
+                l.await(); return go[0];
+            }
+            @Override public void status(String text) { post(() -> pd.setMessage(text)); }
+        };
+        new Thread(() -> {
+            String r;
+            try { r = com.macdmr.radio.SecondRadioTest.run(s, ui); } catch (Throwable t) { r = "failed: " + t + "\n"; }
+            final String result = r;
+            if (com.macdmr.radio.DeviceReport.newestDir() == null) { try { com.macdmr.radio.DeviceReport.currentOrNew(c); } catch (Throwable ignored) { } }
+            com.macdmr.radio.DeviceReport.append("Second radio test", result);
+            if (!cancelled[0]) c.getSharedPreferences("radio", Context.MODE_PRIVATE).edit().putLong("supportSecond", System.currentTimeMillis()).apply();
+            post(() -> {
+                pd.dismiss();
+                StringBuilder v = new StringBuilder(); for (String line : result.split("\n")) { String t = line.trim(); if (t.matches("[0-9]\\. .*")) v.append(v.length() > 0 ? "\n" : "").append(t); else if (t.startsWith("verdict:")) v.append(" \u2014 ").append(t.substring(8).trim()); }
+                new android.app.AlertDialog.Builder(c).setTitle("Second radio test").setMessage((v.length() == 0 ? result : v.toString()) + "\n\nThe full results are in the device report; Share sends it (with a summary first).")
+                        .setPositiveButton("Share the report", (d2, w2) -> shareReport()).setNegativeButton("Close", null).show();
+            });
+        }, "second-radio-test").start();
     }
 
     private void listenCheckIntro() {

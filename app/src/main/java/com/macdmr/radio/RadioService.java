@@ -1623,7 +1623,13 @@ public class RadioService extends Service implements RadioEngine.Events {
     @Override public void rssi(int raw, double dbm) { if (scope.running()) { scope.onRssi(raw); return; }   // a sweep step's reading: not the channel's signal, not for the coverage log
         rssi0(raw, dbm); }
     private void rssi0(int raw, double dbm) { rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
-    @Override public void version(int v, String text) { log("module " + text); }
+    private volatile String moduleVersion = "";
+    @Override public void version(int v, String text) { log("module " + text); moduleVersion = text; }
+    public String moduleVersion() { return moduleVersion; }
+    /** The last signal reading (dBm, -999 none) and whether the module reports a reception (for the bench tests). */
+    public int rssiNow() { return rssi; }
+    public boolean receivingNow() { return receiving; }
+    public RadioEngine engine() { return engine; }
     /** One history line, voice announcement and caller report per call (the caller is asked at the start, a second in, and at the end). */
     private volatile boolean callLogged; private volatile int loggedCaller, loggedTarget;
     @Override public void callerInfo(int type, int caller, int target) {

@@ -308,12 +308,57 @@ public final class DeviceReport {
     public static File zipNewest(Context c, boolean withApks, boolean withStation) throws Exception {
         File newest = newestDir();
         if (newest == null) throw new Exception("no report yet");
+        try (OutputStream o = new FileOutputStream(new File(newest, "00_SUMMARY.txt"))) { o.write(summary(RadioService.running, new File(newest, "report.txt")).getBytes("UTF-8")); } catch (Throwable ignored) { }
         File zip = new File(new File(c.getCacheDir(), "share"), newest.getName() + (withApks ? "" : "_noapk") + (withStation ? "" : "_nostation") + ".zip"); zip.getParentFile().mkdirs();
         try (ZipOutputStream z = new ZipOutputStream(new FileOutputStream(zip))) {
             File[] in = newest.listFiles();
             if (in != null) for (File f : in) { if (!withApks && f.getName().endsWith(".apk")) continue; if (!withStation && f.getName().equals(STATION_CLIP)) continue; z.putNextEntry(new ZipEntry(f.getName())); try (InputStream i = new FileInputStream(f)) { byte[] b = new byte[65536]; int n; while ((n = i.read(b)) > 0) z.write(b, 0, n); } z.closeEntry(); }
         }
+        try { java.nio.file.Files.copy(zip.toPath(), new File(reportRoot(), zip.getName()).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING); } catch (Throwable ignored) { }   // a copy the owner can always find
         return zip;
+    }
+
+    /**
+     * The first page of a report: what a profile needs to know at a glance (phone, profile, audio path, the latest
+     * check results, which commands the module refused or answered slowly, odd signal values), so nobody has to dig
+     * through the raw sections below.
+     */
+    static String summary(RadioService svc, File reportTxt) {
+        StringBuilder b = new StringBuilder("SIGNALDECK DEVICE REPORT \u2014 SUMMARY\n\n");
+        b.append("phone: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append(" \u00B7 Android ").append(Build.VERSION.RELEASE).append(" \u00B7 ").append(Build.DISPLAY).append('\n');
+        b.append("SignalDeck: ").append(BuildConfig.VERSION_NAME).append(" \u00B7 up ").append(android.os.SystemClock.elapsedRealtime() / 60_000).append(" min since the phone booted\n");
+        if (svc != null) {
+            DeviceProfile dp = svc.profile();
+            b.append("profile: ").append(dp.name).append(" (").append(dp.id).append(" revision ").append(dp.revision).append(dp.verified ? ", verified" : ", not verified yet").append(")\n");
+            b.append("radio: ").append(svc.isReady() ? "owned by SignalDeck" : "not owned (" + svc.link() + ")").append(svc.moduleVersion().isEmpty() ? "" : " \u00B7 module " + svc.moduleVersion()).append('\n');
+            b.append("receive audio: ").append(svc.audioBackendName()).append(svc.audioError() != null ? " \u00B7 ERROR " + svc.audioError() : "").append(" \u00B7 ").append(svc.rxAudioBytes()).append(" bytes so far\n");
+        } else b.append("radio: SignalDeck's radio service was not running when this was made\n");
+        String rep = "";
+        try { rep = new String(java.nio.file.Files.readAllBytes(reportTxt.toPath()), "UTF-8"); } catch (Throwable ignored) { }
+        String audio = lastVerdict(rep, "==== Radio audio check ====");
+        if (audio != null) b.append("\nlatest Radio audio check: ").append(audio).append('\n');
+        int k = rep.lastIndexOf("==== Second radio test ====");
+        if (k >= 0) {
+            b.append("\nlatest second radio test:\n");
+            for (String line : rep.substring(k).split("\n")) { String t = line.trim(); if (t.startsWith("verdict:") || t.matches("[0-9]\\..*") || t.startsWith("scanDwellMs") || t.startsWith("noise floor")) b.append("  ").append(t).append('\n'); }
+        }
+        if (svc != null) {
+            b.append("\nradio commands (sent / answered / refused / slow > 1 s / average / slowest answer):\n");
+            for (java.util.Map.Entry<Integer, RadioEngine.CommandStats> e : svc.engine().stats().entrySet()) {
+                RadioEngine.CommandStats c = e.getValue();
+                b.append(String.format(java.util.Locale.US, "  0x%02X  %d / %d / %d / %d / %d ms / %d ms%s\n", e.getKey(), c.sent, c.answered, c.refused, c.slow, c.answered > 0 ? c.sumMs / c.answered : 0, c.maxMs, c.refused > 0 || c.slow > 0 ? "   <-- look" : ""));
+            }
+            int[] r = svc.engine().rssiCounts();
+            b.append(String.format(java.util.Locale.US, "signal readings: %d, of them %d the module's \"no reading\" value%s\n", r[0], r[1], r[1] > 0 ? " (shown as no signal)" : ""));
+        }
+        b.append("\nThe raw sections follow in report.txt (newest checks at the end).\n");
+        return b.toString();
+    }
+    private static String lastVerdict(String rep, String header) {
+        int k = rep.lastIndexOf(header); if (k < 0) return null;
+        int v = rep.indexOf("verdict:\n", k); if (v < 0) return null;
+        int e = rep.indexOf("\n\n", v); String t = rep.substring(v + 9, e > v ? e : Math.min(rep.length(), v + 600)).trim();
+        return t.length() > 400 ? t.substring(0, 400) + "\u2026" : t;
     }
 
     /** Open a new GitHub issue in the browser with the phone facts filled in; the zip is attached by hand (drag it into the issue). */

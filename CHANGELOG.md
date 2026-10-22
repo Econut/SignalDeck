@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Device report: a summary page and the guided second radio test
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | Lessons from the Xplore 1 round trips. **Summary** (`00_SUMMARY.txt`, written at every zip): phone, SignalDeck, profile id/revision/verified, module version, audio backend and bytes, uptime, the latest Radio audio check verdict and second radio test verdicts, a per-command table (sent / answered / refused / slow > 1 s / average / slowest answer, flagged), and the count of RSSI "no reading" values; the zip is also copied to Download/DMR/DeviceReport. `RadioEngine` times every request (one `send` helper) against its answer. **Second radio test** (`SecondRadioTest`, Device report menu and Help support this phone step 2): with any other FM radio, step by step with Ready / Cancel: reception (signal vs the module's receive report → latency, loudest-half-second audio RMS, squelch closing), MON (noise RMS, refusal, closing), CTCSS 100.0 Hz on a temporary VFO copy (without / with the tone), suggested `scanDwellMs`; receive only. Measured by audio level, not bytes (the Armor's audio bytes flow with the squelch closed too). Help: Device report → Second radio test, Report summary. | `DeviceReport.java`, `RadioEngine.java`, `RadioService.java`, `SecondRadioTest.java` (new), `ui/DeviceView.java`, `ui/HelpView.java` | **HackRF as the other radio** (147.550 MHz FM 1 kHz, without / with 100 Hz CTCSS, phone 5 ft away, owner's Armor): reception works (−83 dBm, report at once, RMS 4626, squelch closes), MON works (noise RMS 4698, then 1), CTCSS works (no tone: RMS 1; 100 Hz: RMS 4628). A first version counted bytes and wrongly reported "CTCSS opened": fixed by measuring the level. |
+
 ## 2026-10-22 — Xplore 1 tester's report: MON refusals retried, longer scan dwell, no false "-7 dBm"
 
 | Backlog | Change | Files | Test |
