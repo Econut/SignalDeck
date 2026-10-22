@@ -151,6 +151,11 @@ public final class PktDialog {
         body.addView(fr);
         body.addView(hint((svc.foxTxOn() ? "\uD83E\uDD8A The fox beacon is on. " : "") + "Find a hidden transmitter: live signal strength, compass bearings and an estimate of where the fox is. Or be the fox."));
         // ---- net control ----
+        body.addView(section("Message forms"));
+        LinearLayout formRow = row();
+        button(formRow, "ICS-213 and radiograms (" + svc.forms().list(1000).size() + ")", Theme.SOFTSQ, x -> { dlg.dismiss(); FormsDialog.show(c, svc); });
+        body.addView(formRow);
+        body.addView(hint("Fill in an ICS-213 or a radiogram, read it on the air or send it by APRS or DMR text; forms sent to you are put back together here."));
         body.addView(section("Nets"));
         LinearLayout nr = row();
         button(nr, "Nets near you", Theme.SOFTSQ, x -> { dlg.dismiss(); NetsDialog.show(c, svc); });

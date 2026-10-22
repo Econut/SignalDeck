@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Message forms: ICS-213 and ARRL radiogram over APRS or DMR text
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Roadmap #7 | `ham/Forms` (pure): the ICS-213 General Message and ARRL Radiogram fields, a compact wire format (`ICS213 <id> n/N KEY=value|…`, `|` and `\` escaped; parts never end in a space), splitting to a length (APRS 67, DMR 120) and an `Assembler` that rebuilds a sender's form from its parts in any order (stale parts dropped after 6 h); `text()` for reading on air / sharing; the radiogram check from the word count. `FormStore` (forms.db): sent and received forms. `RadioService.sendForm` (APRS parts one every 12 s via `sendMessage`, DMR texts every 4 s via `sendSms`, or save only) and `onFormText` (from `PacketEngine.messageReceived` for messages addressed to you and from `sms`): rebuilt forms are stored with a notification and a history line. Phone: PKT → Message forms (list, view, Read on air, Share, Reply, Delete, editor with Send by APRS / DMR text / Save). Web: a forms panel on the Messages page (`/api/forms`). DIAG `formtext` (bench). Help: Message forms. | `ham/Forms.java` (new), `ham/FormStore.java` (new), `RadioService.java`, `PacketEngine.java`, `ui/FormsDialog.java` (new), `ui/PktDialog.java`, `DiagReceiver.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java`, `FormsTest.java` (new, 2 tests) | Host tests (an ICS-213 through 67-character parts in reverse order with `|` and `\` in it, a radiogram and its check). **Device** (owner's Armor): a form saved through the web; a two-part ICS-213 fed in reverse order (DIAG formtext) rebuilt, stored, notified ("ICS-213 General Message from N0CALL-9: …"); phone list / view / Read on air / Reply shown; test forms deleted. Sending over the air (APRS / DMR) not yet bench-tested. |
+
 ## 2026-10-22 — DMR roaming
 
 | Backlog | Change | Files | Test |

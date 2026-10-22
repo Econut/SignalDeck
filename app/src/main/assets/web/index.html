@@ -132,6 +132,13 @@
 
     <!-- MESSAGES -->
     <section id="page-messages" class="page hidden">
+      <div class="panel" id="formsPanel">
+        <div class="row between wrap"><span class="label">MESSAGE FORMS · ICS-213 AND RADIOGRAM</span><div class="row"><button class="btn small-btn" id="fmNew213">New ICS-213</button><button class="btn small-btn" id="fmNewRg">New radiogram</button></div></div>
+        <form id="fmEdit" class="sched-form hidden" autocomplete="off"><div id="fmFields" class="fm-fields"></div>
+          <div class="row wrap" style="grid-column:1/-1"><select id="fmVia" aria-label="Send by"><option value="save">Save only</option><option value="aprs">Send by APRS to a callsign</option><option value="dmr">Send by DMR text to a contact</option></select><input id="fmTo" placeholder="Callsign" style="text-transform:uppercase" maxlength="12"><select id="fmContact" class="hidden" aria-label="Contact"></select><button class="btn small-btn" type="submit">Go</button><button class="btn small-btn" type="button" id="fmCancel">Cancel</button></div></form>
+        <div id="fmView" class="hidden"><pre id="fmText" class="dec-out" style="font-size:16px"></pre><div class="row"><button class="btn small-btn" id="fmReply" type="button">Reply</button><button class="btn small-btn danger" id="fmDel" type="button">Delete</button><button class="btn small-btn" id="fmClose" type="button">Close</button></div></div>
+        <div id="fmList" class="list small"></div>
+      </div>
       <div class="grid-side">
         <div class="panel"><div class="row between"><span class="label">CONVERSATIONS</span><button class="btn small-btn" id="newMsg">New</button></div><div id="convList" class="list"></div></div>
         <div class="panel thread">

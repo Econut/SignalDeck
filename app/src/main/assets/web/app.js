@@ -47,7 +47,7 @@ function route() {
   if (S.page === 'sat') { renderSat(); loadPasses(); loadConditions(); }
   if (S.page === 'scope') loadScope();
   if (S.page === 'intercom') loadHeard();
-  if (S.page === 'messages') loadConversations();
+  if (S.page === 'messages') { loadConversations(); loadForms(); }
   if (S.page === 'contacts') loadContacts();
   if (S.page === 'map') loadMap();
   if (S.page === 'help') loadHelp();

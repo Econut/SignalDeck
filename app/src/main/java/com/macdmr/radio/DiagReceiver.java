@@ -55,6 +55,7 @@ public final class DiagReceiver extends BroadcastReceiver {
                 }, "diag-scope").start();
                 break;
             }
+            case "formtext": s.onFormText(i.getStringExtra("from"), i.getStringExtra("text"), "bench"); break;   // bench: a text as if it arrived (form parts)
             case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s) on the current channel or VFO
                 int ms = Math.max(200, Math.min(5000, i.getIntExtra("ms", 2000)));
                 Log.i("DiagReceiver", "testtone " + ms + " ms"); s.diagTestTone(ms); break;

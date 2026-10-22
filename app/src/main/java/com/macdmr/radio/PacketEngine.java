@@ -828,6 +828,7 @@ public final class PacketEngine {
         store.log(p.isAck ? "ack" : p.isRej ? "rej" : "msg", from, p.messageTo, p.messageText, p.messageId, mine);
         if (mine && !p.isAck && !p.isRej && p.messageId != null) maybeAutoAck(from, p.messageId);
         if ((mine || bulletin) && !p.isAck && !p.isRej) host.notifyUser((mine ? "APRS message from " : "APRS bulletin from ") + from, p.messageText, false);
+        if (mine && !p.isAck && !p.isRej) { RadioService r = RadioService.running; if (r != null) r.onFormText(from, p.messageText, "APRS"); }   // ICS-213 / radiogram parts
     }
 
     /** APRS protocol: a message with an {id must be acked or the sender keeps retrying (monitoring mode only, not under KISS). */

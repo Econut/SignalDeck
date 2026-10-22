@@ -333,6 +333,37 @@ function renderPhone(d) {
 }
 setInterval(() => { if (S.phoneAt && Date.now() - S.phoneAt > 15000) $('phoneAge').textContent = 'NOT UPDATING'; }, 5000);
 
+// ---- message forms (Messages page) ----
+async function loadForms() {
+  try {
+    const j = await api('forms'); S.forms = j;
+    $('fmContact').innerHTML = j.contacts.map(c => '<option value="' + c.id + '">' + esc(c.name || String(c.number)) + ' (' + (c.type === 1 ? 'talkgroup ' : 'ID ') + c.number + ')</option>').join('');
+    $('fmList').innerHTML = j.forms.map((f, i) => '<div class="item click" data-i="' + i + '"><div class="main"><b>' + esc((f.kind === 'RADIOGRAM' ? 'Radiogram: ' : 'ICS-213: ') + (f.fields.SU || (f.fields.NR ? 'number ' + f.fields.NR : f.title))) + '</b><div class="sub">' + (f.outgoing ? 'To ' : 'From ') + esc(f.peer || '—') + ' · ' + esc(f.via) + ' · ' + new Date(f.ts).toLocaleString() + (f.status ? ' · ' + esc(f.status) : '') + '</div></div></div>').join('') || '<div class="empty">No forms yet</div>';
+  } catch (e) { }
+}
+function fmOpen(kind, pre) {
+  S.fmKind = kind; const fl = S.forms.kinds[kind]; pre = pre || {};
+  const now = new Date(), d = now.toISOString().slice(0, 10), hm = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0');
+  const def = Object.assign({ DT: d }, kind === 'RADIOGRAM' ? { TF: hm, PR: 'R' } : { TM: hm }, pre);
+  $('fmFields').innerHTML = fl.filter(k => !(kind === 'RADIOGRAM' && k[0] === 'CK')).map(k => '<label' + (k[0] === 'MS' ? ' class="wide"' : '') + '>' + esc(k[1]) + (k[0] === 'MS' ? '<textarea data-k="MS">' + esc(def.MS || '') + '</textarea>' : '<input data-k="' + k[0] + '" value="' + esc(def[k[0]] || '') + '">') + '</label>').join('');
+  $('fmEdit').classList.remove('hidden'); $('fmView').classList.add('hidden'); $('fmVia').value = 'save'; fmVia(); const first = $('fmFields').querySelector('input,textarea'); if (first) first.focus();
+}
+function fmVia() { const v = $('fmVia').value; $('fmTo').classList.toggle('hidden', v !== 'aprs'); $('fmContact').classList.toggle('hidden', v !== 'dmr'); }
+$('fmVia').onchange = fmVia;
+$('fmNew213').onclick = async () => { if (!S.forms) await loadForms(); fmOpen('ICS213'); };
+$('fmNewRg').onclick = async () => { if (!S.forms) await loadForms(); fmOpen('RADIOGRAM'); };
+$('fmCancel').onclick = () => $('fmEdit').classList.add('hidden');
+$('fmEdit').onsubmit = async e => {
+  e.preventDefault();
+  const fields = {}; $('fmFields').querySelectorAll('[data-k]').forEach(x => fields[x.dataset.k] = x.value);
+  const body = { kind: S.fmKind, fields, via: $('fmVia').value, to: $('fmTo').value, contact: +$('fmContact').value };
+  try { const r = await api('forms', body); toast(r.message); $('fmEdit').classList.add('hidden'); loadForms(); } catch (x) { toast(x.message); }
+};
+$('fmList').onclick = e => { const it = e.target.closest('[data-i]'); if (!it) return; const f = S.forms.forms[+it.dataset.i]; S.fmSel = f; $('fmText').textContent = f.text; $('fmView').classList.remove('hidden'); $('fmEdit').classList.add('hidden'); };
+$('fmClose').onclick = () => $('fmView').classList.add('hidden');
+$('fmDel').onclick = async () => { if (!S.fmSel || !await ask('Delete this form?')) return; try { await api('forms', { action: 'delete', id: S.fmSel.id }); $('fmView').classList.add('hidden'); loadForms(); } catch (e) { toast(e.message); } };
+$('fmReply').onclick = () => { const f = S.fmSel; if (!f) return; fmOpen(f.kind, f.kind === 'ICS213' ? { TO: f.fields.FR || '', FR: f.fields.TO || '', SU: 'Re: ' + (f.fields.SU || '') } : { TO: f.fields.SG || '' }); };
+
 // ---- POTA / SOTA (Logbook page) ----
 async function loadPota() {
   $('potaSpots').innerHTML = '<div class="empty">Loading the spots…</div>';

@@ -911,6 +911,26 @@ public final class WebHost {
                 resp.headers.put("Content-Disposition", "attachment; filename=\"" + (me.isEmpty() ? "MYCALL" : me) + "@" + act.ref.replace('/', '_') + "-" + com.macdmr.radio.ham.Pota.utcDay(System.currentTimeMillis()) + ".adi\"");
                 return resp;
             }
+            case "/api/forms": {                                                // GET: the forms log and the field lists; POST {action: send|delete, ...}
+                if (post) {
+                    String a0 = b.optString("action");
+                    if (a0.equals("delete")) { svc.forms().delete(b.optLong("id")); return ok("Deleted"); }
+                    com.macdmr.radio.ham.Forms.Form f = new com.macdmr.radio.ham.Forms.Form(); f.kind = com.macdmr.radio.ham.Forms.RADIOGRAM.equals(b.optString("kind")) ? com.macdmr.radio.ham.Forms.RADIOGRAM : com.macdmr.radio.ham.Forms.ICS213;
+                    JSONObject fv = b.optJSONObject("fields"); if (fv != null) for (String[] k : com.macdmr.radio.ham.Forms.fields(f.kind)) f.f.put(k[0], fv.optString(k[0], "").trim());
+                    if (com.macdmr.radio.ham.Forms.RADIOGRAM.equals(f.kind)) f.f.put("CK", String.valueOf(com.macdmr.radio.ham.Forms.words(f.f.get("MS"))));
+                    String via = b.optString("via", "save"); ChannelStore.Contact to = null;
+                    if (via.equals("dmr")) { long cid = b.optLong("contact", -1); for (ChannelStore.Contact ct : svc.store().contacts()) if (ct.id == cid) to = ct; }
+                    final ChannelStore.Contact toF = to; final String via0 = via;
+                    String e = onMain(() -> svc.sendForm(f, via0, b.optString("to", ""), toF));
+                    return e == null ? ok(via.equals("save") ? "Saved" : "Sending") : WebServer.Response.error(409, e);
+                }
+                JSONArray rows = new JSONArray();
+                for (com.macdmr.radio.ham.FormStore.Row r0 : svc.forms().list(100)) { JSONObject fo = new JSONObject(); for (java.util.Map.Entry<String, String> e : r0.form.f.entrySet()) fo.put(e.getKey(), e.getValue()); rows.put(new JSONObject().put("id", r0.id).put("ts", r0.ts).put("outgoing", r0.outgoing).put("peer", r0.peer).put("via", r0.via).put("status", r0.status).put("kind", r0.form.kind).put("title", com.macdmr.radio.ham.Forms.title(r0.form.kind)).put("fields", fo).put("text", com.macdmr.radio.ham.Forms.text(r0.form))); }
+                JSONObject kinds = new JSONObject();
+                for (String kd : new String[] { com.macdmr.radio.ham.Forms.ICS213, com.macdmr.radio.ham.Forms.RADIOGRAM }) { JSONArray fl = new JSONArray(); for (String[] k : com.macdmr.radio.ham.Forms.fields(kd)) fl.put(new JSONArray().put(k[0]).put(k[1])); kinds.put(kd, fl); }
+                JSONArray cs = new JSONArray(); for (ChannelStore.Contact ct : svc.store().contacts()) cs.put(new JSONObject().put("id", ct.id).put("name", ct.name).put("number", ct.number).put("type", ct.type));
+                return ok(new JSONObject().put("forms", rows).put("kinds", kinds).put("contacts", cs));
+            }
             case "/api/logbook/delete": if (!post) break; { svc.logbook().delete(b.optLong("id", 0)); return ok("Deleted"); }
             case "/api/settings": {
                 if (post) {

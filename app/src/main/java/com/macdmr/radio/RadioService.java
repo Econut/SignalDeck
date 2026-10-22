@@ -1671,6 +1671,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         String nm = t == 1 ? store.contactName(fromId, 1) : callerName(fromId);
         CarMessages.dmr(this, fromId, t, nm, text);   // the phone and Android Auto (read aloud, voice reply)
         history("sms", "✉ Text from " + fromId + ": " + (text.length() > 40 ? text.substring(0, 40) + "…" : text));
+        onFormText(nm == null || nm.isEmpty() ? String.valueOf(fromId) : nm, text, "DMR");
         ui.post(() -> { for (Listener l : listeners) l.onSms(fromId, t, text); });
     }
 
@@ -2223,6 +2224,45 @@ public class RadioService extends Service implements RadioEngine.Events {
     public boolean isScanHolding() { return scanner != null && scanner.isHolding(); }
     /** Something is actually heard: the Soft SQ gate on Soft SQ channels, the radio's own report otherwise. */
     public boolean hearing() { return injecting || (softSq != null && softSq.isEnabled() ? squelchOpen : receiving && rxCounts); }
+
+    // ---- message forms (ICS-213, radiogram) over APRS messages or DMR texts ----
+    private com.macdmr.radio.ham.FormStore forms;
+    public com.macdmr.radio.ham.FormStore forms() { if (forms == null) forms = new com.macdmr.radio.ham.FormStore(this); return forms; }
+    private final com.macdmr.radio.ham.Forms.Assembler formParts = new com.macdmr.radio.ham.Forms.Assembler();
+    /** An APRS message or DMR text that may be part of a form: rebuilt when all its parts are in. */
+    public void onFormText(String from, String text, String via) {
+        try {
+            if (com.macdmr.radio.ham.Forms.part(text) == null) return;
+            com.macdmr.radio.ham.Forms.Form f = formParts.add(from, text, System.currentTimeMillis());
+            if (f == null) { int[] p = formParts.progress(from, text); if (p != null) log("form part " + p[0] + "/" + p[1] + " from " + from); return; }
+            com.macdmr.radio.ham.FormStore.Row r = new com.macdmr.radio.ham.FormStore.Row(); r.ts = System.currentTimeMillis(); r.outgoing = false; r.peer = from; r.via = via; r.status = "received"; r.form = f;
+            forms().save(r);
+            String subj = f.f.containsKey("SU") ? f.f.get("SU") : f.f.containsKey("NR") ? "number " + f.f.get("NR") : "";
+            history("sms", "\uD83D\uDCCB " + com.macdmr.radio.ham.Forms.title(f.kind) + " from " + from + (subj.isEmpty() ? "" : ": " + subj));
+            notifyUser(com.macdmr.radio.ham.Forms.title(f.kind) + " from " + from, subj.isEmpty() ? "Open PKT \u2192 Message forms" : subj, false);
+        } catch (Throwable t) { log("form: " + t); }
+    }
+    /** Send a form: "aprs" to a callsign (67-character parts, one every 12 s) or "dmr" to a contact (120-character parts). Null or an error. */
+    public String sendForm(final com.macdmr.radio.ham.Forms.Form f, String via, final String toCall, final ChannelStore.Contact toContact) {
+        if (f.id == null || f.id.isEmpty()) f.id = com.macdmr.radio.ham.Forms.newId(new java.util.Random());
+        final com.macdmr.radio.ham.FormStore.Row r = new com.macdmr.radio.ham.FormStore.Row(); r.ts = System.currentTimeMillis(); r.outgoing = true; r.form = f;
+        if ("aprs".equals(via)) {
+            if (packet == null) return "The packet engine is not running";
+            if (toCall == null || toCall.trim().isEmpty()) return "Enter the callsign to send it to";
+            final java.util.List<String> parts = com.macdmr.radio.ham.Forms.split(f, 67);
+            String first = packet.sendMessage(toCall, parts.get(0)); if (first != null) return first;
+            for (int k = 1; k < parts.size(); k++) { final String p = parts.get(k); ui.postDelayed(() -> { String e = packet.sendMessage(toCall, p); if (e != null) log("form part: " + e); }, k * 12_000L); }
+            r.peer = toCall.trim().toUpperCase(Locale.US); r.via = "APRS"; r.status = "sent in " + parts.size() + " message" + (parts.size() == 1 ? "" : "s");
+        } else if ("dmr".equals(via)) {
+            if (toContact == null) return "Choose the contact or talkgroup";
+            ChannelStore.Channel cur = current; if (cur == null || !cur.isDigital()) return "DMR texts need a DMR channel";
+            final java.util.List<String> parts = com.macdmr.radio.ham.Forms.split(f, 120);
+            for (int k = 0; k < parts.size(); k++) { final String p = parts.get(k); ui.postDelayed(() -> sendSms(toContact, p), k * 4_000L); }
+            r.peer = toContact.name.isEmpty() ? String.valueOf(toContact.number) : toContact.name; r.via = "DMR"; r.status = "sent in " + parts.size() + " text" + (parts.size() == 1 ? "" : "s");
+        } else { r.peer = ""; r.via = "saved"; r.status = "saved"; }
+        forms().save(r);
+        return null;
+    }
 
     // ---- DMR roaming (Roaming): the nearest repeater with the same talkgroup, while moving ----
     public boolean roaming() { return getSharedPreferences("radio", MODE_PRIVATE).getBoolean("roaming", false); }
