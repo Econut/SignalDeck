@@ -174,7 +174,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Stop tracking and following passes (the Stop buttons). */
     public void endSatTracking() { setIssRepeat(-1); stopSatTrack(); }
     /** Bench (DIAG vfo): listen on a frequency through the VFO, wide, low power. */
-    void diagVfo(int hz) { ChannelStore.Channel a = new ChannelStore.Channel(); a.type = 1; a.rxFreq = a.txFreq = hz; a.band = 1; a.power = 1; a.name = "Bench"; applyVfo(a, false); }
+    void diagVfo(int hz, int power) { ChannelStore.Channel a = new ChannelStore.Channel(); a.type = 1; a.rxFreq = a.txFreq = hz; a.band = 1; a.power = power; a.name = "Bench"; applyVfo(a, false); }   // power 0 = low, 1 = high
     void diagVfoOff() { if (vfo != null && "Bench".equals(vfo.name)) exitVfo(); }
     /** Track a pass: at AOS minus a minute the VFO takes the satellite's channel, corrected for Doppler every 2 s, until LOS. */
     public String trackSat(final com.macdmr.radio.ham.Satellites.Sat sat, final com.macdmr.radio.ham.Sgp4 el, final com.macdmr.radio.ham.SatTrack.Pass pass) {

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Bench: the radio really tunes in 500 Hz steps (Doppler); DIAG testtone, vfo power
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner's question: does the radio actually follow the ISS Doppler retunes in sub-kHz steps? **Yes.** HackRF measurement of the carrier at low power on 467.625 MHz: requested +0.5 / +1 / +1.5 / +2.5 / +5 kHz landed within 3 Hz (+499.8 / +1000.3 / +1498.9 / +2499.5 / +4999.6 Hz), back to 0 within 1.5 Hz; during the 11:20 ISS pass all 9 frequency writes (437.5570 → 437.5445 MHz in 2 kHz steps, then back to the channel) were acknowledged. DIAG (adb only): new `testtone --ei ms N` (≤ 5 s, current channel or VFO); `vfo` now transmits at **low** power unless `--ei power 1` (it said low but used high). No user-facing change. | `DiagReceiver.java`, `RadioService.java` | Device + HackRF (owner's Armor), see the numbers; radio returned to the owner's channel. |
+
 ## 2026-10-22 — SignalDeck Web: Phone panel (battery, cell, Wi-Fi)
 
 | Backlog | Change | Files | Test |

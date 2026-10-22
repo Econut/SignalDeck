@@ -35,9 +35,13 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "inject": s.injectWav(new java.io.File(i.getStringExtra("path"))); break;
             case "isline": if (s.packet() != null) s.packet().diagServerLine(i.getStringExtra("line")); break;
             case "heard": if (s.packet() != null) s.packet().diagHeard(i.getStringExtra("call")); break;
-            case "vfo": {                                                       // receive bench: the VFO on --ei hz (wide, low power; nothing is keyed)
+            case "vfo": {                                                       // bench: the VFO on --ei hz (wide; low power unless --ei power 1; nothing is keyed)
                 int hz = i.getIntExtra("hz", 0); if (hz < 136_000_000 || hz > 480_000_000) { Log.w("DiagReceiver", "vfo: bad hz " + hz); break; }
-                s.diagVfo(hz); break;
+                s.diagVfo(hz, i.getIntExtra("power", 0) == 1 ? 1 : 0); break;
+            }
+            case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s) on the current channel or VFO
+                int ms = Math.max(200, Math.min(5000, i.getIntExtra("ms", 2000)));
+                Log.i("DiagReceiver", "testtone " + ms + " ms"); s.diagTestTone(ms); break;
             }
             case "vfooff": s.diagVfoOff(); break;
             // bench: load a signed profile list from a file (--es path …), regardless of its serial, to try advisories on this
