@@ -1040,6 +1040,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     private volatile int monRetries; private volatile long monRefusedAt;
+    private volatile Runnable pendingPostWrite; private volatile long postWriteToken;   // monitor + squelch after a channel write (globalSquelch profiles)
     /** When the radio last refused MON after the retries (0 = never): the radio audio check reports it. */
     public long monRefusedAt() { return monRefusedAt; }
     public void setMonitor(final boolean on) {
@@ -1185,7 +1186,20 @@ public class RadioService extends Service implements RadioEngine.Events {
         selectChannel(list.get(next).number);
     }
 
-    public void selectChannel(final int number) { worker.execute(() -> selectChannelNow(number)); }
+    private final java.util.concurrent.atomic.AtomicInteger selectSeq = new java.util.concurrent.atomic.AtomicInteger();
+    private volatile long lastChannelWrite;
+    public void selectChannel(final int number) {
+        final int my = selectSeq.incrementAndGet();
+        worker.execute(() -> {
+            long gap = profile.minWriteGapMs;
+            if (gap > 0) {                                                     // this module wants room between channel writes: wait it out, keep only the newest request
+                long wait = lastChannelWrite + gap - System.currentTimeMillis();
+                if (wait > 0) { try { Thread.sleep(wait); } catch (InterruptedException e) { return; } }
+                if (selectSeq.get() != my) return;
+            }
+            selectChannelNow(number);
+        });
+    }
 
     private synchronized void selectChannelNow(int number) {
         ChannelStore.Channel ch = store.byNumber(number);
@@ -1260,9 +1274,11 @@ public class RadioService extends Service implements RadioEngine.Events {
             } else {
                 int band = ch.rxFreq < 300_000_000 ? 1 : ch.band;      // VHF must be band=1 (band=0 deafens the RX)
                 engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
-                if (profile.globalSquelch) {                              // this module's squelch follows 0x30; QuickChat sends channel, monitor, squelch in that order
-                    engine.setMonitor(monitorOn && !moved(ch));
-                    engine.setSquelch(hardwareSq(ch));
+                lastChannelWrite = System.currentTimeMillis();
+                if (profile.globalSquelch) {                              // this module's squelch follows 0x30; QuickChat sends monitor and squelch 200 ms after the channel's acknowledgement
+                    final boolean mon = monitorOn && !moved(ch); final int sq = hardwareSq(ch); final long token = ++postWriteToken;
+                    pendingPostWrite = () -> { if (postWriteToken != token) return; postWriteToken++; worker.execute(() -> { try { engine.setMonitor(mon); engine.setSquelch(sq); } catch (IOException e) { log("monitor/squelch: " + e); } }); };
+                    ui.postDelayed(() -> { Runnable r = pendingPostWrite; if (r != null && postWriteToken == token) { log("no channel acknowledgement in 1.5 s: monitor and squelch sent anyway"); r.run(); } }, 1500);
                 }
             }
             finishRecording();
@@ -1652,6 +1668,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (monRetries < 3) { monRetries++; final boolean want = monitorOn; ui.postDelayed(() -> { if (monitorOn == want) worker.execute(() -> { try { engine.setMonitor(want); } catch (IOException e) { log("monitor: " + e); } }); }, 1500); log("MON refused, retry " + monRetries); }
             else { monRefusedAt = System.currentTimeMillis(); history("warn", "\u26A0 The radio refused MON (busy after channel changes?): wait a few seconds and switch it again"); }
         }
+        if (cmd == RadioEngine.CMD_SET_ANALOG && ok && pendingPostWrite != null) { final Runnable r = pendingPostWrite; ui.postDelayed(r, 200); }
         if (cmd != RadioEngine.CMD_SET_ANALOG && cmd != RadioEngine.CMD_SET_DIGITAL) return;
         Object[] t; synchronized (tunes) { t = tunes.pollFirst(); }
         if (t == null) return;

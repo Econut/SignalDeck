@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Xplore 1: channel-write timing from the stock app (QuickChat analysis)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | From decompiling the Xplore's stock app (QuickChat, notes in phonedmrapp `docs/multi-device-xplore1-findings.md`): it never writes channels less than 1 s apart and sends monitor + squelch 200 ms after the channel's acknowledgement. `DeviceProfile.minWriteGapMs` (Xplore 1000 ms): quick channel changes wait out the gap and collapse into the newest request; on `globalSquelch` profiles monitor + squelch now go 200 ms after the 0x23 acknowledgement (sent anyway after 1.5 s without one). The Armor is unchanged (gap 0, no global squelch). | `DeviceProfile.java`, `RadioService.java` | Built; the owner's Armor still changes channel normally (34 → 35 → 38). Needs the Xplore tester. |
+
 ## 2026-10-22 — Device report: a summary page and the guided second radio test
 
 | Backlog | Change | Files | Test |

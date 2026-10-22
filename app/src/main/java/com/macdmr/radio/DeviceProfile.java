@@ -40,6 +40,8 @@ public final class DeviceProfile {
     public boolean globalSquelch;        // the module follows its global squelch (0x30) rather than the channel's sq byte: send it with every analog channel
     /** How long the scanner listens on each channel before moving on (the module's "receiving" report must arrive in time). */
     public long scanDwellMs = 1500;
+    /** Least time between two channel writes (0 = none); quicker channel changes collapse into the last one. */
+    public long minWriteGapMs;
     public String[][] lineSetup;         // {node, value} written in this order before the power line, every bring-up (null = none)
 
     private DeviceProfile(String name, String controlPort, int baud, Audio audio, String pcmPort, int pcmBaud,
@@ -85,7 +87,8 @@ public final class DeviceProfile {
         // powered, or a module left by QuickChat's power-off would come up with its PTT line asserted.
         ARMOR_26_ULTRA.id = "ulefone-armor26ultra"; ARMOR_26_ULTRA.revision = 1;
         XPLORE_1.id = "blackview-xplore1"; XPLORE_1.revision = 2;
-        XPLORE_1.scanDwellMs = 2500;          // owner's tester 2026-10-22: the first scan stepped past an active channel; its receive report comes later than the Armor's
+        XPLORE_1.scanDwellMs = 2500;
+        XPLORE_1.minWriteGapMs = 1000;        // QuickChat never writes channels less than 1 s apart; a burst of writes made the module refuse MON (2026-10-22)          // owner's tester 2026-10-22: the first scan stepped past an active channel; its receive report comes later than the Armor's
         XPLORE_1.globalSquelch = true;        // QuickChat sends 0x30 after each channel; the beta.3/5 trials showed the channel's sq 0 alone did not open it
         XPLORE_1.lineSetup = new String[][] {
                 { "/sys/devices/platform/intercom/intercom_ptt_control", "1" },
@@ -113,7 +116,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.minWriteGapMs = minWriteGapMs;
         return p;
     }
 
@@ -123,7 +126,7 @@ public final class DeviceProfile {
                 o.optString("pcmPort", null), o.optInt("pcmBaud", 0), o.optString("powerNode", null), o.optString("pttNode", null), o.optString("powerOnToken", "1"),
                 strings(o.optJSONArray("pttActions")), o.optString("stockApp", ""), strings(o.optJSONArray("sepolicy")), o.optString("serialLib", null),
                 o.optBoolean("supported", true), o.optBoolean("verified", false));
-        p.id = o.getString("id"); p.revision = o.getInt("revision"); p.globalSquelch = o.optBoolean("globalSquelch", false); p.scanDwellMs = o.optLong("scanDwellMs", 1500);
+        p.id = o.getString("id"); p.revision = o.getInt("revision"); p.globalSquelch = o.optBoolean("globalSquelch", false); p.scanDwellMs = o.optLong("scanDwellMs", 1500); p.minWriteGapMs = o.optLong("minWriteGapMs", 0);
         org.json.JSONArray ls = o.optJSONArray("lineSetup");
         if (ls != null) { p.lineSetup = new String[ls.length()][]; for (int i = 0; i < ls.length(); i++) p.lineSetup[i] = strings(ls.getJSONArray(i)); }
         return p;
