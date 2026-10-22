@@ -18,6 +18,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.macdmr.radio.ChannelStore;
 import com.macdmr.radio.RadioService;
 import com.macdmr.radio.winlink.B2Message;
 import com.macdmr.radio.winlink.Winlink;
@@ -52,6 +53,7 @@ public final class WinlinkDialog {
         final TextView net = btn(c, r1, "Connect: internet", "globe", Neo.CYAN), rf = btn(c, r1, "Connect: radio", "radio", Neo.GREEN);
         LinearLayout r2 = new LinearLayout(c); body.addView(r2);
         btn(c, r2, "New message", "plus", Neo.AMBER).setOnClickListener(v -> { if (self[0] != null) self[0].dismiss(); compose(c, svc, "", "", "", ""); });
+        btn(c, r2, "Gateways", "map", Neo.GREEN).setOnClickListener(v -> { if (self[0] != null) self[0].dismiss(); gateways(c, svc); });
         btn(c, r2, "Settings", "menu", Neo.VIOLET).setOnClickListener(v -> settings(c, svc, () -> { if (later[0] != null) later[0].run(); }));
         TextView logB = Neo.button(c, "Session log", "report", Neo.MUTED); logB.setTextSize(14);
         LinearLayout.LayoutParams ll = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (44 * d)); ll.topMargin = (int) (6 * d);
@@ -107,6 +109,67 @@ public final class WinlinkDialog {
     }
 
     static String shownList(List<String> l) { StringBuilder b = new StringBuilder(); for (String a : l) { if (b.length() > 0) b.append(", "); b.append(B2Message.shown(a)); } return b.length() == 0 ? "—" : b.toString(); }
+
+    /** The imported gateway list, nearest first: tune and connect, or hand the frequencies to the packet finder. */
+    static void gateways(Context c, RadioService svc) {
+        final Winlink w = svc.winlink();
+        float d = Theme.dp(c);
+        LinearLayout body = Neo.sheetBody(c, "Winlink gateways");
+        body.addView(Neo.sheetHint(c, "Winlink publishes its gateways at winlink.org (RMS Channels). There, choose Packet, download the CSV file, then Import it here. SignalDeck keeps the 1200-baud packet gateways this radio can tune and sorts them by distance from the phone's last known position (worked out on the phone; it is not sent anywhere). Tap one to tune it and connect."));
+        LinearLayout r = new LinearLayout(c); body.addView(r);
+        btn(c, r, "Open winlink.org", "globe", Neo.CYAN).setOnClickListener(v -> { try { c.startActivity(new Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://winlink.org/RMSChannels"))); } catch (Exception e) { toast(c, "https://winlink.org/RMSChannels"); } });
+        btn(c, r, "Import the CSV", "import", Neo.GREEN).setOnClickListener(v -> {
+            if (!(c instanceof com.macdmr.radio.MainActivity)) { toast(c, "Open this from the app"); return; }
+            ((com.macdmr.radio.MainActivity) c).pickDocument(uri -> new Thread(() -> {
+                String msg;
+                try (java.io.InputStream in = c.getContentResolver().openInputStream(uri)) {
+                    byte[] b = in.readAllBytes(); if (b.length > 8 << 20) throw new IllegalArgumentException("The file is too large");
+                    msg = w.importGateways(new String(b, java.nio.charset.StandardCharsets.UTF_8));
+                } catch (Exception e) { msg = "Could not import: " + e.getMessage(); }
+                final String m = msg;
+                new Handler(Looper.getMainLooper()).post(() -> { new AlertDialog.Builder(c).setTitle("Winlink gateways").setMessage(m).setPositiveButton("OK", null).show(); gateways(c, svc); });
+            }).start());
+        });
+        java.util.List<com.macdmr.radio.winlink.RmsList.Gateway> l = w.gateways();
+        long at = w.gatewaysImportedAt();
+        body.addView(Neo.sheetSection(c, l.isEmpty() ? "No list imported yet" : l.size() + " gateways \u00B7 imported " + new SimpleDateFormat("d MMM", Locale.getDefault()).format(new Date(at))));
+        final AlertDialog[] self = { null };
+        if (!l.isEmpty()) {
+            TextView pf = Neo.button(c, "Packet finder: listen on the nearest 10", "search", Neo.VIOLET); pf.setTextSize(14);
+            LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (44 * d)); pl.bottomMargin = (int) (8 * d);
+            body.addView(pf, pl);
+            pf.setOnClickListener(v -> {
+                java.util.LinkedHashSet<String> fr = new java.util.LinkedHashSet<>();
+                for (com.macdmr.radio.winlink.RmsList.Gateway g : l) { if (fr.size() >= 10) break; fr.add(String.format(Locale.US, "%.4f", g.hz / 1e6)); }
+                String e = svc.finder().setSettings(String.join(", ", fr), 5, 2);
+                if (e != null) { toast(c, e); return; }
+                if (self[0] != null) self[0].dismiss(); PacketFinderDialog.show(c, svc);
+                toast(c, "Packet finder set to " + fr.size() + " gateway frequencies, 5 min each");
+            });
+        }
+        int shown = 0;
+        for (com.macdmr.radio.winlink.RmsList.Gateway g : l) {
+            if (++shown > 60) { body.addView(Neo.sheetHint(c, (l.size() - 60) + " farther ones not shown.")); break; }
+            String dist = g.km < 0 ? "" : (Locale.getDefault().getCountry().equals("US") || Locale.getDefault().getCountry().equals("GB") ? Math.round(g.km * 0.621371) + " mi " : Math.round(g.km) + " km ") + com.macdmr.radio.ham.Maidenhead.compass(g.bearing) + " \u00B7 ";
+            LinearLayout t = Neo.tile(c, "mail", Neo.GREEN, g.call, dist + String.format(Locale.US, "%.4f MHz", g.hz / 1e6) + (g.hours.isEmpty() || g.hours.equals("00-23") ? "" : " \u00B7 hours " + g.hours) + (g.qth.isEmpty() ? "" : "\n" + g.qth));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.bottomMargin = (int) (6 * d);
+            body.addView(t, lp);
+            t.setOnClickListener(v -> new AlertDialog.Builder(c).setTitle(g.call).setItems(new String[] { "Tune " + String.format(Locale.US, "%.4f", g.hz / 1e6) + " and connect", "Tune and listen first", "Use it as my gateway" }, (dd, which) -> {
+                w.setGateway(g.call, "");
+                if (which <= 1) { ChannelStore.Channel ch = new ChannelStore.Channel(); ch.type = 1; ch.rxFreq = ch.txFreq = g.hz; ch.band = 1; ch.power = 1; ch.sq = 2; ch.name = g.call; svc.applyVfo(ch, true); }
+                if (self[0] != null) self[0].dismiss();
+                if (which == 0) { new Handler(Looper.getMainLooper()).postDelayed(() -> { String e = w.connectRadio(g.call, ""); if (e != null) toast(c, e); }, 4500); toast(c, "Tuning " + String.format(Locale.US, "%.4f MHz", g.hz / 1e6) + ", connecting in a few seconds"); }
+                show(c, svc);
+            }).show());
+        }
+        if (!l.isEmpty()) {
+            TextView clr = Neo.button(c, "Remove the list", "stop", Neo.RED); clr.setTextSize(14);
+            LinearLayout.LayoutParams cl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (44 * d)); cl.topMargin = (int) (6 * d);
+            body.addView(clr, cl);
+            clr.setOnClickListener(v -> { w.clearGateways(); if (self[0] != null) self[0].dismiss(); gateways(c, svc); });
+        }
+        self[0] = Neo.showSheet(c, body);
+    }
 
     private static void radioConnect(Context c, RadioService svc, Runnable refresh) {
         final Winlink w = svc.winlink();

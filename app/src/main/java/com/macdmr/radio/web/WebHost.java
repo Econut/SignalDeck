@@ -944,6 +944,15 @@ public final class WebHost {
                         case "cancel": w.cancel(); return ok("Stopping");
                         case "delete": st.delete(b.optString("folder"), b.optString("mid")); return ok("Deleted");
                         case "read": st.markRead(b.optString("mid")); return ok("ok");
+                        case "gateways": { try { return ok(w.importGateways(b.optString("csv"))); } catch (IllegalArgumentException e) { return WebServer.Response.error(400, e.getMessage()); } }
+                        case "cleargateways": w.clearGateways(); return ok("Removed");
+                        case "tuneconnect": {
+                            String call = b.optString("call"); int hz = b.optInt("hz");
+                            if (!((hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000))) return WebServer.Response.error(400, "Bad frequency");
+                            onMain(() -> { ChannelStore.Channel ch = new ChannelStore.Channel(); ch.type = 1; ch.rxFreq = ch.txFreq = hz; ch.band = 1; ch.power = 1; ch.sq = 2; ch.name = call; svc.applyVfo(ch, true); w.setGateway(call, ""); return null; });
+                            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> w.connectRadio(call, ""), 4500);
+                            return ok("Tuning " + String.format(java.util.Locale.US, "%.4f MHz", hz / 1e6) + ", connecting in a few seconds");
+                        }
                         case "settings": {
                             String g = b.optString("grid", "").trim();
                             if (!g.isEmpty() && !g.matches("(?i)[A-R]{2}[0-9]{2}([A-X]{2})?")) return WebServer.Response.error(400, "Grid square like JO01 or JO01ab");
@@ -965,7 +974,9 @@ public final class WebHost {
                     }
                     fo.put(folder, arr);
                 }
-                return ok(new JSONObject().put("state", w.state()).put("busy", w.busy()).put("progress", w.progress()).put("passwordSet", w.passwordSet()).put("grid", w.grid())
+                JSONArray gws = new JSONArray(); int gn = 0;
+                for (com.macdmr.radio.winlink.RmsList.Gateway g : w.gateways()) { if (++gn > 40) break; gws.put(g.json().put("km", g.km < 0 ? JSONObject.NULL : (Object) Math.round(g.km)).put("dir", g.km < 0 ? "" : com.macdmr.radio.ham.Maidenhead.compass(g.bearing))); }
+                return ok(new JSONObject().put("gateways", gws).put("gatewayCount", w.gateways().size()).put("state", w.state()).put("busy", w.busy()).put("progress", w.progress()).put("passwordSet", w.passwordSet()).put("grid", w.grid())
                         .put("gateway", w.gateway()).put("via", w.via()).put("log", w.logText()).put("folders", fo));
             }
             case "/api/finder": {                                               // GET: state, settings, stations; POST {action: start|stop|clear|settings}

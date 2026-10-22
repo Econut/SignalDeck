@@ -140,7 +140,7 @@
         <div id="fmList" class="list small"></div>
       </div>
       <div class="panel" id="wlPanel">
-        <div class="row between wrap"><span class="label">WINLINK E-MAIL</span><div class="row"><button class="btn small-btn" id="wlNew">New message</button><button class="btn small-btn" id="wlNet">Connect: internet</button><button class="btn small-btn" id="wlRf">Connect: radio</button><button class="btn small-btn" id="wlSet">Settings</button><button class="btn small-btn" id="wlLogB">Session log</button></div></div>
+        <div class="row between wrap"><span class="label">WINLINK E-MAIL</span><div class="row"><button class="btn small-btn" id="wlNew">New message</button><button class="btn small-btn" id="wlNet">Connect: internet</button><button class="btn small-btn" id="wlRf">Connect: radio</button><button class="btn small-btn" id="wlGwB">Gateways</button><button class="btn small-btn" id="wlSet">Settings</button><button class="btn small-btn" id="wlLogB">Session log</button></div></div>
         <p class="wl-beta" id="wlBeta">New: not yet tested with the real Winlink system. Please tell us if it works for you: <a href="https://github.com/IIMacGyverII/SignalDeck/issues" target="_blank" rel="noopener">report it on GitHub</a>.</p>
         <p class="muted small" id="wlState"></p>
         <form id="wlCompose" class="sched-form hidden" autocomplete="off">
@@ -162,6 +162,8 @@
           <p class="muted small" style="grid-column:1/-1">Your callsign comes from the PKT settings. The password is write-only here: it is kept in SignalDeck's private settings and never shown, logged or backed up. Leave it empty to keep the saved one; "-" clears it.</p>
           <div class="row" style="grid-column:1/-1"><button class="btn primary small-btn">Save</button><button class="btn small-btn" id="wlSetCancel" type="button">Cancel</button></div>
         </form>
+        <div id="wlGw" class="hidden"><p class="muted small">Winlink lists its gateways at <a href="https://winlink.org/RMSChannels" target="_blank" rel="noopener">winlink.org (RMS Channels)</a>: choose Packet, download the CSV, then import it here. SignalDeck keeps the 1200-baud packet gateways this radio can tune, nearest first (distance worked out on the phone).</p>
+          <div class="row wrap"><input type="file" id="wlGwFile" accept=".csv,text/csv"><button class="btn small-btn danger" id="wlGwClear" type="button">Remove the list</button></div><div id="wlGwList" class="list small"></div></div>
         <pre id="wlLog" class="dec-out hidden"></pre>
         <div id="wlView" class="hidden"><div id="wlHead" class="muted small"></div><pre id="wlBody" class="dec-out" style="font-size:15px;white-space:pre-wrap"></pre><div id="wlFiles" class="row wrap"></div>
           <div class="row"><button class="btn small-btn" id="wlReply" type="button">Reply</button><button class="btn small-btn" id="wlFwd" type="button">Forward</button><button class="btn small-btn danger" id="wlDel" type="button">Delete</button><button class="btn small-btn" id="wlClose" type="button">Close</button></div></div>

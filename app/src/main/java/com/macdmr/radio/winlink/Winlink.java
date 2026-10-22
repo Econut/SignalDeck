@@ -38,6 +38,8 @@ public final class Winlink {
         String callsign();
         /** Tell the user (new mail). */
         void notifyUser(String title, String text);
+        /** The phone's last known position {lat, lon}, or null (for gateway distances; never leaves the phone). */
+        default double[] position() { return null; }
         /** A received message carried a SignalDeck form code line (the host rebuilds the form). */
         default void formText(String from, String line) { }
     }
@@ -80,6 +82,25 @@ public final class Winlink {
     public String gateway() { return prefs.getString("gateway", ""); }
     public String via() { return prefs.getString("via", ""); }
     public void setGateway(String g, String v) { prefs.edit().putString("gateway", g.trim().toUpperCase(Locale.US)).putString("via", v.trim().toUpperCase(Locale.US)).apply(); }
+
+    // ---- gateway list (the CSV from winlink.org, RMS Channels) --------------------------------------------
+
+    /** Import the CSV text; returns a summary for the user, or throws IllegalArgumentException. */
+    public String importGateways(String csv) {
+        RmsList.Result r = RmsList.parse(csv);
+        prefs.edit().putString("gateways", RmsList.toJson(r.usable)).putLong("gatewaysAt", System.currentTimeMillis()).apply();
+        changed();
+        return r.usable.size() + " packet gateway" + (r.usable.size() == 1 ? "" : "s") + " this radio can use (1200 baud, 136\u2013174 or 400\u2013480 MHz), of " + r.rows + " in the file"
+                + (r.hf > 0 ? "; " + r.hf + " HF" : "") + (r.otherBaud > 0 ? "; " + r.otherBaud + " other speeds or modes" : "") + (r.outOfRange > 0 ? "; " + r.outOfRange + " on other bands" : "");
+    }
+    /** The imported gateways, nearest first when the position is known. */
+    public java.util.List<RmsList.Gateway> gateways() {
+        java.util.List<RmsList.Gateway> l = RmsList.fromJson(prefs.getString("gateways", "[]"));
+        double[] p = radio.position(); if (p != null) RmsList.rank(l, p[0], p[1]);
+        return l;
+    }
+    public long gatewaysImportedAt() { return prefs.getLong("gatewaysAt", 0); }
+    public void clearGateways() { prefs.edit().remove("gateways").remove("gatewaysAt").apply(); changed(); }
 
     // ---- mail ------------------------------------------------------------------------------------------
 

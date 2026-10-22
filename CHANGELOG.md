@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Winlink gateways: import winlink.org's list, nearest first
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R#8 | **Winlink → Gateways** (and SignalDeck Web's Winlink panel): import the CSV that winlink.org (RMS Channels) offers for download. SignalDeck keeps the 1200-baud packet gateways on frequencies this radio tunes (136–174, 400–480 MHz) and lists them nearest first with distance and direction from the phone's last known position (from each gateway's grid square; computed on the phone, never sent). Tap: tune and connect, tune and listen first, or use as my gateway; *Packet finder: listen on the nearest 10* sets the finder to their frequencies. Help: Winlink → Gateways near you. No Winlink API key is needed. | `winlink/RmsList.java` (new), `winlink/Winlink.java`, `RadioService.java`, `ui/WinlinkDialog.java`, `web/WebHost.java`, `assets/web/index.html`, `assets/web/pages.js`, `ui/HelpView.java`, `RmsListTest.java` | `RmsListTest` (the exact CSV layout with made-up rows: HF, 9600 baud and 220 MHz rows dropped, quoted fields with commas, kHz with a thousands comma, nearest first, bad files refused). **Device:** the owner's real packet CSV (1,307 rows) imported through the web API: 1,210 usable, 77 other speeds or modes, 20 on other bands; listed sorted by distance; the phone sheet shows the list. The owner's file stays out of the repository. |
+
 ## 2026-10-22 — Packet finder (find BBSs, nodes and Winlink gateways by listening)
 
 | Backlog | Change | Files | Test |

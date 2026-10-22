@@ -2273,6 +2273,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             @Override public String callsign() { PacketEngine pe = packet(); if (pe != null) return pe.callsignSet() ? pe.callsign() : ""; String c = getSharedPreferences("packet", MODE_PRIVATE).getString("callsign", "").trim().toUpperCase(java.util.Locale.US).replaceAll("-.*", ""); return "N0CALL".equals(c) ? "" : c; }
             @Override public void notifyUser(String title, String text) { RadioService.this.notifyUser(title, text, false); }
             @Override public void formText(String from, String line) { ui.post(() -> onFormText(from, line, "Winlink")); }
+            @Override public double[] position() { android.location.Location l = lastKnownLocation(); return l == null ? null : new double[] { l.getLatitude(), l.getLongitude() }; }
         });
         return winlink;
     }

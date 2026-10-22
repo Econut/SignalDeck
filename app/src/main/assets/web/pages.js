@@ -397,9 +397,10 @@ async function loadWinlink() {
       + esc(key === 'inbox' ? 'From ' + m.from : 'To ' + m.to.join(', ')) + ' · ' + when(m.time) + (m.files.length ? ' · 📎 ' + m.files.length : '') + '</div></div></div>').join('');
   };
   $('wlList').innerHTML = sec('inbox', 'INBOX') + sec('outbox', 'OUTBOX · GOES OUT AT THE NEXT CONNECTION') + sec('sent', 'SENT');
+  $('wlGwList').innerHTML = j.gateways.length ? j.gateways.map((g, i) => '<div class="item click" data-g="' + i + '"><div class="main"><b>' + esc(g.call) + '</b><div class="muted small">' + (g.km !== null ? g.km + ' km ' + g.dir + ' · ' : '') + (g.hz / 1e6).toFixed(4) + ' MHz' + (g.qth ? ' · ' + esc(g.qth) : '') + '</div></div></div>').join('') + (j.gatewayCount > j.gateways.length ? '<div class="empty">' + (j.gatewayCount - j.gateways.length) + ' farther ones not shown</div>' : '') : '<div class="empty">No list imported yet</div>';
   clearTimeout(S.wlTimer); if (j.busy && S.page === 'messages') S.wlTimer = setTimeout(loadWinlink, 1500);
 }
-function wlOnly(id) { ['wlCompose', 'wlRfForm', 'wlSetForm', 'wlView', 'wlLog'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
+function wlOnly(id) { ['wlCompose', 'wlRfForm', 'wlSetForm', 'wlView', 'wlLog', 'wlGw'].forEach(x => $(x).classList.toggle('hidden', x !== id)); }
 function wlCompose(to, subj, text) { $('wlTo').value = to || ''; $('wlCc').value = ''; $('wlSubj').value = subj || ''; $('wlText').value = text || ''; wlOnly('wlCompose'); $(to ? 'wlText' : 'wlTo').focus(); }
 $('wlNew').onclick = () => wlCompose();
 $('wlCancelC').onclick = () => wlOnly('');
@@ -436,6 +437,18 @@ $('wlList').onclick = async e => {
   if (m.unread) { try { await api('winlink', { action: 'read', mid: m.mid }); m.unread = false; loadWinlink(); } catch (x) { } }
 };
 $('wlClose').onclick = () => wlOnly('');
+$('wlGwB').onclick = () => { if (!$('wlGw').classList.contains('hidden')) { wlOnly(''); return; } wlOnly('wlGw'); };
+$('wlGwFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const r = await api('winlink', { action: 'gateways', csv: await f.text() }); toast(r.message); loadWinlink(); } catch (x) { toast(x.message); }
+  e.target.value = '';
+};
+$('wlGwClear').onclick = async () => { if (!await ask('Remove the gateway list?')) return; try { await api('winlink', { action: 'cleargateways' }); loadWinlink(); } catch (x) { toast(x.message); } };
+$('wlGwList').onclick = async e => {
+  const it = e.target.closest('[data-g]'); if (!it) return; const g = S.wl.gateways[+it.dataset.g];
+  if (!await ask('Tune ' + (g.hz / 1e6).toFixed(4) + ' MHz and connect to ' + g.call + '? The radio transmits.')) return;
+  try { const r = await api('winlink', { action: 'tuneconnect', call: g.call, hz: g.hz }); toast(r.message); setTimeout(loadWinlink, 5000); } catch (x) { toast(x.message); }
+};
 $('wlReply').onclick = () => { const m = S.wlSel.m; wlCompose(m.from, /^Re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject, '\n\n--- ' + m.from + ' wrote:\n' + m.text); };
 $('wlFwd').onclick = () => { const m = S.wlSel.m; wlCompose('', 'Fw: ' + m.subject, '\n\n--- Forwarded message from ' + m.from + ':\n' + m.text); $('wlTo').focus(); };
 $('wlDel').onclick = async () => {
