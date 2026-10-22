@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Radio audio check: right verdict on serial-port audio phones (Xplore 1)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | Xplore 1 tester's report (Faraday cage, beta.11): audio **works** over the UART PCM path (MON: 168 kB in 10 s at −21 dBFS, receptions at −50 dBm carried audio, squelch now closes after MON), but every run's verdict said "this ROM does not have PrizeTinyService … can't get any receive audio", because the missing-class check ran on every phone. The verdict now depends on the profile's audio backend: a `UartPcmAudio` phone skips the PrizeTinyService verdict (the system section notes the class is not used there), and its "no audio" sentences name the radio's audio serial port instead of the tinyservice daemon. Help: Device → Radio audio check. | `DmrAudioCheck.java`, `ui/HelpView.java`, `DmrAudioCheckTest.java` (+1 test with the report's numbers) | Host tests pass; installed on the owner's Armor (TinyService path unchanged). Not yet re-run on an Xplore. |
+
 ## 2026-10-22 — SignalDeck moves to its own repository
 
 | Backlog | Change | Files | Test |
