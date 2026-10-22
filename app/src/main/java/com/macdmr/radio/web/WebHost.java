@@ -1462,7 +1462,7 @@ public final class WebHost {
             }
             case "/api/conversations": {
                 JSONArray a = new JSONArray();
-                for (ChannelStore.Conversation c : svc.store().conversations())
+                for (ChannelStore.Conversation c : svc.conversations())
                     a.put(new JSONObject().put("peer", c.peer).put("type", c.type).put("name", c.name).put("lastText", c.lastText).put("lastTs", c.lastTs).put("outgoing", c.outgoing));
                 return ok(new JSONObject().put("conversations", a).put("quickReplies", new JSONArray(quickReplies())));
             }
@@ -1481,7 +1481,8 @@ public final class WebHost {
                 int peer = parse(r.param("peer"), 0), type = parse(r.param("type"), 0);
                 JSONArray a = new JSONArray();
                 for (ChannelStore.Message m : svc.store().messages(peer, type))
-                    a.put(new JSONObject().put("id", m.id).put("outgoing", m.outgoing).put("ts", m.ts).put("text", m.text).put("status", m.status));
+                    a.put(new JSONObject().put("id", m.id).put("outgoing", m.outgoing).put("ts", m.ts).put("text", m.text).put("status", m.status)
+                            .put("sender", m.sender).put("senderName", m.sender > 0 ? svc.callerName(m.sender) : ""));
                 return ok(new JSONObject().put("messages", a));
             }
             default: break;

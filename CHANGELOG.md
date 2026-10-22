@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — DMR texts: talkgroup threads and names everywhere
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner request (message chains). **Bug fix:** incoming 0x2D texts were read as "type 3 = group", but the module reports **1 = talkgroup text, anything else private** (the stock app's own `FetchSmsMessage` / `DmrManager.onSmsReceived`), so every talkgroup text was filed as a private message from its sender. Now a talkgroup text goes to the talkgroup's conversation (the current channel's call target, as the stock app does: the text does not say which talkgroup) and keeps its sender (new `messages.sender` column, added on open); the thread shows the sender's name over each message (phone and web), Android Auto replies go to the talkgroup, the history names the sender and talkgroup, and the raw type is logged. **Names:** conversations without a contact show the RadioID name/callsign for radios and "TG n" (or the contact name) for talkgroups. Bench: DIAG `smsbench --ei type --ei from --es text` / `smsbenchclear` (adb only). Help: Messages → Receiving, Names. | `RadioService.java`, `ChannelStore.java`, `ui/MessagesView.java`, `web/WebHost.java`, `assets/web/pages.js`, `assets/web/app.css`, `DiagReceiver.java`, `ui/HelpView.java` | Device (owner's Armor, DMR channel 24 = TG 1 for the test, then back to 38): two injected type-1 texts from two IDs landed in one "World Wide" (TG 1) thread with each sender named from RadioID; a type-0 text went to the contact's own thread; the owner's existing "ID …" conversation now shows its RadioID name; the phone thread shows sender labels; bench texts removed. **Still to confirm on the air:** a real talkgroup text from another radio (the type code comes from the stock app's code, not yet from our own air test). |
+
 ## 2026-10-22 — Soft SQ: one 1–9 scale on the phone and the web
 
 | Backlog | Change | Files | Test |

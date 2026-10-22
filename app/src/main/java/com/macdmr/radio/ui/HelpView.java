@@ -205,7 +205,8 @@ public class HelpView extends LinearLayout {
         new Topic("Pages", "messages", Neo.GREEN, "Messages", "DMR text messages.",
             s("Sending", "Texts travel over the current DMR channel. Tap + and pick a contact or the channel's own call target, type, or tap the lightning button for a quick reply (the list is yours to edit), and send with the green button. On an analog channel the thread says so and nothing is sent."),
             s("Delivery", "Under each of your messages: green ✓✓ delivered means the other radio acknowledged it; amber ✓ sent means it went out without an acknowledgement, which is normal for many radios (the BTECH 6X2 among them) and the text still arrives; red ✖ means the radio could not send it."),
-            s("Receiving", "Incoming texts appear in their conversation and in the intercom's activity panel.")),
+            s("Receiving", "Incoming texts appear in their conversation and in the intercom's activity panel. A private text goes to the sender's conversation. A talkgroup text goes to the talkgroup's conversation, with the sender's name over each message, so a group chat stays one thread; the radio does not say which talkgroup a text was sent on, so (as in the stock app) it is the talkgroup of the channel you are on."),
+            s("Names", "Conversations show the contact's name; for a radio that is not in your contacts, the name and callsign from the RadioID list (Device), and for a talkgroup its contact name or TG and its number. SignalDeck Web's Messages page shows the same.")),
 
         new Topic("Pages", "device", Neo.GREEN, "Device", "Radio link, settings and tools.",
             s("Radio link", "The card at the top shows who owns the radio (green: this app, cyan: the stock app, amber: a problem) with the serial port and speed. Take over and Hand back move the radio between this app and the stock app."),

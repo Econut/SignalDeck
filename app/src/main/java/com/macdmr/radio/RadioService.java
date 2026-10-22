@@ -353,6 +353,15 @@ public class RadioService extends Service implements RadioEngine.Events {
     private RadioIdStore radioId;
     public RadioIdStore radioId() { return radioId; }
 
+    /** A talkgroup's contact name, or "TG 91". */
+    public String talkgroupName(int tg) { String n = store.contactName(tg, 1); return n != null && !n.isEmpty() ? n : "TG " + tg; }
+    /** Conversations with a name for everyone: contacts, then RadioID for radios, "TG n" for talkgroups. */
+    public java.util.List<ChannelStore.Conversation> conversations() {
+        java.util.List<ChannelStore.Conversation> l = store.conversations();
+        for (ChannelStore.Conversation cv : l) if (cv.name == null || cv.name.isEmpty()) cv.name = cv.type == 1 ? talkgroupName(cv.peer) : cv.type == 0 ? callerName(cv.peer) : "";
+        return l;
+    }
+
     /** Contacts first, then the RadioID register: "Name" or "W1AW Hiram"; empty when unknown. */
     public String callerName(int id) {
         if (id <= 0) return "";
@@ -1698,13 +1707,22 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile long pendingSmsId = -1;
 
     @Override public void sms(int type, int fromId, String text) {
-        int t = type == 3 ? 1 : type == 2 ? 2 : 0;                         // store with our contact-type codes
-        store.addMessage(fromId, t, false, text, 1);
-        String nm = t == 1 ? store.contactName(fromId, 1) : callerName(fromId);
-        CarMessages.dmr(this, fromId, t, nm, text);   // the phone and Android Auto (read aloud, voice reply)
-        history("sms", "✉ Text from " + fromId + ": " + (text.length() > 40 ? text.substring(0, 40) + "…" : text));
+        // 0x2D type: 1 = a talkgroup text, anything else private (the stock app's own reading, FetchSmsMessage/DmrManager.onSmsReceived).
+        // A talkgroup text does not say which talkgroup: like the stock app, it belongs to the current channel's talkgroup.
+        boolean group = type == 1;
+        ChannelStore.Channel cur = current;
+        int peer = fromId, sender = 0, t = 0;
+        if (group && cur != null && cur.isDigital() && cur.txContact > 0) { peer = cur.txContact; sender = fromId; t = 1; }
+        else if (group) t = 1;                                                // no talkgroup to file it under: the sender, marked as a group text
+        log("text received: type " + type + (group ? " (talkgroup " + peer + ")" : " (private)") + " from " + fromId);
+        store.addMessage(peer, t, false, text, 1, sender);
+        String who = callerName(fromId); if (who == null || who.isEmpty()) who = String.valueOf(fromId);
+        String nm = t == 1 ? talkgroupName(peer) + (sender > 0 ? " \u00B7 " + who : "") : who;
+        CarMessages.dmr(this, peer, t, nm, text);   // the phone and Android Auto (read aloud, voice reply to the thread)
+        history("sms", "✉ Text from " + who + (sender > 0 ? " on " + talkgroupName(peer) : "") + ": " + (text.length() > 40 ? text.substring(0, 40) + "…" : text));
         onFormText(nm == null || nm.isEmpty() ? String.valueOf(fromId) : nm, text, "DMR");
-        ui.post(() -> { for (Listener l : listeners) l.onSms(fromId, t, text); });
+        final int threadPeer = peer, threadType = t;                         // the open thread (the talkgroup for a group text) refreshes
+        ui.post(() -> { for (Listener l : listeners) l.onSms(threadPeer, threadType, text); });
     }
 
     /** Status 8 = the other radio acknowledged; 9 = no acknowledgement came back (the text usually still arrived — a BTECH 6X2 shows it and never acks, 2026-10-17). */

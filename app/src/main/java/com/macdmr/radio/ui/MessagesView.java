@@ -86,7 +86,7 @@ public class MessagesView extends LinearLayout implements RadioService.Listener 
 
     public void reload() {
         if (svc == null) return;
-        convs.clear(); convs.addAll(svc.store().conversations()); convAdapter.notifyDataSetChanged();
+        convs.clear(); convs.addAll(svc.conversations()); convAdapter.notifyDataSetChanged();
         empty.setVisibility(convs.isEmpty() ? VISIBLE : GONE);
         Neo.headerSubtitle(header).setText(convs.isEmpty() ? "DMR TEXT" : (convs.size() + (convs.size() == 1 ? " conversation" : " conversations")).toUpperCase(java.util.Locale.US));
     }
@@ -237,6 +237,11 @@ public class MessagesView extends LinearLayout implements RadioService.Listener 
             ChannelStore.Message m = msgs.get(i);
             LinearLayout row = new LinearLayout(c); row.setOrientation(VERTICAL); row.setGravity(m.outgoing ? Gravity.END : Gravity.START);
             row.setPadding((int) (14 * d), (int) (5 * d), (int) (14 * d), (int) (5 * d));
+            if (!m.outgoing && m.sender > 0) {                                  // a talkgroup thread: who wrote it
+                String who = svc.callerName(m.sender);
+                TextView nm = Neo.text(c, who == null || who.isEmpty() ? String.valueOf(m.sender) : who, Neo.CYAN_LIGHT, 12.5f, Neo.ui(c)); nm.setPadding((int) (6 * d), 0, 0, (int) (2 * d));
+                row.addView(nm, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
+            }
             TextView b = Neo.text(c, m.text, Neo.TEXT, 16, Neo.uiSemi(c)); b.setMaxWidth((int) (270 * d)); b.setLineSpacing(0, 1.1f);
             android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
                     m.outgoing ? new int[] { 0xFF0F4258, 0xFF0A2C3C } : new int[] { 0xFF16222F, 0xFF101A25 });

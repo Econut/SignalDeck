@@ -37,7 +37,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
     }
 
     public static final class Contact { public long id; public String name = ""; public int number; public int type; }   // type 0 private, 1 group, 2 all
-    public static final class Message { public long id; public int peer, type; public boolean outgoing; public long ts; public String text; public int status; }   // status 0 pending 1 sent 2 failed
+    public static final class Message { public long id; public int peer, type; public boolean outgoing; public long ts; public String text; public int status; public int sender; }   // sender: who wrote a talkgroup text (0 = the peer)   // status 0 pending 1 sent 2 failed
     public static final class Conversation { public int peer, type; public String name, lastText; public long lastTs; public boolean outgoing; }
 
     public static final class Zone { public long id; public String name; public int[] numbers = new int[0]; }
@@ -76,6 +76,9 @@ public final class ChannelStore extends SQLiteOpenHelper {
         boolean hasNotes = false;
         try (Cursor c = db.rawQuery("PRAGMA table_info(channels)", null)) { while (c.moveToNext()) if ("notes".equals(c.getString(1))) hasNotes = true; }
         if (!hasNotes) db.execSQL("ALTER TABLE channels ADD COLUMN notes TEXT DEFAULT ''");
+        boolean hasSender = false;                                             // talkgroup texts: the thread is the talkgroup, each message keeps who wrote it
+        try (Cursor c = db.rawQuery("PRAGMA table_info(messages)", null)) { while (c.moveToNext()) if ("sender".equals(c.getString(1))) hasSender = true; }
+        if (!hasSender) db.execSQL("ALTER TABLE messages ADD COLUMN sender INTEGER DEFAULT 0");
     }
 
     /** A named talkgroup list (the module's TG lists): a set of talkgroups to drop into a channel's RX group list. */
@@ -399,15 +402,18 @@ public final class ChannelStore extends SQLiteOpenHelper {
     public void deleteContact(Contact ct) { getWritableDatabase().delete("contacts", "_id=?", new String[] { String.valueOf(ct.id) }); }
 
     // ---- messages ----
-    public long addMessage(int peer, int type, boolean outgoing, String text, int status) {
-        ContentValues v = new ContentValues(); v.put("peer", peer); v.put("type", type); v.put("outgoing", outgoing ? 1 : 0); v.put("ts", System.currentTimeMillis()); v.put("text", text); v.put("status", status);
+    public long addMessage(int peer, int type, boolean outgoing, String text, int status) { return addMessage(peer, type, outgoing, text, status, 0); }
+    public long addMessage(int peer, int type, boolean outgoing, String text, int status, int sender) {
+        ContentValues v = new ContentValues(); v.put("peer", peer); v.put("type", type); v.put("outgoing", outgoing ? 1 : 0); v.put("ts", System.currentTimeMillis()); v.put("text", text); v.put("status", status); v.put("sender", sender);
         return getWritableDatabase().insert("messages", null, v);
     }
+    /** Bench only: remove the texts injected by DIAG smsbench. */
+    public int deleteBenchMessages() { return getWritableDatabase().delete("messages", "text LIKE '[bench] %'", null); }
     public void setMessageStatus(long id, int status) { ContentValues v = new ContentValues(); v.put("status", status); getWritableDatabase().update("messages", v, "_id=?", new String[] { String.valueOf(id) }); }
     public List<Message> messages(int peer, int type) {
         List<Message> out = new ArrayList<>();
         try (Cursor c = getReadableDatabase().query("messages", null, "peer=? AND type=?", new String[] { String.valueOf(peer), String.valueOf(type) }, null, null, "ts")) {
-            while (c.moveToNext()) { Message m = new Message(); m.id = c.getLong(0); m.peer = c.getInt(1); m.type = c.getInt(2); m.outgoing = c.getInt(3) == 1; m.ts = c.getLong(4); m.text = c.getString(5); m.status = c.getInt(6); out.add(m); }
+            while (c.moveToNext()) { Message m = new Message(); m.id = c.getLong(0); m.peer = c.getInt(1); m.type = c.getInt(2); m.outgoing = c.getInt(3) == 1; m.ts = c.getLong(4); m.text = c.getString(5); m.status = c.getInt(6); int si = c.getColumnIndex("sender"); m.sender = si >= 0 ? c.getInt(si) : 0; out.add(m); }
         }
         return out;
     }
