@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-23 — SSTV: combine receptions of the same picture
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | **Combine** in the SSTV gallery (phone: long-press a picture, tap the others, Combine; SignalDeck Web: Select, Combine): two or more receptions of the same picture (the ISS repeats its slides through an event) are lined up on the one with the most lines (row and pixel shift, found on the blurred brightness) and averaged pixel by pixel (the median from three on), so the noise of weak passes averages out; pictures that do not match are left out and said so; the result is saved beside them as `SSTV_combined_<time>_<n>x.png`. `/api/sstv/combine`. Help updated. | `pkt/SstvStack.java`, `SstvCombine.java`, `ui/SstvScreen.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java` | Host: SstvStackTest (alignment exact: −2 px, 3 rows; three noisy receptions: noise 56.6 → 39.7; a different picture left out). Real ISS pictures (2026-10-23, slide 4/12 received at 04:10 and 07:21): the combination reads clearly better ("ARISS antenna" title, the antenna photo, the footer); the same on the phone through the web API. |
+
 ## 2026-10-23 — The new intercom look is the default; the classic page fits with a mode bar; SSTV backfill
 
 | Backlog | Change | Files | Test |

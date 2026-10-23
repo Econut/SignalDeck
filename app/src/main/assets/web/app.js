@@ -313,7 +313,7 @@ async function sharePics(list) {
   toast(window.isSecureContext ? 'This browser cannot share pictures: use Download' : 'Sharing needs the secure address (https, port 8443, see Settings): use Download here');
 }
 // selecting several pictures (Select on the gallery)
-function selCount() { const n = S.sel ? S.sel.size : 0; $('selCount').textContent = n + ' selected'; $('selShare').disabled = $('selDel').disabled = n === 0; }
+function selCount() { const n = S.sel ? S.sel.size : 0; $('selCount').textContent = n + ' selected'; $('selShare').disabled = $('selDel').disabled = n === 0; $('selComb').disabled = n < 2; }
 function toggleSel(a) { const n = S.pictures[+a.dataset.i].name; if (S.sel.has(n)) S.sel.delete(n); else S.sel.add(n); a.classList.toggle('sel', S.sel.has(n)); selCount(); }
 function setSelecting(on) {
   S.sel = on ? new Set() : null; $('gallery').classList.toggle('selecting', on); $('selBar').classList.toggle('hidden', !on); $('picSelect').classList.toggle('hidden', on);
@@ -323,6 +323,10 @@ $('picSelect').onclick = () => setSelecting(true);
 $('selDone').onclick = () => setSelecting(false);
 $('selAll').onclick = () => { const all = (S.pictures || []).length && S.sel.size === S.pictures.length; S.sel = new Set(all ? [] : (S.pictures || []).map(p => p.name)); $('gallery').querySelectorAll('a[data-i]').forEach(a => a.classList.toggle('sel', S.sel.has(S.pictures[+a.dataset.i].name))); selCount(); };
 $('selShare').onclick = () => sharePics((S.pictures || []).filter(p => S.sel.has(p.name)));
+$('selComb').onclick = async () => {
+  const names = [...S.sel]; if (names.length < 2) return;
+  try { const j = await api('sstv/combine', { names }); toast(j.message); setSelecting(false); loadSstv(); } catch (e) { toast(e.message); }
+};
 $('selDel').onclick = async () => {
   const names = [...S.sel]; if (!names.length) return;
   if (!await ask(names.length === 1 ? 'Delete this picture from the phone? This cannot be undone.' : 'Delete these ' + names.length + ' pictures from the phone? This cannot be undone.')) return;

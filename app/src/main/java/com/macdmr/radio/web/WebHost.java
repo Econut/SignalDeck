@@ -670,6 +670,18 @@ public final class WebHost {
                 }
                 return ok(new JSONObject().put("pictures", a));
             }
+            case "/api/sstv/combine": if (!post) break; {                        // {names: [...]}: several receptions of one picture into a new one
+                JSONArray names = b.optJSONArray("names"); if (names == null || names.length() < 2) return WebServer.Response.error(400, "Select two or more pictures");
+                java.util.List<File> fs = new java.util.ArrayList<>();
+                for (int i = 0; i < names.length(); i++) {
+                    String n = names.optString(i, "");
+                    if (n.isEmpty() || n.contains("/") || n.contains("\\") || n.contains("..")) return WebServer.Response.error(400, "Bad name");
+                    File f = new File(sstvDir(), n); if (f.isFile()) fs.add(f);
+                }
+                com.macdmr.radio.SstvCombine.Result cr = com.macdmr.radio.SstvCombine.combine(fs);
+                if (cr.file == null) return WebServer.Response.error(409, cr.message);
+                return ok(new JSONObject().put("message", cr.message).put("name", cr.file.getName()));
+            }
             case "/api/sstv/delete": if (!post) break; {                         // {names: [...]}: received pictures in Download/DMR/SSTV only
                 JSONArray names = b.optJSONArray("names"); if (names == null || names.length() == 0) return WebServer.Response.error(400, "No pictures given");
                 int gone = 0;

@@ -68,6 +68,9 @@ public final class SstvScreen extends ModeScreen {
         selBar = new LinearLayout(c); selBar.setGravity(Gravity.CENTER_VERTICAL); selBar.setVisibility(GONE); selBar.setPadding(0, 0, 0, dp(8));
         selCount = Neo.text(c, "", Neo.CYAN_LIGHT, 15, Neo.uiMedium(c)); selBar.addView(selCount, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         TextView sShare = Neo.button(c, "Share", "send", Neo.CYAN), sDel = Neo.button(c, "Delete", "stop", Neo.RED), sDone = Neo.button(c, "Done", "check", Neo.MUTED);
+        TextView sComb = Neo.button(c, "Combine", "plus", Neo.GREEN);
+        sComb.setOnClickListener(v -> combine(selectedFiles()));
+        { LayoutParams l = new LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)); l.leftMargin = dp(6); selBar.addView(sComb, l); }
         for (TextView t : new TextView[] { sShare, sDel, sDone }) { LayoutParams l = new LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)); l.leftMargin = dp(6); selBar.addView(t, l); }
         sShare.setOnClickListener(v -> { java.util.List<File> fs = selectedFiles(); if (fs.isEmpty()) toast("Tap pictures to select them"); else share(fs); });
         sDel.setOnClickListener(v -> { java.util.List<File> fs = selectedFiles(); if (fs.isEmpty()) toast("Tap pictures to select them"); else delete(fs, null); });
@@ -197,6 +200,15 @@ public final class SstvScreen extends ModeScreen {
         if (!selected.remove(f.getName())) selected.add(f.getName());
         for (java.util.Map.Entry<String, ImageView> e : thumbs.entrySet()) mark(e.getValue(), selected.contains(e.getKey()));
         selCount.setText(selected.size() == 1 ? "1 selected" : selected.size() + " selected");
+    }
+    /** Several receptions of the same picture (the ISS repeats its slides) into one cleaner picture, saved beside them. */
+    private void combine(final java.util.List<File> fs) {
+        if (fs.size() < 2) { toast("Select two or more receptions of the same picture"); return; }
+        toast("Combining " + fs.size() + " pictures\u2026");
+        new Thread(() -> {
+            final com.macdmr.radio.SstvCombine.Result r = com.macdmr.radio.SstvCombine.combine(fs);
+            post(() -> { toast(r.message); if (r.file != null) { endSelect(); refresh(); view(r.file); } });
+        }, "sstv-combine").start();
     }
     private void endSelect() {
         selected = null; if (selBar != null) selBar.setVisibility(GONE);

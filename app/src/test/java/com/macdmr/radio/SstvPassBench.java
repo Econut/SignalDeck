@@ -49,4 +49,24 @@ public class SstvPassBench {
         return c == 0 ? 0 : s / c;
     }
     static double luma(int p) { return 0.299 * ((p >> 16) & 255) + 0.587 * ((p >> 8) & 255) + 0.114 * (p & 255); }
+
+    /** Bench: combine STACK_IN (PPM files, separated by ;) into STACK_OUT (PPM) with SstvStack. */
+    @Test public void stackPictures() throws Exception {
+        String in = System.getenv("STACK_IN"), out = System.getenv("STACK_OUT");
+        assumeTrue(in != null && out != null);
+        java.util.List<int[]> pics = new java.util.ArrayList<>();
+        for (String f : in.split(";")) {
+            byte[] b = java.nio.file.Files.readAllBytes(new File(f).toPath()); int off = 0, fields = 0;
+            while (fields < 4) { while (Character.isWhitespace(b[off])) off++; while (!Character.isWhitespace(b[off])) off++; fields++; } off++;
+            int[] p = new int[320 * 240]; for (int k = 0; k < p.length; k++) p[k] = 0xFF000000 | (b[off + 3 * k] & 255) << 16 | (b[off + 3 * k + 1] & 255) << 8 | (b[off + 3 * k + 2] & 255);
+            pics.add(p);
+        }
+        com.macdmr.radio.pkt.SstvStack.Result r = com.macdmr.radio.pkt.SstvStack.combine(pics, 320, 240, 0.3);
+        System.out.println("used " + r.used + ", dy " + java.util.Arrays.toString(r.dy) + ", dx " + java.util.Arrays.toString(r.dx) + ", aligned " + java.util.Arrays.toString(r.aligned));
+        try (java.io.FileOutputStream o = new java.io.FileOutputStream(out)) {
+            o.write("P6\n320 240\n255\n".getBytes()); byte[] px = new byte[320 * 240 * 3];
+            for (int k = 0; k < 320 * 240; k++) { px[3 * k] = (byte) (r.argb[k] >> 16); px[3 * k + 1] = (byte) (r.argb[k] >> 8); px[3 * k + 2] = (byte) r.argb[k]; }
+            o.write(px);
+        }
+    }
 }
