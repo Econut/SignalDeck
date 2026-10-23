@@ -235,9 +235,9 @@
           <p id="sstvSendNote" class="muted small">Sends on the current analog channel. The radio stops any transmission after 30 seconds, so only these short modes are offered.</p>
         </div>
         <div class="panel"><div class="row between"><span class="label">PICTURES</span><button class="btn small-btn" id="picSelect">Select</button></div>
-          <div id="selBar" class="sel-bar hidden"><span id="selCount" class="mono">0 selected</span><div class="row"><button class="btn small-btn" id="selAll">All</button><button class="btn small-btn" id="selComb" title="Combine receptions of the same picture">Combine</button><button class="btn small-btn" id="selShare">Share</button><button class="btn small-btn danger" id="selDel">Delete</button><button class="btn small-btn" id="selDone">Done</button></div></div>
+          <div id="selBar" class="sel-bar hidden"><span id="selCount" class="mono">0 selected</span><div class="row wrap"><button class="btn small-btn" id="selAll">All</button><button class="btn small-btn" id="selComb" title="Combine receptions of the same picture">Combine</button><button class="btn small-btn" id="selShare">Share</button><button class="btn small-btn danger" id="selDel">Delete</button><button class="btn small-btn" id="selDone">Done</button></div></div>
           <div id="gallery" class="gallery"></div></div>
-        <div class="panel"><div class="row between"><span class="label">DECODE A RECORDING</span><div class="row"><select id="decMode" aria-label="What to look for"><option value="sstv">SSTV pictures (every mode)</option><option value="aprs">APRS packets</option></select><button class="btn small-btn" id="decUpload">Upload…</button><input type="file" id="decFile" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.opus,.flac" hidden><button class="btn small-btn" id="decRefresh">Refresh</button></div></div>
+        <div class="panel"><div class="row between wrap"><span class="label">DECODE A RECORDING</span><div class="row wrap"><select id="decMode" aria-label="What to look for"><option value="sstv">SSTV pictures (every mode)</option><option value="aprs">APRS packets</option></select><button class="btn small-btn" id="decUpload">Upload…</button><input type="file" id="decFile" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.opus,.flac" hidden><button class="btn small-btn" id="decRefresh">Refresh</button></div></div>
           <p class="muted small">A pass recording (Satellite passes → Record each pass), a REC recording, or one from anywhere (Upload…: WAV, MP3, M4A, OGG, FLAC, up to 200 MB), decoded on the phone in the background, faster than it plays; the radio is not used. SSTV finds every mode from its header (Robot, Martin, Scottie, PD…) and Robot 36 pictures whose header was lost. Pictures join the gallery, packets are listed below.</p>
           <div id="decJob" class="dec-job hidden"><div class="row between"><b id="decName"></b><span id="decPct" class="mono"></span></div><div class="pbar"><i id="decBar"></i></div><div id="decState" class="muted small"></div><pre id="decOut" class="dec-out"></pre><button class="btn small-btn danger" id="decStop">Stop</button></div>
           <div id="decList" class="list small"></div>
@@ -281,6 +281,16 @@
         <div class="row between pic-top"><span class="label">SSTV PICTURE</span><span id="picCount" class="chip dim"></span></div>
         <div class="pic-stage"><button type="button" class="pic-nav" id="picPrev" aria-label="Previous picture">‹</button><img id="picImg" alt=""><button type="button" class="pic-nav" id="picNext" aria-label="Next picture">›</button></div>
         <div class="row between pic-bottom"><span id="picWhen" class="muted"></span><div class="row"><a class="btn small-btn" id="picDl" href="#" download>Download</a><button type="button" class="btn small-btn" id="picShare">Share</button><button type="button" class="btn small-btn danger" id="picDel">Delete</button></div></div>
+      </div>
+    </div>
+    <div id="combDlg" class="dlg hidden" role="dialog" aria-modal="true" aria-labelledby="combTitle">
+      <div class="dlg-card comb-card"><button type="button" class="dlg-x" id="combX" aria-label="Close">&times;</button>
+        <h3 id="combTitle">Combine pictures</h3>
+        <img id="combImg" class="comb-img" alt="Combined picture">
+        <p id="combNote" class="sub"></p>
+        <div class="row comb-pick"><span>Picture</span><select id="combSel"></select><label class="comb-use"><input type="checkbox" id="combUse"> in</label></div>
+        <div class="row comb-nudge"><button type="button" class="btn small-btn" id="combUp" title="Move up a line (Shift: 8)">&#9650;</button><button type="button" class="btn small-btn" id="combDown" title="Move down a line (Shift: 8)">&#9660;</button><button type="button" class="btn small-btn" id="combLeft" title="Move left a pixel (Shift: 8)">&#9664;</button><button type="button" class="btn small-btn" id="combRight" title="Move right a pixel (Shift: 8)">&#9654;</button><span id="combShift" class="mono"></span><button type="button" class="btn small-btn" id="combAuto">Automatic</button></div>
+        <div class="row ask-btns"><button type="button" class="btn" id="combNo">Cancel</button><button type="button" class="btn" id="combSave">Save</button></div>
       </div>
     </div>
     <div id="askDlg" class="dlg hidden" role="alertdialog" aria-modal="true" aria-labelledby="askText">

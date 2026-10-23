@@ -24,25 +24,49 @@ public final class SstvCombine {
     /** The new picture's file (null on failure) and a line for the user. */
     public static final class Result { public final File file; public final String message; Result(File f, String m) { file = f; message = m; } }
 
-    public static Result combine(List<File> files) {
-        if (files.size() < 2) return new Result(null, "Select at least two receptions of the same picture");
+    /** The selected pictures, loaded once, with their line-up (automatic first, then as the user nudges it). */
+    public static final class Plan {
+        public final List<File> files; public final List<int[]> pixels; public final int w, h;
+        public int ref; public int[] dy, dx; public boolean[] use, sure;
+        Plan(List<File> f, List<int[]> p, int w, int h) { files = f; pixels = p; this.w = w; this.h = h; }
+        /** The combination as it stands (ARGB). */
+        public int[] render() { return SstvStack.place(pixels, w, h, dy, dx, use).argb; }
+        public int used() { int n = 0; for (boolean b : use) if (b) n++; return n; }
+        /** Pictures whose automatic line-up is a guess (1-based, for the user), empty when all are clear. */
+        public String unsure() { StringBuilder b = new StringBuilder(); for (int i = 0; i < sure.length; i++) if (use[i] && !sure[i]) b.append(b.length() == 0 ? "" : ", ").append(i + 1); return b.toString(); }
+    }
+
+    /** Load the pictures and line them up automatically; null with the reason in {@code err[0]}. */
+    public static Plan plan(List<File> files, String[] err) {
+        if (files.size() < 2) { err[0] = "Select at least two receptions of the same picture"; return null; }
         List<int[]> px = new ArrayList<>(); int w = -1, h = -1;
         for (File f : files) {
             Bitmap b = BitmapFactory.decodeFile(f.getAbsolutePath());
-            if (b == null) return new Result(null, "Could not read " + f.getName());
+            if (b == null) { err[0] = "Could not read " + f.getName(); return null; }
             if (w < 0) { w = b.getWidth(); h = b.getHeight(); }
-            else if (b.getWidth() != w || b.getHeight() != h) { b.recycle(); return new Result(null, "The pictures are different sizes (different SSTV modes): they cannot be combined"); }
+            else if (b.getWidth() != w || b.getHeight() != h) { b.recycle(); err[0] = "The pictures are different sizes (different SSTV modes): they cannot be combined"; return null; }
             int[] a = new int[w * h]; b.getPixels(a, 0, w, 0, 0, w, h); b.recycle(); px.add(a);
         }
+        Plan p = new Plan(files, px, w, h);
         SstvStack.Result r = SstvStack.combine(px, w, h, 0.3);
-        if (r.used < 2) return new Result(null, "These do not look like the same picture: nothing to combine");
-        Bitmap out = Bitmap.createBitmap(r.argb, w, h, Bitmap.Config.ARGB_8888);
-        File dir = files.get(0).getParentFile();
-        File f = new File(dir, "SSTV_combined_" + new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new java.util.Date()) + "_" + r.used + "x.png");
+        p.ref = r.ref; p.dy = r.dy.clone(); p.dx = r.dx.clone(); p.use = r.aligned.clone(); p.sure = r.sure.clone();
+        return p;
+    }
+
+    /** Save the plan's combination beside the pictures. */
+    public static Result save(Plan p) {
+        if (p.used() < 2) return new Result(null, "Only one picture is in: nothing to combine");
+        Bitmap out = Bitmap.createBitmap(p.render(), p.w, p.h, Bitmap.Config.ARGB_8888);
+        File f = new File(p.files.get(0).getParentFile(), "SSTV_combined_" + new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new java.util.Date()) + "_" + p.used() + "x.png");
         try (FileOutputStream o = new FileOutputStream(f)) { out.compress(Bitmap.CompressFormat.PNG, 100, o); }
         catch (Exception e) { return new Result(null, "Could not save: " + e.getMessage()); }
         finally { out.recycle(); }
-        int left = files.size() - r.used;
-        return new Result(f, "Combined " + r.used + " receptions" + (left > 0 ? " (" + left + " left out: a different picture)" : "") + " → " + f.getName());
+        return new Result(f, "Combined " + p.used() + " pictures → " + f.getName());
+    }
+
+    /** PNG bytes of the combination as it stands (the web preview). */
+    public static byte[] png(Plan p) {
+        Bitmap out = Bitmap.createBitmap(p.render(), p.w, p.h, Bitmap.Config.ARGB_8888);
+        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream(); out.compress(Bitmap.CompressFormat.PNG, 100, o); out.recycle(); return o.toByteArray();
     }
 }

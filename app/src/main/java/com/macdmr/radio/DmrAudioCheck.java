@@ -40,6 +40,8 @@ public final class DmrAudioCheck {
         public double rms = -1;                         // of what arrived during calls (-1 = not measured)
         public boolean muted, mediaMode, rxAudioOn = true;
         public boolean monTested; public long monPcm; public double monRms = -1;
+        public long monAckMs = -1;                     // when the radio acknowledged MON (ms after asking), -1 = never (or MON was already on)
+        public boolean monUnanswered;                  // the check asked for MON and the radio never answered (no ack, no refusal)
         public boolean squelchStuck; public int closedBy = -1;      // after MON off the squelch stayed open with no signal; which step closed it (0 none)   // analog: 10 s with the squelch held open (MON): receiver noise must arrive
         public int musicVolume = -1, musicMax = -1;
         public String output = "";                      // where media plays (speaker, Bluetooth …)
@@ -62,6 +64,12 @@ public final class DmrAudioCheck {
         if (f.audioError != null) { v.add("Receive audio did not start: " + f.audioError + ". Please send this report."); return v; }
         String rx = f.digitalChannel ? "call" : "reception";
         if (f.monTested) {                                         // analog: the squelch was held open, so receiver noise had to arrive whatever was on the air
+            if (f.monPcm == 0 && f.monUnanswered && !f.monRefused) {
+                v.add("The radio did not answer the MON command (SignalDeck sent it four times), so the squelch stayed closed for the first part and nothing could be measured there."
+                        + (f.pcmDuringCalls > 0 ? " Receptions in the second part did bring audio, so receive audio works on this phone: only MON did not switch on." : "")
+                        + " Run the check again after a few seconds on the channel; please send this report if MON keeps failing.");
+                return v;
+            }
             if (f.monPcm == 0 && f.monRefused) {
                 v.add("The radio refused to switch MON on (it answered the request with a refusal, also after three retries), so the squelch never opened for the first part. "
                         + "This happens right after many quick channel changes: wait a few seconds on the channel and run the check again. Please send this report if it keeps happening.");
@@ -186,6 +194,10 @@ public final class DmrAudioCheck {
             try {
                 long monAsked = System.currentTimeMillis();
                 if (!wasMon) svc.setMonitor(true);
+                // wait for the radio to acknowledge MON (resent automatically after 1.5 s without an answer), at most 6 s
+                while (!wasMon && svc.monAckAt() < monAsked && System.currentTimeMillis() - monAsked < 6000) Thread.sleep(100);
+                f.monAckMs = svc.monAckAt() >= monAsked ? svc.monAckAt() - monAsked : -1;
+                f.monUnanswered = !wasMon && f.monAckMs < 0;
                 Thread.sleep(800);                                                // the squelch opens
                 try { mc = new ClipRecorder(monFile, 10_000); svc.recordClip(mc, false); } catch (Throwable ignored) { }
                 long m0 = svc.rxAudioBytes(), mt = System.currentTimeMillis();
@@ -260,7 +272,7 @@ public final class DmrAudioCheck {
         StringBuilder out = new StringBuilder();
         out.append("verdict:\n"); for (String line : verdict(f)) out.append("  ").append(line).append('\n');
         out.append('\n').append(sys).append('\n').append(au).append('\n').append(chs).append('\n');
-        if (f.monTested) out.append(String.format(Locale.US, "part 1, squelch held open (MON) 10 s: %d audio bytes%s\n", f.monPcm, monStats.isEmpty() ? "" : " · level: " + monStats)).append("after MON off:\n").append(sqProbe);
+        if (f.monTested) out.append(String.format(Locale.US, "part 1, squelch held open (MON) 10 s: %s · %d audio bytes%s\n", f.monAckMs >= 0 ? "MON acknowledged after " + f.monAckMs + " ms" : "MON not acknowledged by the radio", f.monPcm, monStats.isEmpty() ? "" : " · level: " + monStats)).append("after MON off:\n").append(sqProbe);
         out.append(String.format(Locale.US, (f.monTested ? "part 2, " : "") + "minute: receiving %d of %d s · %d reception(s) · %d caller report(s) · audio %d bytes in total, %d during receptions%s\n",
                 heard, seconds, f.receptions, f.callerReports, f.pcmTotal, f.pcmDuringCalls, clipStats.isEmpty() ? "" : " · level of what arrived while receiving: " + clipStats));
         out.append("signal each second (* = receiving): ").append(rs.toString().trim()).append('\n');

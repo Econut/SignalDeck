@@ -1097,8 +1097,21 @@ public class RadioService extends Service implements RadioEngine.Events {
     public long monRefusedAt() { return monRefusedAt; }
     public void setMonitor(final boolean on) {
         monitorOn = on; monRetries = 0;
-        worker.execute(() -> { try { engine.setMonitor(on); } catch (IOException e) { log("monitor: " + e); } });
+        sendMonitor(on);
         pushModes();
+    }
+    /** When the radio last acknowledged MON (0x2F), and when it was last sent: the Xplore 1 sometimes does not answer at all. */
+    private volatile long monAckAt, monSentAt;
+    public long monAckAt() { return monAckAt; }
+    /** Send MON and check that the radio answers within 1.5 s; no answer: send again (3 times), then warn. A refusal is retried in ack(). */
+    private void sendMonitor(final boolean want) {
+        worker.execute(() -> { try { monSentAt = System.currentTimeMillis(); engine.setMonitor(want); } catch (IOException e) { log("monitor: " + e); } });
+        final long asked = System.currentTimeMillis();
+        ui.postDelayed(() -> {
+            if (monitorOn != want || monAckAt >= asked) return;            // answered (or MON changed meanwhile)
+            if (monRetries < 3) { monRetries++; log("MON not answered, sending again (" + monRetries + ")"); sendMonitor(want); }
+            else { monRefusedAt = System.currentTimeMillis(); history("warn", "\u26A0 The radio did not answer MON: switch it again in a few seconds"); }
+        }, 1500);
     }
 
     public void setRecord(boolean on) { recordOn = on; if (!on) finishRecording(); pushModes(); }
@@ -1725,8 +1738,10 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     @Override public void ack(int cmd, boolean ok) {
         if (!ok) log(String.format(Locale.US, "MCU rejected 0x%02X", cmd));
+        if (cmd == RadioEngine.CMD_MONITOR && ok) monAckAt = System.currentTimeMillis();
         if (cmd == RadioEngine.CMD_MONITOR && !ok) {                          // seen on the Xplore 1 right after a burst of channel changes: try again
-            if (monRetries < 3) { monRetries++; final boolean want = monitorOn; ui.postDelayed(() -> { if (monitorOn == want) worker.execute(() -> { try { engine.setMonitor(want); } catch (IOException e) { log("monitor: " + e); } }); }, 1500); log("MON refused, retry " + monRetries); }
+            monAckAt = System.currentTimeMillis();                            // an answer (a refusal): the no-answer check stands down
+            if (monRetries < 3) { monRetries++; final boolean want = monitorOn; ui.postDelayed(() -> { if (monitorOn == want) sendMonitor(want); }, 1500); log("MON refused, retry " + monRetries); }
             else { monRefusedAt = System.currentTimeMillis(); history("warn", "\u26A0 The radio refused MON (busy after channel changes?): wait a few seconds and switch it again"); }
         }
         if (cmd == RadioEngine.CMD_SET_ANALOG && ok && pendingPostWrite != null) { final Runnable r = pendingPostWrite; ui.postDelayed(r, 200); }

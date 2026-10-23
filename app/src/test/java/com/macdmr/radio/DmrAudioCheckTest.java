@@ -32,6 +32,11 @@ public class DmrAudioCheckTest {
         DmrAudioCheck.Facts f = ok(); f.uartPcm = true; f.digitalChannel = false; f.monTested = true; f.monPcm = 0; f.monRefused = true;
         String s = v(f); assertTrue(s, s.contains("refused to switch MON on") && !s.contains("not sending audio")); assertEquals(1, DmrAudioCheck.verdict(f).size());
     }
+    @Test public void monNotAnsweredIsNotBlamedOnTheAudioPath() {            // Xplore 1 report 2026-10-23: MON sent once, no answer, 0 bytes in part 1
+        DmrAudioCheck.Facts f = ok(); f.uartPcm = true; f.digitalChannel = false; f.monTested = true; f.monPcm = 0; f.monUnanswered = true; f.pcmDuringCalls = 459918;
+        String s = v(f); assertTrue(s, s.contains("did not answer the MON command") && s.contains("receive audio works") && !s.contains("not sending audio"));
+        assertEquals(1, DmrAudioCheck.verdict(f).size());
+    }
     @Test public void radioNeverReportedACall() {
         DmrAudioCheck.Facts f = ok(); f.receptions = 0; f.callerReports = 0; f.pcmDuringCalls = 0;
         assertTrue(v(f).contains("RX group list"));

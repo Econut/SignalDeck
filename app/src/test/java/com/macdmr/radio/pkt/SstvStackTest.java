@@ -60,6 +60,7 @@ public class SstvStackTest {
         rec.add(reception(pic, 60, 240, -3, 0, 60, 3));       // partial, placed 3 rows off
         SstvStack.Result r = SstvStack.combine(rec, W, H, 0.3);
         assertEquals(3, r.used);
+        assertTrue("clear line-up", r.sure[1] && r.sure[2]);
         System.out.printf("alignment: picture 2 dy %d dx %d, picture 3 dy %d dx %d%n", r.dy[1], r.dx[1], r.dy[2], r.dx[2]);
         assertEquals("pixel shift of picture 2", -2, r.dx[1]); assertEquals("row shift of picture 3", 3, r.dy[2]);
         double single = rms(rec.get(0), pic, 100, 230), stacked = rms(r.argb, pic, 100, 230);
@@ -67,6 +68,14 @@ public class SstvStackTest {
         assertTrue("combining must lower the noise: " + single + " -> " + stacked, stacked < single * 0.75);
     }
 
+    @Test public void aThinStripIsMarkedUnsure() {                         // ISS 2026-10-23: a 33-row strip fooled the match; say so
+        int[] pic = picture(); List<int[]> rec = new ArrayList<>();
+        rec.add(reception(pic, 100, 240, 0, 0, 60, 1)); rec.add(reception(pic, 220, 240, 0, 0, 60, 2));
+        SstvStack.Result r = SstvStack.combine(rec, W, H, 0.3);
+        assertFalse("20 shared rows are not enough to be sure", r.sure[1]);
+        SstvStack.Result m = SstvStack.place(rec, W, H, new int[] { 0, -40 }, new int[] { 0, 0 }, new boolean[] { false, true });
+        assertEquals("placed by hand: the strip moved up 40 rows", rec.get(1)[230 * W + 50], m.argb[190 * W + 50]);
+    }
     @Test public void aDifferentPictureIsLeftOut() {
         int[] pic = picture(), other = new int[W * H];
         Random r = new Random(9); for (int i = 0; i < other.length; i++) other[i] = 0xFF000000 | (r.nextInt(200) + 20) << 8;

@@ -390,6 +390,9 @@ public final class WebHost {
         if (p == null) return o;
         android.graphics.Bitmap b = p.sstvLast();
         o.put("on", p.sstvRx()).put("status", p.sstvStatus()).put("picture", b != null).put("stamp", b == null ? "" : System.identityHashCode(b) + "_" + b.getGenerationId());
+        File[] fs = sstvDir().listFiles((d, n) -> n.endsWith(".png") || n.endsWith(".jpg"));   // changes when a picture is saved, combined or deleted
+        long newest = 0; if (fs != null) for (File f : fs) newest = Math.max(newest, f.lastModified());
+        o.put("gallery", (fs == null ? 0 : fs.length) + "_" + newest);
         return o;
     }
 
@@ -670,17 +673,29 @@ public final class WebHost {
                 }
                 return ok(new JSONObject().put("pictures", a));
             }
-            case "/api/sstv/combine": if (!post) break; {                        // {names: [...]}: several receptions of one picture into a new one
+            case "/api/sstv/combine": if (!post) break; {                        // {names, dy?, dx?, use?, save?}: line-up + preview, or save it
                 JSONArray names = b.optJSONArray("names"); if (names == null || names.length() < 2) return WebServer.Response.error(400, "Select two or more pictures");
                 java.util.List<File> fs = new java.util.ArrayList<>();
                 for (int i = 0; i < names.length(); i++) {
                     String n = names.optString(i, "");
                     if (n.isEmpty() || n.contains("/") || n.contains("\\") || n.contains("..")) return WebServer.Response.error(400, "Bad name");
-                    File f = new File(sstvDir(), n); if (f.isFile()) fs.add(f);
+                    File f = new File(sstvDir(), n); if (!f.isFile()) return WebServer.Response.error(404, "Not found: " + n); fs.add(f);
                 }
-                com.macdmr.radio.SstvCombine.Result cr = com.macdmr.radio.SstvCombine.combine(fs);
-                if (cr.file == null) return WebServer.Response.error(409, cr.message);
-                return ok(new JSONObject().put("message", cr.message).put("name", cr.file.getName()));
+                String[] err = { null };
+                com.macdmr.radio.SstvCombine.Plan pl = com.macdmr.radio.SstvCombine.plan(fs, err);
+                if (pl == null) return WebServer.Response.error(409, err[0]);
+                JSONArray jy = b.optJSONArray("dy"), jx = b.optJSONArray("dx"), ju = b.optJSONArray("use");
+                if (jy != null && jx != null && ju != null && jy.length() == fs.size() && jx.length() == fs.size() && ju.length() == fs.size())
+                    for (int i = 0; i < fs.size(); i++) { pl.dy[i] = Math.max(-pl.h, Math.min(pl.h, jy.optInt(i))); pl.dx[i] = Math.max(-pl.w / 2, Math.min(pl.w / 2, jx.optInt(i))); pl.use[i] = i == pl.ref || ju.optBoolean(i); }
+                if (b.optBoolean("save")) {
+                    com.macdmr.radio.SstvCombine.Result cr = com.macdmr.radio.SstvCombine.save(pl);
+                    if (cr.file == null) return WebServer.Response.error(409, cr.message);
+                    return ok(new JSONObject().put("message", cr.message).put("name", cr.file.getName()));
+                }
+                JSONArray oy = new JSONArray(), ox = new JSONArray(), ou = new JSONArray(), os = new JSONArray();
+                for (int i = 0; i < fs.size(); i++) { oy.put(pl.dy[i]); ox.put(pl.dx[i]); ou.put(pl.use[i]); os.put(pl.sure[i]); }
+                return ok(new JSONObject().put("ref", pl.ref).put("dy", oy).put("dx", ox).put("use", ou).put("sure", os)
+                        .put("png", android.util.Base64.encodeToString(com.macdmr.radio.SstvCombine.png(pl), android.util.Base64.NO_WRAP)));
             }
             case "/api/sstv/delete": if (!post) break; {                         // {names: [...]}: received pictures in Download/DMR/SSTV only
                 JSONArray names = b.optJSONArray("names"); if (names == null || names.length() == 0) return WebServer.Response.error(400, "No pictures given");

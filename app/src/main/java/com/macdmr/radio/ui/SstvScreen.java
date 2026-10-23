@@ -65,20 +65,21 @@ public final class SstvScreen extends ModeScreen {
 
         galleryTitle = Neo.caps(c, "RECEIVED"); galleryTitle.setPadding(0, dp(14), 0, dp(6));
         body.addView(galleryTitle);
-        selBar = new LinearLayout(c); selBar.setGravity(Gravity.CENTER_VERTICAL); selBar.setVisibility(GONE); selBar.setPadding(0, 0, 0, dp(8));
-        selCount = Neo.text(c, "", Neo.CYAN_LIGHT, 15, Neo.uiMedium(c)); selBar.addView(selCount, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        TextView sShare = Neo.button(c, "Share", "send", Neo.CYAN), sDel = Neo.button(c, "Delete", "stop", Neo.RED), sDone = Neo.button(c, "Done", "check", Neo.MUTED);
-        TextView sComb = Neo.button(c, "Combine", "plus", Neo.GREEN);
+        selBar = new LinearLayout(c); selBar.setOrientation(VERTICAL); selBar.setVisibility(GONE); selBar.setPadding(0, 0, 0, dp(8));   // the count, then the actions sharing the width
+        selCount = Neo.text(c, "", Neo.CYAN_LIGHT, 15, Neo.uiMedium(c)); selCount.setPadding(0, 0, 0, dp(6)); selBar.addView(selCount);
+        TextView sShare = Neo.button(c, "Share", null, Neo.CYAN), sDel = Neo.button(c, "Delete", null, Neo.RED), sDone = Neo.button(c, "Done", null, Neo.MUTED);
+        TextView sComb = Neo.button(c, "Combine", null, Neo.GREEN);
         sComb.setOnClickListener(v -> combine(selectedFiles()));
-        { LayoutParams l = new LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)); l.leftMargin = dp(6); selBar.addView(sComb, l); }
-        for (TextView t : new TextView[] { sShare, sDel, sDone }) { LayoutParams l = new LayoutParams(LayoutParams.WRAP_CONTENT, dp(40)); l.leftMargin = dp(6); selBar.addView(t, l); }
+        LinearLayout selRow = new LinearLayout(c); selBar.addView(selRow, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        TextView[] acts = { sComb, sShare, sDel, sDone };
+        for (int k = 0; k < acts.length; k++) { TextView t = acts[k]; t.setTextSize(14); t.setPadding(dp(4), 0, dp(4), 0); LayoutParams l = new LayoutParams(0, dp(42), 1f); if (k > 0) l.leftMargin = dp(6); selRow.addView(t, l); }
         sShare.setOnClickListener(v -> { java.util.List<File> fs = selectedFiles(); if (fs.isEmpty()) toast("Tap pictures to select them"); else share(fs); });
         sDel.setOnClickListener(v -> { java.util.List<File> fs = selectedFiles(); if (fs.isEmpty()) toast("Tap pictures to select them"); else delete(fs, null); });
         sDone.setOnClickListener(v -> endSelect());
-        body.addView(selBar);
         HorizontalScrollView hs = new HorizontalScrollView(c); hs.setHorizontalScrollBarEnabled(false);
         gallery = new LinearLayout(c); hs.addView(gallery);
         body.addView(hs);
+        selBar.setPadding(0, dp(8), 0, 0); body.addView(selBar);                  // below the pictures: they stay where the finger is
         content.addView(sv);
 
         LinearLayout r1 = buttonRow();
@@ -201,14 +202,71 @@ public final class SstvScreen extends ModeScreen {
         for (java.util.Map.Entry<String, ImageView> e : thumbs.entrySet()) mark(e.getValue(), selected.contains(e.getKey()));
         selCount.setText(selected.size() == 1 ? "1 selected" : selected.size() + " selected");
     }
-    /** Several receptions of the same picture (the ISS repeats its slides) into one cleaner picture, saved beside them. */
+    /**
+     * Several receptions of the same picture (the ISS repeats its slides) into one cleaner picture, saved beside them.
+     * Lined up automatically first; partial pictures are drawn at the bottom, so the user can move each one and leave
+     * one out, with a preview after every change, then Save.
+     */
     private void combine(final java.util.List<File> fs) {
         if (fs.size() < 2) { toast("Select two or more receptions of the same picture"); return; }
-        toast("Combining " + fs.size() + " pictures\u2026");
+        toast("Lining up " + fs.size() + " pictures\u2026");
         new Thread(() -> {
-            final com.macdmr.radio.SstvCombine.Result r = com.macdmr.radio.SstvCombine.combine(fs);
-            post(() -> { toast(r.message); if (r.file != null) { endSelect(); refresh(); view(r.file); } });
+            final String[] err = { null };
+            final com.macdmr.radio.SstvCombine.Plan pl = com.macdmr.radio.SstvCombine.plan(fs, err);
+            post(() -> { if (pl == null) toast(err[0]); else combineSheet(pl); });
         }, "sstv-combine").start();
+    }
+    private void combineSheet(final com.macdmr.radio.SstvCombine.Plan pl) {
+        LinearLayout body = Neo.sheetBody(c, "\uD83D\uDCFA  Combine " + pl.files.size() + " pictures");
+        final ImageView iv = new ImageView(c); iv.setAdjustViewBounds(true);
+        body.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        final TextView note = Neo.sheetHint(c, ""); body.addView(note);
+        final int[] cur = { pl.ref == 0 ? 1 : 0 }; final boolean[] manual = { false };
+        final TextView pick = Neo.button(c, "", null, Neo.CYAN), use = Neo.button(c, "", null, Neo.MUTED);
+        pick.setTextSize(13);
+        LinearLayout r1 = new LinearLayout(c); r1.setOrientation(HORIZONTAL);
+        r1.addView(pick, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)); LayoutParams ul = new LayoutParams(dp(104), LayoutParams.MATCH_PARENT); ul.leftMargin = dp(6); r1.addView(use, ul);
+        LayoutParams r1l = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); r1l.topMargin = dp(6); body.addView(r1, r1l);
+        LinearLayout r2 = new LinearLayout(c); r2.setOrientation(HORIZONTAL);
+        final TextView[] arrows = { Neo.button(c, "\u25B2", null, Neo.VIOLET), Neo.button(c, "\u25BC", null, Neo.VIOLET), Neo.button(c, "\u25C0", null, Neo.VIOLET), Neo.button(c, "\u25B6", null, Neo.VIOLET) };
+        final int[][] step = { { -1, 0 }, { 1, 0 }, { 0, 1 }, { 0, -1 } };      // rows, and the sideways shift (positive moves the picture left)
+        for (int k = 0; k < 4; k++) { LayoutParams l = new LayoutParams(0, dp(46), 1f); if (k > 0) l.leftMargin = dp(6); r2.addView(arrows[k], l); }
+        LayoutParams r2l = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); r2l.topMargin = dp(6); body.addView(r2, r2l);
+        final TextView auto = Neo.button(c, "Automatic", null, Neo.MUTED), save = Neo.button(c, "Save", "check", Neo.GREEN);
+        LinearLayout r3 = new LinearLayout(c); r3.setOrientation(HORIZONTAL);
+        r3.addView(auto, new LayoutParams(0, dp(48), 1f)); LayoutParams sl = new LayoutParams(0, dp(48), 1f); sl.leftMargin = dp(6); r3.addView(save, sl);
+        LayoutParams r3l = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); r3l.topMargin = dp(8); body.addView(r3, r3l);
+        final int[] auto0y = pl.dy.clone(), auto0x = pl.dx.clone(); final boolean[] auto0u = pl.use.clone();
+        final Runnable[] show = { null };
+        show[0] = () -> {
+            int i = cur[0]; boolean isRef = i == pl.ref;
+            String n = pl.files.get(i).getName().replace("SSTV_", "").replace(".png", "");
+            String where = isRef ? "reference" : !pl.use[i] ? "left out" : (pl.dy[i] < 0 ? "up " + -pl.dy[i] : "down " + pl.dy[i]) + " lines, " + (pl.dx[i] > 0 ? "left " + pl.dx[i] : "right " + -pl.dx[i]) + " px";
+            pick.setText("Picture " + (i + 1) + " of " + pl.files.size() + " \u25B8\n" + n + " \u00B7 " + where);
+            use.setText(isRef ? "Reference" : pl.use[i] ? "In" : "Left out"); use.setEnabled(!isRef); use.setAlpha(isRef ? 0.5f : 1f);
+            for (TextView a : arrows) { a.setEnabled(!isRef && pl.use[i]); a.setAlpha(!isRef && pl.use[i] ? 1f : 0.4f); }
+            String uns = pl.unsure();
+            note.setText((pl.used() < 2 ? "Only one picture is in. " : "") + (manual[0] ? "Placed by hand. " : uns.isEmpty() ? "Lined up automatically. " : "Not sure of the line-up of picture " + uns + ": check it and move it with the arrows. ")
+                    + "Partial pictures are drawn at the bottom, so a piece may belong higher up. Tap the picture name to choose which one the arrows move; long-press an arrow for 8 steps.");
+            save.setEnabled(pl.used() >= 2); save.setAlpha(pl.used() >= 2 ? 1f : 0.4f);
+            android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(pl.render(), pl.w, pl.h, android.graphics.Bitmap.Config.ARGB_8888);
+            iv.setImageBitmap(android.graphics.Bitmap.createScaledBitmap(bm, pl.w * 2, pl.h * 2, false)); bm.recycle();
+        };
+        pick.setOnClickListener(v -> { cur[0] = (cur[0] + 1) % pl.files.size(); show[0].run(); });
+        use.setOnClickListener(v -> { int i = cur[0]; if (i == pl.ref) return; pl.use[i] = !pl.use[i]; manual[0] = true; show[0].run(); });
+        for (int k = 0; k < 4; k++) {
+            final int kk = k;
+            arrows[k].setOnClickListener(v -> { int i = cur[0]; pl.dy[i] += step[kk][0]; pl.dx[i] += step[kk][1]; manual[0] = true; show[0].run(); });
+            arrows[k].setOnLongClickListener(v -> { int i = cur[0]; pl.dy[i] += 8 * step[kk][0]; pl.dx[i] += 8 * step[kk][1]; manual[0] = true; show[0].run(); return true; });
+        }
+        auto.setOnClickListener(v -> { System.arraycopy(auto0y, 0, pl.dy, 0, auto0y.length); System.arraycopy(auto0x, 0, pl.dx, 0, auto0x.length); System.arraycopy(auto0u, 0, pl.use, 0, auto0u.length); manual[0] = false; show[0].run(); });
+        final android.app.AlertDialog[] sheet = { null };
+        save.setOnClickListener(v -> {
+            com.macdmr.radio.SstvCombine.Result r = com.macdmr.radio.SstvCombine.save(pl);
+            toast(r.message); if (r.file != null) { if (sheet[0] != null) sheet[0].dismiss(); endSelect(); refresh(); view(r.file); }
+        });
+        show[0].run();
+        sheet[0] = Neo.showSheet(c, body);
     }
     private void endSelect() {
         selected = null; if (selBar != null) selBar.setVisibility(GONE);

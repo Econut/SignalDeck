@@ -4,6 +4,19 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-23 — SSTV Combine: preview with manual line-up; the web gallery shows new pictures by itself
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner: Combine on two pieces of the same slide (from different passes) "did not combine them". Partial pictures are drawn at the bottom (the decoder does not know which line it started on), so the row shift is unknown, and with a 33-row noisy strip the automatic match picked a doubtful shift (−54 rows, +6 px at the edge of its range) that put the strip inside rows the reference already had. Combine now opens a preview first (phone sheet and SignalDeck Web dialog): pick a picture, move it with ▲▼◀▶ (long-press / Shift: 8 steps), leave it out or put it back, Automatic, Save. On the phone the selection bar is now the count above four equal buttons (Combine, Share, Delete, Done; with Combine added Done was pushed off the screen) and sits below the pictures, so they stay put while selecting. The automatic line-up says when it is not sure (fewer than 24 shared rows, a sideways shift at the edge of the range, or a peak less than 0.05 above any other row shift). `/api/sstv/combine` returns the line-up and a preview unless `save` is set. Help updated. | `pkt/SstvStack.java`, `SstvCombine.java`, `ui/SstvScreen.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java` | Host: SstvStackTest (thin strip marked unsure; hand placement). Device (Armor, release build): the owner's pair (04:10:39 + 07:26:22) comes back from `/api/sstv/combine` with the strip marked not sure; a hand-placed save worked; SignalDeck Web dialog checked in headless Chrome at 1280 and 390 px (the SSTV page was 595 px wide on a phone because the "Decode a recording" row did not wrap: fixed); phone sheet opened from the gallery, a non-matching picture is left out. |
+| — | Owner: in SignalDeck Web a finished SSTV picture did not appear in the gallery until the page was reloaded: the page reloaded it only when the decoder switched off, and the continuous (ISS) decoder stays on. The SSTV status now carries a gallery stamp (count + newest file), and the page reloads the gallery whenever it changes (also after combining or deleting on the phone). The phone screen already followed the folder. | `web/WebHost.java`, `assets/web/app.js` | Device: the stamp changed from 13 to 14 pictures when a combination was saved. |
+
+## 2026-10-23 — MON is sent again when the radio does not answer (Xplore 1)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | Xplore 1 tester report (beta.15, 2026-10-23): in the radio audio check MON did not switch on. The log shows the radio never answered the MON command (`0x2F 01`, no acknowledgement and no refusal), so the squelch stayed closed and part 1 got 0 bytes, while the same check's second part had receptions with audio the evening before. SignalDeck now checks that the radio answers MON within 1.5 s and sends it again up to three times (then warns in the history), for the MON button and everything else that switches MON. Refused MON was already retried. The audio check waits for MON's acknowledgement before its 10 s and reports the answer time. If the radio never answers, the verdict says so instead of blaming the audio path. Help updated. | `RadioService.java`, `DmrAudioCheck.java`, `ui/HelpView.java` | Host: DmrAudioCheckTest (new case from the report). Not tested on an Xplore 1. Armor (release build): MON on and off each acknowledged within 7 ms, so nothing is resent. |
+
 ## 2026-10-23 — SSTV: combine receptions of the same picture
 
 | Backlog | Change | Files | Test |

@@ -94,7 +94,7 @@ function connect() {
   on('sat', d => { S.status.sat = d; renderModebar(); if (S.page === 'sat') renderSat(); });
   on('mode', d => { S.status.mode = d; renderModebar(); renderAprsState(); renderSstvState(); });
   on('aprs', () => { if (S.page === 'aprs') loadAprs(); });
-  on('sstv', d => { const old = S.status.sstv || {}; S.status.sstv = d; renderSstvState(); if (S.page === 'sstv' && (d.stamp !== old.stamp || d.on)) refreshLive(); if (S.page === 'sstv' && !d.on && old.on) loadSstv(); });
+  on('sstv', d => { const old = S.status.sstv || {}; S.status.sstv = d; renderSstvState(); if (S.page === 'sstv' && (d.stamp !== old.stamp || d.on)) refreshLive(); if (S.page === 'sstv' && ((!d.on && old.on) || (old.gallery !== undefined && d.gallery !== old.gallery))) loadSstv(); });
 }
 async function refresh() { try { S.status = await api('status'); renderStatus(); } catch (e) { } }
 function setConn(ok) { $('connDot').className = 'dot ' + (ok ? 'ok' : 'bad'); $('connText').textContent = ok ? 'Live' : 'Reconnecting…'; }
@@ -323,9 +323,45 @@ $('picSelect').onclick = () => setSelecting(true);
 $('selDone').onclick = () => setSelecting(false);
 $('selAll').onclick = () => { const all = (S.pictures || []).length && S.sel.size === S.pictures.length; S.sel = new Set(all ? [] : (S.pictures || []).map(p => p.name)); $('gallery').querySelectorAll('a[data-i]').forEach(a => a.classList.toggle('sel', S.sel.has(S.pictures[+a.dataset.i].name))); selCount(); };
 $('selShare').onclick = () => sharePics((S.pictures || []).filter(p => S.sel.has(p.name)));
+// combining: an automatic line-up first, then the user nudges each picture (partial pictures sit at the bottom, so the
+// row shift is unknown and a noisy strip can fool the automatic match), with a preview from the phone after every change
+const C = {};
+function combShow() {
+  const i = +$('combSel').value; $('combUse').checked = C.use[i]; $('combUse').disabled = i === C.ref;
+  ['combUp', 'combDown', 'combLeft', 'combRight'].forEach(id => $(id).disabled = i === C.ref || !C.use[i]);
+  $('combShift').textContent = i === C.ref ? 'reference' : (C.use[i] ? (C.dy[i] < 0 ? 'up ' + -C.dy[i] : 'down ' + C.dy[i]) + ' lines · ' + (C.dx[i] > 0 ? 'left ' + C.dx[i] : 'right ' + -C.dx[i]) + ' px' : 'left out');
+  const unsure = C.use.map((u, k) => u && !C.sure[k] ? k + 1 : 0).filter(Boolean);
+  $('combNote').textContent = (C.use.filter(Boolean).length < 2 ? 'Only one picture is in. ' : '')
+    + (C.manual ? 'Placed by hand.' : unsure.length ? 'Not sure of the line-up of picture ' + unsure.join(', ') + ': check it and move it with the arrows.' : 'Lined up automatically.')
+    + ' Partial pictures are drawn at the bottom, so a piece may belong higher up.';
+  $('combSave').disabled = C.use.filter(Boolean).length < 2;
+}
+async function combRun(manual) {
+  const body = { names: C.names }; if (manual) { body.dy = C.dy; body.dx = C.dx; body.use = C.use; }
+  try {
+    const j = await api('sstv/combine', body);
+    Object.assign(C, { ref: j.ref, dy: j.dy, dx: j.dx, use: j.use, manual }); if (!manual) C.sure = j.sure;
+    $('combImg').src = 'data:image/png;base64,' + j.png; combShow();
+  } catch (e) { toast(e.message); }
+}
+let combTimer = 0;
+function combNudge(ddy, ddx, e) { const i = +$('combSel').value, k = e && e.shiftKey ? 8 : 1; C.dy[i] += ddy * k; C.dx[i] += ddx * k; combShow(); clearTimeout(combTimer); combTimer = setTimeout(() => combRun(true), 150); }
+$('combUp').onclick = e => combNudge(-1, 0, e); $('combDown').onclick = e => combNudge(1, 0, e);
+$('combLeft').onclick = e => combNudge(0, 1, e); $('combRight').onclick = e => combNudge(0, -1, e);
+$('combUse').onchange = () => { C.use[+$('combSel').value] = $('combUse').checked; combShow(); combRun(true); };
+$('combSel').onchange = combShow;
+$('combAuto').onclick = () => combRun(false);
+const combClose = () => $('combDlg').classList.add('hidden');
+$('combNo').onclick = $('combX').onclick = combClose;
+$('combSave').onclick = async () => {
+  try { const j = await api('sstv/combine', { names: C.names, dy: C.dy, dx: C.dx, use: C.use, save: true }); toast(j.message); combClose(); setSelecting(false); loadSstv(); } catch (e) { toast(e.message); }
+};
 $('selComb').onclick = async () => {
   const names = [...S.sel]; if (names.length < 2) return;
-  try { const j = await api('sstv/combine', { names }); toast(j.message); setSelecting(false); loadSstv(); } catch (e) { toast(e.message); }
+  C.names = names; C.sure = [];
+  $('combSel').innerHTML = names.map((n, i) => '<option value="' + i + '">' + (i + 1) + ': ' + esc(n.replace(/^SSTV_/, '').replace(/\.png$/, '')) + '</option>').join('');
+  $('combImg').removeAttribute('src'); $('combNote').textContent = 'Lining up…'; $('combDlg').classList.remove('hidden');
+  await combRun(false); if (C.ref != null) { $('combSel').value = String(names.length > 1 ? (C.ref === 0 ? 1 : 0) : 0); combShow(); }
 };
 $('selDel').onclick = async () => {
   const names = [...S.sel]; if (!names.length) return;
