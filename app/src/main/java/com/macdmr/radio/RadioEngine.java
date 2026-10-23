@@ -45,12 +45,22 @@ public final class RadioEngine implements UartPort.Listener {
     }
     private final java.util.Map<Integer, CommandStats> stats = new java.util.TreeMap<>();
     private volatile int rssiNoReading, rssiReadings;
+    /**
+     * Commands the module always answers (channel, MON, squelch, version). Xplore 1 tester 2026-10-23: after an update the
+     * module answered signal readings at once but none of these for four minutes, so these are watched separately.
+     */
+    static boolean watched(int cmd) { return cmd == CMD_SET_DIGITAL || cmd == CMD_SET_ANALOG || cmd == CMD_MONITOR || cmd == CMD_SQUELCH || cmd == CMD_VERSION; }
+    private volatile long firstUnansweredAt;                // the first watched command sent since the module last answered one (0 = none waiting)
+    /** How long a watched command has been waiting for the module's answer (0 = none): a stuck module grows this. */
+    public long unansweredForMs() { long t = firstUnansweredAt; return t == 0 ? 0 : System.currentTimeMillis() - t; }
     private void send(Frame fr) throws IOException {
+        if (fr.rw == 1 && watched(fr.cmd) && firstUnansweredAt == 0) firstUnansweredAt = System.currentTimeMillis();
         if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
         port.send(fr);
     }
     private void answered(Frame f) {
         if (f.rw != 0) return;
+        if (watched(f.cmd)) firstUnansweredAt = 0;                       // any answer (or refusal) shows the module is listening
         synchronized (stats) {
             CommandStats c = stats.get(f.cmd); if (c == null) return;
             Long t = c.pending.pollFirst(); c.answered++; if (f.sr != 0) c.refused++;
@@ -94,9 +104,17 @@ public final class RadioEngine implements UartPort.Listener {
 
     public void powerOff() throws IOException { power.set(false); ev.log("module power -> off (" + power.read() + ")"); }
 
+    /**
+     * A real restart of the module: the power line off, and the profile's other supply lines too (the Xplore 1's stock app
+     * switches power, pwd and the PTT line off), a second's pause, then the normal power-up order. Needed where the power
+     * line cannot be read back, so a module that is already on is never restarted by {@link #powerOn}.
+     */
     public void powerCycle() throws IOException {
-        power.set(false); try { Thread.sleep(500); } catch (InterruptedException ignored) { }
-        bootLatch = new java.util.concurrent.CountDownLatch(1);
+        power.set(false);
+        if (profile.lineSetup != null) for (int i = profile.lineSetup.length - 1; i >= 0; i--) { String[] l = profile.lineSetup[i]; SysfsGpio.write(l[0], "0"); }
+        try { Thread.sleep(1000); } catch (InterruptedException ignored) { }
+        if (profile.lineSetup != null) for (String[] l : profile.lineSetup) SysfsGpio.write(l[0], l[1]);
+        bootLatch = new java.util.concurrent.CountDownLatch(1); firstUnansweredAt = 0;
         power.set(true); ev.log("module power-cycled (" + power.read() + ")");
     }
 

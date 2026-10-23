@@ -779,6 +779,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void onDestroy() {
         running = null; RadioWidget.refresh(this, null);
+        ui.removeCallbacks(moduleWatch);
         try { if (web != null) web.stop(); } catch (Throwable ignored) { }
         try { if (coverage != null) coverage.stop(); } catch (Throwable ignored) { }
         stopBluetoothMic();
@@ -852,10 +853,11 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (!engine.waitBooted(12000)) log("no boot banner within 12 s — continuing anyway");
                     Thread.sleep(300);
                 }
-                engine.queryVersion();
+                moduleHandshake();
                 selectChannel(store.activeNumber());
                 startRxAudio();
                 setLink("ready");
+                ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
                 if (roaming()) ui.post(() -> startRoaming());
@@ -1714,7 +1716,71 @@ public class RadioService extends Service implements RadioEngine.Events {
         rssi0(raw, dbm); }
     private void rssi0(int raw, double dbm) { rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     private volatile String moduleVersion = "";
-    @Override public void version(int v, String text) { log("module " + text); moduleVersion = text; }
+    private volatile long versionAt;
+    @Override public void version(int v, String text) { log("module " + text); moduleVersion = text; versionAt = System.currentTimeMillis(); }
+    /** Ask the module for its version and wait up to {@code ms} for the answer: does it take commands at all? */
+    private boolean versionHandshake(long ms) throws Exception {
+        long asked = System.currentTimeMillis(); engine.queryVersion();
+        while (versionAt < asked && System.currentTimeMillis() - asked < ms) Thread.sleep(50);
+        return versionAt >= asked;
+    }
+    /**
+     * Start-up check (what the Xplore 1's stock app does with a 5 s watchdog): the module must answer the version query.
+     * If not, it is restarted for real, twice at most. Xplore 1 tester 2026-10-23: after an update the module was already on,
+     * powering it "on" did not restart it, and it ignored every command for four minutes.
+     */
+    private void moduleHandshake() throws Exception {
+        if (versionHandshake(3000)) return;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+            log("the module did not answer the version query: restarting it (" + attempt + " of 2)");
+            setLink("booting");
+            engine.powerCycle();
+            if (!engine.waitBooted(12000)) log("no boot banner after the restart");
+            Thread.sleep(300);
+            if (versionHandshake(3000)) { history("warn", "\u26A0 The radio module did not answer at start-up and was restarted: it works now"); return; }
+        }
+        history("warn", "\u26A0 The radio module does not answer commands (channel, MON, squelch). Restarting the phone usually fixes this; please send a device report");
+    }
+
+    /**
+     * While running: a channel, MON, squelch or version command unanswered for 6 s while the module still answers signal
+     * readings means it has stopped taking commands. Confirm with a version query, then restart it and put the channel,
+     * MON and audio back. At most once every two minutes, never while transmitting.
+     */
+    private volatile long lastRecoverAt; private volatile boolean recovering;
+    private final Runnable moduleWatch = new Runnable() { @Override public void run() {
+        ui.postDelayed(this, 2000);
+        if (exiting || !isReady() || recovering || isTransmitting() || engine.unansweredForMs() < 6000 || System.currentTimeMillis() - lastRecoverAt < 120_000) return;
+        recovering = true;
+        worker.execute(() -> {
+            try {
+                if (versionHandshake(2500)) { log("the module was slow but answered the version query"); return; }
+                restartModule("the module stopped answering commands for " + engine.unansweredForMs() / 1000 + " s");
+            } catch (Throwable t) { log("module restart: " + t); setLink("ready"); }
+            finally { recovering = false; }
+        });
+    } };
+    /** Restart the module for real and put the channel, MON and receive audio back (on the worker thread). */
+    void restartModule(String why) {
+        try {
+                lastRecoverAt = System.currentTimeMillis();
+                log(why + ": restarting it");
+                history("warn", "\u26A0 The radio module stopped answering commands: restarting it (a few seconds without reception)");
+                setLink("booting");
+                if (audio != null) audio.stopRx();
+                engine.powerCycle();
+                if (!engine.waitBooted(12000)) log("no boot banner after the restart");
+                Thread.sleep(300);
+                boolean ok = versionHandshake(3000);
+                if (current != null) applyChannelNow(current, current.id > 0);
+                if (monitorOn) sendMonitor(true);
+                if (rxAudioOn && audio != null) audio.startRx(true);
+                setLink("ready");
+                history("warn", ok ? "\u2714 The radio module was restarted and answers again" : "\u26A0 The radio module still does not answer after a restart. Restarting the phone usually fixes this; please send a device report");
+        } catch (Throwable t) { log("module restart: " + t); setLink("ready"); }
+    }
+    /** Bench: the watchdog's restart, by hand (DIAG restartmodule). */
+    public void diagRestartModule() { worker.execute(() -> { recovering = true; try { restartModule("DIAG restartmodule"); } finally { recovering = false; } }); }
     public String moduleVersion() { return moduleVersion; }
     /** The last signal reading (dBm, -999 none) and whether the module reports a reception (for the bench tests). */
     public int rssiNow() { return rssi; }

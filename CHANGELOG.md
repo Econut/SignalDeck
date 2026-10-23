@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-23 — A radio module that stops taking commands is restarted (Xplore 1)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | Xplore 1 tester (beta.16, 2026-10-23): MON "works sometimes" (once it came on 2 minutes late), no signal from a Baofeng in the 60 s test, and CTCSS 100 Hz did not take. One cause: after the update the module was already on (this phone's power line reads back empty, so "power on" did not restart it), it sent no boot banner, and for four minutes it answered signal readings at once but no channel, MON, squelch or version command (answers came 90–230 s late in one burst at 16:45:13, then it stopped again). The stock app guards against this with a 5 s version watchdog that re-powers the module. SignalDeck now: (1) at start-up waits up to 3 s for the version answer and otherwise restarts the module for real (power line and the profile's supply lines off, 1 s, normal power-up), twice at most, with a history note; (2) while running, a channel/MON/squelch/version command unanswered for 6 s while signal readings still arrive gets one more version query, then a restart that puts the channel, MON and receive audio back (at most every 2 min, never while transmitting or after Exit). DIAG `restartmodule` runs that restart by hand. Help: new section "When the radio module stops answering". | `RadioEngine.java`, `RadioService.java`, `DiagReceiver.java`, `ui/HelpView.java` | Host: all tests pass. Armor (release build): start-up version answered at once, no restart; DIAG `restartmodule`: module off and on, boot banner, version, channel 162.425 re-applied and acknowledged, ready again in about 3 s, ISS tracking kept. Not tested on an Xplore 1. |
+
 ## 2026-10-23 — SSTV Combine: preview with manual line-up; the web gallery shows new pictures by itself
 
 | Backlog | Change | Files | Test |
