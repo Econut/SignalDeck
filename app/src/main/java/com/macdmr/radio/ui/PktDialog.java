@@ -343,7 +343,7 @@ public final class PktDialog {
             if (Math.abs(lat) > 90 || Math.abs(lon) > 180) throw new NumberFormatException();
             String e = pe.sendObject(name.getText().toString(), live, lat, lon, sym.getText().toString().trim(), comment.getText().toString());
             toast(e == null ? (live ? "Object queued" : "Removal queued") : e); if (e == null) sub.dismiss();
-        } catch (Throwable t) { toast("Position: latitude, longitude in degrees (e.g. 45.123, -93.456)"); }
+        } catch (Throwable t) { toast("Position: latitude, longitude in degrees (e.g. 39.74, -104.99)"); }
     }
     private void bulletinSheet() {
         LinearLayout body = page("\uD83D\uDCE2  APRS bulletin");

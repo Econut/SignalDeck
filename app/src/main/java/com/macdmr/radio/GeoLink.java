@@ -29,7 +29,7 @@ public final class GeoLink {
         Pattern.compile("mlat=" + NUM + "&mlon=" + NUM),
         Pattern.compile("#map=\\d+/" + NUM + "/" + NUM),
         Pattern.compile("center=" + NUM + "%2C" + NUM),                               // og:image of a Google Maps page
-        Pattern.compile("^\\s*" + NUM + "\\s*[, ]\\s*" + NUM + "\\s*$"),              // "45.12345, -93.12345"
+        Pattern.compile("^\\s*" + NUM + "\\s*[, ]\\s*" + NUM + "\\s*$"),              // "39.74, -104.99"
     };
 
     /** Coordinates in the text, or null. */

@@ -78,6 +78,8 @@ public final class Ft8Station {
     public synchronized List<Heard> heard() { return new ArrayList<>(heard); }
     public synchronized List<String> sent() { return new ArrayList<>(sent); }
     public synchronized void clear() { heard.clear(); sent.clear(); changed(); }
+    /** A decode by its slot and text (what a browser clicked). */
+    public synchronized Heard find(long slot, String text) { for (int i = heard.size() - 1; i >= 0; i--) { Heard h = heard.get(i); if (h.slot == slot && h.d.text.equals(text)) return h; } return null; }
     public boolean txEnabled() { return txEnabled; }
     public int txParity() { return txParity; }
     public void setTxParity(int p) { txParity = p & 1; changed(); }

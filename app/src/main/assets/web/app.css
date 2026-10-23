@@ -331,3 +331,13 @@ a.btn, a.act { text-decoration: none; display: inline-block; }
 
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); padding: 12px 20px; border-radius: 12px; background: var(--panel-solid);
   border: 1px solid var(--cyan); color: var(--text); box-shadow: 0 10px 30px rgba(0,0,0,.5); z-index: 10; max-width: calc(100% - 32px); }
+/* FT8 over FM */
+.f8clock { position: relative; height: 22px; margin: 10px 0 6px; border-radius: 11px; background: #14263a; overflow: hidden; }
+.f8clock div { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(25,211,255,.55); }
+.f8clock.p1 div { background: rgba(43,234,122,.55); } .f8clock.tx div { background: rgba(255,84,104,.65); }
+.f8clock span { position: relative; padding-left: 10px; font: 13px/22px ShareTech, monospace; color: var(--text); }
+.f8fall { width: 100%; height: 90px; border-radius: 8px; background: #06121a; cursor: crosshair; display: block; }
+.f8list { height: 260px; color: var(--text); }
+.f8list div { padding: 3px 6px; border-radius: 6px; cursor: pointer; white-space: pre; }
+.f8list div:hover { background: rgba(25,211,255,.08); }
+.f8list .cq { color: var(--green); } .f8list .me { color: var(--amber); background: rgba(255,176,32,.08); } .f8list .sent { color: #ff9aa6; cursor: default; }

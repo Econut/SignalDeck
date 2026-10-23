@@ -400,6 +400,11 @@ public final class WebHost {
     private String channelNameAt(int hz, int step) { for (ChannelStore.Channel ch : svc.store().all()) if (!ch.isDigital() && Math.abs(ch.rxFreq - hz) <= step / 2) return ch.name; return ""; }
     private static WebServer.Response ok(JSONObject o) { return WebServer.Response.json(200, o.toString()); }
     private static WebServer.Response ok(String msg) { return WebServer.Response.json(200, "{\"ok\":true,\"message\":" + WebServer.quote(msg) + "}"); }
+    /** The owner's callsign never reaches a browser: whole-word occurrences become "(you)". */
+    static String hideCall(String s, String call) {
+        if (s == null || call == null || call.isEmpty()) return s;
+        return s.replaceAll("(?<![A-Z0-9/])<?" + java.util.regex.Pattern.quote(call) + "(/[A-Z0-9]+)?>?(?![A-Z0-9])", "(you)");
+    }
     private static JSONObject body(WebServer.Request r) { try { return r.body.length == 0 ? new JSONObject() : new JSONObject(r.bodyText()); } catch (Exception e) { return new JSONObject(); } }
     private static final String DEFAULT_QUICK = "QSL\nCopy, I will call you back\nOn my way\nWhere are you?\nSwitch to the other channel\nAll OK here";
     private List<String> quickReplies() {
@@ -1253,6 +1258,54 @@ public final class WebHost {
                 }
                 short[] p0 = svc.keyer().pcm(slot); if (p0 == null || p0.length == 0) return WebServer.Response.error(404, "Nothing recorded");
                 return WebServer.Response.bytes("audio/wav", wav(p0));
+            }
+            case "/api/ft8": {                                                  // FT8 over FM: GET state + decodes; POST {on} | {cq} | {reply:{slot,text}} | {halt} | {send} | {parity} | {txHz} | {grid} | {clear}
+                final com.macdmr.radio.ham.Ft8Station f8 = svc.ft8();
+                if (post) {
+                    boolean tx = b.optBoolean("cq", false) || b.has("reply") || b.has("send");
+                    if (tx && !allowTx()) return WebServer.Response.error(403, TX_OFF);
+                    String e = onMain(() -> {
+                        if (b.has("on")) svc.setFt8(b.getBoolean("on"));
+                        if (b.has("parity")) f8.setTxParity(b.getInt("parity"));
+                        if (b.has("txHz")) f8.setTxHz(b.getDouble("txHz"));
+                        if (b.has("grid")) {
+                            String g = b.getString("grid").trim().toUpperCase(java.util.Locale.US);
+                            if (!g.isEmpty() && !g.equals("-") && !g.matches("[A-R]{2}[0-9]{2}([A-X]{2})?")) return "A grid is two letters A-R and two digits, like FN42";
+                            svc.setFt8Grid(g);
+                        }
+                        if (b.optBoolean("clear", false)) f8.clear();
+                        if (b.optBoolean("halt", false)) f8.haltTx();
+                        if (b.optBoolean("cq", false)) return f8.callCq();
+                        if (b.has("send")) return f8.sendText(b.getString("send"));
+                        if (b.has("reply")) {
+                            JSONObject rp = b.getJSONObject("reply");
+                            com.macdmr.radio.ham.Ft8Station.Heard h = f8.find(rp.getLong("slot"), rp.getString("text"));
+                            return h == null ? "That decode is no longer in the list" : f8.reply(h);
+                        }
+                        return null;
+                    });
+                    if (e != null) return WebServer.Response.error(409, e);
+                }
+                String my = svc.packet() != null && svc.packet().callsignSet() ? svc.packet().callsign() : null;
+                JSONArray heard = new JSONArray();
+                java.util.List<com.macdmr.radio.ham.Ft8Station.Heard> hl = f8.heard();
+                for (int i = Math.max(0, hl.size() - 80); i < hl.size(); i++) {
+                    com.macdmr.radio.ham.Ft8Station.Heard h = hl.get(i);
+                    heard.put(new JSONObject().put("slot", h.slot).put("time", h.time()).put("snr", h.d.snrDb).put("dt", Math.round(h.d.dtS * 10) / 10.0).put("hz", Math.round(h.d.freqHz))
+                        .put("text", h.d.text).put("shown", hideCall(h.d.text, my)).put("cq", h.cq).put("toMe", h.toMe).put("from", h.from == null ? JSONObject.NULL : h.from));
+                }
+                JSONArray sent = new JSONArray(); for (String s0 : f8.sent()) sent.put(hideCall(s0, my));
+                String next = f8.nextMessage();
+                return ok(new JSONObject().put("running", f8.running()).put("status", hideCall(f8.status(), my)).put("tx", f8.txEnabled()).put("next", next == null ? JSONObject.NULL : hideCall(next, my))
+                    .put("partner", f8.partner() == null ? JSONObject.NULL : f8.partner()).put("parity", f8.txParity()).put("txHz", Math.round(f8.txHz())).put("grid", svc.ft8Grid()).put("gridSetting", svc.ft8GridSetting())
+                    .put("now", System.currentTimeMillis()).put("heard", heard).put("sent", sent).put("analog", svc.current() != null && !svc.current().isDigital())
+                    .put("callsignSet", my != null).put("webTx", allowTx()));
+            }
+            case "/api/ft8/spectrum": {                                         // the FT8 waterfall's next line: 200 levels in dB, 200-2800 Hz
+                com.macdmr.radio.ham.Ft8Station f8 = svc.ft8();
+                JSONArray a = new JSONArray();
+                if (f8.running()) for (float v : f8.spectrum(200, 200, 2800)) a.put(Math.round(v * 10) / 10.0);
+                return ok(new JSONObject().put("db", a));
             }
             case "/api/textmodes": {                                            // RTTY / PSK31: GET state + text; POST {mode?, txMode?, clear?, send?}
                 com.macdmr.radio.PacketEngine pe = svc.packet();

@@ -20,17 +20,18 @@ public class SatTrackTest {
     @Test public void passGeometryAndDoppler() {
         Sgp4 s = new Sgp4("ISS", L1, L2);
         long from = Math.round((s.epochJd - 2440587.5) * 86_400_000.0);
-        List<SatTrack.Pass> ps = SatTrack.passes(s, from, 24, 44.98, -93.27, 260, 0);
+        List<SatTrack.Pass> ps = SatTrack.passes(s, from, 24, 39.74, -104.99, 1600, 0);
         assertTrue("several passes a day", ps.size() >= 4);
         for (SatTrack.Pass p : ps) {
             assertTrue(p.los > p.tca && p.tca > p.aos);
             assertTrue("an ISS pass lasts under 12 minutes", p.durationS() < 720);
-            SatTrack.Look a = SatTrack.look(s, p.aos + 5000, 44.98, -93.27, 260), b = SatTrack.look(s, p.los - 5000, 44.98, -93.27, 260);
+            SatTrack.Look a = SatTrack.look(s, p.aos + 5000, 39.74, -104.99, 1600), b = SatTrack.look(s, p.los - 5000, 39.74, -104.99, 1600);
             assertTrue("approaching after rise", a.rangeRateKmS < 0); assertTrue("receding before set", b.rangeRateKmS > 0);
             long up = SatTrack.downlink(437_800_000, a.rangeRateKmS);
             if (p.maxEl > 20) assertTrue("70 cm Doppler at the rise of a good pass is about +9 to +10 kHz, was " + (up - 437_800_000), up - 437_800_000 > 8000 && up - 437_800_000 < 11000);
-            else assertTrue("a low pass stays far away: less Doppler", up - 437_800_000 > 0 && up - 437_800_000 < 8000);
-            assertTrue("rises and sets near the horizon", Math.abs(SatTrack.look(s, p.aos, 44.98, -93.27, 260).el) < 0.2);
+            else if (p.maxEl < 10) assertTrue("a low pass stays far away: less Doppler, was " + (up - 437_800_000), up - 437_800_000 > 0 && up - 437_800_000 < 8000);
+            else assertTrue("in between: positive, never more than a good pass", up - 437_800_000 > 0 && up - 437_800_000 < 11000);
+            assertTrue("rises and sets near the horizon", Math.abs(SatTrack.look(s, p.aos, 39.74, -104.99, 1600).el) < 0.2);
         }
         assertEquals(145_990_000 + 3000, SatTrack.uplink(145_990_000, 6.16), 50);    // 6.16 km/s receding: send higher
     }

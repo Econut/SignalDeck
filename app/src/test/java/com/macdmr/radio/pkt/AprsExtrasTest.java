@@ -17,9 +17,9 @@ public class AprsExtrasTest {
     private static long utc(int day, int h, int m) { Calendar c = Calendar.getInstance(TimeZone.getTimeZone("UTC")); c.clear(); c.set(2026, Calendar.OCTOBER, day, h, m); return c.getTimeInMillis(); }
 
     @Test public void objectReport() {
-        assertEquals(";NETCTL   *201435z4512.34N/09330.00WNNet control here",
-                AprsExtras.objectInfo("NETCTL", true, 45.20567, -93.5, '/', 'N', "Net control here", utc(20, 14, 35)));
-        assertEquals(";HAZARD-1 _011200z4500.00N\\09300.00W!", AprsExtras.objectInfo("HAZARD-1", false, 45.0, -93.0, '\\', '!', "", utc(1, 12, 0)));
+        assertEquals(";NETCTL   *201435z3912.34N/10430.00WNNet control here",
+                AprsExtras.objectInfo("NETCTL", true, 39.20567, -104.5, '/', 'N', "Net control here", utc(20, 14, 35)));
+        assertEquals(";HAZARD-1 _011200z3900.00N\\10500.00W!", AprsExtras.objectInfo("HAZARD-1", false, 39.0, -105.0, '\\', '!', "", utc(1, 12, 0)));
         assertEquals("name cut to 9", ";ABCDEFGHI*", AprsExtras.objectInfo("ABCDEFGHIJK", true, 0, 0, '/', '/', "", 0).substring(0, 11));
     }
 
@@ -29,8 +29,8 @@ public class AprsExtrasTest {
     }
 
     @Test public void weatherReportCarriesPressureInTenths() {
-        String w = AprsExtras.weatherInfo(45.0, -93.0, 1013.25, "phone barometer");
-        assertEquals("=4500.00N/09300.00W_.../...g...t...b10133phone barometer", w);
+        String w = AprsExtras.weatherInfo(39.0, -105.0, 1013.25, "phone barometer");
+        assertEquals("=3900.00N/10500.00W_.../...g...t...b10133phone barometer", w);
         assertEquals(1013.25, AprsExtras.seaLevel(1013.25, 0), 1e-9);
         assertEquals("about 1 hPa per 8.4 m near the ground", 1013.25, AprsExtras.seaLevel(1001.3, 100), 0.6);
     }

@@ -394,6 +394,16 @@
             <div class="row wrap" style="margin-top:10px"><select id="tmMode" aria-label="Listen"></select><select id="tmTx" aria-label="Send as"><option value="2">Send as PSK31</option><option value="1">Send as RTTY 45</option></select><button class="btn small-btn" id="tmClear">Clear</button></div>
             <pre id="tmText" class="term"></pre>
             <form id="tmForm" class="row"><input id="tmLine" placeholder="Text to send" class="grow"><button class="btn primary">Send</button></form></div>
+          <div class="panel"><div class="row between wrap"><span class="label">FT8 OVER FM</span><span id="f8State" class="chip dim"></span></div>
+            <div class="row wrap" style="margin-top:10px"><button class="btn primary" id="f8On">Start FT8</button><button class="btn" id="f8Cq">Call CQ</button><button class="btn" id="f8Halt">Halt TX</button>
+              <select id="f8Par" aria-label="Transmit period"><option value="0">TX 1st (:00 :30)</option><option value="1">TX 2nd (:15 :45)</option></select>
+              <label class="small muted">TX Hz <input id="f8Hz" inputmode="numeric" style="width:70px"></label><label class="small muted">Grid <input id="f8Grid" style="width:80px;text-transform:uppercase" placeholder="location"></label></div>
+            <div id="f8Clock" class="f8clock"><div></div><span></span></div>
+            <canvas id="f8Fall" class="f8fall" width="400" height="90" title="Click to set the transmit frequency"></canvas>
+            <div id="f8Next" class="small mono" style="margin:6px 0"></div>
+            <div id="f8List" class="term f8list"></div>
+            <form id="f8Form" class="row"><input id="f8Line" placeholder="Message or free text (13 characters)" maxlength="40" class="grow mono" style="text-transform:uppercase"><button class="btn primary">Send</button></form>
+            <p class="muted small">The WSJT-X mode on the phone's current FM channel. Click a CQ to answer it: the phone runs the exchange and logs the contact. It cannot hear SSB FT8 (144.174 / 432.174), and FM lets one station through per slot. Your callsign shows as (you). Sending needs Allow transmit from the web.</p></div>
           <div class="panel"><div class="row between wrap"><span class="label">PACKET TERMINAL</span><span id="trState" class="chip dim"></span></div>
             <form id="trConnect" class="row wrap" style="margin-top:10px"><input id="trCall" placeholder="BBS or node (N0ABC-1)" style="text-transform:uppercase"><input id="trVia" placeholder="via (optional, up to 2)" style="text-transform:uppercase" class="grow"><button class="btn primary">Connect</button><button type="button" class="btn" id="trDisc">Disconnect</button></form>
             <label class="chk" style="margin-top:8px"><input type="checkbox" id="trAccept"> Accept incoming connections</label>

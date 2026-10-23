@@ -995,6 +995,66 @@ $('trDisc').onclick = () => act('terminal', { disconnect: true });
 $('trAccept').onchange = () => act('terminal', { accept: $('trAccept').checked });
 $('trForm').addEventListener('submit', async e => { e.preventDefault(); if (await act('terminal', { send: $('trLine').value })) $('trLine').value = ''; });
 
+// ---- FT8 over FM: state once a second, the waterfall about five times a second while running ----
+const f8 = { j: null, skew: 0, fall: null };
+function f8Row(h) { return h.time + ' ' + (h.snr >= 0 ? '+' : '') + String(h.snr).padStart(3) + ' ' + (h.dt >= 0 ? '+' : '') + h.dt.toFixed(1) + ' ' + String(h.hz).padStart(4) + '  ' + h.shown; }
+async function pollFt8() {
+  if (S.page !== 'pkt') return;
+  try {
+    const j = await api('ft8'); f8.j = j; f8.skew = j.now - Date.now();
+    $('f8State').textContent = j.running ? (j.tx ? 'TRANSMITTING IN ITS PERIOD' : 'LISTENING') : 'OFF'; $('f8State').className = 'chip ' + (j.running ? (j.tx ? 'amber' : 'green') : 'dim');
+    $('f8On').textContent = j.running ? 'Stop FT8' : 'Start FT8';
+    $('f8Cq').disabled = $('f8Form').querySelector('button').disabled = !j.webTx || !j.callsignSet || !j.analog;
+    $('f8Halt').disabled = !j.tx;
+    if (document.activeElement !== $('f8Par')) $('f8Par').value = j.parity;
+    if (document.activeElement !== $('f8Hz')) $('f8Hz').value = j.txHz;
+    if (document.activeElement !== $('f8Grid')) $('f8Grid').value = j.gridSetting;
+    $('f8Next').textContent = j.tx && j.next ? 'Next: ' + j.next : (j.partner ? 'QSO with ' + j.partner : (j.running ? j.status : (j.callsignSet ? 'Not running.' : 'Set your callsign in the APRS settings first.')));
+    const key = j.heard.length + ':' + j.sent.length + ':' + (j.heard.length ? j.heard[j.heard.length - 1].slot : 0);
+    if (key !== f8.key) {
+      f8.key = key;
+      const rows = j.heard.slice().reverse().map(h => '<div class="' + (h.toMe ? 'me' : h.cq ? 'cq' : '') + '" data-slot="' + h.slot + '" data-text="' + esc(h.text) + '">' + esc(f8Row(h)) + '</div>');
+      const sent = j.sent.slice().reverse().slice(0, 20).map(t => '<div class="sent">' + esc(t) + '</div>');
+      $('f8List').innerHTML = rows.length || sent.length ? rows.join('') + (sent.length ? '<div class="sent">— sent —</div>' + sent.join('') : '') : '<div class="sent">Nothing decoded yet. Each 15 s slot is decoded when it ends.</div>';
+    }
+  } catch (e) { }
+}
+function drawFt8Clock() {
+  const j = f8.j; if (!j || S.page !== 'pkt') return;
+  const t = Date.now() + f8.skew, slot = Math.floor(t / 15000), sec = (t % 15000) / 1000, par = slot & 1, ours = j.tx && par === j.parity;
+  $('f8Clock').className = 'f8clock' + (par ? ' p1' : '') + (ours ? ' tx' : '');
+  $('f8Clock').firstElementChild.style.width = (sec / 15 * 100).toFixed(1) + '%';
+  $('f8Clock').lastElementChild.textContent = (par ? '2nd' : '1st') + ' period  ' + sec.toFixed(1) + ' s' + (ours ? '  · TX' : '');
+}
+async function pollFt8Fall() {
+  if (S.page !== 'pkt' || !f8.j || !f8.j.running) return;
+  try {
+    const j = await api('ft8/spectrum'); if (!j.db.length) return;
+    const c = $('f8Fall'), g = c.getContext('2d'), w = c.width, h = c.height;
+    g.drawImage(c, 0, 0, w, h - 1, 0, 1, w, h - 1);
+    const sorted = j.db.slice().sort((a, b) => a - b), med = sorted[sorted.length >> 1];
+    f8.floor = f8.floor === undefined ? med : f8.floor * 0.9 + med * 0.1;
+    const img = g.createImageData(w, 1);
+    for (let x = 0; x < w; x++) {
+      const v = Math.max(0, Math.min(1, (j.db[Math.floor(x * j.db.length / w)] - f8.floor - 3) / 30));
+      const r = v < .4 ? 6 + 25 * v : v < .75 ? 16 + 680 * (v - .4) : 255, gr = v < .4 ? 18 + 375 * v : v < .75 ? 168 + 63 * (v - .4) : 190 + 260 * (v - .75), b = v < .4 ? 26 + 425 * v : v < .75 ? 196 - 430 * (v - .4) : 46 + 836 * (v - .75);
+      img.data.set([r, gr, b, 255], x * 4);
+    }
+    g.putImageData(img, 0, 0);
+    const mx = (f8.j.txHz - 200) / 2600 * w; g.fillStyle = 'rgba(255,84,104,.8)'; g.fillRect(mx, 0, 2, h);
+  } catch (e) { }
+}
+setInterval(pollFt8, 1000); setInterval(drawFt8Clock, 100); setInterval(pollFt8Fall, 200);
+$('f8On').onclick = () => act('ft8', { on: !(f8.j && f8.j.running) }).then(pollFt8);
+$('f8Cq').onclick = () => act('ft8', { cq: true }).then(pollFt8);
+$('f8Halt').onclick = () => act('ft8', { halt: true }).then(pollFt8);
+$('f8Par').onchange = () => act('ft8', { parity: +$('f8Par').value });
+$('f8Hz').onchange = () => act('ft8', { txHz: +$('f8Hz').value });
+$('f8Grid').onchange = () => act('ft8', { grid: $('f8Grid').value.trim() });
+$('f8Fall').onclick = e => { const r = e.target.getBoundingClientRect(); act('ft8', { txHz: Math.round(200 + 2600 * (e.clientX - r.left) / r.width) }).then(pollFt8); };
+$('f8List').addEventListener('click', e => { const d = e.target.closest('div[data-slot]'); if (d) act('ft8', { reply: { slot: +d.dataset.slot, text: d.dataset.text } }).then(pollFt8); });
+$('f8Form').addEventListener('submit', async e => { e.preventDefault(); if (await act('ft8', { send: $('f8Line').value.trim() })) $('f8Line').value = ''; pollFt8(); });
+
 // ---- diagnostics log (Settings) ----
 async function loadDiagLog() { try { const j = await api('log'); const el = $('diagLog'); el.textContent = j.lines.join(String.fromCharCode(10)); el.scrollTop = el.scrollHeight; } catch (e) { } }
 $('logRefresh').onclick = loadDiagLog;

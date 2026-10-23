@@ -52,14 +52,14 @@ public class PredictorTest {
 
     @Test public void fitsTheAntennaHeight() {
         Predictor.Elevation hills = (lat, lon) -> 250 + 40 * Math.sin(lat * 900) + 30 * Math.cos(lon * 700);
-        Predictor.Params truth = new Predictor.Params(); truth.lat = 45.0; truth.lon = -93.0; truth.hz = 162.55e6; truth.antennaAgl = 120;
+        Predictor.Params truth = new Predictor.Params(); truth.lat = 39.0; truth.lon = -105.0; truth.hz = 162.55e6; truth.antennaAgl = 120;
         java.util.List<double[]> m = new ArrayList<>();
         for (int i = 0; i < 24; i++) {                                   // readings 3 to 40 km out in different directions
             double brg = i * 0.9, km = 3 + i * 1.6;
-            double lat = 45.0 + km / 111.32 * Math.cos(brg), lon = -93.0 + km / (111.32 * Math.cos(Math.toRadians(45))) * Math.sin(brg);
+            double lat = 39.0 + km / 111.32 * Math.cos(brg), lon = -105.0 + km / (111.32 * Math.cos(Math.toRadians(39))) * Math.sin(brg);
             m.add(new double[] { lat, lon, Predictor.DOWNLINK_BUDGET - Predictor.loss(hills, truth, lat, lon) + 10 });
         }
-        Predictor.Params guess = new Predictor.Params(); guess.lat = 45.0; guess.lon = -93.0; guess.hz = 162.55e6; guess.antennaAgl = 30;
+        Predictor.Params guess = new Predictor.Params(); guess.lat = 39.0; guess.lon = -105.0; guess.hz = 162.55e6; guess.antennaAgl = 30;
         double[] fit = Predictor.fitAntenna(hills, guess, m);
         assertEquals(120, fit[0], 1e-9);
         assertEquals(10, fit[1], 0.5);
@@ -75,23 +75,23 @@ public class PredictorTest {
 
     @Test public void gridAndCalibration() {
         Predictor.Elevation flat = (lat, lon) -> 250;
-        Predictor.Elevation hill = (lat, lon) -> (lat > 45.05 && lat < 45.06) ? 450 : 250;   // an east-west ridge 6 km north
-        Predictor.Params p = new Predictor.Params(); p.lat = 45.0; p.lon = -93.0; p.hz = 146.94e6; p.radiusM = 12_000; p.cellM = 1000;
+        Predictor.Elevation hill = (lat, lon) -> (lat > 39.05 && lat < 39.06) ? 450 : 250;   // an east-west ridge 6 km north
+        Predictor.Params p = new Predictor.Params(); p.lat = 39.0; p.lon = -105.0; p.hz = 146.94e6; p.radiusM = 12_000; p.cellM = 1000;
         List<Predictor.Square> g = Predictor.grid(flat, p, null);
         assertTrue(g.size() > 400 && g.size() < 470);                   // pi * 12^2 squares
-        double near = Predictor.loss(flat, p, 45.01, -93.0), far = Predictor.loss(flat, p, 45.1, -93.0);
+        double near = Predictor.loss(flat, p, 39.01, -105.0), far = Predictor.loss(flat, p, 39.1, -105.0);
         assertTrue(far > near + 15);
-        assertTrue(Predictor.loss(hill, p, 45.1, -93.0) > Predictor.loss(flat, p, 45.1, -93.0) + 15);   // behind the ridge
-        assertEquals(Predictor.loss(hill, p, 44.95, -93.0), Predictor.loss(flat, p, 44.95, -93.0), 0.5); // the other side: no hill
+        assertTrue(Predictor.loss(hill, p, 39.1, -105.0) > Predictor.loss(flat, p, 39.1, -105.0) + 15);   // behind the ridge
+        assertEquals(Predictor.loss(hill, p, 38.95, -105.0), Predictor.loss(flat, p, 38.95, -105.0), 0.5); // the other side: no hill
 
         // Heard readings 7 dB above the model: calibration says +7
         List<double[]> m = new ArrayList<>();
-        for (double lat : new double[] { 45.02, 45.03, 44.98 }) m.add(new double[] { lat, -93.0, Predictor.DOWNLINK_BUDGET - Predictor.loss(flat, p, lat, -93.0) + 7 });
+        for (double lat : new double[] { 39.02, 39.03, 38.98 }) m.add(new double[] { lat, -105.0, Predictor.DOWNLINK_BUDGET - Predictor.loss(flat, p, lat, -105.0) + 7 });
         assertEquals(7, Predictor.calibrateRx(flat, p, m), 0.01);
 
         // key-ups: keyed near, failed far -> limit between them
-        double lNear = Predictor.loss(flat, p, 45.02, -93.0), lFar = Predictor.loss(flat, p, 45.09, -93.0);
-        double thr = Predictor.calibrateTx(flat, p, Arrays.asList(new double[] { 45.02, -93.0, 1 }, new double[] { 45.09, -93.0, 0 }));
+        double lNear = Predictor.loss(flat, p, 39.02, -105.0), lFar = Predictor.loss(flat, p, 39.09, -105.0);
+        double thr = Predictor.calibrateTx(flat, p, Arrays.asList(new double[] { 39.02, -105.0, 1 }, new double[] { 39.09, -105.0, 0 }));
         assertTrue(thr > lNear && thr < lFar);
         assertEquals(Predictor.UPLINK_MAX_LOSS, Predictor.calibrateTx(flat, p, null), 1e-9);
     }

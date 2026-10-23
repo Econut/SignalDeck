@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — FT8 in SignalDeck Web; test data off the owner's area
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | **SignalDeck Web → Packet → FT8 over FM**: start/stop, the slot clock, a live waterfall (click to set the transmit frequency), the decodes (click a CQ to answer it), Call CQ, Halt TX, send a message, period, TX frequency and grid. API `/api/ft8` (GET state + decodes; POST on / cq / reply / halt / send / parity / txHz / grid / clear) and `/api/ft8/spectrum`. Answering, CQ and sending need Allow transmit from the web (403 otherwise). The owner's callsign never reaches the browser: it shows as "(you)" in decodes, sent messages and status. Help (SignalDeck Web and FT8 topics) updated. | `web/WebHost.java`, `assets/web/index.html`, `pages.js`, `app.css`, `ham/Ft8Station.java` (find), `ui/HelpView.java` | Host: HideCallTest (own call hidden in every message form, other calls kept). Device + headless Chrome: FT8 started over the API, an injected slot with three signals decoded and listed in the browser (CQs green), slot clock and button states checked, CQ refused with 403 while web transmit is off, no console errors. |
+| — | Tests and examples no longer use positions in the owner's area: SatTrackTest / PassBench / PredictorTest / AprsExtrasTest moved to Denver (APRS strings recomputed; the satellite test's Doppler bands made independent of the place), GeoLink comment and the APRS object hint use a Denver example. | tests above, `GeoLink.java`, `ui/PktDialog.java` | All 236 host tests pass. |
+
 ## 2026-10-22 — FT8 over FM
 
 | Backlog | Change | Files | Test |
