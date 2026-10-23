@@ -901,7 +901,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (audio == null) {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud) : new TinyServiceAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
-                audio.setGate(() -> squelchOpen && !muted);
+                audio.setGate(() -> squelchOpen && !muted && !(m17 != null && m17.receiving()));   // M17: its decoded voice plays instead
             }
             String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -930,6 +930,8 @@ public class RadioService extends Service implements RadioEngine.Events {
             else if (peak > 400 && System.currentTimeMillis() - captionLastEnd > 1500 && captions != null) { Log.i(TAG, "captions: starting utterance (peak " + peak + ")"); captions.start(); }
         }
         if (packet != null) packet.feed(mono, n, open, packet.monitoring() || packet.sstvRx());   // APRS / SSTV decode below any squelch (noise fails the CRC / VIS); Morse and DTMF wait for a signal
+        M17Station m7 = m17;
+        if (m7 != null && m7.running() && current != null && !current.isDigital()) m7.feed(mono, n);   // finds the preamble itself, squelch or not
         com.macdmr.radio.ham.Ft8Station f8 = ft8;
         if (f8 != null && f8.running() && current != null && !current.isDigital()) f8.feed(mono, n);   // every slot, squelch or not: noise fails FT8's CRC
         if (parrot.enabled()) {
@@ -2288,6 +2290,26 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- message forms (ICS-213, radiogram) over APRS messages or DMR texts ----
     private com.macdmr.radio.ham.FormStore forms;
+    // ---- M17 receive ----
+    private volatile M17Station m17;
+    public synchronized M17Station m17() {
+        if (m17 == null) m17 = new M17Station(this, profile != null ? profile.id : "unknown", new M17Station.Host() {
+            @Override public void event(String line) { history("pkt", line); }
+            @Override public void heard(String call) { if (call != null && !call.isEmpty() && !call.startsWith("@") && !call.startsWith("#")) logHeardStation(call, "M17", "M17"); }
+            @Override public void changed() { ui.post(() -> pushModes()); }
+        });
+        return m17;
+    }
+    public boolean m17Running() { M17Station s = m17; return s != null && s.running(); }
+    /** M17 receive on or off (null = done, else why not). */
+    public synchronized String setM17(boolean on) {
+        M17Station s = m17();
+        if (!on) { s.stop(); return null; }
+        ChannelStore.Channel c = current;
+        if (c == null || c.isDigital()) return "M17 needs an analog (FM) channel or the VFO";
+        return s.start();
+    }
+
     // ---- FT8 over FM ----
     private volatile com.macdmr.radio.ham.Ft8Station ft8;
     private java.util.concurrent.ScheduledExecutorService ft8Exec;

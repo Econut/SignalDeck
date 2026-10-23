@@ -9,3 +9,6 @@ local.properties
 *.jks
 *.pem
 keystore.properties
+
+# native build working folder (CMake/NDK)
+app/.cxx/

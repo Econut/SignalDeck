@@ -58,6 +58,26 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
             case "txwav": { String nm = i.getStringExtra("name"); if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) Log.i("DiagReceiver", "txwav: " + s.diagTxWav(new java.io.File(c.getCacheDir(), "tx_" + nm + ".wav"))); break; }   // bench: transmit cache/tx_<name>.wav (low power VFO)
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel
+            case "m17": {                                                       // bench: M17 receive on/off (--ez on); --es enc NAME: Codec 2 3200 encode cache/NAME.wav (8 kHz mono) to cache/NAME.c2
+                if (i.hasExtra("dump")) com.macdmr.radio.M17Station.benchDump = i.getBooleanExtra("dump", false);
+                if (i.hasExtra("on")) Log.i("DiagReceiver", "m17: " + s.setM17(i.getBooleanExtra("on", false)));
+                String nm = i.getStringExtra("enc");
+                if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) {
+                    try (com.macdmr.radio.ham.Codec2 c2 = new com.macdmr.radio.ham.Codec2(com.macdmr.radio.ham.Codec2.MODE_3200)) {
+                        byte[] w = java.nio.file.Files.readAllBytes(new java.io.File(c.getCacheDir(), nm + ".wav").toPath());
+                        int data = 12; while (!(w[data] == 'd' && w[data + 1] == 'a' && w[data + 2] == 't' && w[data + 3] == 'a')) data += 8 + ((w[data + 4] & 0xFF) | (w[data + 5] & 0xFF) << 8);
+                        int n = Math.min((w.length - data - 8) / 2, ((w[data + 4] & 0xFF) | (w[data + 5] & 0xFF) << 8 | (w[data + 6] & 0xFF) << 16) / 2);
+                        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream(); short[] fr = new short[c2.samples];
+                        for (int k = 0; k + c2.samples <= n; k += c2.samples) { for (int j = 0; j < c2.samples; j++) fr[j] = (short) ((w[data + 8 + 2 * (k + j)] & 0xFF) | (w[data + 9 + 2 * (k + j)] << 8)); o.write(c2.encode(fr)); }
+                        java.nio.file.Files.write(new java.io.File(c.getCacheDir(), nm + ".c2").toPath(), o.toByteArray());
+                        Log.i("DiagReceiver", "m17 enc: " + o.size() + " bytes, " + o.size() / c2.bytes + " frames");
+                    } catch (Throwable t) { Log.w("DiagReceiver", "m17 enc: " + t); }
+                }
+                com.macdmr.radio.M17Station m = s.m17();
+                for (com.macdmr.radio.M17Station.Heard h : m.heard()) Log.i("DiagReceiver", "m17 heard " + h.src + " -> " + h.dst + " frames " + h.frames + " good " + h.good + (h.meta != null ? " meta " + h.meta : ""));
+                Log.i("DiagReceiver", "m17: running " + m.running() + ", receiving " + m.receiving() + ", " + m.calibration());
+                break;
+            }
             case "ft8": {                                                       // bench: FT8 on/off (--ez on), send one message (--es msg) in a period (--ei parity 0/1); decodes go to the log
                 com.macdmr.radio.ham.Ft8Station f = s.ft8();
                 if (i.hasExtra("on")) s.setFt8(i.getBooleanExtra("on", false));

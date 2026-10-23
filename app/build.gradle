@@ -25,6 +25,8 @@ android {
     }
 
     buildFeatures { buildConfig true }
+    ndkVersion '26.3.11579264'
+    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }   // Codec 2 for M17 voice
     // One key for debug and release (the project's release key): adb install -r keeps working across both and users
     // can move from a test build to a release without uninstalling. Official builds are signed with it.
     signingConfigs {

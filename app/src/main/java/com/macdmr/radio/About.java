@@ -25,7 +25,7 @@ public final class About {
                 + "and do not present it as the original SignalDeck or as the author's work; the license gives no rights to the name "
                 + "“SignalDeck” or its icon, so a modified version needs its own name and icon.\n\n"
                 + "Source code, official signed builds and the full license (LICENSE, COPYRIGHT): " + SOURCE + "\n\n"
-                + "Built with: robot36 SSTV by Ahmet Inan (GPL v3); ft8_lib FT8 by Karlis Goba (MIT); Vosk speech recognition and models, JNA, AndroidX and HiddenApiBypass "
+                + "Built with: robot36 SSTV by Ahmet Inan (GPL v3); ft8_lib FT8 by Karlis Goba (MIT); Codec 2 by David Rowe VK5DGR (LGPL 2.1) for M17; Vosk speech recognition and models, JNA, AndroidX and HiddenApiBypass "
                 + "(Apache 2.0); Orbitron, Rajdhani and Share Tech Mono fonts (SIL OFL 1.1); US exam question pools (NCVEC, public domain). "
                 + "Data: map tiles © OpenStreetMap contributors (ODbL), Terrain Tiles on AWS Open Data, RadioID.net, BrandMeister, "
                 + "hearham.com, NetLogger, CelesTrak and AMSAT, ARISS.";

@@ -253,6 +253,7 @@ public class MainActivity extends AppCompatActivity {
         if (s.packet().monitoring() || s.packet().kiss().isActive()) return new com.macdmr.radio.ui.AprsScreen(this, s, close);
         if (s.parrot().enabled()) return new com.macdmr.radio.ui.ParrotScreen(this, s, close);
         if (s.ft8Running()) return new com.macdmr.radio.ui.Ft8Screen(this, s, close);
+        if (s.m17Running()) return new com.macdmr.radio.ui.M17Screen(this, s, close);
         return null;
     }
     /** PKT -> Band scope. */
@@ -278,6 +279,7 @@ public class MainActivity extends AppCompatActivity {
         if (pe.monitoring()) return "\uD83D\uDCE1  APRS monitoring  \u00B7  " + String.format(java.util.Locale.US, "%.3f", s.aprsMonitorHz() / 1e6);
         if (pe.kiss().isActive()) return "📡  KISS TNC";
         if (s.parrot().enabled()) return "🦜  Parrot";
+        if (s.m17Running()) { com.macdmr.radio.M17Station.Heard h = s.m17().current(); return "📻  M17" + (h != null ? "  ·  " + (h.src.isEmpty() ? "receiving" : h.src + " → " + h.dst) : "  ·  listening"); }
         if (s.ft8Running()) return "〰  FT8" + (s.ft8().txEnabled() ? "  ·  transmitting in its period" : "  ·  listening");
         return null;
     }

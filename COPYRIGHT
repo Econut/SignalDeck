@@ -52,6 +52,10 @@ https://github.com/IIMacGyverII/SignalDeck/releases (each release lists the SHA-
 SignalDeck includes or uses the following, each under its own license:
 
   - robot36 by Ahmet Inan (https://github.com/xdsopl/robot36) -- SSTV decoding, ported to Java; GNU GPL v3.
+  - Codec 2 by David Rowe VK5DGR and contributors (https://github.com/drowe67/codec2) -- the voice codec of M17,
+    built from source into the app (app/src/main/cpp/codec2, with its COPYING); GNU Lesser General Public License 2.1.
+  - M17 protocol: the M17 Project specification (https://spec.m17project.org); SignalDeck's M17 receiver is written from
+    the specification.
   - ft8_lib by Karlis Goba (https://github.com/kgoba/ft8_lib) -- the FT8 encoder, decoder and message packing, ported
     to Java; MIT License: Copyright (c) 2018 Karlis Goba. Permission is hereby granted, free of charge, to any person
     obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software
