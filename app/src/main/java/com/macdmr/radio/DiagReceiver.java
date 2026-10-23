@@ -56,6 +56,19 @@ public final class DiagReceiver extends BroadcastReceiver {
                 break;
             }
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
+            case "txwav": { String nm = i.getStringExtra("name"); if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) Log.i("DiagReceiver", "txwav: " + s.diagTxWav(new java.io.File(c.getCacheDir(), "tx_" + nm + ".wav"))); break; }   // bench: transmit cache/tx_<name>.wav (low power VFO)
+            case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel
+            case "rxclip": {                                                    // bench: record the receive audio (8 kHz mono, before any app squelch) for --ei ms into cache/rxclip_<name>.wav
+                final int ms = Math.max(1000, Math.min(120_000, i.getIntExtra("ms", 10_000)));
+                String nm = i.getStringExtra("name"); if (nm == null || !nm.matches("[A-Za-z0-9_-]{1,40}")) nm = "clip";
+                try {
+                    final java.io.File f = new java.io.File(c.getCacheDir(), "rxclip_" + nm + ".wav");
+                    final ClipRecorder cr = new ClipRecorder(f, ms); s.recordClip(cr, false);
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> { s.recordClip(null, false); cr.finish(); Log.i("DiagReceiver", "rxclip done: " + f + " " + f.length() + " B"); }, ms + 300);
+                    Log.i("DiagReceiver", "rxclip start " + ms + " ms");
+                } catch (Throwable t) { Log.w("DiagReceiver", "rxclip: " + t); }
+                break;
+            }
             case "wlbench": com.macdmr.radio.winlink.Winlink.benchPort = Math.max(0, Math.min(65535, i.getIntExtra("port", 0))); Log.i("DiagReceiver", "wlbench port " + com.macdmr.radio.winlink.Winlink.benchPort); break;   // bench: test CMS on 127.0.0.1 (0 = off)
             case "wldiagreset": s.winlink().resetDiag(); Log.i("DiagReceiver", "wldiagreset"); break;   // bench: the first-connection question again, log off
             case "wlconnect": Log.i("DiagReceiver", "wlconnect: " + s.winlink().connectInternet()); break;

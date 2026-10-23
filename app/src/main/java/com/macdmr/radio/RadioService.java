@@ -1551,6 +1551,15 @@ public class RadioService extends Service implements RadioEngine.Events {
     // ---- Device tools ----
     public void diagVersion() { worker.execute(() -> { try { engine.queryVersion(); } catch (IOException e) { log("version: " + e); } }); }
     public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
+    /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
+    public String diagTxWav(java.io.File f) {
+        try {
+            byte[] b = java.nio.file.Files.readAllBytes(f.toPath()); int n = (b.length - 44) / 2;
+            if (n <= 0 || n > 8000 * 28) return "bad length";
+            short[] pcm = new short[n]; for (int i = 0; i < n; i++) pcm[i] = (short) ((b[44 + 2 * i] & 0xFF) | (b[45 + 2 * i] << 8));
+            transmitPcm(pcm, "bench wav", null); return "transmitting " + n / 8 + " ms";
+        } catch (Exception e) { return "txwav: " + e; }
+    }
     public void diagTestTone(int ms) { short[] pcm = new short[8000 * ms / 1000]; for (int i = 0; i < pcm.length; i++) pcm[i] = (short) (12000 * Math.sin(2 * Math.PI * 1000 * i / 8000.0)); transmitPcm(pcm, "1 kHz test tone " + ms + " ms", null); }
 
     /** Ask the module for the signal strength (on the radio worker: never a serial write on the main thread). */
@@ -2513,6 +2522,12 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (p.getBoolean("stoppedScan", false) && !scanning()) ui.postDelayed(this::toggleScan, RETUNE_SETTLE_MS);
         history("pkt", "\u23F0 Scheduled: " + (e == null ? "operation" : e.actionName()) + " ended" + (moved && prev >= 0 ? ": back to channel " + prev : ""));
         Scheduler.arm(this);
+    }
+
+    /** Bench (DiagReceiver): re-send the current analog channel/VFO with another module volume byte (normally 8). */
+    public void diagAnalogVolume(final int vol) {
+        final ChannelStore.Channel ch = vfo != null ? vfo : current; if (ch == null || ch.isDigital()) return;
+        worker.execute(() -> { try { engine.setAnalog(ch.rxFreq, ch.txFreq, ch.band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, vol, 2); log("bench: module volume " + vol); } catch (Exception e) { log("bench volume: " + e); } });
     }
 
     // ---- bench: play a WAV into the receive path as if the radio heard it (DiagReceiver, adb only) ----

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Bench commands for the POCSAG deep dive (adb only)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | DIAG `rxclip --ei ms --es name` (record the raw receive audio, 8 kHz mono, before any app squelch, to the app cache), `rxvol --ei v` (re-send the current analog channel with another module volume byte; normally 8), `txwav --es name` (transmit an 8 kHz WAV from the app cache on the current channel/VFO, ≤ 28 s). Nothing user-facing. Used for the POCSAG deep dive (phonedmrapp `docs/pocsag-deep-dive-2026-10-22.md`, tools in `tools/pocsag-research/`): receive decodable with a calibrated decision-feedback equalizer and BCH inside the loop (limits at 4.5 kHz and per transmitter shape), transmit not feasible for real pagers on this phone. | `DiagReceiver.java`, `RadioService.java` | Used throughout the bench session on the owner's Armor (467.625 MHz, low power); module volume restored to 8; bench files removed from the app cache. |
+
 ## 2026-10-22 — Packet: frames in air order across decode windows
 
 | Backlog | Change | Files | Test |
