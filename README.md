@@ -25,6 +25,26 @@
 4. More channels: open a CHIRP CSV with SignalDeck or use the share button on the Channels page, or restore a backup (the five-CSV layout of the DMRModHooks module and the OpenGD77 CPS fork, in `Download/DMR/DMR_Backups`).
 5. To hand the radio back, use **Device → Exit SignalDeck**: it switches the module off, or gives the radio back to the stock app.
 
+## Screenshots
+
+The screenshots use demo data: made-up callsigns (unallocated `Q` prefixes, `DEMO-n`), a test location in Denver, demo channels and signals from a bench transmitter. The SSTV picture of the ISS is a real reception.
+
+<table>
+<tr><td align="center" width="25%"><img src="docs/screenshots/intercom-noaa.png" width="200" alt="Intercom: NOAA weather, S-meter"><br><sub>Intercom: NOAA weather, S-meter</sub></td><td align="center" width="25%"><img src="docs/screenshots/intercom-captions.png" width="200" alt="Live captions of a reception"><br><sub>Live captions of a reception</sub></td><td align="center" width="25%"><img src="docs/screenshots/intercom-dmr.png" width="200" alt="A DMR repeater channel"><br><sub>A DMR repeater channel</sub></td><td align="center" width="25%"><img src="docs/screenshots/intercom-classic.png" width="200" alt="The classic intercom look"><br><sub>The classic intercom look</sub></td></tr>
+<tr><td align="center" width="25%"><img src="docs/screenshots/channels.png" width="200" alt="Channels and zones"><br><sub>Channels and zones</sub></td><td align="center" width="25%"><img src="docs/screenshots/channel-editor.png" width="200" alt="Channel editor"><br><sub>Channel editor</sub></td><td align="center" width="25%"><img src="docs/screenshots/pkt-sheet.png" width="200" alt="The PKT key: every mode"><br><sub>The PKT key: every mode</sub></td><td align="center" width="25%"><img src="docs/screenshots/launch.png" width="200" alt="Launch screen"><br><sub>Launch screen</sub></td></tr>
+<tr><td align="center" width="25%"><img src="docs/screenshots/aprs.png" width="200" alt="APRS: packets and messages"><br><sub>APRS: packets and messages</sub></td><td align="center" width="25%"><img src="docs/screenshots/aprs-stations.png" width="200" alt="APRS stations"><br><sub>APRS stations</sub></td><td align="center" width="25%"><img src="docs/screenshots/map.png" width="200" alt="Map with APRS stations"><br><sub>Map with APRS stations</sub></td><td align="center" width="25%"><img src="docs/screenshots/ft8.png" width="200" alt="FT8 over FM"><br><sub>FT8 over FM</sub></td></tr>
+<tr><td align="center" width="25%"><img src="docs/screenshots/sstv-receive.png" width="200" alt="SSTV receive"><br><sub>SSTV receive</sub></td><td align="center" width="25%"><img src="docs/screenshots/sstv-picture.png" width="200" alt="ISS SSTV picture (real reception)"><br><sub>ISS SSTV picture (real reception)</sub></td><td align="center" width="25%"><img src="docs/screenshots/band-scope.png" width="200" alt="Band scope"><br><sub>Band scope</sub></td><td align="center" width="25%"><img src="docs/screenshots/satellite-passes.png" width="200" alt="Satellite passes"><br><sub>Satellite passes</sub></td></tr>
+<tr><td align="center" width="25%"><img src="docs/screenshots/conditions.png" width="200" alt="VHF/UHF conditions"><br><sub>VHF/UHF conditions</sub></td><td align="center" width="25%"><img src="docs/screenshots/help.png" width="200" alt="In-app help"><br><sub>In-app help</sub></td></tr>
+</table>
+
+**SignalDeck Web**, the radio in a browser on your Wi-Fi (desktop and phone):
+
+<table>
+<tr><td align="center" width="33%"><img src="docs/screenshots/web-intercom.png" width="300" alt="SignalDeck Web: Intercom"><br><sub>Intercom</sub></td><td align="center" width="33%"><img src="docs/screenshots/web-aprs.png" width="300" alt="SignalDeck Web: APRS"><br><sub>APRS</sub></td><td align="center" width="33%"><img src="docs/screenshots/web-map.png" width="300" alt="SignalDeck Web: Map"><br><sub>Map</sub></td></tr>
+<tr><td align="center" width="33%"><img src="docs/screenshots/web-ft8.png" width="300" alt="SignalDeck Web: FT8"><br><sub>FT8</sub></td><td align="center" width="33%"><img src="docs/screenshots/web-sstv.png" width="300" alt="SignalDeck Web: SSTV gallery"><br><sub>SSTV gallery</sub></td><td align="center" width="33%"><img src="docs/screenshots/web-band-scope.png" width="300" alt="SignalDeck Web: Band scope"><br><sub>Band scope</sub></td></tr>
+<tr><td align="center"><img src="docs/screenshots/web-intercom-phone.png" width="200" alt="SignalDeck Web on a phone: intercom"><br><sub>On a phone: intercom</sub></td><td align="center"><img src="docs/screenshots/web-aprs-phone.png" width="200" alt="SignalDeck Web on a phone: APRS"><br><sub>On a phone: APRS</sub></td><td></td></tr>
+</table>
+
 ## What it does
 
 ### Talk and listen

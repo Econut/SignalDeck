@@ -40,6 +40,7 @@ public final class DmrAudioCheck {
         public double rms = -1;                         // of what arrived during calls (-1 = not measured)
         public boolean muted, mediaMode, rxAudioOn = true;
         public boolean monTested; public long monPcm; public double monRms = -1;
+        public boolean notReady;                       // the radio was still starting up (or being restarted) when the check ran
         public long monAckMs = -1;                     // when the radio acknowledged MON (ms after asking), -1 = never (or MON was already on)
         public boolean monUnanswered;                  // the check asked for MON and the radio never answered (no ack, no refusal)
         public boolean squelchStuck; public int closedBy = -1;      // after MON off the squelch stayed open with no signal; which step closed it (0 none)   // analog: 10 s with the squelch held open (MON): receiver noise must arrive
@@ -55,6 +56,10 @@ public final class DmrAudioCheck {
     /** The most likely cause first, as plain sentences. Pure: host-tested. */
     public static List<String> verdict(Facts f) {
         List<String> v = new ArrayList<>();
+        if (f.notReady) {
+            v.add("The radio was still starting up (or being restarted) when the check ran, so nothing could be measured. Run the check again once the intercom says READY.");
+            return v;
+        }
         if (f.classMissing && !f.uartPcm) {                        // only phones whose audio goes through PrizeTinyService need it
             v.add("This ROM does not have Ulefone's PrizeTinyService framework class, which carries the radio's receive audio on this phone. "
                     + "SignalDeck (and the stock app) can't get any receive audio on it, analog and DMR alike."
@@ -134,7 +139,11 @@ public final class DmrAudioCheck {
         sys.append("  system image ").append(DeviceReport.getprop("ro.product.system.name")).append(" / ").append(DeviceReport.getprop("ro.system.build.fingerprint")).append('\n');
         sys.append("  vendor image ").append(DeviceReport.getprop("ro.vendor.build.fingerprint")).append('\n');
         sys.append("  security patch ").append(Build.VERSION.SECURITY_PATCH).append(" · build type ").append(Build.TYPE).append('/').append(Build.TAGS).append('\n');
-        f.uartPcm = "UartPcmAudio".equals(svc.audioBackendName());
+        // from the profile, not the running backend: during a module restart no audio backend runs yet (Xplore 1, 2026-10-23)
+        f.uartPcm = svc.profile() != null ? svc.profile().audio == DeviceProfile.Audio.UART_PCM : "UartPcmAudio".equals(svc.audioBackendName());
+        // a check started while the radio is still starting (or being restarted) waits for it, up to 30 s
+        for (int w = 0; w < 30 && !svc.isReady(); w++) { p.step("Waiting for the radio to be ready (" + (30 - w) + " s)…"); Thread.sleep(1000); }
+        f.notReady = !svc.isReady();
         if (f.uartPcm) { java.util.regex.Matcher m = java.util.regex.Pattern.compile("(/dev/\\S+)").matcher(String.valueOf(svc.audioStartResult())); if (m.find()) f.pcmPort = m.group(1); }
         try { Class.forName("android.os.PrizeTinyService"); sys.append("  framework class android.os.PrizeTinyService: present\n"); }
         catch (Throwable t) { f.classMissing = true; sys.append("  framework class android.os.PrizeTinyService: MISSING (").append(t.getClass().getSimpleName()).append(")").append(f.uartPcm ? " (not used on this phone: its audio comes over the radio's audio serial port)" : "").append("\n"); }

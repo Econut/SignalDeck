@@ -32,6 +32,10 @@ public class DmrAudioCheckTest {
         DmrAudioCheck.Facts f = ok(); f.uartPcm = true; f.digitalChannel = false; f.monTested = true; f.monPcm = 0; f.monRefused = true;
         String s = v(f); assertTrue(s, s.contains("refused to switch MON on") && !s.contains("not sending audio")); assertEquals(1, DmrAudioCheck.verdict(f).size());
     }
+    @Test public void aCheckDuringStartUpSaysSo() {                         // Xplore 1 report 2026-10-23: ran while the module was being restarted
+        DmrAudioCheck.Facts f = ok(); f.classMissing = true; f.uartPcm = true; f.notReady = true; f.pcmDuringCalls = 0;
+        String s = v(f); assertTrue(s, s.contains("still starting up") && !s.contains("PrizeTinyService")); assertEquals(1, DmrAudioCheck.verdict(f).size());
+    }
     @Test public void monNotAnsweredIsNotBlamedOnTheAudioPath() {            // Xplore 1 report 2026-10-23: MON sent once, no answer, 0 bytes in part 1
         DmrAudioCheck.Facts f = ok(); f.uartPcm = true; f.digitalChannel = false; f.monTested = true; f.monPcm = 0; f.monUnanswered = true; f.pcmDuringCalls = 459918;
         String s = v(f); assertTrue(s, s.contains("did not answer the MON command") && s.contains("receive audio works") && !s.contains("not sending audio"));

@@ -4,6 +4,14 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-23 — README screenshots; SSTV picture sheet fits; radio audio check waits for start-up
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | Xplore 1 tester, beta.17 (2026-10-23): "Now everything worked just fine": the start-up check found the module not answering, restarted it (its boot banner arrived for the first time in SignalDeck), and reception, MON and CTCSS 100 Hz all passed the second radio test, every command answered in milliseconds. One report had a Radio audio check run during that restart (link booting, no audio yet), and it blamed a missing PrizeTinyService. The check now waits up to 30 s for the radio to be ready and otherwise says it was still starting; whether audio comes over a serial port is taken from the phone's profile, not the running backend. Help updated. | `DmrAudioCheck.java`, `ui/HelpView.java` | Host: DmrAudioCheckTest (new case). |
+| — | SSTV: the picture sheet (gallery) and the Combine preview were sized before the picture's height was known, so the sheet came out short and cut off the picture and its Share button; the picture now gets its real height up front. | `ui/SstvScreen.java` | Device (Armor): the sheet shows the whole picture with Share and Delete. |
+| — | README: a Screenshots section (18 phone, 8 SignalDeck Web), taken with demo data only (made-up callsigns, a Denver test location, bench signals). Bench: `WriteBenchWavs` also writes the demo APRS traffic. | `README.md`, `docs/screenshots/`, `test/.../WriteBenchWavs.java` | Every image reviewed for personal data. |
+
 ## 2026-10-23 — A radio module that stops taking commands is restarted (Xplore 1)
 
 | Backlog | Change | Files | Test |

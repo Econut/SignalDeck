@@ -172,8 +172,10 @@ public final class SstvScreen extends ModeScreen {
 
     private void view(File f) {
         LinearLayout body = Neo.sheetBody(c, "📺  " + f.getName());
-        ImageView iv = new ImageView(c); iv.setAdjustViewBounds(true); iv.setImageBitmap(BitmapFactory.decodeFile(f.getAbsolutePath()));
-        body.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        ImageView iv = new ImageView(c); iv.setAdjustViewBounds(true); android.graphics.Bitmap bm = BitmapFactory.decodeFile(f.getAbsolutePath()); iv.setImageBitmap(bm);
+        // its real height up front: the sheet's window is sized when it opens, and a wrap-content picture measured short there (cut the sheet off)
+        int pw = getResources().getDisplayMetrics().widthPixels - dp(56), ph = bm != null && bm.getWidth() > 0 ? pw * bm.getHeight() / bm.getWidth() : LayoutParams.WRAP_CONTENT;
+        body.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, ph));
         body.addView(Neo.sheetHint(c, "Received " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new java.util.Date(f.lastModified())) + " · Download/DMR/SSTV"));
         TextView share = Neo.button(c, "Share", "send", Neo.CYAN);
         share.setOnClickListener(v -> {
@@ -219,7 +221,8 @@ public final class SstvScreen extends ModeScreen {
     private void combineSheet(final com.macdmr.radio.SstvCombine.Plan pl) {
         LinearLayout body = Neo.sheetBody(c, "\uD83D\uDCFA  Combine " + pl.files.size() + " pictures");
         final ImageView iv = new ImageView(c); iv.setAdjustViewBounds(true);
-        body.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        int pw = getResources().getDisplayMetrics().widthPixels - dp(56);                 // real height up front (see view())
+        body.addView(iv, new LayoutParams(LayoutParams.MATCH_PARENT, pw * pl.h / Math.max(1, pl.w)));
         final TextView note = Neo.sheetHint(c, ""); body.addView(note);
         final int[] cur = { pl.ref == 0 ? 1 : 0 }; final boolean[] manual = { false };
         final TextView pick = Neo.button(c, "", null, Neo.CYAN), use = Neo.button(c, "", null, Neo.MUTED);
