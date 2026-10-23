@@ -34,7 +34,7 @@ public final class Ft8Station {
     /** Key-up this long before the slot starts, so that after the lead-in the signal starts 0.5 s into the slot. */
     public static volatile int txAdvanceMs = TX_LEAD_MS - 500;
     /** From the transmit call to the first audio sample on air (bench-measured; the lead-in is shortened by it). */
-    public static volatile int txLatencyMs = 200;                        // RadioService.transmitPcm keys, waits 200 ms, then plays
+    public static volatile int txLatencyMs = 320;                        // measured 2026-10-22 (HackRF, decoded DT of 3 transmissions): transmitPcm's 200 ms wait + playback start
     public static final int WATCHDOG = 8;                                // the same message unanswered this many times: stop
 
     /** One line of the decode list. */
@@ -270,7 +270,8 @@ public final class Ft8Station {
         if (m.equals(lastMsg)) { if (++repeats >= limit) { txEnabled = false; status = "Stopped: no answer after " + WATCHDOG + " tries"; host.event("⏹ FT8: no answer to \"" + m + "\", stopped"); changed(); return; } }
         else repeats = 0;
         lastMsg = m; scheduledSlot = next; lastTxSlot = next;
-        short[] pcm = Ft8.pcm(p, txHz, Math.max(0, txAdvanceMs + 500 - txLatencyMs), 0.7);
+        // the lead-in from the actual moment of keying: a late tick is absorbed, the signal still starts 0.5 s into the slot
+        short[] pcm = Ft8.pcm(p, txHz, (int) Math.max(0, next * 15000L + 500 - now - txLatencyMs), 0.7);
         synchronized (this) { long s = next * 15; sent.add(String.format(Locale.US, "%02d%02d%02d  %4.0f  %s", (s / 3600) % 24, (s / 60) % 60, s % 60, txHz, m)); while (sent.size() > 200) sent.remove(0); }
         status = "Transmitting: " + m;
         final int stepAtTx = step;

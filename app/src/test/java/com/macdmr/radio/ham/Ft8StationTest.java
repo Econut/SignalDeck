@@ -29,9 +29,11 @@ public class Ft8StationTest {
             tx.add(d.isEmpty() ? "?" : d.get(0).text);
             done.run();
         }
-        float[] padToSlot(float[] x) {                                   // where the audio lands in its slot: keyed txAdvanceMs before the boundary
-            float[] s = new float[Ft8.RATE * 15]; int shift = Ft8.RATE * (Ft8Station.txAdvanceMs - Ft8Station.txLatencyMs) / 1000;   // the radio plays the audio txLatencyMs after keying
-            for (int i = shift; i < x.length && i - shift < s.length; i++) s[i - shift] = x[i];
+        float[] padToSlot(float[] x) {                                   // where the audio lands in its slot: it plays txLatencyMs after keying
+            long key = txAt.get(txAt.size() - 1), boundary = (key / 15000 + 1) * 15000;
+            int shift = (int) ((boundary - key - Ft8Station.txLatencyMs) * Ft8.RATE / 1000);
+            float[] s = new float[Ft8.RATE * 15];
+            for (int i = Math.max(0, shift); i < x.length && i - shift < s.length; i++) s[i - shift] = x[i];
             return s;
         }
         @Override public String callsign() { return "W9XYZ"; }
