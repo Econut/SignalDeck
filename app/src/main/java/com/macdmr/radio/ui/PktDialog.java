@@ -122,8 +122,9 @@ public final class PktDialog {
         body.addView(section("Text modes"));
         LinearLayout xr = row();
         button(xr, "RTTY and PSK31", Theme.SOFTSQ, x -> { dlg.dismiss(); TextModesDialog.show(c, svc); });
+        button(xr, svc.ft8Running() ? "FT8 (running)" : "FT8 over FM", Theme.SOFTSQ, x -> { if (!svc.ft8Running()) svc.setFt8(true); openScreen(); });
         body.addView(xr);
-        body.addView(hint("Keyboard chat modes used with fldigi: " + pe.textStatus() + "."));
+        body.addView(hint("Keyboard chat modes used with fldigi: " + pe.textStatus() + ". FT8 over FM: the WSJT-X mode on this FM channel, with automatic QSOs (it cannot hear SSB FT8)."));
         // ---- packet terminal ----
         body.addView(section("Packet terminal"));
         LinearLayout tr = row();

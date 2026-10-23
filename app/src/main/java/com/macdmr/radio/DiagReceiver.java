@@ -58,6 +58,18 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
             case "txwav": { String nm = i.getStringExtra("name"); if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) Log.i("DiagReceiver", "txwav: " + s.diagTxWav(new java.io.File(c.getCacheDir(), "tx_" + nm + ".wav"))); break; }   // bench: transmit cache/tx_<name>.wav (low power VFO)
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel
+            case "ft8": {                                                       // bench: FT8 on/off (--ez on), send one message (--es msg) in a period (--ei parity 0/1); decodes go to the log
+                com.macdmr.radio.ham.Ft8Station f = s.ft8();
+                if (i.hasExtra("on")) s.setFt8(i.getBooleanExtra("on", false));
+                if (i.hasExtra("parity")) f.setTxParity(i.getIntExtra("parity", 0));
+                if (i.hasExtra("advance")) com.macdmr.radio.ham.Ft8Station.txAdvanceMs = Math.max(0, Math.min(3000, i.getIntExtra("advance", 1100)));
+                String m = i.getStringExtra("msg"); if (m != null) Log.i("DiagReceiver", "ft8 send: " + f.sendText(m));
+                if (i.getBooleanExtra("cq", false)) Log.i("DiagReceiver", "ft8 cq: " + f.callCq());
+                if (i.getBooleanExtra("halt", false)) f.haltTx();
+                for (com.macdmr.radio.ham.Ft8Station.Heard h : f.heard()) Log.i("DiagReceiver", "ft8 heard " + h.time() + " " + h.d);
+                Log.i("DiagReceiver", "ft8: " + f.status() + ", running " + f.running() + ", tx " + f.txEnabled() + " " + f.nextMessage() + ", parity " + f.txParity() + ", advance " + com.macdmr.radio.ham.Ft8Station.txAdvanceMs);
+                break;
+            }
             case "rxclip": {                                                    // bench: record the receive audio (8 kHz mono, before any app squelch) for --ei ms into cache/rxclip_<name>.wav
                 final int ms = Math.max(1000, Math.min(120_000, i.getIntExtra("ms", 10_000)));
                 String nm = i.getStringExtra("name"); if (nm == null || !nm.matches("[A-Za-z0-9_-]{1,40}")) nm = "clip";

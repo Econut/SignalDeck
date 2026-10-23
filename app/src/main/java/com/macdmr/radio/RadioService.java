@@ -930,6 +930,8 @@ public class RadioService extends Service implements RadioEngine.Events {
             else if (peak > 400 && System.currentTimeMillis() - captionLastEnd > 1500 && captions != null) { Log.i(TAG, "captions: starting utterance (peak " + peak + ")"); captions.start(); }
         }
         if (packet != null) packet.feed(mono, n, open, packet.monitoring() || packet.sstvRx());   // APRS / SSTV decode below any squelch (noise fails the CRC / VIS); Morse and DTMF wait for a signal
+        com.macdmr.radio.ham.Ft8Station f8 = ft8;
+        if (f8 != null && f8.running() && current != null && !current.isDigital()) f8.feed(mono, n);   // every slot, squelch or not: noise fails FT8's CRC
         if (parrot.enabled()) {
             ChannelStore.Channel pc = current;
             if (pc == null || pc.number != parrotChannel) { ui.post(() -> { if (parrot.enabled()) { setParrot(false); history("pkt", "\uD83E\uDD9C Parrot stopped: the channel changed"); } }); }
@@ -2286,6 +2288,57 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- message forms (ICS-213, radiogram) over APRS messages or DMR texts ----
     private com.macdmr.radio.ham.FormStore forms;
+    // ---- FT8 over FM ----
+    private volatile com.macdmr.radio.ham.Ft8Station ft8;
+    private java.util.concurrent.ScheduledExecutorService ft8Exec;
+    private java.util.concurrent.ScheduledFuture<?> ft8Ticks;
+    /** The FT8 station (slots, decodes, the QSO sequence) on the current FM channel. */
+    public synchronized com.macdmr.radio.ham.Ft8Station ft8() {
+        if (ft8 == null) {
+            ft8Exec = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> { Thread t = new Thread(r, "ft8"); t.setPriority(Thread.NORM_PRIORITY - 1); return t; });
+            ft8 = new com.macdmr.radio.ham.Ft8Station(new com.macdmr.radio.ham.Ft8Station.Host() {
+                @Override public long now() { return System.currentTimeMillis(); }
+                @Override public boolean canTransmit() { ChannelStore.Channel c = current; return c != null && !c.isDigital() && isReady() && !pttDown && !txInhibited(); }
+                @Override public void transmit(short[] pcm, String label, Runnable done) { transmitPcm(pcm, label, done); }
+                @Override public String callsign() { return packet != null && packet.callsignSet() ? packet.callsign() : null; }
+                @Override public String grid() { return ft8Grid(); }
+                @Override public void event(String line) { history("pkt", line); }
+                @Override public void heard(String call, String grid, int snr) {
+                    logHeardStation(call, "FT8", "FT8 over FM, " + snr + " dB");
+                    if (grid != null) try { logbook().enrich(call, null, grid, null); } catch (Throwable t) { log("logbook: " + t); }
+                }
+                @Override public void logQso(String call, String grid, String sent, String rcvd) {
+                    try {
+                        com.macdmr.radio.ham.Logbook.Entry e = new com.macdmr.radio.ham.Logbook.Entry();
+                        ChannelStore.Channel c = current;
+                        e.ts = System.currentTimeMillis(); e.call = call; e.freqHz = c != null ? c.rxFreq : 0; e.mode = "FT8"; e.qso = true;
+                        e.rstSent = sent == null ? "" : sent; e.rstRcvd = rcvd == null ? "" : rcvd; e.grid = grid == null ? "" : grid; e.source = "FT8 over FM";
+                        logbook().save(e); enrichCall(call, null);
+                    } catch (Throwable t) { log("logbook: " + t); }
+                }
+                @Override public void decodeAsync(Runnable job) { ft8Exec.execute(() -> { long t0 = android.os.SystemClock.elapsedRealtime(); job.run(); log("FT8 slot decoded in " + (android.os.SystemClock.elapsedRealtime() - t0) + " ms"); }); }
+            });
+        }
+        return ft8;
+    }
+    public boolean ft8Running() { com.macdmr.radio.ham.Ft8Station f = ft8; return f != null && f.running(); }
+    /** Start or stop listening for FT8; the scheduler ticks four times a second while it runs. */
+    public synchronized void setFt8(boolean on) {
+        final com.macdmr.radio.ham.Ft8Station s = ft8();
+        if (on) { s.start(); if (ft8Ticks == null) ft8Ticks = ft8Exec.scheduleAtFixedRate(() -> { try { s.tick(); } catch (Throwable t) { log("ft8: " + t); } }, 0, 250, java.util.concurrent.TimeUnit.MILLISECONDS); }
+        else { s.stop(); if (ft8Ticks != null) { ft8Ticks.cancel(false); ft8Ticks = null; } }
+    }
+    /** The 4-character grid FT8 sends: the one set in FT8 settings, else the phone's location; "-" sends none. */
+    public String ft8Grid() {
+        String g = getSharedPreferences("radio", MODE_PRIVATE).getString("ft8Grid", "").trim().toUpperCase(java.util.Locale.US);
+        if (g.equals("-")) return "";
+        if (g.length() >= 4) return g.substring(0, 4);
+        android.location.Location l = lastKnownLocation();
+        return l != null ? com.macdmr.radio.ham.Maidenhead.grid(l.getLatitude(), l.getLongitude(), 4) : "";
+    }
+    public String ft8GridSetting() { return getSharedPreferences("radio", MODE_PRIVATE).getString("ft8Grid", ""); }
+    public void setFt8Grid(String g) { getSharedPreferences("radio", MODE_PRIVATE).edit().putString("ft8Grid", g == null ? "" : g.trim().toUpperCase(java.util.Locale.US)).apply(); }
+
     private PacketFinder finder;
     /** The packet finder (listens for BBSs, nodes and Winlink gateways). */
     public synchronized PacketFinder finder() { if (finder == null) finder = new PacketFinder(this); return finder; }

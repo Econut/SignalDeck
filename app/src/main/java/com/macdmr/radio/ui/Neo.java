@@ -221,6 +221,7 @@ public final class Neo {
         ICONS.put("device", "M4 8h16v13H4zM8 3l8 5M7 13h3M7 16h3M15 12a2.5 2.5 0 1 0 0.01 0");
         ICONS.put("scan", "M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3M18 3v4h-4M6 21v-4h4");
         ICONS.put("stop", "M7 7h10v10H7z");
+        ICONS.put("ft8", "M3 18h3v-4h3v5h3v-9h3v4h3V6h3");                 // stepped tones: 8-FSK
         ICONS.put("zone", "M12 3l9 5-9 5-9-5zM3 13l9 5 9-5");
         ICONS.put("softsq", "M3 12h3l2-5 3 10 3-7 2 2h5");
         ICONS.put("txt", "M4 6h16M4 11h11M4 16h14M4 21h7");
