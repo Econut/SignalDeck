@@ -69,8 +69,13 @@ public class AFSKDecoder {
     public static volatile int fixedFrames;
 
     public static List<byte[]> decode(short[] audioSamples) {
-        if (!MULTI_SLICER && !BIT_FIX && !TONE_AGC) return decodeLegacy(audioSamples);
-        List<byte[]> packets = new ArrayList<>();
+        List<byte[]> out = new ArrayList<>(); for (Object[] f : decodeTimed(audioSamples)) out.add((byte[]) f[1]); return out;
+    }
+
+    /** As {@link #decode}, each frame with its start position in bits (1200 per second from the buffer's start), in air order. */
+    public static List<Object[]> decodeTimed(short[] audioSamples) {
+        if (!MULTI_SLICER && !BIT_FIX && !TONE_AGC) { List<Object[]> l = new ArrayList<>(); for (byte[] f : decodeLegacy(audioSamples)) l.add(new Object[] { 0, f }); return l; }
+        List<Object[]> packets = new ArrayList<>();
         try {
             short[] s = applyAGC(audioSamples);
             float[][] tones = AFSKDecoderIQ.toneStrengths(s);
@@ -90,7 +95,7 @@ public class AFSKDecoder {
                 }
             }
             found.sort((a, b) -> Integer.compare((Integer) a[0], (Integer) b[0]));   // the order they were on the air (connected mode depends on it)
-            for (Object[] f : found) packets.add((byte[]) f[1]);
+            packets.addAll(found);
         } catch (Exception e) {
             android.util.Log.d("pkt", TAG + ": Error decoding AFSK: " + e.getMessage());
         }

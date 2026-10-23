@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Packet: frames in air order across decode windows
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | The decoder works on 2 s windows that repeat the previous window's last second; a frame missed in one window and caught in that overlap reached the AX.25 session after a later frame (one REJ round per occurrence, seen in the Winlink detailed log). Frames that start in a window's last second are now held until the next window is decoded, merged without duplicates and released in air order (`WindowOrder`; `AFSKDecoder.decodeTimed` gives each frame's bit position); held frames are released after 3.5 s if no further window comes. Adds at most about a second before a frame in the overlap is handed on. | `pkt/WindowOrder.java` (new), `pkt/AFSKDecoder.java`, `PacketEngine.java`, `WindowOrderTest.java` | `WindowOrderTest` (the bench case: 5 found before 4 comes out 4, 5; release when the audio stops; a window after a gap). APRS benchmark unchanged. **On the air** (HackRF gateway, 467.625 low power): received I frames 0,1,2,3,4,5,6 in order (one retransmission after a lost frame), Winlink session 133 s (163 s before this fix, 215 s before the slicer-order fix), gateway "RESULT ok", 1 sent and 1 received. Bench state reset. |
+
 ## 2026-10-22 — SignalDeck 1.0.0-beta.14 (pre-release)
 
 | Backlog | Change | Files | Test |

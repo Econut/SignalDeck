@@ -817,7 +817,8 @@ public final class PacketEngine {
                     System.arraycopy(window, 0, samples, tl, WINDOW);
                     overlapTail = Arrays.copyOfRange(window, WINDOW - OVERLAP, WINDOW);
                     fill = 0;
-                    decoder.execute(() -> decodeWindow(samples));
+                    final boolean hasTail = tl > 0;
+                    decoder.execute(() -> decodeWindow(samples, hasTail));
                 }
             }
         } catch (Throwable t) { Log.w(TAG, "feed: " + t); }
@@ -833,9 +834,21 @@ public final class PacketEngine {
         return out;
     }
 
-    private void decodeWindow(short[] samples) {
+    /** Frames in a window's last second wait for the next window, so they are handed on in air order (WindowOrder). */
+    private final com.macdmr.radio.pkt.WindowOrder order = new com.macdmr.radio.pkt.WindowOrder();
+    private volatile long orderStamp;
+    private void decodeWindow(short[] samples, boolean hasTail) {
         try {
-            List<byte[]> frames = AFSKDecoder.decode(up6(samples));
+            List<byte[]> frames = order.add(AFSKDecoder.decodeTimed(up6(samples)), (samples.length - OVERLAP) * 1200.0 / SR, hasTail);
+            deliverFrames(frames);
+            if (order.holding()) {                                            // no next window within 3.5 s (the audio stopped): release what is held
+                final long stamp = ++orderStamp;
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> decoder.execute(() -> { if (orderStamp == stamp && order.holding()) deliverFrames(order.flush()); }), 3500);
+            }
+        } catch (Throwable t) { Log.w(TAG, "decode: " + t); }
+    }
+    private void deliverFrames(List<byte[]> frames) {
+        try {
             for (byte[] frame : frames) {
                 java.util.function.Consumer<byte[]> ft = finderTap; if (ft != null) try { ft.accept(frame); } catch (Throwable x) { Log.w(TAG, "finder: " + x); }
                 com.macdmr.radio.pkt.Ax25Session ts = terminal;
