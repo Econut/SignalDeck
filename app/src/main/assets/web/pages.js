@@ -1008,6 +1008,25 @@ $('trDisc').onclick = () => act('terminal', { disconnect: true });
 $('trAccept').onchange = () => act('terminal', { accept: $('trAccept').checked });
 $('trForm').addEventListener('submit', async e => { e.preventDefault(); if (await act('terminal', { send: $('trLine').value })) $('trLine').value = ''; });
 
+// ---- M17 receive: state once a second while the Packet page is open ----
+let m7 = null;
+async function pollM17() {
+  if (S.page !== 'pkt') return;
+  try {
+    const j = await api('m17'); m7 = j;
+    $('m7State').textContent = j.running ? (j.receiving ? 'RECEIVING' : 'LISTENING') : 'OFF'; $('m7State').className = 'chip ' + (j.running ? (j.receiving ? 'green' : 'amber') : 'dim');
+    $('m7On').textContent = j.running ? 'Stop M17' : 'Start M17'; $('m7On').disabled = !j.running && !j.analog;
+    const c = j.current;
+    $('m7Now').innerHTML = c ? esc((c.src || '…') + '  →  ' + (c.dst || '…')) + (c.encrypted ? '<span class="meta">Encrypted: not played</span>' : c.meta ? '<span class="meta">“' + esc(c.meta) + '”</span>' : '') + '<span class="stats">' + c.seconds.toFixed(1) + ' s · ' + c.frames + ' frames · signal ' + j.quality + ' %</span>'
+      : (j.running ? '<span class="stats">Listening for M17…</span>' : '');
+    const t = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    $('m7List').innerHTML = j.heard.slice().reverse().map(h => '<div class="item"><div class="main"><b class="mono">' + esc(h.src || '?') + '</b> → ' + esc(h.dst || '?') + (h.meta ? ' · “' + esc(h.meta) + '”' : '') + '</div><div class="sub">' + t(h.start) + ' · ' + ((h.end - h.start) / 1000).toFixed(1) + ' s · ' + h.frames + ' frames' + (h.frames ? ' · ' + Math.round(100 * h.good / h.frames) + ' % clean' : '') + '</div></div>').join('') || (j.running ? '<div class="empty">Nothing heard yet</div>' : '');
+    $('m7Cal').textContent = j.calibration ? 'Equalizer ' + j.calibration + '.' : '';
+  } catch (e) { }
+}
+setInterval(pollM17, 1000);
+$('m7On').onclick = () => act('m17', { on: !(m7 && m7.running) }).then(pollM17);
+
 // ---- FT8 over FM: state once a second, the waterfall about five times a second while running ----
 const f8 = { j: null, skew: 0, fall: null };
 function f8Row(h) { return h.time + ' ' + (h.snr >= 0 ? '+' : '') + String(h.snr).padStart(3) + ' ' + (h.dt >= 0 ? '+' : '') + h.dt.toFixed(1) + ' ' + String(h.hz).padStart(4) + '  ' + h.shown; }

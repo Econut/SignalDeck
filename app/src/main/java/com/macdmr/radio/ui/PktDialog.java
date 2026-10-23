@@ -49,6 +49,27 @@ public final class PktDialog {
 
     private void open() {
         LinearLayout body = page("📡  Packet radio");
+        // ---- running now: one tap to each running mode's page ----
+        if (c instanceof com.macdmr.radio.MainActivity) {
+            java.util.List<String[]> run = ((com.macdmr.radio.MainActivity) c).runningModes();
+            if (!run.isEmpty()) {
+                body.addView(section("Running now"));
+                for (int k = 0; k < run.size(); k += 2) {
+                    LinearLayout rr = row();
+                    for (int q = k; q < Math.min(run.size(), k + 2); q++) {
+                        final String key = run.get(q)[0];
+                        button(rr, run.get(q)[1] + "  \u203A", Theme.PKT, x -> { dlg.dismiss(); ((com.macdmr.radio.MainActivity) c).openMode(key); });
+                    }
+                    body.addView(rr);
+                }
+            }
+        }
+        // ---- digital voice ----
+        body.addView(section("Digital voice"));
+        LinearLayout m17r = row();
+        button(m17r, svc.m17Running() ? "M17 (listening)" : "M17 receive", Theme.SOFTSQ, x -> { if (!svc.m17Running()) { String e = svc.setM17(true); if (e != null) { toast(e); return; } } dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openM17(); });
+        body.addView(m17r);
+        body.addView(hint("M17 receive: hear M17 digital voice stations on this channel or the VFO, with the caller's callsign and message (receive only: this radio cannot transmit M17)."));
         // ---- APRS ----
         body.addView(section("APRS"));
         body.addView(status());
@@ -124,10 +145,7 @@ public final class PktDialog {
         button(xr, "RTTY and PSK31", Theme.SOFTSQ, x -> { dlg.dismiss(); TextModesDialog.show(c, svc); });
         button(xr, svc.ft8Running() ? "FT8 (running)" : "FT8 over FM", Theme.SOFTSQ, x -> { if (!svc.ft8Running()) svc.setFt8(true); dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openFt8(); });
         body.addView(xr);
-        LinearLayout m17r = row();
-        button(m17r, svc.m17Running() ? "M17 (listening)" : "M17 receive", Theme.SOFTSQ, x -> { if (!svc.m17Running()) { String e = svc.setM17(true); if (e != null) { toast(e); return; } } dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openM17(); });
-        body.addView(m17r);
-        body.addView(hint("Keyboard chat modes used with fldigi: " + pe.textStatus() + ". FT8 over FM: the WSJT-X mode on this FM channel, with automatic QSOs (it cannot hear SSB FT8). M17 receive: hear M17 digital voice stations on this channel (receive only)."));
+        body.addView(hint("Keyboard chat modes used with fldigi: " + pe.textStatus() + ". FT8 over FM: the WSJT-X mode on this FM channel, with automatic QSOs (it cannot hear SSB FT8)."));
         // ---- packet terminal ----
         body.addView(section("Packet terminal"));
         LinearLayout tr = row();

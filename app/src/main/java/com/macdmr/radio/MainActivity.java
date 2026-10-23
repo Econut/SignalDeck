@@ -260,6 +260,39 @@ public class MainActivity extends AppCompatActivity {
         if (s.m17Running()) return new com.macdmr.radio.ui.M17Screen(this, s, close);
         return null;
     }
+    /** Every mode running now with its own page: {key, label}. */
+    public java.util.List<String[]> runningModes() {
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        RadioService s = svc; if (s == null || s.packet() == null) return out;
+        com.macdmr.radio.PacketEngine pe = s.packet();
+        if (s.scope().running()) out.add(new String[] { "scope", "Band scope" });
+        RadioService.SatState ss = s.satState();
+        if (s.satMode() == com.macdmr.radio.ham.Satellites.SSTV) out.add(new String[] { "sstv", "ISS SSTV" + (ss != null && ss.waiting ? " (waiting for the pass)" : "") });
+        else if (pe.sstvRx()) out.add(new String[] { "sstv", "SSTV receive" });
+        if (s.satMode() == com.macdmr.radio.ham.Satellites.APRS) out.add(new String[] { "aprs", "ISS APRS" + (ss != null && ss.waiting ? " (waiting for the pass)" : "") });
+        else if (pe.monitoring() || pe.kiss().isActive()) out.add(new String[] { "aprs", pe.monitoring() ? "APRS monitoring" : "KISS TNC" });
+        if (s.parrot().enabled()) out.add(new String[] { "parrot", "Parrot" });
+        if (s.ft8Running()) out.add(new String[] { "ft8", "FT8" });
+        if (s.m17Running()) out.add(new String[] { "m17", "M17 receive" });
+        return out;
+    }
+    /** Open one running mode's page by its key (see {@link #runningModes}). */
+    public void openMode(String key) {
+        RadioService s = svc; if (s == null) return;
+        Runnable close = this::closeOverlay; com.macdmr.radio.ui.ModeScreen m;
+        switch (key) {
+            case "scope": m = new com.macdmr.radio.ui.BandScopeScreen(this, s, close); break;
+            case "sstv": m = new com.macdmr.radio.ui.SstvScreen(this, s, close); break;
+            case "aprs": m = new com.macdmr.radio.ui.AprsScreen(this, s, close); break;
+            case "parrot": m = new com.macdmr.radio.ui.ParrotScreen(this, s, close); break;
+            case "ft8": m = new com.macdmr.radio.ui.Ft8Screen(this, s, close); break;
+            case "m17": m = new com.macdmr.radio.ui.M17Screen(this, s, close); break;
+            default: return;
+        }
+        if (tab != 0) show(0);
+        showOverlay(m); updateModeBar();
+    }
+
     /** PKT -> FT8 / M17: their own page even while another mode (a satellite pass waiting) has the bar. */
     public void openFt8() { RadioService s = svc; if (s == null) return; if (tab != 0) show(0); showOverlay(new com.macdmr.radio.ui.Ft8Screen(this, s, this::closeOverlay)); updateModeBar(); }
     public void openM17() { RadioService s = svc; if (s == null) return; if (tab != 0) show(0); showOverlay(new com.macdmr.radio.ui.M17Screen(this, s, this::closeOverlay)); updateModeBar(); }

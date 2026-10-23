@@ -26,7 +26,7 @@ import java.util.Locale;
  * Receive only: this radio's transmit path cannot produce M17 that M17 radios decode.
  */
 public final class M17Station {
-    public interface Host { void event(String line); void heard(String call); void changed(); }
+    public interface Host { void event(String line); void heard(String call); void changed(); default void voice(short[] pcm) { } }
 
     /** One transmission heard. */
     public static final class Heard {
@@ -116,6 +116,7 @@ public final class M17Station {
             short[] a = c.decode(java.util.Arrays.copyOfRange(s.payload, 0, 8)), b = c.decode(java.util.Arrays.copyOfRange(s.payload, 8, 16));
             short[] pcm = new short[a.length + b.length]; System.arraycopy(a, 0, pcm, 0, a.length); System.arraycopy(b, 0, pcm, a.length, b.length);
             t.write(pcm, 0, pcm.length, AudioTrack.WRITE_NON_BLOCKING);
+            host.voice(pcm);
             if (benchDump) try (java.io.FileOutputStream o = new java.io.FileOutputStream(new java.io.File(ctx.getCacheDir(), "m17_out.raw"), true)) { byte[] by = new byte[pcm.length * 2]; for (int i = 0; i < pcm.length; i++) { by[2 * i] = (byte) pcm[i]; by[2 * i + 1] = (byte) (pcm[i] >> 8); } o.write(by); }
         } catch (Throwable e) { Log.w("M17Station", "voice: " + e); }
         if (h.frames % 12 == 0) host.changed();

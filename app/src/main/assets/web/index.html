@@ -394,6 +394,11 @@
             <div class="row wrap" style="margin-top:10px"><select id="tmMode" aria-label="Listen"></select><select id="tmTx" aria-label="Send as"><option value="2">Send as PSK31</option><option value="1">Send as RTTY 45</option></select><button class="btn small-btn" id="tmClear">Clear</button></div>
             <pre id="tmText" class="term"></pre>
             <form id="tmForm" class="row"><input id="tmLine" placeholder="Text to send" class="grow"><button class="btn primary">Send</button></form></div>
+          <div class="panel"><div class="row between wrap"><span class="label">M17 RECEIVE</span><span id="m7State" class="chip dim"></span></div>
+            <div class="row wrap" style="margin-top:10px"><button class="btn primary" id="m7On">Start M17</button></div>
+            <div id="m7Now" class="m7now"></div>
+            <div id="m7List" class="list small"></div>
+            <p class="muted small">M17 digital voice on the phone's current channel or VFO: the caller, who it is for and their message; press Listen on the Intercom page to hear the decoded voice. Receive only (this radio cannot transmit M17). <span id="m7Cal"></span></p></div>
           <div class="panel"><div class="row between wrap"><span class="label">FT8 OVER FM</span><span id="f8State" class="chip dim"></span></div>
             <div class="row wrap" style="margin-top:10px"><button class="btn primary" id="f8On">Start FT8</button><button class="btn" id="f8Cq">Call CQ</button><button class="btn" id="f8Halt">Halt TX</button>
               <select id="f8Par" aria-label="Transmit period"><option value="0">TX 1st (:00 :30)</option><option value="1">TX 2nd (:15 :45)</option></select>

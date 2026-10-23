@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-23 — PKT: Running now and Digital voice; M17 on SignalDeck Web
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | **PKT always opens the packet tools** (it used to jump to a running mode's page, so with an ISS pass waiting M17 and FT8 were three taps deep): a **Running now** row at the top opens the page of each running mode (band scope, ISS SSTV / SSTV receive, ISS APRS / APRS monitoring / KISS TNC, parrot, FT8, M17), and **M17 receive** has its own **Digital voice** section near the top. **SignalDeck Web → Packet → M17 receive**: start / stop, who is talking (caller → destination, message, signal), what was heard; `/api/m17`. Browsers that are listening hear the decoded M17 voice (the radio's own audio is held back during a transmission, as on the phone). Help updated (Packet radio → Mode pages, M17 receive). | `ui/IntercomView.java`, `ui/PktDialog.java`, `MainActivity.java` (`runningModes`, `openMode`), `M17Station.java`, `RadioService.java`, `web/WebHost.java`, `assets/web/*`, `ui/HelpView.java` | Device: PKT with the ISS pass waiting showed Running now → ISS SSTV (waiting for the pass) › and Digital voice → M17 receive; headless browser: M17 started over the API, the panel showed LISTENING and the calibration, stopped again, no console errors. |
+
 ## 2026-10-22 — Receive-only channels; Exit that switches the radio off
 
 | Backlog | Change | Files | Test |

@@ -957,7 +957,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (open != squelchOpen && softSq.isEnabled()) log("soft squelch " + (open ? "open" : "closed") + (current != null && current.rxType == 1 ? " (CTCSS " + com.macdmr.radio.dsp.ToneTable.ctcssLabel(current.rxSubCode) + ")" : ""));
         if (open != squelchOpen && softSq.isEnabled()) { softGateHistory(open); squelchOpen = open; pushModes(); }   // pages see the gate (activity box, Soft SQ number colour)
         squelchOpen = open;
-        if (web != null && open && !muted && !pttDown) web.rxAudio(mono, n);      // SignalDeck Web listeners hear what the speaker plays
+        if (web != null && open && !muted && !pttDown && !(m17 != null && m17.receiving())) web.rxAudio(mono, n);      // SignalDeck Web listeners hear what the speaker plays (M17: its decoded voice instead)
         ClipRecorder clip = this.clip;                                            // listen check: what arrived, before the speaker
         if (clip != null && (!clipOnlyHeard || rxActive()) && !clip.write(mono, n)) this.clip = null;
         int peak = 0;
@@ -2336,6 +2336,11 @@ public class RadioService extends Service implements RadioEngine.Events {
             @Override public void event(String line) { history("pkt", line); }
             @Override public void heard(String call) { if (call != null && !call.isEmpty() && !call.startsWith("@") && !call.startsWith("#")) logHeardStation(call, "M17", "M17"); }
             @Override public void changed() { ui.post(() -> pushModes()); }
+            @Override public void voice(short[] pcm) {                       // SignalDeck Web listeners hear the decoded voice (the radio's own audio is held back)
+                com.macdmr.radio.web.WebHost w = web; if (w == null || muted) return;
+                byte[] b = new byte[pcm.length * 2]; for (int i = 0; i < pcm.length; i++) { b[2 * i] = (byte) pcm[i]; b[2 * i + 1] = (byte) (pcm[i] >> 8); }
+                w.rxAudio(b, b.length);
+            }
         });
         return m17;
     }

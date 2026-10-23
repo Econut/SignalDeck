@@ -1305,6 +1305,20 @@ public final class WebHost {
                     .put("now", System.currentTimeMillis()).put("heard", heard).put("sent", sent).put("analog", svc.current() != null && !svc.current().isDigital())
                     .put("callsignSet", my != null).put("webTx", allowTx()));
             }
+            case "/api/m17": {                                                  // M17 receive: GET state + what was heard; POST {on}
+                final com.macdmr.radio.M17Station m7 = svc.m17();
+                if (post && b.has("on")) { String e = onMain(() -> svc.setM17(b.getBoolean("on"))); if (e != null) return WebServer.Response.error(409, e); }
+                JSONArray hl = new JSONArray(); java.util.List<com.macdmr.radio.M17Station.Heard> hs = m7.heard();
+                for (int i = Math.max(0, hs.size() - 50); i < hs.size(); i++) {
+                    com.macdmr.radio.M17Station.Heard h = hs.get(i);
+                    hl.put(new JSONObject().put("start", h.start).put("end", h.end).put("src", h.src).put("dst", h.dst).put("meta", h.meta == null ? JSONObject.NULL : h.meta)
+                        .put("frames", h.frames).put("good", h.good).put("encrypted", h.encrypted).put("data", h.data));
+                }
+                com.macdmr.radio.M17Station.Heard cur = m7.current();
+                return ok(new JSONObject().put("running", m7.running()).put("receiving", cur != null).put("quality", Math.round(m7.quality() * 100))
+                    .put("current", cur == null ? JSONObject.NULL : new JSONObject().put("src", cur.src).put("dst", cur.dst).put("meta", cur.meta == null ? JSONObject.NULL : cur.meta).put("frames", cur.frames).put("seconds", (cur.end - cur.start) / 1000.0).put("encrypted", cur.encrypted))
+                    .put("heard", hl).put("calibration", m7.calibration()).put("analog", svc.current() != null && !svc.current().isDigital()));
+            }
             case "/api/ft8/spectrum": {                                         // the FT8 waterfall's next line: 200 levels in dB, 200-2800 Hz
                 com.macdmr.radio.ham.Ft8Station f8 = svc.ft8();
                 JSONArray a = new JSONArray();
