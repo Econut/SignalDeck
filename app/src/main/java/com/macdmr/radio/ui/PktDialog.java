@@ -122,10 +122,10 @@ public final class PktDialog {
         body.addView(section("Text modes"));
         LinearLayout xr = row();
         button(xr, "RTTY and PSK31", Theme.SOFTSQ, x -> { dlg.dismiss(); TextModesDialog.show(c, svc); });
-        button(xr, svc.ft8Running() ? "FT8 (running)" : "FT8 over FM", Theme.SOFTSQ, x -> { if (!svc.ft8Running()) svc.setFt8(true); openScreen(); });
+        button(xr, svc.ft8Running() ? "FT8 (running)" : "FT8 over FM", Theme.SOFTSQ, x -> { if (!svc.ft8Running()) svc.setFt8(true); dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openFt8(); });
         body.addView(xr);
         LinearLayout m17r = row();
-        button(m17r, svc.m17Running() ? "M17 (listening)" : "M17 receive", Theme.SOFTSQ, x -> { if (!svc.m17Running()) { String e = svc.setM17(true); if (e != null) { toast(e); return; } } openScreen(); });
+        button(m17r, svc.m17Running() ? "M17 (listening)" : "M17 receive", Theme.SOFTSQ, x -> { if (!svc.m17Running()) { String e = svc.setM17(true); if (e != null) { toast(e); return; } } dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openM17(); });
         body.addView(m17r);
         body.addView(hint("Keyboard chat modes used with fldigi: " + pe.textStatus() + ". FT8 over FM: the WSJT-X mode on this FM channel, with automatic QSOs (it cannot hear SSB FT8). M17 receive: hear M17 digital voice stations on this channel (receive only)."));
         // ---- packet terminal ----

@@ -260,6 +260,9 @@ public class MainActivity extends AppCompatActivity {
         if (s.m17Running()) return new com.macdmr.radio.ui.M17Screen(this, s, close);
         return null;
     }
+    /** PKT -> FT8 / M17: their own page even while another mode (a satellite pass waiting) has the bar. */
+    public void openFt8() { RadioService s = svc; if (s == null) return; if (tab != 0) show(0); showOverlay(new com.macdmr.radio.ui.Ft8Screen(this, s, this::closeOverlay)); updateModeBar(); }
+    public void openM17() { RadioService s = svc; if (s == null) return; if (tab != 0) show(0); showOverlay(new com.macdmr.radio.ui.M17Screen(this, s, this::closeOverlay)); updateModeBar(); }
     /** PKT -> Band scope. */
     public void openBandScope() { RadioService s = svc; if (s == null) return; if (tab != 0) show(0); showOverlay(new com.macdmr.radio.ui.BandScopeScreen(this, s, this::closeOverlay)); updateModeBar(); }
     /** Show the running mode's page; false when no mode has one. */
