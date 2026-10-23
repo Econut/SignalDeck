@@ -64,7 +64,7 @@ public final class SstvContinuous {
     public SstvContinuous(int sampleRate, Listener l) {
         sr = sampleRate; listener = l;
         demod = new SSTVIQDemodulator(sampleRate);
-        int size = 1; while (size < sampleRate * 2) size <<= 1;   // 2 s of history
+        int size = 1; while (size < sampleRate * 16) size <<= 1;  // 16 s of history (backfill reads up to 12 s back)
         ring = new float[size]; ringMask = size - 1;
         nominal = LINE_MS * sampleRate / 1000.0; period = nominal;
         java.util.Arrays.fill(canvas, 0xFF202428);
@@ -108,6 +108,7 @@ public final class SstvContinuous {
                 // the first line's sync can merge with the VIS stop bit (both 1200 Hz), so the demodulator does not report
                 // it: if a 1200 Hz sync tone sits one line earlier, the picture starts there
                 for (int k = 0; k < 2 && n - (first - (long) nominal) < ring.length - 16 && syncToneAt(first - Math.round(nominal)); k++) first -= Math.round(nominal);
+                first = backfill(first);
                 startPicture(first);
                 if (first < match[0]) { endLine(match[0]); realLines = lines; }
                 for (int i = 1; i < hits; i++) {
@@ -173,6 +174,25 @@ public final class SstvContinuous {
         cType[row] = sep < 0 ? 0 : 1;                        // 1500 Hz (below 1900) = R-Y, 2300 Hz = B-Y
     }
     /** A sync tone (1200 Hz, normalised about -0.78) just before sample b. */
+    private static final int MAX_BACK = 80;                  // lines (12 s) the backfill may reach back
+    /**
+     * After locking, the lines before the first clean sync: a weak signal fades in, so its first syncs are too faint for
+     * the demodulator to report although the picture is there. Step back a line at a time while a (weaker) 1200 Hz sync
+     * tone sits where the line clock puts it, allowing two misses in a row; stop at the history's end or a leader tone.
+     */
+    private long backfill(long first) {
+        long best = first, c = first; int miss = 0;
+        for (int k = 0; k < MAX_BACK; k++) {
+            c -= Math.round(nominal);
+            if (n - c >= ring.length - 2 * (long) nominal || c <= 0) break;
+            if (lastLeaderEnd >= 0 && c < lastLeaderEnd) break;
+            boolean tone = false;
+            for (int d = -3; d <= 3 && !tone; d++) tone = weakSyncAt(c + d);
+            if (tone) { best = c; miss = 0; } else if (++miss > 2) break;
+        }
+        return best;
+    }
+    private boolean weakSyncAt(long b) { return b > 0 && avg(b - 7.0 * sr / 1000, 5.0 * sr / 1000) < -0.45 && avg(b + 1.0 * sr / 1000, 2.0 * sr / 1000) > -0.35; }
     private boolean syncToneAt(long b) { return b > 0 && avg(b - 7.0 * sr / 1000, 5.0 * sr / 1000) < -0.6; }
     private double avg(double from, double len) {
         int a = (int) Math.floor(from), b = Math.max(a + 1, (int) Math.ceil(from + len));

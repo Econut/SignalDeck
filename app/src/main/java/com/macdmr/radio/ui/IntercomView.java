@@ -71,8 +71,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     public static boolean animatedPanel(Context c) { return c.getSharedPreferences("radio", Context.MODE_PRIVATE).getBoolean("animPanel", true); }
     public void setAnimatedPanel(boolean on) { getContext().getSharedPreferences("radio", Context.MODE_PRIVATE).edit().putBoolean("animPanel", on).apply(); board.animateIdle = on; }
 
-    /** Which intercom page to build: the classic module page (default) or the new look. */
-    public static boolean newLook(Context c) { return c.getSharedPreferences("radio", Context.MODE_PRIVATE).getBoolean("newIntercom", false); }
+    /** Which intercom page to build: the new look (default since 2026-10-23) or the classic module page. */
+    public static boolean newLook(Context c) { return c.getSharedPreferences("radio", Context.MODE_PRIVATE).getBoolean("newIntercom", true); }
     public static void setNewLook(Context c, boolean on) { c.getSharedPreferences("radio", Context.MODE_PRIVATE).edit().putBoolean("newIntercom", on).apply(); }
     private final LinearLayout transcriptionBox;
     private final TextView captionLive;
@@ -142,7 +142,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         // module: OEM's 15 dp labels are restyled to 11 sp with no padding (MainHook 1762-1774)
         power = Theme.label(c, "Power:", Theme.CYAN, 11, false); squelch = Theme.label(c, "Squelch Level:", Theme.CYAN, 11, false);
         send = Theme.label(c, "Send:", Theme.CYAN, 11, false); receive = Theme.label(c, "Receive:", Theme.CYAN, 11, false);
-        for (TextView t : new TextView[] { power, squelch, send, receive }) { t.setPadding(0, (int) (1 * d), 0, (int) (1 * d)); leftCol.addView(t); }
+        for (TextView t : new TextView[] { power, squelch, send, receive }) { t.setPadding(dp10, (int) (1 * d), 0, (int) (1 * d)); leftCol.addView(t); }   // the page's 10 dp margin
         info.addView(leftCol, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         location = Theme.label(c, "", Theme.WHITE, 12, false); location.setGravity(Gravity.END);
         LayoutParams locLp = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); locLp.rightMargin = dp10;
@@ -250,12 +250,12 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         FrameLayout.LayoutParams tbl = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         tbl.leftMargin = tbl.rightMargin = dp8; tbl.bottomMargin = (int) (22 * d);
         panel.addView(transcriptionBox, tbl); transcriptionBox.setVisibility(GONE);
-        LayoutParams pl = neo ? new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f) : new LayoutParams(LayoutParams.MATCH_PARENT, (int) (250 * d)); pl.leftMargin = pl.rightMargin = neo ? (int) (16 * d) : dp10; pl.topMargin = dp8;
+        LayoutParams pl = neo ? new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f) : new LayoutParams(LayoutParams.MATCH_PARENT, (int) (250 * d)); pl.leftMargin = pl.rightMargin = neo ? (int) (16 * d) : dp10; pl.topMargin = dp8;   // classic: the module's fixed 250 dp (its circuit board is a surface: no resizing)
         if (neo) board.setFrame(0xFF07121D, Neo.LINE, 1, 14, Neo.GROUND);   // the card fill as it looks over the page
         addView(panel, pl);
 
         // ---- PTT (176 dp, centred) with the six satellites at the module's exact offsets ----
-        FrameLayout bottom = new FrameLayout(c);
+        final FrameLayout bottom = new FrameLayout(c);
         ptt = new PttButton(c);
         bottom.addView(ptt, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         if (neo) {
@@ -273,8 +273,23 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         bottom.addView(mon, sat(d, 70, Gravity.END, 16, 58));
         bottom.addView(pkt, sat(d, 76, Gravity.END, 16, 112));
         }
-        LayoutParams btl = neo ? new LayoutParams(LayoutParams.MATCH_PARENT, (int) (182 * d)) : new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f); btl.topMargin = dp4;
-        addView(bottom, btl);
+        LayoutParams btl = new LayoutParams(LayoutParams.MATCH_PARENT, (int) (182 * d)); btl.topMargin = dp4;   // PTT + satellites need 182 dp (classic offsets 4/58/112 dp + 70 dp)
+        if (neo) addView(bottom, btl);
+        else {
+            // classic: the PTT area keeps its 182 dp design and is scaled down to the room left (a mode bar takes ~55 dp), so
+            // all six satellites stay on the page and tappable (touches follow the scaling)
+            final int design = (int) (182 * d);
+            FrameLayout holder = new FrameLayout(c) {
+                @Override protected void onSizeChanged(int w, int h, int ow, int oh) {
+                    super.onSizeChanged(w, h, ow, oh);
+                    float sc = Math.min(1f, h / (float) design);
+                    bottom.setPivotX(w / 2f); bottom.setPivotY(0); bottom.setScaleX(sc); bottom.setScaleY(sc);
+                }
+            };
+            holder.addView(bottom, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, design, Gravity.TOP));
+            LayoutParams hold = new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f); hold.topMargin = dp4;
+            addView(holder, hold);
+        }
         // Mode satellites. Those not brought over yet say so instead of pretending to toggle.
         softSq.setOnClickListener(v -> { if (svc != null) svc.setSoftSq(!softSq.isOn()); });
         rec.setOnClickListener(v -> { if (svc != null) svc.setRecord(!rec.isOn()); });

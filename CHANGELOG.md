@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-23 — The new intercom look is the default; the classic page fits with a mode bar; SSTV backfill
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | **New intercom look by default** (Device → Radio settings → New intercom look still switches; phones that already chose a look keep it). **Classic page**: with a mode bar showing (an ISS pass waiting, APRS, M17…) the bottom row of satellites (VFO, PKT) was cut off, because the PTT area got only what the fixed 250 dp panel left; the PTT area now keeps its 182 dp design and is scaled to the room left (all six satellites visible and tappable), and the Power / Squelch / Send / Receive lines have the page's 10 dp margin instead of touching the edge. | `ui/IntercomView.java`, `ui/HelpView.java` | Device (owner's Armor, with the ISS-pass bar showing): screenshots of the classic page before (VFO and PKT half hidden, info at the edge) and after (everything on the page, the panel below the SQ slider), and of the new look (unchanged). |
+| — | **SSTV backfill**: once the continuous Robot 36 decoder locks, it steps back over up to 12 s of history (16 s ring, was 2 s) while a weaker sync tone is still where the line clock puts it, so lines before the first clean syncs are drawn too. On tonight's four ISS pass recordings it gained only a line per picture: the missing tops were below the noise (0-1.5 dB). | `pkt/SstvContinuous.java`, `test/.../SstvPassBench.java` (bench over pass recordings) | Host: all SSTV tests; bench on the 2026-10-23 pass recordings (8 pictures, 1 complete, as live). |
+
 ## 2026-10-23 — PKT: Running now and Digital voice; M17 on SignalDeck Web
 
 | Backlog | Change | Files | Test |
