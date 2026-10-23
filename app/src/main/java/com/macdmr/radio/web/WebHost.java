@@ -788,7 +788,7 @@ public final class WebHost {
             case "/api/scope": {                                                // GET: presets, state, the last sweep, peak hold and the waterfall (newest last)
                 com.macdmr.radio.BandScope s = svc.scope();
                 JSONArray pr = new JSONArray(); for (com.macdmr.radio.BandScope.Preset p0 : com.macdmr.radio.BandScope.PRESETS) pr.put(new JSONObject().put("name", p0.name).put("from", p0.from).put("to", p0.to).put("step", p0.step));
-                JSONObject o = new JSONObject().put("presets", pr).put("running", s.running()).put("from", s.from()).put("to", s.to()).put("step", s.step()).put("sweepMs", s.sweepMs()).put("settleMs", s.settleMs());
+                JSONObject o = new JSONObject().put("presets", pr).put("running", s.running()).put("from", s.from()).put("to", s.to()).put("step", s.step()).put("sweepMs", s.sweepMs()).put("settleMs", s.settleMs()).put("estimateMs", s.estimateMs()).put("currentHz", s.currentHz()).put("maxSteps", com.macdmr.radio.BandScope.MAX_STEPS);
                 float[] last = s.last(), peak = s.peak(), part = s.partial();
                 if (last != null) o.put("last", arr(last)); if (peak != null) o.put("peak", arr(peak)); if (part != null && s.partialIndex() >= 0) o.put("partial", arr(part)).put("partialIndex", s.partialIndex());
                 JSONArray h = new JSONArray(); java.util.List<float[]> hist = s.history(); for (int k = Math.max(0, hist.size() - 60); k < hist.size(); k++) h.put(arr(hist.get(k)));
@@ -796,6 +796,8 @@ public final class WebHost {
                 return ok(o.put("history", h).put("peaks", pk));
             }
             case "/api/scope/start": if (!post) break; {
+                String bad = com.macdmr.radio.BandScope.problem(b.optInt("from"), b.optInt("to"), b.optInt("step", 25_000));
+                if (bad != null) return WebServer.Response.error(400, bad);
                 String e = svc.scopeStart(b.optInt("from"), b.optInt("to"), b.optInt("step", 25_000), com.macdmr.radio.BandScope.DEFAULT_SETTLE_MS);
                 return e == null ? ok("Sweeping") : WebServer.Response.error(409, e);
             }

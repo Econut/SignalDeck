@@ -40,12 +40,8 @@ public final class BandScopeScreen extends ModeScreen {
         info = Neo.text(c, "", Neo.CYAN_LIGHT, 15, Neo.mono(c)); info.setPadding(0, dp(8), 0, dp(2)); col.addView(info);
         peaks = Neo.text(c, "", Neo.MUTED, 13.5f, Neo.uiMedium(c)); peaks.setLineSpacing(0, 1.1f); col.addView(peaks);
         content.addView(col);
-        LinearLayout r1 = buttonRow();
-        button(r1, "", "scan", Neo.CYAN, v -> choosePreset()).setText(BandScope.PRESETS[presetIdx].name);
-        startBtn = button(r1, "Start", "signal", Neo.GREEN, v -> toggle());
-        LinearLayout r2 = buttonRow();
-        button(r2, "Listen here", "radio", Neo.AMBER, v -> listenHere());
-        button(r2, "Clear peaks", "restore", Neo.VIOLET, v -> { svc.scope().clearPeak(); view.invalidate(); });
+        if (presetIdx < 0 || presetIdx > BandScope.PRESETS.length) presetIdx = 0;
+        buildButtons();
         setSubtitle("Receive only · nothing is transmitted");
         refresh();
     }
@@ -56,8 +52,10 @@ public final class BandScopeScreen extends ModeScreen {
         boolean on = s.running();
         String l = on ? "Stop" : "Start"; if (!l.contentEquals(startBtn.getText())) { startBtn.setText(l); Neo.fit(startBtn); }
         int nSteps = BandScope.steps(s.from(), s.to(), s.step());
-        if (on) setSubtitle(String.format(Locale.US, "%.3f–%.3f MHz · %d kHz steps · a sweep takes %s", s.from() / 1e6, s.to() / 1e6, s.step() / 1000, s.sweepMs() > 0 ? String.format(Locale.US, "%.0f s", s.sweepMs() / 1000.0) : String.format(Locale.US, "about %.0f s", nSteps * (s.settleMs() + 15) / 1000.0)));
+        if (on) setSubtitle(String.format(Locale.US, "%.3f–%.3f · %d × %s kHz · sweep %s%s", s.from() / 1e6, s.to() / 1e6, nSteps, khz(s.step()),
+            s.sweepMs() > 0 ? "" : "≈", BandScope.duration(s.estimateMs())) + (s.partialIndex() >= 0 ? String.format(Locale.US, " · step %d", s.partialIndex() + 1) : ""));
         else setSubtitle("Receive only · nothing is transmitted");
+        showLive();
         float[] last = s.last();
         if (last != null) {
             StringBuilder b = new StringBuilder();
@@ -66,35 +64,93 @@ public final class BandScopeScreen extends ModeScreen {
                 b.append(b.length() > 0 ? "\n" : "").append(String.format(Locale.US, "%.4f MHz  %d dBm", p[0] / 1e6, p[1])).append(ch == null ? "" : "  · " + ch.name);
             }
             set(peaks, b.length() == 0 ? "No signal stands out above the noise (8 dB)." : "Strongest above the noise:\n" + b);
-        } else set(peaks, on ? "First sweep…" : "Choose a band and Start. The radio sweeps it step by step (receive only; your channel comes back when it stops). Tap the graph to read a frequency.");
+        } else set(peaks, on ? "First sweep…" : "Choose a band or a custom range and Start. The radio sweeps it step by step (receive only; your channel comes back when it stops). Tap the graph to read a frequency.");
         view.invalidate();
     }
     private static List<int[]> firstPeaks(List<int[]> p, int n) { p.sort((a, b) -> b[1] - a[1]); return p.size() > n ? p.subList(0, n) : p; }
     private ChannelStore.Channel channelAt(int hz) { for (ChannelStore.Channel ch : svc.store().all()) if (!ch.isDigital() && Math.abs(ch.rxFreq - hz) <= svc.scope().step() / 2) return ch; return null; }
 
+    private android.content.SharedPreferences prefs() { return c.getSharedPreferences("scope", Context.MODE_PRIVATE); }
+    private boolean custom() { return presetIdx == BandScope.PRESETS.length; }
+    /** The range to sweep: a preset, or the custom one (from, to, step in Hz). */
+    private int[] range() {
+        if (!custom()) { BandScope.Preset p = BandScope.PRESETS[presetIdx]; return new int[] { p.from, p.to, p.step }; }
+        return new int[] { prefs().getInt("customFrom", 446_000_000), prefs().getInt("customTo", 446_200_000), prefs().getInt("customStep", 12_500) };
+    }
+    private String rangeLabel() {
+        if (!custom()) return BandScope.PRESETS[presetIdx].name;
+        int[] r = range(); return String.format(Locale.US, "%.3f–%.3f", r[0] / 1e6, r[1] / 1e6);
+    }
+    private void buildButtons() {
+        footer.removeAllViews();
+        LinearLayout r1 = buttonRow();
+        button(r1, rangeLabel(), "scan", Neo.CYAN, v -> choosePreset());
+        startBtn = button(r1, svc.scope().running() ? "Stop" : "Start", "signal", Neo.GREEN, v -> toggle());
+        LinearLayout r2 = buttonRow();
+        button(r2, "Listen here", "radio", Neo.AMBER, v -> listenHere());
+        button(r2, "Clear peaks", "restore", Neo.VIOLET, v -> { svc.scope().clearPeak(); view.invalidate(); });
+    }
+
     private void toggle() {
         BandScope s = svc.scope();
         if (s.running()) { new Thread(svc::scopeStop, "scope-stop").start(); return; }
-        BandScope.Preset p = BandScope.PRESETS[presetIdx];
-        toast(svc.scopeStart(p.from, p.to, p.step, c.getSharedPreferences("scope", Context.MODE_PRIVATE).getInt("settle", BandScope.DEFAULT_SETTLE_MS)));
+        int[] r = range();
+        toast(svc.scopeStart(r[0], r[1], r[2], prefs().getInt("settle", BandScope.DEFAULT_SETTLE_MS)));
+        refresh();
+    }
+    /** Use a new range: restart the sweep if one is running. */
+    private void picked(int idx) {
+        presetIdx = idx; prefs().edit().putInt("preset", idx).apply();
+        buildButtons();
+        if (svc.scope().running()) new Thread(() -> { svc.scopeStop(); post(this::toggle); }, "scope-restart").start();
         refresh();
     }
     private void choosePreset() {
-        String[] n = new String[BandScope.PRESETS.length];
-        for (int i = 0; i < n.length; i++) { BandScope.Preset p = BandScope.PRESETS[i]; n[i] = String.format(Locale.US, "%s  (%.3f–%.3f, %d kHz, %d steps)", p.name, p.from / 1e6, p.to / 1e6, p.step / 1000, BandScope.steps(p.from, p.to, p.step)); }
-        new AlertDialog.Builder(c).setTitle("Which band?").setItems(n, (dd, w) -> {
-            presetIdx = w; c.getSharedPreferences("scope", Context.MODE_PRIVATE).edit().putInt("preset", w).apply();
-            footer.removeAllViews(); // rebuild the buttons with the new label
-            LinearLayout r1 = buttonRow();
-            button(r1, BandScope.PRESETS[w].name, "scan", Neo.CYAN, v -> choosePreset());
-            startBtn = button(r1, "Start", "signal", Neo.GREEN, v -> toggle());
-            LinearLayout r2 = buttonRow();
-            button(r2, "Listen here", "radio", Neo.AMBER, v -> listenHere());
-            button(r2, "Clear peaks", "restore", Neo.VIOLET, v -> { svc.scope().clearPeak(); view.invalidate(); });
-            if (svc.scope().running()) new Thread(() -> { svc.scopeStop(); post(() -> { toggle(); }); }, "scope-restart").start();
-            refresh();
-        }).show();
+        int k = BandScope.PRESETS.length; String[] n = new String[k + 1];
+        for (int i = 0; i < k; i++) { BandScope.Preset p = BandScope.PRESETS[i]; int st = BandScope.steps(p.from, p.to, p.step); n[i] = String.format(Locale.US, "%s  (%.3f–%.3f, %s kHz, %d steps, about %s)", p.name, p.from / 1e6, p.to / 1e6, khz(p.step), st, BandScope.duration((long) st * (BandScope.DEFAULT_SETTLE_MS + 300))); }
+        n[k] = "Custom range…";
+        new AlertDialog.Builder(c).setTitle("Which band?").setItems(n, (dd, w) -> { if (w == k) customRange(); else picked(w); }).show();
     }
+    /** From, to and step of your own; checked against what the radio can tune before it is used. */
+    private void customRange() {
+        LinearLayout b = Neo.sheetBody(c, "Custom range");
+        b.addView(Neo.sheetHint(c, "Any range inside 136–174 or 400–480 MHz (the radio tunes nothing else), up to " + BandScope.MAX_STEPS + " steps. Each step takes about a second, so a narrow range with a fine step comes round quickly; a wide one takes minutes."));
+        int[] r = range();
+        final android.widget.EditText from = field(b, "From (MHz)", String.format(Locale.US, "%.4f", (custom() ? r[0] : prefs().getInt("customFrom", 446_000_000)) / 1e6));
+        final android.widget.EditText to = field(b, "To (MHz)", String.format(Locale.US, "%.4f", (custom() ? r[1] : prefs().getInt("customTo", 446_200_000)) / 1e6));
+        final android.widget.EditText step = field(b, "Step (kHz)", khz(custom() ? r[2] : prefs().getInt("customStep", 12_500)));
+        final TextView est = Neo.sheetHint(c, ""); b.addView(est);
+        final Runnable check = () -> set(est, describe(parse(from), parse(to), parseKhz(step)));
+        android.text.TextWatcher tw = new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence x, int a1, int a2, int a3) { }
+            @Override public void onTextChanged(CharSequence x, int a1, int a2, int a3) { }
+            @Override public void afterTextChanged(android.text.Editable e) { check.run(); }
+        };
+        from.addTextChangedListener(tw); to.addTextChangedListener(tw); step.addTextChangedListener(tw); check.run();
+        final android.app.AlertDialog[] dlg = new android.app.AlertDialog[1];
+        TextView use = Neo.button(c, "Use this range", "check", Neo.GREEN);
+        use.setOnClickListener(v -> {
+            int f = parse(from), t = parse(to), st = parseKhz(step);
+            String e = BandScope.problem(f, t, st); if (e != null) { toast(e); return; }
+            prefs().edit().putInt("customFrom", f).putInt("customTo", t).putInt("customStep", st).apply();
+            dlg[0].dismiss(); picked(BandScope.PRESETS.length);
+        });
+        LinearLayout row = new LinearLayout(c); row.addView(use, new LinearLayout.LayoutParams(0, dp(48), 1f)); b.addView(row);
+        dlg[0] = Neo.showSheet(c, b);
+    }
+    private android.widget.EditText field(LinearLayout b, String label, String value) {
+        b.addView(Neo.sheetSection(c, label));
+        android.widget.EditText e = new android.widget.EditText(c); e.setTextColor(Neo.TEXT); e.setTypeface(Neo.mono(c)); e.setSingleLine(true); e.setText(value);
+        e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL); b.addView(e); return e;
+    }
+    private static int parse(android.widget.EditText e) { try { return (int) Math.round(Double.parseDouble(e.getText().toString().trim().replace(',', '.')) * 1e6); } catch (Exception x) { return 0; } }
+    private static int parseKhz(android.widget.EditText e) { try { return (int) Math.round(Double.parseDouble(e.getText().toString().trim().replace(',', '.')) * 1e3); } catch (Exception x) { return 0; } }
+    private static String describe(int from, int to, int step) {
+        String e = BandScope.problem(from, to, step); if (e != null) return e;
+        int n = BandScope.steps(from, to, step);
+        return n + " steps, a sweep takes about " + BandScope.duration((long) n * (BandScope.DEFAULT_SETTLE_MS + 300));
+    }
+
     private void listenHere() {
         if (view.selHz <= 0) { toast("Tap the graph first to pick a frequency"); return; }
         final int hz = view.selHz;
@@ -108,6 +164,8 @@ public final class BandScopeScreen extends ModeScreen {
     }
 
     @Override public void onScope(int from, int step, float[] dbm) { refresh(); }
+    @Override protected long liveHz() { return svc.scope().currentHz(); }
+    static String khz(int hz) { return hz % 1000 == 0 ? String.valueOf(hz / 1000) : String.format(Locale.US, "%.2f", hz / 1000.0).replaceAll("0+$", ""); }
     @Override public void onScopeState(String state) { refresh(); }
 
     /** Graph (top 55 %) and waterfall (bottom). */

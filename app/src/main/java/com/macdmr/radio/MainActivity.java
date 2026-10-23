@@ -268,7 +268,7 @@ public class MainActivity extends AppCompatActivity {
     private String modeLabel() {
         RadioService s = svc; if (s == null || s.packet() == null) return null;
         com.macdmr.radio.PacketEngine pe = s.packet();
-        if (s.scope().running()) return "Band scope sweeping";
+        if (s.scope().running()) { int hz = s.scope().currentHz(); return "Band scope sweeping" + (hz > 0 ? String.format(java.util.Locale.US, "  ·  %.4f MHz", hz / 1e6) : ""); }
         RadioService.SatState ss = s.satState();
         if (ss != null && ss.mode != com.macdmr.radio.ham.Satellites.VOICE) {
             String when = ss.waiting ? "next pass " + new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(new java.util.Date(ss.aos)) : "pass in progress";

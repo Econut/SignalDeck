@@ -45,6 +45,7 @@ public abstract class ModeScreen extends LinearLayout implements RadioService.Li
         if (!stillRunning()) { onClose.run(); return; }      // the mode was stopped elsewhere
         showWaiting();
         if (!waiting) set(timeText, elapsed(since()));
+        showLive();
         refresh();
         ui.postDelayed(this, 1000);
     } };
@@ -135,6 +136,15 @@ public abstract class ModeScreen extends LinearLayout implements RadioService.Li
         long s = Math.max(0, (System.currentTimeMillis() - since) / 1000);
         return s >= 3600 ? String.format(java.util.Locale.US, "%d:%02d:%02d", s / 3600, s % 3600 / 60, s % 60) : String.format(java.util.Locale.US, "%02d:%02d", s / 60, s % 60);
     }
+    /** The frequency the radio is really on when the mode retunes it itself (a band scope sweep), 0 = the channel's. */
+    protected long liveHz() { return 0; }
+    private boolean live;
+    /** Show {@link #liveHz} in the strip while there is one, the channel again afterwards. Subclasses may call it more often. */
+    protected void showLive() {
+        long hz = liveHz();
+        if (hz > 0) { android.text.SpannableString f = freqSpan(hz); if (!android.text.TextUtils.equals(freqText.getText(), f)) freqText.setText(f); color(freqText, Neo.GREEN_LIGHT); live = true; }
+        else if (live) { live = false; color(freqText, Neo.TEXT); com.macdmr.radio.ChannelStore.Channel ch = svc.current(); if (ch != null) freqText.setText(freqSpan(ch.rxFreq)); }
+    }
     /** A satellite pass the mode waits for: the frequency it will use (0 = not waiting). The radio stays on the
      *  channel until a minute before the pass, so the strip shows the pass frequency, dimmed, not the channel's. */
     protected long waitingHz() { return 0; }
@@ -178,7 +188,7 @@ public abstract class ModeScreen extends LinearLayout implements RadioService.Li
 
     // ---- RadioService.Listener ----
     @Override public void onChannel(ChannelStore.Channel ch) {
-        if (ch == null || waiting) return;
+        if (ch == null || waiting || liveHz() > 0) return;
         freqText.setText(freqSpan(ch.rxFreq));
     }
     @Override public void onRx(boolean receiving) { rx = receiving; showState(); if (!receiving && !waiting) { signal.set(-999); signalText.setText("no signal"); } }

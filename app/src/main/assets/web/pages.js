@@ -500,13 +500,21 @@ $('potaLog').onsubmit = async e => {
 };
 
 // ---- band scope ----
+const scSteps = (f, t, s) => s > 0 && t >= f ? Math.floor((t - f) / s) + 1 : 0;
+const scDur = ms => { const s = Math.round(ms / 1000); return s < 90 ? s + ' s' : s < 5400 ? Math.round(s / 60) + ' min' : (s / 3600).toFixed(1) + ' h'; };
+$('scPreset').onchange = () => { $('scCustom').classList.toggle('hidden', $('scPreset').value !== 'c'); try { localStorage.setItem('scPreset', $('scPreset').value); } catch (e) { } };
 async function loadScope() {
   try {
     const j = await api('scope'); S.scope = j;
-    if (!$('scPreset').options.length) { $('scPreset').innerHTML = j.presets.map((p, i) => '<option value="' + i + '">' + esc(p.name) + ' (' + (p.from / 1e6).toFixed(3) + '–' + (p.to / 1e6).toFixed(3) + ', ' + p.step / 1000 + ' kHz)</option>').join(''); try { $('scPreset').value = localStorage.getItem('scPreset') || 0; } catch (e) { } }
+    if (!$('scPreset').options.length) {
+      $('scPreset').innerHTML = j.presets.map((p, i) => '<option value="' + i + '">' + esc(p.name) + ' (' + (p.from / 1e6).toFixed(3) + '–' + (p.to / 1e6).toFixed(3) + ', ' + p.step / 1000 + ' kHz, about ' + scDur(scSteps(p.from, p.to, p.step) * (j.settleMs + 300)) + ')</option>').join('') + '<option value="c">Custom range…</option>';
+      try { $('scPreset').value = localStorage.getItem('scPreset') || 0; const c = JSON.parse(localStorage.getItem('scCustom') || 'null'); if (c) { $('scFrom').value = c.from; $('scTo').value = c.to; $('scStep').value = c.step; } } catch (e) { }
+      if (!$('scFrom').value) { $('scFrom').value = '446.0000'; $('scTo').value = '446.2000'; $('scStep').value = '12.5'; }
+      $('scCustom').classList.toggle('hidden', $('scPreset').value !== 'c');
+    }
     $('scStart').textContent = j.running ? 'Stop' : 'Start';
     const n = j.step > 0 ? Math.floor((j.to - j.from) / j.step) + 1 : 0;
-    $('scSub').textContent = j.running ? (j.from / 1e6).toFixed(3) + '–' + (j.to / 1e6).toFixed(3) + ' MHz · ' + j.step / 1000 + ' kHz steps · a sweep takes ' + (j.sweepMs > 0 ? Math.round(j.sweepMs / 1000) : Math.round(n * (j.settleMs + 15) / 1000)) + ' s · receive only' : 'Receive only: the radio sweeps the band step by step (about 0.7 s a step: its signal reading needs that long after each retune) and comes back to your channel when it stops. Click the graph to pick a frequency.';
+    $('scSub').textContent = j.running ? (j.from / 1e6).toFixed(3) + '–' + (j.to / 1e6).toFixed(3) + ' MHz · ' + j.step / 1000 + ' kHz steps · ' + n + ' steps, a sweep takes ' + (j.sweepMs > 0 ? '' : 'about ') + scDur(j.estimateMs) + (j.currentHz ? ' · now at ' + (j.currentHz / 1e6).toFixed(4) + ' MHz' + (j.partialIndex >= 0 ? ' (step ' + (j.partialIndex + 1) + ')' : '') : '') + ' · receive only' : 'Receive only: the radio sweeps the band step by step (about 0.7 s a step: its signal reading needs that long after each retune) and comes back to your channel when it stops. Click the graph to pick a frequency.';
     $('scPeaks').innerHTML = (j.peaks || []).sort((a, b) => b.dbm - a.dbm).slice(0, 8).map(p => '<div class="item click" data-hz="' + p.hz + '"><div class="main"><b class="mono">' + (p.hz / 1e6).toFixed(4) + ' MHz</b> · ' + p.dbm + ' dBm' + (p.name ? ' · ' + esc(p.name) : '') + '</div></div>').join('') || (j.last ? '<div class="empty">Nothing stands out above the noise (8 dB)</div>' : '');
     drawScope();
     clearTimeout(S.scT); if (j.running && S.page === 'scope') S.scT = setTimeout(loadScope, 1500);   // the sweep in progress, step by step
@@ -539,6 +547,11 @@ $('scStart').onclick = async () => {
   const j = S.scope || {};
   try {
     if (j.running) { await api('scope/stop', {}); toast('Stopping: the radio goes back to your channel'); }
+    else if ($('scPreset').value === 'c') {
+      const from = Math.round(parseFloat($('scFrom').value) * 1e6), to = Math.round(parseFloat($('scTo').value) * 1e6), step = Math.round(parseFloat($('scStep').value) * 1e3);
+      try { localStorage.setItem('scCustom', JSON.stringify({ from: $('scFrom').value, to: $('scTo').value, step: $('scStep').value })); } catch (e) { }
+      await api('scope/start', { from, to, step }); toast('Sweeping ' + (from / 1e6).toFixed(4) + '–' + (to / 1e6).toFixed(4) + ' MHz, ' + scSteps(from, to, step) + ' steps (receive only)');
+    }
     else { const p = j.presets[+$('scPreset').value]; try { localStorage.setItem('scPreset', $('scPreset').value); } catch (e) { } await api('scope/start', { from: p.from, to: p.to, step: p.step }); toast('Sweeping ' + p.name + ' (receive only)'); }
   } catch (e) { toast(e.message); }
   setTimeout(loadScope, 600);

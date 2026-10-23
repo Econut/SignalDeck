@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Band scope: real sweep times, the frequency being measured, custom ranges
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | The sweep time shown was the previous range's (GMRS showed "a sweep takes 5 s", NOAA's 7 steps, while its 421 steps take about 7 minutes): it is reset when a sweep starts, estimated from the steps measured so far (each is 0.7 s settle + 0.1–0.5 s reading, about 1 s, not the 0.715 s assumed) and replaced by the measured time after the first sweep; the presets list their duration. While sweeping, the band scope page's frequency strip shows the frequency being measured (green) instead of the channel's, the intercom's mode bar shows it too ("Band scope sweeping · 462.5500 MHz"), and the subtitle the steps and the step being measured. **Custom range** on the phone (Which band? → Custom range…: from / to in MHz, step in kHz, the sweep time shown as you type) and in SignalDeck Web (Custom range… in the band list); the range is checked (inside 136–174 or 400–480 MHz, step ≥ 2.5 kHz, ≤ 1200 steps) on the phone and by the web API. Help updated. | `BandScope.java`, `ui/BandScopeScreen.java`, `ui/ModeScreen.java` (live frequency), `MainActivity.java`, `web/WebHost.java`, `assets/web/index.html`, `pages.js`, `ui/HelpView.java` | Host: BandScopeTest (range checks, durations). Device (owner's Armor, started from the web API): a range across the 174–400 MHz gap refused; 462.550–462.725 MHz / 12.5 kHz: 15 steps, about 0.78 s each, estimate 11 s, the live frequency in the API, the browser ("now at … (step 9)"), the phone's mode bar and the page's strip; presets show GMRS about 7 min; stopping put the radio back on its channel. |
+
 ## 2026-10-22 — FT8 in SignalDeck Web; test data off the owner's area
 
 | Backlog | Change | Files | Test |

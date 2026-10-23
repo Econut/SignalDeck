@@ -31,4 +31,23 @@ public class BandScopeTest {
         assertEquals(147_700_000, p.get(1)[0]);
         assertTrue(BandScope.peaks(new float[] { -100, -100.5f, -96.5f, -101 }, 162_400_000, 25_000, 8).isEmpty());
     }
+
+    @Test public void customRangesAreCheckedBeforeSweeping() {
+        assertNull(BandScope.problem(462_500_000, 467_750_000, 12_500));
+        assertNull(BandScope.problem(146_000_000, 146_100_000, 5_000));
+        assertNotNull("the end below the start", BandScope.problem(146_100_000, 146_000_000, 5_000));
+        assertNotNull("across the gap the radio cannot tune", BandScope.problem(170_000_000, 410_000_000, 100_000));
+        assertNotNull("220 MHz", BandScope.problem(222_000_000, 225_000_000, 20_000));
+        assertNotNull("too fine a step", BandScope.problem(146_000_000, 146_100_000, 1_000));
+        assertNotNull("too many steps", BandScope.problem(420_000_000, 450_000_000, 12_500));
+        assertNotNull("nothing typed", BandScope.problem(0, 0, 0));
+    }
+
+    @Test public void sweepTimeIsEstimatedFromTheRangeNotTheLastSweep() {
+        BandScope s = new BandScope(null);
+        assertEquals("GMRS: 421 steps of about a second", "7 min", BandScope.duration(421L * (BandScope.DEFAULT_SETTLE_MS + 300)));
+        assertEquals("5 s", BandScope.duration(5_000));
+        assertEquals("2.0 h", BandScope.duration(7_200_000));
+        assertEquals(0, s.currentHz());
+    }
 }

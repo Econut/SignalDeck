@@ -67,6 +67,19 @@ public final class BandScope {
     public boolean running() { return thread != null; }
     public int from() { return from; } public int to() { return to; } public int step() { return step; } public int settleMs() { return settleMs; }
     public long sweepMs() { return sweepMs; }
+    private volatile long sweepStart; private volatile int currentHz;
+    /** The frequency being measured right now (0 when not sweeping). */
+    public int currentHz() { return thread != null ? currentHz : 0; }
+    /** How long a whole sweep of this range takes: the last full sweep, else the steps so far scaled up, else a guess
+     *  (settle time plus a typical 0.3 s for the reading). */
+    public long estimateMs() {
+        if (sweepMs > 0) return sweepMs;
+        int n = steps(from, to, step), done = partialIdx + 1;
+        if (thread != null && done >= 3) return (System.currentTimeMillis() - sweepStart) * n / done;
+        return (long) n * (settleMs + 300);
+    }
+    /** "about 5 min", "40 s": for the screens. */
+    public static String duration(long ms) { long s = Math.round(ms / 1000.0); return s < 90 ? s + " s" : s < 5400 ? Math.round(s / 60.0) + " min" : String.format(java.util.Locale.US, "%.1f h", s / 3600.0); }
     /** The signal strength reply (raw byte) while sweeping. */
     public void onRssi(int raw) { if (thread != null) replies.offer(raw); }
 
@@ -76,15 +89,25 @@ public final class BandScope {
     /** Raw RSSI byte to dBm, as the module reports it (0 = no reading). */
     public static float dbm(int raw) { return raw > 0 && raw < 200 ? -(120f - raw / 2f) : Float.NaN; }   // 200+ (above -20 dBm) is the module's "no reading"
 
+    /** Why a range cannot be swept, or null. Pure. */
+    public static String problem(int from, int to, int step) {
+        if (from <= 0 || to <= 0 || step <= 0) return "Enter the frequencies in MHz and the step in kHz";
+        if (step < 2_500) return "Use a step of at least 2.5 kHz";
+        if (to <= from) return "The end must be above the start";
+        if (!tunable(from) || !tunable(to) || (from <= 174_000_000 && to >= 400_000_000)) return "The radio tunes 136–174 and 400–480 MHz: keep the range inside one of them";
+        int n = steps(from, to, step);
+        if (n < 2) return "Choose a range with at least two steps";
+        if (n > MAX_STEPS) return n + " steps is too many (up to " + MAX_STEPS + "): use a larger step";
+        return null;
+    }
+
     /** Start sweeping (null), or why not. */
     public synchronized String start(int from, int to, int step, int settleMs) {
         if (thread != null) stop();
-        int n = steps(from, to, step);
-        if (n < 2) return "Choose a range with at least two steps";
-        if (n > MAX_STEPS) return "Too many steps (" + n + "): use a larger step";
-        if (!tunable(from) || !tunable(to) || (from <= 174_000_000 && to >= 400_000_000)) return "The radio tunes 136–174 and 400–480 MHz: keep the range inside one of them";
+        String bad = problem(from, to, step); if (bad != null) return bad;
         this.from = from; this.to = to; this.step = step; this.settleMs = Math.max(10, Math.min(3000, settleMs));
         synchronized (history) { history.clear(); last = null; peak = null; }
+        sweepMs = 0; partialIdx = -1; currentHz = from;                    // a new range: forget the last range's timing
         replies.clear();
         Thread t = new Thread(this::loop, "band-scope"); thread = t; t.setPriority(Thread.NORM_PRIORITY + 1); t.start();
         hooks.state("sweeping");
@@ -106,10 +129,11 @@ public final class BandScope {
         final float[] row = new float[n]; int[] lat = new int[n];
         try {
             while (thread == Thread.currentThread()) {
-                long t0 = System.currentTimeMillis();
+                long t0 = System.currentTimeMillis(); sweepStart = t0;
                 java.util.Arrays.fill(row, Float.NaN); partial = row; partialIdx = -1;
                 for (int i = 0; i < n && thread == Thread.currentThread(); i++) {
-                    hooks.tune(from + i * step);
+                    currentHz = from + i * step;
+                    hooks.tune(currentHz);
                     Thread.sleep(settleMs);
                     replies.clear(); long q = System.currentTimeMillis(); hooks.query();
                     Integer raw = replies.poll(timeoutMs, TimeUnit.MILLISECONDS);      // the module answers after about 0.1 s or 0.55 s (its measuring cycle)

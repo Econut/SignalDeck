@@ -248,8 +248,8 @@
     <!-- SATELLITES -->
     <section id="page-scope" class="page hidden">
       <div class="panel">
-        <div class="row between wrap"><span class="label">BAND SCOPE</span><div class="row"><select id="scPreset" aria-label="Band"></select><button class="btn small-btn" id="scStart">Start</button><button class="btn small-btn" id="scClear">Clear peaks</button></div></div>
-        <p class="muted small" id="scSub">Receive only: the radio sweeps the band step by step (about 0.7 s a step: its signal reading needs that long after each retune) and comes back to your channel when it stops. Click the graph to pick a frequency.</p>
+        <div class="row between wrap"><span class="label">BAND SCOPE</span><div class="row"><select id="scPreset" aria-label="Band"></select><span id="scCustom" class="row hidden"><input id="scFrom" inputmode="decimal" placeholder="from MHz" style="width:92px"><input id="scTo" inputmode="decimal" placeholder="to MHz" style="width:92px"><input id="scStep" inputmode="decimal" placeholder="step kHz" style="width:76px"></span><button class="btn small-btn" id="scStart">Start</button><button class="btn small-btn" id="scClear">Clear peaks</button></div></div>
+        <p class="muted small" id="scSub">Receive only: the radio sweeps the band step by step (about a second a step: its signal reading needs 0.7 s after each retune) and comes back to your channel when it stops. Pick a band or a custom range; click the graph to pick a frequency.</p>
         <canvas id="scCv" class="scope-cv" aria-label="Band scope: signal strength across the band and a waterfall of the recent sweeps"></canvas>
         <div class="row between wrap"><span id="scSel" class="mono"></span><button class="btn small-btn hidden" id="scListen">Listen here</button></div>
         <div id="scPeaks" class="list small"></div>
