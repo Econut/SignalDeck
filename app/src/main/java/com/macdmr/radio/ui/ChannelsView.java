@@ -156,7 +156,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         List<String> parts = new ArrayList<>();
         int shift = ch.txFreq - ch.rxFreq;
         if (ch.rxFreq >= 162_400_000 && ch.rxFreq <= 162_550_000) parts.add("WX · RX ONLY");
-        else if (ChannelStore.receiveOnly(ch.txFreq)) parts.add("RX ONLY");
+        else if (ChannelStore.receiveOnly(ch)) parts.add("RX ONLY");
         else if (Math.abs(shift) >= 100_000) parts.add((shift > 0 ? "+" : "−") + String.format(Locale.US, "%s MHz", trim(Math.abs(shift) / 1e6)));
         if (ch.rxType == 1 && com.macdmr.radio.dsp.ToneTable.ctcssHz(ch.rxSubCode) > 0) parts.add(String.format(Locale.US, "%.1f", com.macdmr.radio.dsp.ToneTable.ctcssHz(ch.rxSubCode)));
         else if (ch.rxType == 2 || ch.rxType == 3) parts.add(com.macdmr.radio.dsp.ToneTable.toneLabel(ch.rxType, ch.rxSubCode));

@@ -82,6 +82,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                     .setPositiveButton("Take over", (dd, w) -> svc.bringUp()).setNegativeButton("Cancel", null).show();
         });
         handBack.setOnClickListener(v -> { if (svc != null) svc.shutDown(true); });
+        TextView exit = Neo.button(c, "Exit SignalDeck", "power", Neo.RED);
+        LayoutParams el = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); el.topMargin = (int) (8 * d);
+        hero.addView(exit, el);
+        exit.setOnClickListener(v -> exitSheet());
         TextView boot = Neo.button(c, "Keep access after reboot", "shield", Neo.CYAN);
         LayoutParams bl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); bl.topMargin = (int) (8 * d);
         hero.addView(boot, bl);
@@ -401,6 +405,24 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     }
 
     /** Which profile this phone uses, the profile list and its advisories; the owner decides about every advisory. */
+    /** Exit: radio off (the usual way to finish), or back to the stock app. */
+    private void exitSheet() {
+        final Context c = getContext();
+        LinearLayout b = Neo.sheetBody(c, "Exit SignalDeck");
+        b.addView(Neo.sheetHint(c, "Closing the app or swiping it away leaves the radio running in the background (that is how it keeps receiving with the screen off). Exit stops it properly: it ends any transmission and everything running (scan, APRS, FT8, M17, satellite tracking, the parrot), stops the audio and closes the radio's serial port."));
+        final android.app.AlertDialog[] dlg = new android.app.AlertDialog[1];
+        TextView off = Neo.button(c, "Turn the radio off and exit", "power", Neo.RED);
+        off.setOnClickListener(v -> { dlg[0].dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).exitApp(false); });
+        b.addView(off, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (52 * Theme.dp(c))));
+        b.addView(Neo.sheetHint(c, "Switches the radio module's power off: it no longer receives or uses battery. Opening SignalDeck turns it on again (a few seconds)."));
+        TextView back = Neo.button(c, "Hand back to the stock app and exit", "handback", Neo.AMBER);
+        back.setOnClickListener(v -> { dlg[0].dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).exitApp(true); });
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (52 * Theme.dp(c))); bl.topMargin = (int) (10 * Theme.dp(c));
+        b.addView(back, bl);
+        b.addView(Neo.sheetHint(c, "Switches the phone's own intercom app back on and leaves the radio to it." + (svc != null && svc.ownAtBoot() ? " SignalDeck still takes the radio back at the next reboot (Keep access after reboot)." : "") + " Scheduled operations still start SignalDeck at their time."));
+        dlg[0] = Neo.showSheet(c, b);
+    }
+
     private void profileDialog() {
         final Context c = getContext();
         final com.macdmr.radio.ProfileRegistry.Selection s = com.macdmr.radio.ProfileRegistry.selection();

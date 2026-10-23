@@ -48,6 +48,7 @@ function renderEditor() {
   h += field('tx', 'Send frequency (MHz)', txt('fTx', mhzIn(c.txFreq), 'inputmode="decimal"'));
   h += field('rx', 'Receive frequency (MHz)', txt('fRx', mhzIn(c.rxFreq), 'inputmode="decimal"'));
   h += field('power', 'Power', sel('fPower', [[0, 'Low power'], [1, 'High power']], c.power));
+  h += field('rxOnly', 'Transmit', sel('fRxOnly', [[0, 'Allowed'], [1, 'Receive only']], c.rxOnly ? 1 : 0));
   h += field('relay', 'Relay (repeater)', sel('fRelay', [[1, 'Disconnect'], [2, 'Normal']], c.relay === 1 ? 1 : 2));
   if (digital) {
     h += '<div class="sect">DIGITAL (DMR)</div>';
@@ -106,13 +107,13 @@ function renderEditor() {
 function collect(keepOnly) {
   const v = id => { const e = $(id); return e ? e.value : undefined; };
   const o = { number: ED.isNew ? 0 : ED.ch.number, name: v('fName'), type: +v('fType'), txMHz: parseFloat(v('fTx')), rxMHz: parseFloat(v('fRx')),
-    power: +v('fPower'), relay: +v('fRelay'), lat: v('fLat'), lon: v('fLon') };
+    power: +v('fPower'), relay: +v('fRelay'), rxOnly: v('fRxOnly') === '1', lat: v('fLat'), lon: v('fLon') };
   if ($('fNotes')) o.notes = v('fNotes');
   if ($('fCc')) Object.assign(o, { cc: +v('fCc'), mode: +v('fMode'), slot: +v('fSlot'), contactType: +v('fCtype'), txContact: v('fCall'), groups: v('fGroups'), encryptSw: +v('fEnc'), interrupt: +v('fInt') });
   if ($('fKey') && v('fKey')) o.encryptKey = v('fKey');
   if ($('fBand')) Object.assign(o, { band: +v('fBand'), softSq: v('fSoft') === '1', softSqLevel: +v('fSoftLvl'), sq: +v('fSq'), txType: +v('fTxType'), txSubCode: +v('fTxCode'), rxType: +v('fRxType'), rxSubCode: +v('fRxCode') });
   if (keepOnly) {   // map back onto the channel object's own field names
-    return { name: o.name, txFreq: Math.round((o.txMHz || 0) * 1e6), rxFreq: Math.round((o.rxMHz || 0) * 1e6), power: o.power, relay: o.relay,
+    return { name: o.name, txFreq: Math.round((o.txMHz || 0) * 1e6), rxFreq: Math.round((o.rxMHz || 0) * 1e6), power: o.power, relay: o.relay, rxOnly: o.rxOnly,
       lat: o.lat ? parseFloat(o.lat) : undefined, lon: o.lon ? parseFloat(o.lon) : undefined };
   }
   return o;

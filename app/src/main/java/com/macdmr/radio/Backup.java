@@ -136,9 +136,10 @@ public final class Backup {
                 w.write(r + "\r\n");
             }
         }
-        try (Writer w = writer(new File(dir, EXTRAS))) {             // SignalDeck's own: channel notes and nets (other tools ignore the file)
+        try (Writer w = writer(new File(dir, EXTRAS))) {             // SignalDeck's own: channel notes, receive-only channels and nets (other tools ignore the file)
             w.write(EXTRAS_HEADER + "\r\n");
             for (ChannelStore.Channel ch : channels) if (ch.notes != null && !ch.notes.isEmpty()) w.write(ch.number + "," + q(ch.name) + ",notes,,,,," + q(line(ch.notes)) + "\r\n");
+            for (ChannelStore.Channel ch : channels) if (ch.rxOnly) w.write(ch.number + "," + q(ch.name) + ",rxonly,,,,,\r\n");
             for (ChannelStore.Zone z : store.zones()) {                  // Zones.csv lists channels by name; two channels with one name need the exact numbers
                 StringBuilder nums = new StringBuilder(); for (int n : z.numbers) { if (nums.length() > 0) nums.append(';'); nums.append(n); }
                 w.write(",," + "zone," + q(line(z.name)) + ",,,," + nums + "\r\n");
@@ -225,7 +226,7 @@ public final class Backup {
             for (ChannelStore.TgList t : live.tgLists()) { if (t.tgs.length == 0) continue; boolean ok = false; for (ChannelStore.TgList u : scratch.tgLists()) if (u.name.equals(t.name) && Arrays.equals(u.tgs, t.tgs)) ok = true; if (!ok) { tbad++; r.append("  TG list ").append(t.name).append(" missing\n"); } }
             r.append(tbad == 0 ? "talkgroup lists kept" : tbad + " talkgroup lists not kept").append('\n');
             int notesBad = 0, netsBad = 0;
-            for (ChannelStore.Channel x : a) { ChannelStore.Channel y = scratch.byNumber(x.number); if (y != null && !x.notes.equals(y.notes)) { notesBad++; r.append("  Ch ").append(x.number).append(" notes not kept\n"); } }
+            for (ChannelStore.Channel x : a) { ChannelStore.Channel y = scratch.byNumber(x.number); if (y != null && (!x.notes.equals(y.notes) || x.rxOnly != y.rxOnly)) { notesBad++; r.append("  Ch ").append(x.number).append(" notes or receive only not kept\n"); } }
             List<com.macdmr.radio.ham.NetFinder.Manual> na = live.nets(), nb = scratch.nets();
             for (com.macdmr.radio.ham.NetFinder.Manual m : na) {
                 boolean ok = false;
@@ -380,6 +381,7 @@ public final class Backup {
             for (int i = 1; i < extras.size(); i++) {
                 List<String> r = extras.get(i); Integer nn = renum.get(num(col(r, 0), -1)); ChannelStore.Channel ch = nn == null ? null : store.byNumber(nn); if (ch == null) continue;
                 if ("notes".equalsIgnoreCase(col(r, 2))) { ch.notes = unline(col(r, 7)); store.update(ch); extraNotes++; }
+                else if ("rxonly".equalsIgnoreCase(col(r, 2))) { ch.rxOnly = true; store.update(ch); }
                 else if ("net".equalsIgnoreCase(col(r, 2))) {
                     com.macdmr.radio.ham.NetFinder.Manual m = new com.macdmr.radio.ham.NetFinder.Manual();
                     m.channelId = ch.id; m.channel = ch.number; m.name = unline(col(r, 3)); m.days = num(col(r, 4), 0) & com.macdmr.radio.ham.NetFinder.ALL_DAYS;

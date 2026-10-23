@@ -43,7 +43,7 @@ public class ChannelEditorView extends LinearLayout {
     private static final String[] TONE_TYPES = { "None", "CTCSS", "DCS", "DCS inverted" };
     /** The field help texts, for SignalDeck Web's channel editor: {key, text}. */
     public static String[][] helpForWeb() {
-        return new String[][] { { "name", H_NAME }, { "notes", H_NOTES }, { "type", H_TYPE }, { "tx", H_TX }, { "rx", H_RX }, { "pos", H_POS }, { "power", H_POWER }, { "band", H_BAND },
+        return new String[][] { { "name", H_NAME }, { "notes", H_NOTES }, { "type", H_TYPE }, { "tx", H_TX }, { "rx", H_RX }, { "pos", H_POS }, { "power", H_POWER }, { "rxOnly", H_RXONLY }, { "band", H_BAND },
                 { "relay", H_RELAY }, { "cc", H_CC }, { "mode", H_MODE }, { "slot", H_SLOT }, { "contactType", H_CTYPE }, { "call", H_CALL }, { "groups", H_GROUPS },
                 { "encrypt", H_ENC }, { "key", H_KEY }, { "interrupt", H_INT }, { "sq", H_SQ }, { "softSq", H_SOFTSQ }, { "softSqLevel", H_SOFTSQ_LVL },
                 { "txType", H_TXT }, { "txTone", H_TXC }, { "rxType", H_RXT }, { "rxTone", H_RXC } };
@@ -56,6 +56,7 @@ public class ChannelEditorView extends LinearLayout {
     private static final String H_TX = "The frequency you transmit on, in MHz. On a simplex channel it is the same as the receive frequency; on a repeater channel it is the repeater's input (for example +5 MHz on UHF GMRS, or ±0.6 MHz on 2 m). This radio covers 136–174 and 400–480 MHz.";
     private static final String H_RX = "The frequency you listen on, in MHz. On a repeater channel it is the repeater's output. This radio tunes 136–174 and 400–480 MHz; other frequencies (220 MHz, for example) cannot be saved.";
     private static final String H_POS = "Optional position of the station or repeater this channel reaches. With it the intercom shows the place name and its distance and bearing from you. Use my position fills in the phone's last known location.";
+    private static final String H_RXONLY = "Receive only: this channel never transmits. Talk, the side key, the voice keyer, beacons, replies and every other transmission are refused while you are on it (a listening post, a channel you are not licensed for, a frequency that should stay quiet). NOAA weather, marine and railroad channels are always receive only, whatever this says.";
     private static final String H_POWER = "Transmit power. High reaches further and uses more battery; Low is enough for nearby radios. Some services limit power (FRS, for example).";
     private static final String H_BAND = "Channel width: Wide (25 kHz) or Narrow (12.5 kHz). Use what the other radios or the repeater use. On VHF (below 300 MHz) this radio is always set to Wide: Narrow makes its receiver deaf there.";
     private static final String H_RELAY = "The radio's relay-disconnection setting. Normal (recommended): the radio stays connected to the repeater and transmits normally. Disconnect: the radio waits for repeater confirmation and may not transmit at all; use it only if your network asks for it.";
@@ -112,6 +113,7 @@ public class ChannelEditorView extends LinearLayout {
 
         section(form, "Radio");
         choiceInto(form, "Power", H_POWER, new String[] { "Low power", "High power" }, ch.power, v -> ch.power = v);
+        choiceInto(form, "Transmit", H_RXONLY, new String[] { "Allowed", "Receive only" }, ch.rxOnly ? 1 : 0, v -> ch.rxOnly = v == 1);
         choiceInto(form, "Relay (repeater)", H_RELAY, new String[] { "Disconnect", "Normal" }, ch.relay == 1 ? 0 : 1, v -> ch.relay = v == 0 ? 1 : 2);
 
         digitalGroup = new LinearLayout(c); digitalGroup.setOrientation(VERTICAL); form.addView(digitalGroup);

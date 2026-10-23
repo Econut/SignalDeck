@@ -22,7 +22,7 @@ import android.widget.Toast;
  */
 public class RadioWidget extends AppWidgetProvider {
     public static final String ACTION = "com.macdmr.radio.CONTROL";
-    public static final String CMD_PREV = "prev", CMD_NEXT = "next", CMD_SCAN = "scan", CMD_TALK = "talk";
+    public static final String CMD_PREV = "prev", CMD_NEXT = "next", CMD_SCAN = "scan", CMD_TALK = "talk", CMD_EXIT = "exit";
 
     @Override public void onUpdate(Context c, AppWidgetManager m, int[] ids) { refresh(c, RadioService.running); }
 
@@ -31,6 +31,10 @@ public class RadioWidget extends AppWidgetProvider {
         if (!ACTION.equals(i.getAction())) return;
         String cmd = i.getStringExtra("cmd");
         RadioService s = RadioService.running;
+        if (CMD_EXIT.equals(cmd)) {                                   // the notification's Exit: radio off, service stopped, the app closed if open
+            if (s != null) s.exit(false, r -> { Toast.makeText(c, "Radio switched off. Open SignalDeck to turn it on again", Toast.LENGTH_LONG).show(); c.sendBroadcast(new Intent(MainActivity.ACTION_FINISH).setPackage(c.getPackageName())); });
+            return;
+        }
         if (s == null || !s.isReady()) { Toast.makeText(c, "Open the radio app first: the radio is not on", Toast.LENGTH_SHORT).show(); refresh(c, s); return; }
         if (CMD_PREV.equals(cmd)) s.stepChannel(-1);
         else if (CMD_NEXT.equals(cmd)) s.stepChannel(1);

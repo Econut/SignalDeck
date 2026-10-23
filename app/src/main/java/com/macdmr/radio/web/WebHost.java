@@ -251,6 +251,7 @@ public final class WebHost {
                 .put("rxType", ch.rxType).put("rxSubCode", ch.rxSubCode).put("txType", ch.txType).put("txSubCode", ch.txSubCode).put("location", ch.location);
         if (ch.lat != 0 || ch.lon != 0) o.put("lat", ch.lat).put("lon", ch.lon);
         o.put("notes", ch.notes == null ? "" : ch.notes);
+        o.put("rxOnly", ch.rxOnly).put("receiveOnly", ChannelStore.receiveOnly(ch));
         return o;
     }
     /** Every field the channel editor has (the encrypt key itself stays on the phone: only whether one is set). */
@@ -273,6 +274,7 @@ public final class WebHost {
             ch.power = b.optInt("power", ch.power) == 1 ? 1 : 0;
             ch.relay = b.optInt("relay", ch.relay) == 1 ? 1 : 2;
             if (b.has("notes")) ch.notes = b.optString("notes", "").trim();
+            if (b.has("rxOnly")) ch.rxOnly = b.optBoolean("rxOnly", false);
             String la = b.optString("lat", "").trim(), lo = b.optString("lon", "").trim();
             if (la.isEmpty() && lo.isEmpty()) { ch.lat = 0; ch.lon = 0; }
             else {

@@ -130,6 +130,10 @@ public class MainActivity extends AppCompatActivity {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
             ActivityCompat.requestPermissions(this, android.os.Build.VERSION.SDK_INT >= 33 ? new String[] { Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.ACCESS_FINE_LOCATION, "android.permission.READ_MEDIA_AUDIO" } : new String[] { Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_EXTERNAL_STORAGE }, 1);
         Intent si = new Intent(this, RadioService.class);
+        RadioService.exiting = false;                                // opened again after an exit: the radio comes back
+        finishReceiver = new android.content.BroadcastReceiver() { @Override public void onReceive(Context cx, Intent in) { try { unbindService(conn); } catch (Throwable ignored) { } finishAndRemoveTask(); } };
+        if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(finishReceiver, new android.content.IntentFilter(ACTION_FINISH), Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(finishReceiver, new android.content.IntentFilter(ACTION_FINISH));
         startForegroundService(si);
         bindService(si, conn, Context.BIND_AUTO_CREATE);
     }
@@ -358,8 +362,24 @@ public class MainActivity extends AppCompatActivity {
         super.onBackPressed();
     }
 
+    /** Sent by the notification's Exit once the radio is off: close this screen too. */
+    public static final String ACTION_FINISH = "com.macdmr.radio.FINISH";
+    private android.content.BroadcastReceiver finishReceiver;
+
+    /** Exit SignalDeck (Device page, notification): radio off or handed back, service stopped, app closed. */
+    public void exitApp(boolean restoreStock) {
+        RadioService s = svc;
+        if (s == null) { finishAndRemoveTask(); return; }
+        s.exit(restoreStock, report -> {
+            android.widget.Toast.makeText(this, restoreStock ? "Radio handed back to the stock app" : "Radio switched off. Open SignalDeck to turn it on again", android.widget.Toast.LENGTH_LONG).show();
+            try { unbindService(conn); } catch (Throwable ignored) { }
+            finishAndRemoveTask();
+        });
+    }
+
     @Override protected void onDestroy() {
         super.onDestroy();
+        try { if (finishReceiver != null) unregisterReceiver(finishReceiver); } catch (Throwable ignored) { }
         ui.removeCallbacks(rssiTick); ui.removeCallbacks(modeTick);
         if (svc != null) { intercom.detach(); diagnostics.detach(); }
         try { unbindService(conn); } catch (Throwable ignored) { }

@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-22 — Receive-only channels; Exit that switches the radio off
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | **Receive-only channels**: channel editor (phone and SignalDeck Web) → Transmit: Allowed / Receive only. A receive-only channel refuses Talk, the side key and every automatic transmission (the same block NOAA, marine and railroad channels have by frequency, which stay receive only whatever the setting says); its card says RX ONLY. Stored per channel (new `rxOnly` column, added on open) and kept in backups through SignalDeck's extras file (CPS-compatible CSVs unchanged; the backup round-trip check covers it). Help: Channels → Receive only, editor info text. | `ChannelStore.java`, `RadioService.java`, `Backup.java`, `ui/ChannelEditorView.java`, `ui/ChannelsView.java`, `web/WebHost.java`, `assets/web/editor.js`, `ui/HelpView.java` | Device: a bench channel on 467.625 MHz low power saved over the web API as receive only, selected: the radio reported transmit blocked and a test transmission was refused ("blocked: receive-only channel"); the bench channel deleted, the owner's channel restored. Host: all tests. |
+| — | **Exit**: closing or swiping the app away had never switched the radio off (the service kept running and the module stayed powered; even the service's shutdown only closed the serial port). Device → **Exit SignalDeck**: *Turn the radio off and exit* (ends any transmission and every running mode, stops the audio, switches the radio module's power line off, closes the serial port, stops the service, closes the app) or *Hand back to the stock app and exit*; the notification's expanded view has an **Exit** button (radio off). Opening SignalDeck brings the radio back. Help: Device → Exit. | `RadioService.java` (`exit`), `MainActivity.java`, `ui/DeviceView.java`, `RadioWidget.java` (notification command), `ui/HelpView.java` | Device (owner's Armor): Device → Exit SignalDeck → Turn the radio off and exit: module power line `pwd :1` → `pwd :0`, no SignalDeck service left, back to the launcher; reopening: power `pwd :1`, link ready, the channel and the ISS pass tracking restored within ~10 s. |
+
 ## 2026-10-22 — M17 receive
 
 | Backlog | Change | Files | Test |

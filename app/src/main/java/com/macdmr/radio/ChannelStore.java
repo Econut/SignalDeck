@@ -30,6 +30,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
         public String encryptKey = ""; public int[] groups = new int[0]; public boolean active;
         public String location = "";
         public String notes = "";                  // the owner's notes on this channel (shareable as an option)
+        public boolean rxOnly;                     // the owner made this channel receive only (never transmits)
         public double lat, lon, elev;              // from the module's location table (0 = none)
         public boolean softSq; public int softSqLevel = 5;   // software squelch (analog)
         public boolean isDigital() { return type == 0; }
@@ -76,6 +77,9 @@ public final class ChannelStore extends SQLiteOpenHelper {
         boolean hasNotes = false;
         try (Cursor c = db.rawQuery("PRAGMA table_info(channels)", null)) { while (c.moveToNext()) if ("notes".equals(c.getString(1))) hasNotes = true; }
         if (!hasNotes) db.execSQL("ALTER TABLE channels ADD COLUMN notes TEXT DEFAULT ''");
+        boolean hasRxOnly = false;
+        try (Cursor c = db.rawQuery("PRAGMA table_info(channels)", null)) { while (c.moveToNext()) if ("rxOnly".equals(c.getString(1))) hasRxOnly = true; }
+        if (!hasRxOnly) db.execSQL("ALTER TABLE channels ADD COLUMN rxOnly INTEGER DEFAULT 0");
         boolean hasSender = false;                                             // talkgroup texts: the thread is the talkgroup, each message keeps who wrote it
         try (Cursor c = db.rawQuery("PRAGMA table_info(messages)", null)) { while (c.moveToNext()) if ("sender".equals(c.getString(1))) hasSender = true; }
         if (!hasSender) db.execSQL("ALTER TABLE messages ADD COLUMN sender INTEGER DEFAULT 0");
@@ -200,6 +204,8 @@ public final class ChannelStore extends SQLiteOpenHelper {
     }
 
     /** Frequencies this radio never transmits on: NOAA weather (162.400 to 162.550 MHz), the marine VHF band (156.000 to 157.450 MHz) and the AAR railroad channels (159.810 to 161.565 MHz). */
+    /** This channel never transmits: by its frequency (above) or because the owner set it receive only. */
+    public static boolean receiveOnly(Channel ch) { return ch != null && (ch.rxOnly || receiveOnly(ch.txFreq)); }
     public static boolean receiveOnly(int txHz) {
         return (txHz >= 162_400_000 && txHz <= 162_550_000) || (txHz >= 156_000_000 && txHz <= 157_450_000) || (txHz >= 159_810_000 && txHz <= 161_565_000);
     }
@@ -436,6 +442,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
         v.put("groups", g.toString()); v.put("active", ch.active ? 1 : 0); v.put("location", ch.location);
         v.put("lat", ch.lat); v.put("lon", ch.lon); v.put("elev", ch.elev); v.put("softSq", ch.softSq ? 1 : 0); v.put("softSqLevel", ch.softSqLevel);
         v.put("notes", ch.notes == null ? "" : ch.notes);
+        v.put("rxOnly", ch.rxOnly ? 1 : 0);
         return v;
     }
 
@@ -456,6 +463,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
         ch.lat = c.getDouble(c.getColumnIndexOrThrow("lat")); ch.lon = c.getDouble(c.getColumnIndexOrThrow("lon")); ch.elev = c.getDouble(c.getColumnIndexOrThrow("elev"));
         ch.softSq = c.getInt(c.getColumnIndexOrThrow("softSq")) == 1; ch.softSqLevel = c.getInt(c.getColumnIndexOrThrow("softSqLevel"));
         int ni = c.getColumnIndex("notes"); ch.notes = ni >= 0 && !c.isNull(ni) ? c.getString(ni) : "";
+        int ro = c.getColumnIndex("rxOnly"); ch.rxOnly = ro >= 0 && !c.isNull(ro) && c.getInt(ro) != 0;
         return ch;
     }
 

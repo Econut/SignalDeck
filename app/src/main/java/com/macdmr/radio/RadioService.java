@@ -870,6 +870,44 @@ public class RadioService extends Service implements RadioEngine.Events {
         }, "radio-bringup").start();
     }
 
+    /** Exiting: no new start of the service by the app until it is opened again. */
+    public static volatile boolean exiting;
+    public interface ExitDone { void done(String report); }
+    /**
+     * Exit SignalDeck: end any transmission and every running mode, stop the audio, then either switch the radio module's
+     * power off (restoreStock false) or give the radio back to the stock app (true), close the serial port and stop the
+     * service. {@code done} gets what happened (on the main thread).
+     */
+    public void exit(final boolean restoreStock, final ExitDone done) {
+        exiting = true;
+        new Thread(() -> {
+            StringBuilder r = new StringBuilder();
+            try { if (pttDown) { if (audio != null) audio.stopTx(); engine.ptt(false); pttDown = false; r.append("transmission ended; "); } } catch (Throwable t) { r.append("unkey: ").append(t.getMessage()).append("; "); }
+            try { if (scanner != null && scanner.isScanning()) scanner.stop(); } catch (Throwable ignored) { }
+            try { if (scope.running()) scope.stop(); } catch (Throwable ignored) { }
+            try { if (ft8Running()) setFt8(false); } catch (Throwable ignored) { }
+            try { if (m17Running()) setM17(false); } catch (Throwable ignored) { }
+            try { if (parrot.enabled()) parrot.setEnabled(false); } catch (Throwable ignored) { }
+            try { if (foxTxOn()) setFoxTx(false); } catch (Throwable ignored) { }
+            try { stopSatTrack(); } catch (Throwable ignored) { }
+            try { if (audio != null) { audio.stopRx(); rxAudioOn = false; if (restoreStock) audio.releaseForStockApp(); } } catch (Throwable ignored) { }
+            if (restoreStock) r.append("stock app: ").append(RootSetup.stockApp(profile, true)).append("; ");
+            else {
+                try { engine.powerOff(); r.append("radio module power off (").append(engine.powerState()).append("); "); }
+                catch (Throwable t) { r.append("power off failed: ").append(t.getMessage()).append("; "); }
+            }
+            try { engine.close(); } catch (Throwable ignored) { }
+            setLink("stopped");
+            log("exit: " + r);
+            final String report = r.toString();
+            ui.post(() -> {
+                try { stopForeground(true); } catch (Throwable ignored) { }
+                stopSelf();
+                if (done != null) done.done(report);
+            });
+        }, "radio-exit").start();
+    }
+
     public void shutDown(final boolean restoreStock) {
         new Thread(() -> {
             if (restoreStock) log("stock app on: " + RootSetup.stockApp(profile, true));
@@ -1495,7 +1533,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (ch == null) return true;
         SatState ss = satState;
         if (ss != null && ss.listenOnly && vfo != null && ss.name.equals(vfo.name)) return true;     // a satellite downlink (ISS SSTV)
-        return ChannelStore.receiveOnly(ch.txFreq);      // NOAA weather and marine channels are receive-only
+        return ChannelStore.receiveOnly(ch);             // NOAA weather, marine and railroad channels, and channels set receive only
     }
 
     /** The browser's microphone for the next key-down (SignalDeck Web talk); read once by {@link #ptt}. */
@@ -1773,6 +1811,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_w_left), "Ch −", RadioWidget.command(this, RadioWidget.CMD_PREV, 1)).build());
             b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, scanning ? R.drawable.ic_w_stop : R.drawable.ic_w_scan), scanning ? "Stop scan" : "Scan", RadioWidget.command(this, RadioWidget.CMD_SCAN, 3)).build());
             b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_w_right), "Ch +", RadioWidget.command(this, RadioWidget.CMD_NEXT, 2)).build());
+            b.addAction(new Notification.Action.Builder(android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_w_stop), "Exit", RadioWidget.command(this, RadioWidget.CMD_EXIT, 4)).build());   // expanded view: radio off and exit
             Notification.MediaStyle ms = new Notification.MediaStyle().setShowActionsInCompactView(0, 1, 2);
             try { ms.setMediaSession((android.media.session.MediaSession.Token) com.macdmr.radio.media.RadioMedia.get(this).session().getSessionToken().getToken()); } catch (Throwable ignored) { }
             b.setStyle(ms);
