@@ -494,6 +494,7 @@ public final class WebHost {
             a.put(o);
         }
         return new JSONObject().put("settings", a).put("link", svc.link()).put("ready", svc.isReady()).put("profile", svc.profile() == null ? "" : svc.profile().name)
+                .put("firmware", svc.moduleVersion().trim()).put("firmwareStock", svc.stockFirmware())
                 .put("version", com.macdmr.radio.BuildConfig.VERSION_NAME).put("webTx", allowTx()).put("browsers", clients()).put("listeners", listeners());
     }
 

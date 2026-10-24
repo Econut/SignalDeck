@@ -1717,7 +1717,16 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void rssi0(int raw, double dbm) { rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     private volatile String moduleVersion = "";
     private volatile long versionAt;
-    @Override public void version(int v, String text) { log("module " + text); moduleVersion = text; versionAt = System.currentTimeMillis(); }
+    @Override public void version(int v, String text) {
+        log("module " + text); moduleVersion = text; versionAt = System.currentTimeMillis();
+        android.content.SharedPreferences p = getSharedPreferences("radio", MODE_PRIVATE);
+        String stored = p.getString("fwStock", ""), stock = Firmware.stockAfter(stored, text);
+        if (!stock.equals(stored)) p.edit().putString("fwStock", stock).apply();          // the first version this phone's module ever reported
+    }
+    /** The module firmware this phone came with (the first version SignalDeck saw), "" before the first answer. */
+    public String stockFirmware() { return getSharedPreferences("radio", MODE_PRIVATE).getString("fwStock", ""); }
+    /** Take the version the module reports now as the stock one (for a phone whose first report was already other firmware). */
+    public void setStockFirmwareToCurrent() { if (!moduleVersion.trim().isEmpty()) getSharedPreferences("radio", MODE_PRIVATE).edit().putString("fwStock", moduleVersion.trim()).apply(); }
     /** Ask the module for its version and wait up to {@code ms} for the answer: does it take commands at all? */
     private boolean versionHandshake(long ms) throws Exception {
         long asked = System.currentTimeMillis(); engine.queryVersion();

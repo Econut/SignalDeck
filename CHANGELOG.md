@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-24 — Device page: the radio firmware, stock and current
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Owner request (2026-10-23): show the module's original firmware and the one in use, the current one only when it differs. SignalDeck now keeps the first version the module ever reports (0x34) as this phone's stock firmware (prefs `radio/fwStock`, kept for good). The Device page shows a line under the profile: "firmware X (stock)", or, in amber, "firmware Y" with "stock X" under it when other firmware is loaded. Tapping it explains the line and, when they differ, offers Take the current version as stock (with a confirmation) for a phone that already had other firmware when SignalDeck first saw it. SignalDeck Web shows RADIO FIRMWARE under Settings; the device report summary adds the stock version when it differs. Help: Device → Radio firmware. | `Firmware.java` (new), `RadioService.java`, `ui/DeviceView.java`, `web/WebHost.java`, `assets/web/pages.js`, `DeviceReport.java`, `ui/HelpView.java`, `FirmwareTest.java` (new) | Host: all 253 tests pass (FirmwareTest); release build compiles; `node --check` on pages.js. **Not installed or run on a phone** (no installs during the firmware bench). On the owner's Armor the first version seen after the install may be a bench image: check it, and use Take the current version as stock after the factory image is back if needed. |
+
 ## 2026-10-24 — Custom ROMs: SignalDeck asks Android for the PrizeTinyService library
 
 | Backlog | Change | Files | Test |

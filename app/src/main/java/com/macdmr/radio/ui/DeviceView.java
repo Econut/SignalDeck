@@ -30,7 +30,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     public interface Host { void openHelp(); void openDiagnostics(); void intercomStyleChanged(); void animatedPanelChanged(boolean on); }
 
     private final LinearLayout header, hero;
-    private final TextView linkText, profileText, idText;
+    private final TextView linkText, profileText, idText, firmwareText;
     private final View linkDot;
     private final ImageView heroIcon;
     private final TextView takeOver, handBack, reportNow;
@@ -66,6 +66,9 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         profileText = Neo.text(c, "", 0xFF9FB4C8, 13, Neo.mono(c)); profileText.setPadding(0, (int) (5 * d), 0, 0);
         tc.addView(profileText);
         profileText.setOnClickListener(v -> profileDialog());
+        firmwareText = Neo.text(c, "", 0xFF9FB4C8, 13, Neo.mono(c)); firmwareText.setPadding(0, (int) (3 * d), 0, 0);
+        tc.addView(firmwareText);
+        firmwareText.setOnClickListener(v -> firmwareSheet());
         top.addView(tc, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         hero.addView(top);
         LinearLayout hb = new LinearLayout(c); hb.setBaselineAligned(false);
@@ -872,6 +875,30 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         again.setOnClickListener(v -> { dlg.dismiss(); checkAutoTrust(); });
     }
 
+    /** What the firmware line means; when the module runs other firmware, the stock version can be reset to it. */
+    private void firmwareSheet() {
+        if (svc == null) return;
+        final Context c = getContext(); float d = Theme.dp(c);
+        final String stock = svc.stockFirmware(), now = svc.moduleVersion().trim();
+        boolean differs = com.macdmr.radio.Firmware.differs(stock, now);
+        LinearLayout box = Neo.sheetBody(c, "Radio module firmware");
+        box.addView(Neo.sheetHint(c, "Stock: " + (stock.isEmpty() ? "not known yet" : stock) + "\nNow: " + (now.isEmpty() ? "no answer from the module yet" : now)));
+        box.addView(Neo.sheetHint(c, "The stock version is the first one this phone's radio module reported to SignalDeck, kept for good, so you can always tell what the phone came with. "
+                + (differs ? "The module now reports another version, so other firmware is loaded. If the phone already had other firmware when SignalDeck first saw it, you can take the current version as stock."
+                           : "The module runs its stock firmware.")));
+        final android.app.Dialog[] dlg = new android.app.Dialog[1];
+        if (differs) {
+            TextView reset = Neo.button(c, "Take the current version as stock", "update", Neo.AMBER);
+            LayoutParams bl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); bl.setMargins(0, (int) (10 * d), 0, 0);
+            box.addView(reset, bl);
+            reset.setOnClickListener(v -> new android.app.AlertDialog.Builder(c).setTitle("Take " + now + " as stock?")
+                    .setMessage("SignalDeck will no longer remember " + stock + " as the firmware this phone came with.")
+                    .setPositiveButton("Take as stock", (dd, w) -> { svc.setStockFirmwareToCurrent(); if (dlg[0] != null) dlg[0].dismiss(); refresh(); })
+                    .setNegativeButton("Cancel", null).show());
+        }
+        dlg[0] = Neo.showSheet(c, box);
+    }
+
     private void refresh() {
         if (svc == null) return;
         Context c = getContext(); float d = Theme.dp(c);
@@ -882,6 +909,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         for (com.macdmr.radio.ProfileRegistry.Advisory a : ps.advisories) if (!a.overridden) { profileText.append(" · ⚠ advisory"); break; }
         String l = svc.link();
         if (!svc.profile().verified && svc.profile().supported) profileText.append(" · untested");
+        String fwStock = svc.stockFirmware(), fwNow = svc.moduleVersion().trim();
+        firmwareText.setText(com.macdmr.radio.Firmware.line(fwStock, fwNow));
+        firmwareText.setVisibility(fwStock.isEmpty() ? GONE : VISIBLE);
+        firmwareText.setTextColor(com.macdmr.radio.Firmware.differs(fwStock, fwNow) ? Neo.AMBER_LIGHT : 0xFF9FB4C8);
         boolean ready = "ready".equals(l), unsupported = "unsupported".equals(l), bad = "no root".equals(l) || unsupported;
         int accent = ready ? Neo.GREEN : bad ? Neo.AMBER : "stopped".equals(l) ? Neo.CYAN : Neo.AMBER;
         linkText.setText(ready ? "This app owns the radio" : "no root".equals(l) ? "Root not granted (Magisk → Superuser)" : "stopped".equals(l) ? "The stock app owns the radio" : unsupported ? "No profile for this phone yet" : "Starting: " + l);
