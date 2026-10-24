@@ -36,6 +36,11 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:theme="@style/AppTheme">
 
+        <!-- Ulefone's radio audio class. On the stock ROM it is on the boot class path anyway; a custom ROM or GSI that
+             gets it from a Magisk module ships it as a shared library, which only reaches an app that asks for it.
+             Optional, so the app installs and runs on every phone (tester's report 2026-10-23, Armor 26 Ultra GSI). -->
+        <uses-library android:name="android.os.PrizeTinyService" android:required="false" />
+
         <!-- singleTask: the launcher icon, notifications, the widget and shares all bring the one open screen forward (onNewIntent)
              instead of stacking another copy, which also replayed the launch screen -->
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"

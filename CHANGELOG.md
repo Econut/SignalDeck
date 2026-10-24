@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-24 — Custom ROMs: SignalDeck asks Android for the PrizeTinyService library
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | A tester running an Armor 26 Ultra on a GSI (Android 16) got no receive audio (`ClassNotFoundException: android.os.PrizeTinyService`). Their fix: a Magisk module that installs Ulefone's tinyserver and its framework jar from the stock firmware, mapped as the shared library `android.os.PrizeTinyService`, plus a `uses-library` line in SignalDeck's manifest, since a shared library only reaches apps that ask for it. The manifest now has `<uses-library android:name="android.os.PrizeTinyService" android:required="false" />` (optional: installs and runs on every phone; the tester found it harmless on the stock ROM, where the class is on the boot class path). The Radio audio check's "this ROM does not have PrizeTinyService" verdict now says such a module brings the audio back. SignalDeck does not ship Ulefone's files. Help: Device → Radio audio check. | `AndroidManifest.xml`, `DmrAudioCheck.java`, `ui/HelpView.java`, `DmrAudioCheckTest.java` | Host: all 251 tests pass; `aapt dump badging` of the release APK lists `uses-library-not-required:'android.os.PrizeTinyService'`. **Not installed or run on a phone** (no installs during the firmware bench): needs the owner's Armor (stock ROM, audio must still work) and the GSI tester. |
+
 ## 2026-10-24 — Ulefone Armor 20WT profile (untested); the stock serial library under either class name
 
 | Backlog | Change | Files | Test |

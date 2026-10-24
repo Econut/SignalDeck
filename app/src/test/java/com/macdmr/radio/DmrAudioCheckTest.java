@@ -18,7 +18,7 @@ public class DmrAudioCheckTest {
 
     @Test public void customRomWithoutTheVendorClass() {
         DmrAudioCheck.Facts f = ok(); f.classMissing = true; f.binderPresent = true;
-        String s = v(f); assertTrue(s, s.contains("PrizeTinyService") && s.contains("analog and DMR alike") && s.contains("still running"));
+        String s = v(f); assertTrue(s, s.contains("PrizeTinyService") && s.contains("analog and DMR alike") && s.contains("still running") && s.contains("Magisk module"));
         assertEquals(1, DmrAudioCheck.verdict(f).size());
     }
     @Test public void serialPortAudioPhoneIgnoresTheMissingVendorClass() {      // Xplore 1 report 2026-10-22: audio arrived, the verdict said it could not

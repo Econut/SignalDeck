@@ -62,7 +62,8 @@ public final class DmrAudioCheck {
         }
         if (f.classMissing && !f.uartPcm) {                        // only phones whose audio goes through PrizeTinyService need it
             v.add("This ROM does not have Ulefone's PrizeTinyService framework class, which carries the radio's receive audio on this phone. "
-                    + "SignalDeck (and the stock app) can't get any receive audio on it, analog and DMR alike."
+                    + "SignalDeck (and the stock app) can't get any receive audio on it, analog and DMR alike. "
+                    + "On a custom ROM or GSI: a Magisk module that adds Ulefone's audio service and its PrizeTinyService library, taken from the phone's stock firmware, brings it back (SignalDeck already asks Android for that library); then reboot and run this check again."
                     + (f.binderPresent ? " The vendor audio service itself is still running (binder \"tinyservice\"), so the audio exists below Android: support for this ROM means talking to that service directly. Please send this report." : f.daemonRunning ? " The vendor audio daemon is running." : " The vendor audio service is not running either. Please send this report."));
             return v;
         }
