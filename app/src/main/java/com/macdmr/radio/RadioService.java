@@ -1679,8 +1679,20 @@ public class RadioService extends Service implements RadioEngine.Events {
             log("render bytes=" + pic.body.length + " sr=" + pic.sr);
         } catch (Throwable t) { log("render: " + t); }
     }); }
-    private Frame sym40(byte[] body) {
-        try { return engine.diag40(body); } catch (java.io.IOException e) { log("sym: " + e); return null; }
+    /** Bench: op 5, one FM receive half. mode 0 stores WORK_MODE 0x80, mode 1 stores 0x16A. Does not key. Writes cache/rxram.bin. */
+    public void diagRxRam(int mode) { worker.execute(() -> {
+        try {
+            if (mode != 0 && mode != 1) { log("rxram bad mode"); return; }
+            Frame pic = sym40(new byte[] { 5, (byte) mode }, 2500);
+            if (pic == null) { log("rxram missing"); return; }
+            byte[] body = pic.body == null ? new byte[0] : pic.body;
+            java.nio.file.Files.write(new java.io.File(getCacheDir(), "rxram.bin").toPath(), body);
+            log("rxram bytes=" + body.length + " sr=" + pic.sr + " mode=" + mode);
+        } catch (Throwable t) { log("rxram: " + t); }
+    }); }
+    private Frame sym40(byte[] body) { return sym40(body, 500); }
+    private Frame sym40(byte[] body, int waitMs) {
+        try { return engine.diag40(body, waitMs); } catch (java.io.IOException e) { log("sym: " + e); return null; }
     }
     private void logSymStatus(Frame f) {
         if (f == null || f.body == null || f.body.length < 6) { log("sym status missing"); return; }

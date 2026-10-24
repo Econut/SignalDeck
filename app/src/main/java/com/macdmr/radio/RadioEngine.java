@@ -91,11 +91,13 @@ public final class RadioEngine implements UartPort.Listener {
      * The UART reader delivers the answer. The symbol stream calls this from
      * its own thread: a key holds the radio worker for the whole playback.
      */
-    public Frame diag40(byte[] body) throws IOException {
+    public Frame diag40(byte[] body) throws IOException { return diag40(body, 500); }
+    /** Bench: one command 0x40, then the module's answer, waiting at most waitMs. Does not key. */
+    public Frame diag40(byte[] body, int waitMs) throws IOException {
         if (body == null || body.length == 0 || body.length > 799) throw new IOException("body " + (body == null ? -1 : body.length));
         synchronized (gate40) { reply40 = null; }
         send(Frame.request(0x40, body));
-        long end = System.currentTimeMillis() + 500;
+        long end = System.currentTimeMillis() + Math.max(1, waitMs);
         synchronized (gate40) {
             while (reply40 == null && System.currentTimeMillis() < end) {
                 try { gate40.wait(Math.max(1, end - System.currentTimeMillis())); } catch (InterruptedException e) { break; }

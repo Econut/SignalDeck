@@ -62,9 +62,10 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "cmdbyte": s.diagCmd(i.getIntExtra("b", 0), i.getIntExtra("d", 1)); break;        // bench: one command, body byte --ei d (default 1), does not key
             case "cmdsine": s.diagSine(i.getIntExtra("n", 64), i.getIntExtra("amp", 2048), i.getIntExtra("hz", 1000)); break;  // bench: store a sine on 0x40, does not key
             case "cmdpcm": s.diagPcm(new java.io.File(i.getStringExtra("path")), i.getIntExtra("off", 0), i.getIntExtra("n", 398)); break;  // bench: store one piece, does not key
-            case "cmdsym": {                                                     // bench: stream packed symbols, one status read, or a no-key render. Does not key.
+            case "cmdsym": {                                                     // bench: stream packed symbols, one status read, a no-key render, or one FM receive half. Does not key.
                 if ("status".equals(i.getStringExtra("op"))) s.diagSymStatus();
                 else if ("render".equals(i.getStringExtra("op"))) s.diagSymRender(new java.io.File(i.getStringExtra("path")), i.getIntExtra("n", 0));
+                else if ("rxram".equals(i.getStringExtra("op"))) s.diagRxRam(i.getIntExtra("mode", 0));
                 else s.diagSym(new java.io.File(i.getStringExtra("path")));
                 break;
             }
