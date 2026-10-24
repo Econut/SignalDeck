@@ -1683,7 +1683,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void diagRxRam(int mode) { worker.execute(() -> {
         try {
             if (mode != 0 && mode != 2 && mode != 3 && mode != 4) { log("rxram bad mode"); return; }
-            java.util.List<Frame> got = engine.diag40n(new byte[] { 5, (byte) mode }, 2, 2500);
+            java.util.List<Frame> got = engine.diag40n(new byte[] { 5, (byte) mode }, 4, 4000);
             if (got == null || got.isEmpty()) { log("rxram missing"); return; }
             java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
             StringBuilder b = new StringBuilder();
