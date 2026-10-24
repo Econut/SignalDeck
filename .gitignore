@@ -12,3 +12,6 @@ keystore.properties
 
 # native build working folder (CMake/NDK)
 app/.cxx/
+
+# User reports and files shared for support (never commit)
+temp/
