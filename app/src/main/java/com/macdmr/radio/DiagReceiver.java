@@ -60,6 +60,7 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel
             case "restartmodule": s.diagRestartModule(); break;              // bench: the stuck-module watchdog's restart (power cycle, channel, MON, audio back)
             case "cmdbyte": s.diagCmd(i.getIntExtra("b", 0), i.getIntExtra("d", 1)); break;        // bench: one command, body byte --ei d (default 1), does not key
+            case "cmdsine": s.diagSine(i.getIntExtra("n", 64), i.getIntExtra("amp", 2048), i.getIntExtra("hz", 1000)); break;  // bench: store a sine on 0x40, does not key
             case "m17": {                                                       // bench: M17 receive on/off (--ez on); --es enc NAME: Codec 2 3200 encode cache/NAME.wav (8 kHz mono) to cache/NAME.c2
                 if (i.hasExtra("dump")) com.macdmr.radio.M17Station.benchDump = i.getBooleanExtra("dump", false);
                 if (i.hasExtra("on")) Log.i("DiagReceiver", "m17: " + s.setM17(i.getBooleanExtra("on", false)));

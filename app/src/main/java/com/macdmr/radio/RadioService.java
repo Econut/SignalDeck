@@ -1637,6 +1637,8 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void diagCmd(int cmd) { diagCmd(cmd, 1); }
     /** Bench: one command and one body byte. Does not key. */
     public void diagCmd(int cmd, int data) { worker.execute(() -> { try { engine.diagCommand(cmd, data); log(String.format(java.util.Locale.US, "cmd 0x%02X body 0x%02X", cmd & 0xFF, data & 0xFF)); } catch (IOException e) { log("cmd: " + e); } }); }
+    /** Bench: store a sine on command 0x40. Does not key. */
+    public void diagSine(int n, int amp, int hz) { worker.execute(() -> { try { engine.diagSine(n, amp, hz); log(String.format(java.util.Locale.US, "sine n=%d amp=%d hz=%d", n, amp, hz)); } catch (IOException e) { log("sine: " + e); } }); }
     public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
     /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
     public String diagTxWav(java.io.File f) {

@@ -57,6 +57,22 @@ public final class RadioEngine implements UartPort.Listener {
     public void diagCommand(int cmd) throws IOException { diagCommand(cmd, 1); }
     /** Bench: one command with one body byte. Does not key. */
     public void diagCommand(int cmd, int data) throws IOException { send(Frame.request(cmd & 0xFF, (byte) data)); }
+    /**
+     * Bench: command 0x40 with a 1 kHz-class sine as little-endian samples. Does not key.
+     * The amplitude stays at or below 2048. The firmware clamps anything larger.
+     */
+    public void diagSine(int n, int amp, int hz) throws IOException {
+        int count = Math.max(8, Math.min(256, n));
+        int peak = Math.max(1, Math.min(2048, amp));
+        int tone = Math.max(50, Math.min(3000, hz));
+        byte[] body = new byte[count * 2];
+        for (int i = 0; i < count; i++) {
+            int s = (int) Math.round(peak * Math.sin(2 * Math.PI * tone * i / 8000.0));
+            body[2 * i] = (byte) s;
+            body[2 * i + 1] = (byte) (s >> 8);
+        }
+        send(Frame.request(0x40, body));
+    }
     private void send(Frame fr) throws IOException {
         if (fr.rw == 1 && watched(fr.cmd) && firstUnansweredAt == 0) firstUnansweredAt = System.currentTimeMillis();
         if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
