@@ -54,7 +54,9 @@ public final class RadioEngine implements UartPort.Listener {
     /** How long a watched command has been waiting for the module's answer (0 = none): a stuck module grows this. */
     public long unansweredForMs() { long t = firstUnansweredAt; return t == 0 ? 0 : System.currentTimeMillis() - t; }
     /** Bench: one command, body byte 1. Does not key. */
-    public void diagCommand(int cmd) throws IOException { send(Frame.request(cmd & 0xFF, (byte) 1)); }
+    public void diagCommand(int cmd) throws IOException { diagCommand(cmd, 1); }
+    /** Bench: one command with one body byte. Does not key. */
+    public void diagCommand(int cmd, int data) throws IOException { send(Frame.request(cmd & 0xFF, (byte) data)); }
     private void send(Frame fr) throws IOException {
         if (fr.rw == 1 && watched(fr.cmd) && firstUnansweredAt == 0) firstUnansweredAt = System.currentTimeMillis();
         if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
