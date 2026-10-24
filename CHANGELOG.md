@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-24 — Device report: summary in every report folder, full device-tree pin names, quieter logcat section
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| N8 | Xplore 1 tester's report (beta.18, 2026-10-24), a report folder sent by hand: it had no `00_SUMMARY.txt` (only Share wrote it), the radio module's device-tree pin names were shown as hex cells (the list is longer than the 160 bytes read, so it had no closing NUL; decoded by hand they are `default`, `intercom_dmr_oe_en_low/high`, `intercom_dmr_pwd_en_low/high`, `intercom_dmr_vdd_en_low/high`, …), the logcat section was 120 lines of window and surface noise (the filter word `dmr` matches SignalDeck's own package name), and SELinux read "unknown" (apps cannot read the enforce flag on Android 15). Now: the summary is written when the report is made (Share still rewrites it with the latest checks); device-tree properties are read up to 512 bytes and a text list cut at the limit stays text, marked with "…"; the logcat section drops window/surface/input lines; SELinux is read with root when the app cannot; sysfs values are shown up to 200 bytes (the uevent compatible string was cut). Help: Device report → Report summary. | `DeviceReport.java`, `ui/HelpView.java`, `DeviceReportTest.java` | Host: all 248 tests pass (DeviceReportTest: a pin-name list cut at the read limit). Release build compiles. **Not installed or run on a phone** (owner: no installs while the firmware bench runs). |
+
 ## 2026-10-23 — README screenshots; SSTV picture sheet fits; radio audio check waits for start-up
 
 | Backlog | Change | Files | Test |

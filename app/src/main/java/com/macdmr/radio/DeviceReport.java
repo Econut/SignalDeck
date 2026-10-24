@@ -67,7 +67,9 @@ public final class DeviceReport {
         kv(r, "board", Build.BOARD); kv(r, "hardware", Build.HARDWARE); kv(r, "fingerprint", Build.FINGERPRINT); kv(r, "display", Build.DISPLAY);
         kv(r, "android", Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ", security patch " + Build.VERSION.SECURITY_PATCH + ")");
         kv(r, "abis", String.join(",", Build.SUPPORTED_ABIS)); kv(r, "kernel", System.getProperty("os.version"));
-        kv(r, "selinux", cat("/sys/fs/selinux/enforce").trim().equals("1") ? "enforcing" : cat("/sys/fs/selinux/enforce").trim().equals("0") ? "permissive" : "unknown");
+        String se = cat("/sys/fs/selinux/enforce").trim();
+        if (!se.equals("0") && !se.equals("1") && root) se = RootSetup.run("cat /sys/fs/selinux/enforce 2>/dev/null; true").trim();   // apps cannot read it on newer Android
+        kv(r, "selinux", se.equals("1") ? "enforcing" : se.equals("0") ? "permissive" : "unknown");
         kv(r, "su present", String.valueOf(suPresent())); kv(r, "root granted to this app", String.valueOf(root));
         kv(r, "magisk", root ? RootSetup.run("magisk -v 2>/dev/null; magisk -V 2>/dev/null").replace('\n', ' ') : "n/a");
         for (String prop : new String[] { "ro.product.model", "ro.board.platform", "ro.hardware", "ro.build.version.sdk", "ro.vendor.build.fingerprint", "persist.sys.usb.config", "ro.boot.verifiedbootstate" }) kv(r, prop, getprop(prop));
@@ -89,10 +91,10 @@ public final class DeviceReport {
             File[] fs = d.listFiles();
             if (fs != null) for (File f : fs) if (f.isFile()) r.append(String.format(Locale.US, "      %-24s r=%s w=%s  %s\n", f.getName(), f.canRead(), f.canWrite(), f.canRead() ? cat(f.getAbsolutePath()).trim().replace('\n', ' ').substring(0, Math.min(80, cat(f.getAbsolutePath()).trim().length())) : ""));
         }
-        if (root) r.append(RootSetup.run("for d in /sys/devices/platform/*dmr* /sys/devices/platform/*intercom* /sys/devices/platform/*walkie* /sys/devices/platform/*ptt* /sys/devices/platform/*sy88*; do [ -d \"$d\" ] && echo \"--- $d\" && ls -lZ \"$d\" && for f in \"$d\"/*; do [ -f \"$f\" ] && printf '%s = ' \"$f\" && (head -c 80 \"$f\" 2>&1; echo); done; done 2>/dev/null")).append('\n');
+        if (root) r.append(RootSetup.run("for d in /sys/devices/platform/*dmr* /sys/devices/platform/*intercom* /sys/devices/platform/*walkie* /sys/devices/platform/*ptt* /sys/devices/platform/*sy88*; do [ -d \"$d\" ] && echo \"--- $d\" && ls -lZ \"$d\" && for f in \"$d\"/*; do [ -f \"$f\" ] && printf '%s = ' \"$f\" && (head -c 200 \"$f\" 2>&1; echo); done; done 2>/dev/null")).append('\n');
         if (root) {                                       // how the kernel describes the module's wiring: pin names, compatible string
             h(r, "Device tree of the radio module (root)");
-            String dt = RootSetup.run("for d in /sys/devices/platform/*dmr*/of_node /sys/devices/platform/*intercom*/of_node /sys/devices/platform/*walkie*/of_node; do [ -d \"$d\" ] || continue; echo \"--- $d\"; for f in \"$d\"/*; do [ -f \"$f\" ] && echo \"$(basename \"$f\") $(od -An -tx1 -N160 \"$f\" | tr -s ' \\n' ' ')\"; done; done; true");
+            String dt = RootSetup.run("for d in /sys/devices/platform/*dmr*/of_node /sys/devices/platform/*intercom*/of_node /sys/devices/platform/*walkie*/of_node; do [ -d \"$d\" ] || continue; echo \"--- $d\"; for f in \"$d\"/*; do [ -f \"$f\" ] && echo \"$(basename \"$f\") $(od -An -tx1 -N" + DT_MAX + " \"$f\" | tr -s ' \\n' ' ')\"; done; done; true");
             for (String l : dt.split("\n")) {
                 if (l.startsWith("---") || l.trim().isEmpty()) { r.append(l).append('\n'); continue; }
                 String[] kv = l.trim().split(" ", 2);
@@ -158,7 +160,7 @@ public final class DeviceReport {
             p.step("Root extras");
             h(r, "Processes with a radio-looking name (root)"); r.append(RootSetup.run("ps -AZ | grep -iE 'intercom|interphone|walkie|dmr|ptt|quickchat|tiny|serial|uart' | grep -v grep")).append('\n');
             h(r, "Who holds the serial ports (root)"); r.append(RootSetup.run("for p in /proc/[0-9]*; do ls -l $p/fd 2>/dev/null | grep -q '/dev/tty' && echo \"$(cat $p/comm) ($(basename $p)): $(ls -l $p/fd 2>/dev/null | grep -o '/dev/tty[A-Za-z0-9]*' | sort -u | tr '\\n' ' ')\"; done")).append('\n');
-            h(r, "Recent logcat lines mentioning the radio (root, redacted)"); r.append(redact(RootSetup.run("logcat -d -t 3000 2>/dev/null | grep -iE 'ptt|intercom|interphone|walkie|dmr|serial|tty|tiny' | tail -120"))).append('\n');
+            h(r, "Recent logcat lines mentioning the radio (root, redacted)"); r.append(redact(RootSetup.run("logcat -d -t 3000 2>/dev/null | grep -iE 'ptt|intercom|interphone|walkie|dmr|serial|tty|tiny' | grep -vE 'BufferQueue|SurfaceFlinger|MTK_APPList|WindowManager|InputManager|ImeTracker|InputMethod|ApkAssets|PackageConfig|ViewRootImpl' | tail -120"))).append('\n');
             h(r, "SELinux denials seen so far (root)"); r.append(RootSetup.run("logcat -d -b all 2>/dev/null | grep -i 'avc: denied' | tail -40; dmesg 2>/dev/null | grep -i 'avc: denied' | tail -40")).append('\n');
         } else {
             h(r, "Root"); r.append("  not available — with Magisk root the report also lists SELinux labels, which process holds the serial ports, and the stock app's receivers (the PTT key broadcasts).\n");
@@ -166,6 +168,7 @@ public final class DeviceReport {
 
         File txt = new File(dir, "report.txt");
         try (OutputStream o = new FileOutputStream(txt)) { o.write(r.toString().getBytes("UTF-8")); }
+        try (OutputStream o = new FileOutputStream(new File(dir, "00_SUMMARY.txt"))) { o.write(summary(RadioService.running, txt).getBytes("UTF-8")); } catch (Throwable ignored) { }   // also when the folder is sent by hand, not through Share
         p.step("Zipping");
         File zip = new File(new File(c.getCacheDir(), "share"), dir.getName() + ".zip"); zip.getParentFile().mkdirs();
         try (ZipOutputStream z = new ZipOutputStream(new FileOutputStream(zip))) {
@@ -243,13 +246,17 @@ public final class DeviceReport {
         return out.toString();
     }
 
+    /** Bytes read from each device-tree property (pin-name lists run to a few hundred). */
+    static final int DT_MAX = 512;
+
     /** A device-tree property from its hex dump: NUL-separated text ("coosea,dmr009") as text, anything else (GPIO specifiers, phandles) as 32-bit cells. */
     static String dtValue(String hex) {
         String[] hb = hex.trim().split("\\s+"); byte[] b = new byte[hb.length]; int n = 0;
         for (String h : hb) if (h.matches("[0-9a-fA-F]{2}")) b[n++] = (byte) Integer.parseInt(h, 16);
-        boolean text = n > 0 && b[n - 1] == 0 && (b[0] & 0xFF) >= 0x20;
+        boolean cut = n >= DT_MAX;                        // read limit reached: a text list has no closing NUL yet
+        boolean text = n > 0 && (b[n - 1] == 0 || cut) && (b[0] & 0xFF) >= 0x20;
         for (int i = 0; i < n && text; i++) { int ch = b[i] & 0xFF; if (ch != 0 && (ch < 0x20 || ch > 0x7E)) text = false; }
-        if (text) return "\"" + new String(b, 0, n - 1, java.nio.charset.StandardCharsets.ISO_8859_1).replace('\u0000', '|') + "\"";
+        if (text) return "\"" + new String(b, 0, b[n - 1] == 0 ? n - 1 : n, java.nio.charset.StandardCharsets.ISO_8859_1).replace('\u0000', '|') + (cut ? "\u2026" : "") + "\"";
         StringBuilder s = new StringBuilder("<");
         for (int i = 0; i + 3 < n; i += 4) s.append(i == 0 ? "" : " ").append(String.format(Locale.US, "0x%02x%02x%02x%02x", b[i], b[i + 1], b[i + 2], b[i + 3]));
         if (n % 4 != 0) for (int i = n - n % 4; i < n; i++) s.append(String.format(Locale.US, " %02x", b[i]));

@@ -47,7 +47,7 @@ public class DeviceReportTest {
                 "12:00:09.000 TX cmd=0x2C rw=1 sr=1 len=9 [01 41 00 42 00]  <68 2C 01 01 41 00 42 00 10>",
                 "12:00:10.000 TX cmd=0x23 rw=1 sr=1 len=2 [A0 8D]  <68 23 A0 8D 10>"));
         assertTrue(out, out.contains("module DMR003.UV4T.V022"));
-        assertTrue(out, out.contains("TX cmd=0x2C rw=1 sr=1 len=9 […]  <…>") && out.contains("[A0 8D]  <68 23 A0 8D 10>"));
+        assertTrue(out, out.contains("TX cmd=0x2C rw=1 sr=1 len=9 [\u2026]  <\u2026>") && out.contains("[A0 8D]  <68 23 A0 8D 10>"));
         assertTrue(out, out.contains("sepolicy: ok") && out.contains("module power -> on (pwd :1)") && out.contains("146.520 MHz"));
         assertFalse(out, out.contains("N0CALL") || out.contains("APRS") || out.contains("talking") || out.contains("PIN"));
         assertTrue(out, out.contains("DMR ID from the stock app: ######"));
@@ -76,6 +76,12 @@ public class DeviceReportTest {
         assertEquals("\"coosea,dmr009\"", DeviceReport.dtValue("63 6f 6f 73 65 61 2c 64 6d 72 30 30 39 00"));
         assertEquals("\"default|sleep\"", DeviceReport.dtValue("64 65 66 61 75 6c 74 00 73 6c 65 65 70 00"));
         assertEquals("<0x00000012 0x0000009c 0x00000000>", DeviceReport.dtValue("00 00 00 12 00 00 00 9c 00 00 00 00"));
+        // a pin-name list longer than the read limit (Xplore 1 report, 2026-10-24): still text, marked as cut
+        StringBuilder big = new StringBuilder(); String names = "default\0intercom_dmr_oe_en_low\0";
+        while (big.length() < DeviceReport.DT_MAX * 3) for (char ch : names.toCharArray()) big.append(String.format("%02x ", (int) ch));
+        String cutHex = big.substring(0, DeviceReport.DT_MAX * 3);
+        String v = DeviceReport.dtValue(cutHex);
+        assertTrue(v, v.startsWith("\"default|intercom_dmr_oe_en_low|default") && v.endsWith("\u2026\""));
     }
 
     @Test public void exportedSymbolsStillWinAndPlainLibrariesSayNothing() throws Exception {
