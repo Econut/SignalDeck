@@ -73,6 +73,17 @@ public final class RadioEngine implements UartPort.Listener {
         }
         send(Frame.request(0x40, body));
     }
+    /** Bench: command 0x40, a sample offset then little-endian samples. Does not key. */
+    public void diagPcm(int offset, byte[] samples) throws IOException {
+        if (samples == null || samples.length == 0 || samples.length > 796 || (samples.length & 1) != 0) {
+            throw new IOException("pcm length " + (samples == null ? -1 : samples.length));
+        }
+        byte[] body = new byte[2 + samples.length];
+        body[0] = (byte) offset;
+        body[1] = (byte) (offset >> 8);
+        System.arraycopy(samples, 0, body, 2, samples.length);
+        send(Frame.request(0x40, body));
+    }
     private void send(Frame fr) throws IOException {
         if (fr.rw == 1 && watched(fr.cmd) && firstUnansweredAt == 0) firstUnansweredAt = System.currentTimeMillis();
         if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
