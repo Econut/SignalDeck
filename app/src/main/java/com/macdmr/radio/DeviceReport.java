@@ -276,7 +276,9 @@ public final class DeviceReport {
     private static String dbStructure(Context c, String pkg) {
         StringBuilder out = new StringBuilder();
         File dst = new File(c.getCacheDir(), "dbscan"); dst.mkdirs();
-        String names = RootSetup.run("ls /data/data/" + pkg + "/databases/ 2>&1");
+        // the folder may not exist (Armor 20WT, 2026-10-24: an error message was read as file names)
+        String names = RootSetup.run("d=/data/data/" + pkg + "/databases; [ -d $d ] && ls -1 $d; true").trim();
+        if (names.isEmpty()) return out.append("  files: (no databases folder)\n").toString();
         out.append("  files: ").append(names.replace('\n', ' ')).append('\n');
         for (String n : names.split("\\s+")) {
             if (n.isEmpty() || n.endsWith("-wal") || n.endsWith("-shm") || n.endsWith("-journal") || n.contains("(")) continue;

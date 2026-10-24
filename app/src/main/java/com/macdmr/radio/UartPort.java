@@ -12,7 +12,7 @@ import java.io.IOException;
 
 /**
  * The MCU control UART as plain files. The line is configured by the stock app's own serial JNI
- * ({@link com.pri.prizeinterphone.serial.port.SerialPort}) when the profile names it, else the tty is
+ * ({@link VendorSerial}) when the profile names it, else the tty is
  * opened as a plain file and {@link RootSetup#ensureTty} has to have set raw mode and the baud. SELinux access: see {@link RootSetup}. A reader thread splits the byte stream into {@link Frame}s and hands anything
  * that is not a frame (the module's boot banner, "00 00 BF AA …\r\n") to the listener as raw bytes.
  */
@@ -27,7 +27,7 @@ public final class UartPort {
     private final Listener listener;
     private FileInputStream in;
     private FileOutputStream out;
-    private com.pri.prizeinterphone.serial.port.SerialPort native_;
+    private VendorSerial.Port native_;
     private Thread reader;
     private volatile boolean running;
 
@@ -38,8 +38,8 @@ public final class UartPort {
     /** @param baud 0 = plain file open (line already configured); else configure it through the stock serial JNI. */
     public synchronized void open(int baud) throws IOException {
         if (in != null) return;
-        if (baud > 0 && com.pri.prizeinterphone.serial.port.SerialPort.isLoaded()) {
-            native_ = com.pri.prizeinterphone.serial.port.SerialPort.openPort(path, baud);
+        if (baud > 0 && VendorSerial.isLoaded()) {
+            native_ = VendorSerial.openPort(path, baud);
             if (native_ == null) throw new IOException("serial open " + path + " @ " + baud + " failed");
             in = new FileInputStream(native_.fd());
             out = new FileOutputStream(native_.fd());

@@ -815,7 +815,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     log("No root granted, but the UART is reachable and the stock app is not running — continuing");
                 } else {
                     log("sepolicy: " + RootSetup.applySepolicy(getFilesDir(), profile));
-                    if (!com.pri.prizeinterphone.serial.port.SerialPort.load(this, profile.serialLib)) log("tty (stty fallback): " + RootSetup.ensureTty(profile));
+                    if (!VendorSerial.load(this, profile.serialLib)) log("tty (stty fallback): " + RootSetup.ensureTty(profile));
                     if (RootSetup.stockAppEnabled(profile)) { log("stock app paused (its icon disappears while this app owns the radio; Device → Release brings it back): " + RootSetup.stockApp(profile, false)); pausedStock = true; Thread.sleep(1500); }
                 }
                 final boolean quickChat = "com.chamsion.quickchat".equals(profile.stockApp);      // Xplore 1: a Room database, no module side tables

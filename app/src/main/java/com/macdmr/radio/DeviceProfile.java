@@ -68,6 +68,26 @@ public final class DeviceProfile {
             "/system/lib64/libinterphone_serial_port.so", true, true);
 
     /**
+     * Ulefone Armor 20WT — from an owner's device report (beta.18, 2026-10-24) and its stock app (the same PriInterPhone
+     * family as the Armor 26 Ultra: dmr009 pwd/ptt nodes, PrizeTinyService audio, the same command table). The
+     * differences: the module is on /dev/ttyS1 (the stock app opens only that port, at 57600; ttyS0 here is another
+     * device), the serial library is libserial_port_app.so in the stock app's own folder, bound to
+     * com.serial.port.SerialPort, and the side key arrives as keycode 301 with com.interphone.ptt.down/up. The report's
+     * probe got no answer because the module was powered off at the time. Not run on the phone yet: unverified.
+     */
+    public static final DeviceProfile ARMOR_20WT = new DeviceProfile(
+            "Ulefone Armor 20WT", "/dev/ttyS1", 57600, Audio.TINY_SERVICE, null, 0,
+            "/sys/devices/platform/dmr009/pwd", "/sys/devices/platform/dmr009/ptt", "pwd :1",
+            new String[] { "com.interphone.ptt.down", "com.interphone.ptt.up", "android.intent.action.PTT.down", "android.intent.action.PTT.up" },
+            "com.pri.prizeinterphone",
+            new String[] {
+                    "allow untrusted_app ttyS_device chr_file { open read write ioctl getattr lock }",
+                    "typeattribute ttyS_device mlstrustedobject",
+                    "allow untrusted_app sysfs_prizefactory file { open read write getattr }",
+                    "typeattribute sysfs_prizefactory mlstrustedobject" },
+            "/system/priv-app/PriInterPhone/lib/arm64/libserial_port_app.so", true, false);
+
+    /**
      * Blackview Xplore 1 — from its QuickChat APK and an owner's dumps (docs/multi-device-xplore1-findings.md): ttyS0/ttyS1
      * are ttyS_device, the intercom_* nodes plain sysfs (mode 0777, so SELinux is the only gate; SysfsGpio writes them
      * through root rather than opening all of sysfs to apps). Not run on the phone yet: unverified.
@@ -86,6 +106,7 @@ public final class DeviceProfile {
         // ptt_control 0 is its transmit state (setPttLaunch). So the PTT line goes to receive first, before the module is
         // powered, or a module left by QuickChat's power-off would come up with its PTT line asserted.
         ARMOR_26_ULTRA.id = "ulefone-armor26ultra"; ARMOR_26_ULTRA.revision = 1;
+        ARMOR_20WT.id = "ulefone-armor20wt"; ARMOR_20WT.revision = 1;
         XPLORE_1.id = "blackview-xplore1"; XPLORE_1.revision = 2;
         XPLORE_1.scanDwellMs = 2500;
         XPLORE_1.minWriteGapMs = 1000;        // QuickChat never writes channels less than 1 s apart; a burst of writes made the module refuse MON (2026-10-22)          // owner's tester 2026-10-22: the first scan stepped past an active channel; its receive report comes later than the Armor's
@@ -106,8 +127,14 @@ public final class DeviceProfile {
     /** The profile built into this release for this phone (no profile list, no advisories). */
     public static DeviceProfile detectBuiltIn() {
         String m = (Build.MANUFACTURER + " " + Build.MODEL + " " + Build.DEVICE).toLowerCase();
-        if (new File("/sys/devices/platform/dmr009").exists() || m.contains("armor 26")) return ARMOR_26_ULTRA;
-        if (new File("/sys/devices/platform/intercom").exists() || m.contains("xplore")) return XPLORE_1;
+        return detectBuiltIn(m, new File("/sys/devices/platform/dmr009").exists(), new File("/sys/devices/platform/intercom").exists());
+    }
+
+    /** Model text first (the Armor 20WT has the same dmr009 node as the Armor 26 Ultra, on another port), then the nodes. */
+    static DeviceProfile detectBuiltIn(String m, boolean dmr009, boolean intercom) {
+        if (m.contains("armor 20wt") || m.contains("armor_20wt")) return ARMOR_20WT;
+        if (dmr009 || m.contains("armor 26")) return ARMOR_26_ULTRA;
+        if (intercom || m.contains("xplore")) return XPLORE_1;
         return UNKNOWN;
     }
 

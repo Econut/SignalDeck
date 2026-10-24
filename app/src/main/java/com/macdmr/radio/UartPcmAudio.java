@@ -32,7 +32,7 @@ public final class UartPcmAudio implements AudioBackend {
     private final String path; private final int baud;
     private volatile Sink sink; private volatile Gate gate;
     private InputStream in; private OutputStream out;
-    private com.pri.prizeinterphone.serial.port.SerialPort nativePort;
+    private VendorSerial.Port nativePort;
     private AudioTrack track; private AudioRecord rec;
     private volatile boolean rxRunning, txRunning;
     private Thread rxThread, txThread;
@@ -44,8 +44,8 @@ public final class UartPcmAudio implements AudioBackend {
 
     private synchronized void open() throws Exception {
         if (in != null) return;
-        if (com.pri.prizeinterphone.serial.port.SerialPort.isLoaded()) {
-            nativePort = com.pri.prizeinterphone.serial.port.SerialPort.openPort(path, baud);
+        if (VendorSerial.isLoaded()) {
+            nativePort = VendorSerial.openPort(path, baud);
             if (nativePort != null) { in = new FileInputStream(nativePort.fd()); out = new FileOutputStream(nativePort.fd()); return; }
         }
         in = new FileInputStream(path); out = new FileOutputStream(path);

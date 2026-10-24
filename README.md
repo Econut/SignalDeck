@@ -103,7 +103,8 @@ These are limits of the radio module, measured on the reference phone. SignalDec
 |---|---|
 | **Ulefone Armor 26 Ultra** (walkie-talkie model) | Tested — the reference phone. |
 | **Blackview Xplore 1** | **Profile in testing** ([analysis](docs/multi-device-xplore1-findings.md)): same radio-module protocol, audio over a second serial port. A tester has receive, channel import and CTCSS working; transmit stays blocked until the profile is verified. Owners: please run **Device → Run all checks** and send the zip. |
-| Other DMR phones (Oukitel WP61, Ulefone Armor 20WT, UNIWA P2 Plus…) | No profile yet — the app starts in discovery mode and offers **Run all checks**. See [docs/DEVICE_SUPPORT_REQUEST.md](docs/DEVICE_SUPPORT_REQUEST.md). |
+| **Ulefone Armor 20WT** | **Profile written, untested** (from an owner's device report and its stock app): the Armor 26 Ultra's radio family on another serial port. SignalDeck does not take over or transmit by itself until it is tested. Owners: please run **Device → Run all checks** and send the zip. |
+| Other DMR phones (Oukitel WP61, UNIWA P2 Plus…) | No profile yet — the app starts in discovery mode and offers **Run all checks**. See [docs/DEVICE_SUPPORT_REQUEST.md](docs/DEVICE_SUPPORT_REQUEST.md). |
 
 **Root (Magisk) is required:** Android's SELinux policy only lets the stock app open the radio's serial port. SignalDeck applies the rules it needs with Magisk (Device → *Keep access after reboot* makes them permanent as a small Magisk module). The stock walkie-talkie app is turned off while SignalDeck owns the radio, and turned back on when you hand the radio back.
 

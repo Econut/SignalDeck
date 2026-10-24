@@ -160,13 +160,13 @@ public final class RadioProbe {
                 continue;
             }
             r.append("\n").append(lib.getAbsolutePath()).append(":\n").append(syms);
-            if (!syms.contains("com.pri.prizeinterphone.serial.port.SerialPort.open")) { r.append("  no wrapper class for this JNI class yet: add one named exactly as above (see SerialPort.java) and the app can open the port the vendor way\n"); continue; }
-            r.append("  known wrapper class available: trying it on each port at 57600\n");
-            if (!com.pri.prizeinterphone.serial.port.SerialPort.load(ctx, lib.getAbsolutePath())) continue;
+            if (!VendorSerial.haveWrapper(syms)) { r.append("  no wrapper class for this JNI class yet: add one named exactly as above (see VendorSerial.java) and the app can open the port the vendor way\n"); continue; }
+            r.append("  known wrapper class (").append(VendorSerial.wrapperFor(syms)).append(") available: trying it on each port at 57600\n");
+            if (!VendorSerial.load(ctx, lib.getAbsolutePath())) { r.append("  could not load it (another serial library is already loaded until SignalDeck restarts, or the load failed)\n"); continue; }
             for (String port : ports) {
                 String saved = RootSetup.run("stty -F " + port + " -g 2>/dev/null").trim();
                 try {
-                    com.pri.prizeinterphone.serial.port.SerialPort sp = com.pri.prizeinterphone.serial.port.SerialPort.openPort(port, 57600);
+                    VendorSerial.Port sp = VendorSerial.openPort(port, 57600);
                     if (sp == null) { r.append("  ").append(port).append(": native open failed\n"); continue; }
                     java.io.FileInputStream in = new java.io.FileInputStream(sp.fd()); java.io.FileOutputStream out = new java.io.FileOutputStream(sp.fd());
                     final byte[] buf = new byte[512]; final int[] got = { 0 };
