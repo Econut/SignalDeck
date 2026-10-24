@@ -16,6 +16,13 @@ public class DmrAudioCheckTest {
     private static String v(DmrAudioCheck.Facts f) { return String.join(" | ", DmrAudioCheck.verdict(f)); }
     private static DmrAudioCheck.Facts ok() { DmrAudioCheck.Facts f = new DmrAudioCheck.Facts(); f.digitalChannel = true; f.receptions = 2; f.callerReports = 2; f.pcmDuringCalls = 64000; f.pcmTotal = 64000; f.rms = 900; f.musicVolume = 8; f.output = "speaker"; return f; }
 
+    @Test public void customRomOnTheSoundCardPath() {
+        DmrAudioCheck.Facts f = ok(); f.classMissing = true; f.directKnown = true; f.directAudio = true;
+        String s = v(f); assertFalse(s, s.contains("Magisk module") || s.contains("analog and DMR alike"));       // audio works: the ordinary verdict
+        f = ok(); f.classMissing = true; f.directKnown = true; f.audioError = "startRx failed: sdalsa capture ended (exit 4)";
+        s = v(f); assertTrue(s, s.contains("sound card") && s.contains("did not start") && s.contains("exit 4") && s.contains("root access"));
+    }
+
     @Test public void customRomWithoutTheVendorClass() {
         DmrAudioCheck.Facts f = ok(); f.classMissing = true; f.binderPresent = true;
         String s = v(f); assertTrue(s, s.contains("PrizeTinyService") && s.contains("analog and DMR alike") && s.contains("still running") && s.contains("Magisk module"));

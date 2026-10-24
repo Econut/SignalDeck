@@ -10,6 +10,8 @@ if (localProps.exists()) localProps.withInputStream { signingProps.load(it) }
 def signingValue = { String key, String env -> signingProps.getProperty(key) ?: System.getenv(env) }
 def releaseStore = signingValue('signaldeck.storeFile', 'SIGNALDECK_STORE_FILE')
 
+def sdalsaAssets = layout.buildDirectory.dir('generated/sdalsa-assets').get().asFile
+
 android {
     testOptions { unitTests.returnDefaultValues = true }   // host tests: android.util.Log calls in shared DSP code are no-ops
     namespace 'com.macdmr.radio'
@@ -26,7 +28,10 @@ android {
 
     buildFeatures { buildConfig true }
     ndkVersion '26.3.11579264'
-    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }   // Codec 2 for M17 voice
+    externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }   // Codec 2 for M17 voice; the sdalsa audio helper
+    // sdalsa is an executable: CMake writes it into this folder per ABI and it ships as an asset (sdalsa/<abi>/sdalsa)
+    defaultConfig { externalNativeBuild { cmake { arguments "-DSDALSA_ASSET_DIR=${sdalsaAssets.absolutePath.replace(File.separator, '/')}" } } }
+    sourceSets { main { assets.srcDirs += sdalsaAssets } }
     // One key for debug and release (the project's release key): adb install -r keeps working across both and users
     // can move from a test build to a release without uninstalling. Official builds are signed with it.
     signingConfigs {
@@ -74,4 +79,10 @@ dependencies {
 configurations.all {
     exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
     exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+}
+
+// the assets must be merged after CMake has built the helper for the same build type
+tasks.configureEach { t ->
+    def m = t.name =~ /^merge(Debug|Release)Assets$/
+    if (m.matches()) t.dependsOn("externalNativeBuild${m.group(1)}")
 }

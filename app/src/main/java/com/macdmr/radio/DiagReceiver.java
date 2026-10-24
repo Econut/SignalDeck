@@ -113,6 +113,7 @@ public final class DiagReceiver extends BroadcastReceiver {
                 Log.i("DiagReceiver", "testtone " + ms + " ms"); s.diagTestTone(ms); break;
             }
             case "vfooff": s.diagVfoOff(); break;
+            case "audiopath": { String pth = i.getStringExtra("path"); if ("auto".equals(pth) || "vendor".equals(pth) || "direct".equals(pth)) s.diagAudioPath(pth); else Log.w("DiagReceiver", "audiopath: auto | vendor | direct"); break; }   // bench: the receive/transmit audio path
             // bench: load a signed profile list from a file (--es path …), regardless of its serial, to try advisories on this
             // phone without publishing them; "profileclear" removes it again (and the owner's overrides)
             case "profiletest": Log.i("DiagReceiver", "profiletest: " + ProfileRegistry.loadForTest(new java.io.File(i.getStringExtra("path")))); break;

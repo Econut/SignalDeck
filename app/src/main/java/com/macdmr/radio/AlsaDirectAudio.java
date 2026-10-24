@@ -1,0 +1,246 @@
+/*
+ * SignalDeck - Copyright (C) 2026 IIMacGyverII
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Free software under the GNU General Public License v3 or later, with the additional terms in COPYRIGHT
+ * (keep this notice and the author credit, mark modified versions, no rights to the SignalDeck name or icon).
+ */
+package com.macdmr.radio;
+
+import android.content.Context;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioManager;
+import android.media.AudioRecord;
+import android.media.AudioTrack;
+import android.media.MediaRecorder;
+import android.os.Build;
+import android.util.Log;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Voice audio straight from the phone's sound card, for a ROM that lacks the vendor audio service (a custom ROM or a GSI
+ * on the Ulefone Armor 26 Ultra: no android.os.PrizeTinyService, no tinyserver). The kernel's sound driver and the
+ * phone's codec are still there, so SignalDeck's root helper sdalsa (src/main/cpp/sdalsa, shipped as an asset) sets the
+ * profile's mixer controls and moves 8 kHz stereo 16-bit PCM over a pipe: capture to stdout for receive, stdin to
+ * playback for transmit. Frames have the same format as {@link TinyServiceAudio}'s, so the service sees no difference.
+ */
+public final class AlsaDirectAudio implements AudioBackend {
+    private static final String TAG = "AlsaDirectAudio";
+    static final int BLOCK = 2048;                                     // bytes per receive block, as TinyService delivers them
+
+    private final DeviceProfile.DirectAudio da;
+    private final String helper;
+    private volatile Sink sink;
+    private volatile Gate gate;
+    private AudioTrack track;
+    private volatile boolean playing;
+    private Process rxProc; private Thread rxThread; private volatile boolean rxRunning;
+    private volatile long rxBlocks;
+    private Process txProc; private Thread txThread; private volatile boolean txRunning;
+    private AudioRecord rec;
+    private final StringBuilder err = new StringBuilder();
+
+    public AlsaDirectAudio(Context c, DeviceProfile.DirectAudio da) throws Exception {
+        this.da = da;
+        this.helper = install(c);
+    }
+
+    /** Which audio path a vendor-service phone uses: "vendor" (PrizeTinyService) or "direct" (this class). */
+    static String choose(String pref, boolean classPresent, boolean haveRecipe) {
+        if (!haveRecipe) return "vendor";
+        if ("direct".equals(pref)) return "direct";
+        if ("vendor".equals(pref)) return "vendor";
+        return classPresent ? "vendor" : "direct";
+    }
+
+    /** The helper for this phone's ABI, copied from the APK's assets into files/bin (again whenever it changed). */
+    static String install(Context c) throws Exception {
+        String abi = null;
+        for (String a : Build.SUPPORTED_ABIS) if (a.equals("arm64-v8a") || a.equals("armeabi-v7a")) { abi = a; break; }
+        if (abi == null) throw new IllegalStateException("no sdalsa helper for " + Arrays.toString(Build.SUPPORTED_ABIS));
+        byte[] want;
+        try (InputStream in = c.getAssets().open("sdalsa/" + abi + "/sdalsa")) { want = readAll(in); }
+        File dir = new File(c.getFilesDir(), "bin"); if (!dir.isDirectory() && !dir.mkdirs()) throw new IllegalStateException("cannot create " + dir);
+        File f = new File(dir, "sdalsa");
+        boolean same = false;
+        if (f.length() == want.length) try (InputStream in = new java.io.FileInputStream(f)) { same = Arrays.equals(readAll(in), want); }
+        if (!same) {
+            File tmp = new File(dir, "sdalsa.tmp");
+            try (OutputStream o = new FileOutputStream(tmp)) { o.write(want); }
+            if (!tmp.renameTo(f)) throw new IllegalStateException("cannot install " + f);
+        }
+        if (!f.setExecutable(true, true)) throw new IllegalStateException("cannot make " + f + " executable");
+        return f.getAbsolutePath();
+    }
+    private static byte[] readAll(InputStream in) throws java.io.IOException {
+        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream(); byte[] buf = new byte[8192]; int n;
+        while ((n = in.read(buf)) > 0) b.write(buf, 0, n);
+        return b.toByteArray();
+    }
+
+    /** The root command line for one stream: the controls before "--" are set before it opens, the others after it ends. */
+    static String command(String helper, boolean capture, DeviceProfile.DirectAudio d) {
+        StringBuilder b = new StringBuilder("exec ").append(quote(helper)).append(capture ? " cap" : " play")
+                .append(" -c ").append(d.card).append(" -d ").append(capture ? d.captureDevice : d.playbackDevice)
+                .append(" -r 8000 -n 2 -p 256 -k 4");
+        for (String c : capture ? d.rxOn : d.txOn) b.append(' ').append(quote(c));
+        b.append(" --");
+        for (String c : capture ? d.rxOff : d.txOff) b.append(' ').append(quote(c));
+        return b.toString();
+    }
+    static String quote(String s) { return "'" + s.replace("'", "'\\''") + "'"; }
+
+    private Process start(boolean capture) throws java.io.IOException {
+        Process p = new ProcessBuilder("su", "--context", "u:r:magisk:s0", "-c", command(helper, capture, da)).start();
+        final InputStream es = p.getErrorStream();
+        Thread t = new Thread(() -> {                                    // the helper's own messages: busy device, a missing control, xruns
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(es))) {
+                String line; while ((line = r.readLine()) != null) { Log.i(TAG, line); synchronized (err) { if (err.length() < 2000) err.append(line).append('\n'); } }
+            } catch (Throwable ignored) { }
+        }, capture ? "sdalsa-cap-err" : "sdalsa-play-err");
+        t.setDaemon(true); t.start();
+        return p;
+    }
+    private String takeErrors() { synchronized (err) { String e = err.toString().trim(); err.setLength(0); return e; } }
+
+    private static void finish(Process p, long ms) {
+        if (p == null) return;
+        try { if (!p.waitFor(ms, TimeUnit.MILLISECONDS)) p.destroy(); } catch (InterruptedException e) { p.destroy(); }
+    }
+
+    @Override public void setSink(Sink s) { sink = s; }
+    @Override public void setGate(Gate g) { gate = g; }
+
+    /** Start RX: the helper captures, this side plays the blocks through an AudioTrack (through the gate). */
+    @Override public synchronized String startRx(boolean speaker) {
+        try {
+            if (rxProc != null) return "capture already running";
+            if (track == null) {
+                int min = AudioTrack.getMinBufferSize(8000, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT);
+                track = new AudioTrack(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build(),
+                        new AudioFormat.Builder().setSampleRate(8000).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT).build(),
+                        Math.max(min * 2, 8192), AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE);
+                track.play();
+            }
+            takeErrors();
+            final Process p = start(true); rxProc = p; rxRunning = true; playing = true;
+            final long before = rxBlocks;
+            rxThread = new Thread(() -> {
+                byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK];
+                try (InputStream in = p.getInputStream()) {
+                    while (rxRunning) {
+                        int got = 0;
+                        while (got < BLOCK) { int n = in.read(buf, got, BLOCK - got); if (n < 0) break; got += n; }
+                        if (got < BLOCK) break;                          // the helper ended
+                        rxBlocks++;
+                        Sink s = sink; if (s != null) s.onPcm(buf, BLOCK);  // squelch decision first
+                        Gate g = gate;
+                        if (playing && track != null) track.write(g == null || g.open() ? buf : zero, 0, BLOCK);   // keep the stream timing, play silence
+                    }
+                } catch (Throwable t) { Log.w(TAG, "capture: " + t); }
+            }, "sdalsa-rx");                                             // leaving closes the pipe: the helper's next write fails and it puts the controls back
+            rxThread.start();
+            long t0 = System.currentTimeMillis();                        // the first block, or the helper's refusal (busy device, missing control)
+            while (rxBlocks == before && System.currentTimeMillis() - t0 < 2000) {
+                if (!p.isAlive()) { rxProc = null; rxRunning = false; return "startRx failed: sdalsa capture ended (exit " + p.exitValue() + ") " + takeErrors(); }
+                Thread.sleep(20);
+            }
+            return rxBlocks == before ? "sdalsa capture started, no audio block yet " + takeErrors() : "sdalsa capture on device " + da.captureDevice;
+        } catch (Throwable t) { rxProc = null; rxRunning = false; return "startRx failed: " + t; }
+    }
+
+    @Override public synchronized String stopRx() {
+        playing = false; rxRunning = false;
+        Process p = rxProc; rxProc = null;
+        if (p == null) return "capture not running";
+        try { if (rxThread != null) rxThread.join(500); } catch (InterruptedException ignored) { }
+        finish(p, 1500);
+        String e = takeErrors();
+        return "sdalsa capture stopped" + (e.isEmpty() ? "" : ": " + e);
+    }
+
+    private volatile int txSource = MediaRecorder.AudioSource.MIC;
+    @Override public void setTxSource(int source) { txSource = source; }
+    private volatile TxFeed txFeed;
+    @Override public void setTxFeed(TxFeed f) { txFeed = f; }
+    private volatile Level txLevel;
+    @Override public void setTxLevel(Level l) { txLevel = l; }
+
+    /** TX: phone mic (or the web feed) → 8 kHz mono → stereo-duplicated → the helper's playback while keyed. */
+    @Override public synchronized String startTx() {
+        try {
+            if (txProc != null) return "playback already running";
+            takeErrors();
+            final TxFeed feed = txFeed;
+            if (feed == null) {
+                int min = AudioRecord.getMinBufferSize(8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT);
+                rec = new AudioRecord(txSource, 8000, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, Math.max(min, 4096));
+                rec.startRecording();
+            }
+            final Process p = start(false); txProc = p; txRunning = true;
+            final AudioRecord r = rec;
+            txThread = new Thread(() -> {
+                byte[] mono = new byte[BLOCK / 2]; byte[] st = new byte[BLOCK];
+                try (OutputStream out = p.getOutputStream()) {
+                    while (txRunning) {
+                        int n = feed != null ? feed.read(mono, 0, mono.length) : r.read(mono, 0, mono.length);
+                        if (n <= 0) continue;
+                        int o = stereo(mono, n, st);
+                        Level lv = txLevel; if (lv != null) lv.peak(peak(mono, n));
+                        out.write(st, 0, o);
+                    }
+                } catch (Throwable t) { synchronized (err) { err.append(t).append('\n'); } }
+            }, "sdalsa-tx");                                             // closing stdin ends the helper: it drains, then puts the controls back
+            txThread.start();
+            return "TX started (sdalsa playback on device " + da.playbackDevice + ")";
+        } catch (Throwable t) { return "startTx failed: " + t; }
+    }
+
+    @Override public synchronized String stopTx() {
+        txRunning = false;
+        try { if (txThread != null) txThread.join(500); } catch (InterruptedException ignored) { }
+        try { if (rec != null) { rec.stop(); rec.release(); rec = null; } } catch (Throwable ignored) { }
+        Process p = txProc; txProc = null;
+        finish(p, 1500);
+        String e = takeErrors();
+        return "TX stopped" + (e.isEmpty() ? "" : " errors: " + e);
+    }
+
+    /** Play 8 kHz mono PCM into the TX path; blocks until the helper has played it out. */
+    @Override public String playPcm(short[] mono) {
+        Process p;
+        synchronized (this) { takeErrors(); try { p = start(false); } catch (Throwable t) { return "playPcm: " + t; } }
+        try (OutputStream out = p.getOutputStream()) {
+            byte[] st = new byte[BLOCK];
+            for (int pos = 0; pos < mono.length; pos += BLOCK / 4) {
+                int k = 0;
+                for (int i = pos; i < Math.min(mono.length, pos + BLOCK / 4); i++) { short v = mono[i]; st[k++] = (byte) v; st[k++] = (byte) (v >> 8); st[k++] = (byte) v; st[k++] = (byte) (v >> 8); }
+                out.write(st, 0, k);                                     // the pipe fills and the helper's playback paces it to real time
+            }
+        } catch (Throwable t) { finish(p, 500); return "playPcm: " + t; }
+        finish(p, 3000);                                                 // end of input: the helper drains the last periods, then exits
+        String e = takeErrors();
+        return "played " + mono.length + " samples" + (e.isEmpty() ? "" : " (" + e + ")");
+    }
+
+    /** 8 kHz mono little-endian bytes to stereo-duplicated frames; returns the stereo byte count. */
+    static int stereo(byte[] mono, int n, byte[] st) {
+        int o = 0;
+        for (int i = 0; i + 1 < n && o + 3 < st.length; i += 2) { st[o++] = mono[i]; st[o++] = mono[i + 1]; st[o++] = mono[i]; st[o++] = mono[i + 1]; }
+        return o;
+    }
+    private static int peak(byte[] mono, int n) {
+        int pk = 0; for (int i = 0; i + 1 < n; i += 2) pk = Math.max(pk, Math.abs((short) ((mono[i] & 0xFF) | (mono[i + 1] << 8))));
+        return pk;
+    }
+}

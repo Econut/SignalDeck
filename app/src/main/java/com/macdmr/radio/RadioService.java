@@ -939,12 +939,38 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void startRxAudio() {
         try {
             if (audio == null) {
-                audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud) : new TinyServiceAudio();
+                audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
                 audio.setGate(() -> squelchOpen && !muted && !(m17 != null && m17.receiving()));   // M17: its decoded voice plays instead
             }
             String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
+    }
+
+    /**
+     * A vendor-service phone: PrizeTinyService when the ROM has it, else (a custom ROM or GSI) the radio audio straight
+     * from the sound card when the profile knows how. Prefs radio/audioPath "direct" or "vendor" (DIAG audiopath) force one.
+     */
+    private AudioBackend vendorOrDirectAudio() throws Exception {
+        boolean cls; try { Class.forName("android.os.PrizeTinyService"); cls = true; } catch (Throwable t) { cls = false; }
+        String path = AlsaDirectAudio.choose(getSharedPreferences("radio", MODE_PRIVATE).getString("audioPath", "auto"), cls, profile.directAudio != null);
+        if (!"direct".equals(path)) return new TinyServiceAudio();
+        log(cls ? "audio: the sound card directly (forced by audioPath)" : "audio: this ROM has no PrizeTinyService: the sound card directly");
+        return new AlsaDirectAudio(this, profile.directAudio);
+    }
+    /** True while the radio audio comes straight from the sound card (a ROM without PrizeTinyService). */
+    public boolean directAudio() { return audio instanceof AlsaDirectAudio; }
+    /** Bench: choose the audio path (auto / vendor / direct) and restart receive audio on it; never while transmitting. */
+    public void diagAudioPath(String path) {
+        worker.execute(() -> {
+            if (isTransmitting()) { log("audiopath: transmitting, not changed"); return; }
+            getSharedPreferences("radio", MODE_PRIVATE).edit().putString("audioPath", path).apply();
+            boolean wasOn = rxAudioOn;
+            try { if (audio != null) log(audio.stopRx()); } catch (Throwable t) { log("audiopath stop: " + t); }
+            audio = null;
+            if (wasOn) startRxAudio();
+            log("audiopath " + path + ": " + audioBackendName());
+        });
     }
 
     /** Every received 8 kHz stereo (L == R) block: take the left channel, run the squelch, record, meter. */

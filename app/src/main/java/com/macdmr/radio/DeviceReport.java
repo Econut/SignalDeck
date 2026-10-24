@@ -162,6 +162,8 @@ public final class DeviceReport {
             h(r, "Who holds the serial ports (root)"); r.append(RootSetup.run("for p in /proc/[0-9]*; do ls -l $p/fd 2>/dev/null | grep -q '/dev/tty' && echo \"$(cat $p/comm) ($(basename $p)): $(ls -l $p/fd 2>/dev/null | grep -o '/dev/tty[A-Za-z0-9]*' | sort -u | tr '\\n' ' ')\"; done")).append('\n');
             h(r, "Recent logcat lines mentioning the radio (root, redacted)"); r.append(redact(RootSetup.run("logcat -d -t 3000 2>/dev/null | grep -iE 'ptt|intercom|interphone|walkie|dmr|serial|tty|tiny' | grep -vE 'BufferQueue|SurfaceFlinger|MTK_APPList|WindowManager|InputManager|ImeTracker|InputMethod|ApkAssets|PackageConfig|ViewRootImpl' | tail -120"))).append('\n');
             h(r, "SELinux denials seen so far (root)"); r.append(RootSetup.run("logcat -d -b all 2>/dev/null | grep -i 'avc: denied' | tail -40; dmesg 2>/dev/null | grep -i 'avc: denied' | tail -40")).append('\n');
+            p.step("Sound card");
+            h(r, "Sound card streams and mixer (root)"); r.append(soundCard(c)).append('\n');
         } else {
             h(r, "Root"); r.append("  not available — with Magisk root the report also lists SELinux labels, which process holds the serial ports, and the stock app's receivers (the PTT key broadcasts).\n");
         }
@@ -514,6 +516,18 @@ public final class DeviceReport {
 
     // ---- helpers ----
     private static void h(StringBuilder r, String s) { r.append("\n==== ").append(s).append(" ====\n"); }
+
+    /**
+     * The sound card's streams, which of them run and who holds them, and every mixer control with its value (through
+     * SignalDeck's sdalsa helper): what a direct audio path for a ROM without the vendor audio service is built from.
+     */
+    static String soundCard(Context c) {
+        StringBuilder s = new StringBuilder(RootSetup.run("cat /proc/asound/pcm 2>/dev/null; "
+                + "for f in /proc/asound/card*/pcm*/sub*/status; do grep -q RUNNING $f 2>/dev/null && { echo \"running: $f\"; cat ${f%status}hw_params; }; done; "
+                + "for p in /proc/[0-9]*; do ls -l $p/fd 2>/dev/null | grep -q '/dev/snd/pcm' && echo \"$(cat $p/comm) ($(basename $p)): $(ls -l $p/fd 2>/dev/null | grep -o '/dev/snd/pcm[A-Za-z0-9]*' | sort -u | tr '\\n' ' ')\"; done; true")).append('\n');
+        try { s.append(RootSetup.run(AlsaDirectAudio.quote(AlsaDirectAudio.install(c)) + " list 0")); } catch (Throwable t) { s.append("mixer: ").append(t); }
+        return s.toString();
+    }
     private static void kv(StringBuilder r, String k, String v) { r.append(String.format(Locale.US, "  %-28s %s\n", k, v == null ? "" : v.trim())); }
     private static boolean suPresent() { for (String p : new String[] { "/system/bin/su", "/system/xbin/su", "/sbin/su", "/data/adb/magisk", "/debug_ramdisk/su" }) if (new File(p).exists()) return true; return false; }
     public static String cat(String path) { try (BufferedReader b = new BufferedReader(new InputStreamReader(new FileInputStream(path)))) { StringBuilder s = new StringBuilder(); String l; int n = 0; while ((l = b.readLine()) != null && n++ < 200) s.append(l).append('\n'); return s.toString(); } catch (Throwable t) { return ""; } }

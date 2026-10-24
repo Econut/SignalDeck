@@ -43,6 +43,35 @@ public final class DeviceProfile {
     /** Least time between two channel writes (0 = none); quicker channel changes collapse into the last one. */
     public long minWriteGapMs;
     public String[][] lineSetup;         // {node, value} written in this order before the power line, every bring-up (null = none)
+    /** TINY_SERVICE phones: how to reach the radio audio straight on the sound hardware when the ROM lacks the vendor service (null = not known). */
+    public DirectAudio directAudio;
+
+    /**
+     * The radio's audio as plain ALSA streams on the phone's sound card, for a ROM without the vendor audio service
+     * (a custom ROM or GSI). SignalDeck's root helper (sdalsa) sets the mixer controls and moves the PCM. Each control
+     * is "NAME=VALUE" exactly as the kernel names it; the on lists are set before a stream opens, the off lists after it.
+     */
+    public static final class DirectAudio {
+        public final int card, captureDevice, playbackDevice;
+        public final String[] rxOn, rxOff, txOn, txOff;
+        public DirectAudio(int card, int captureDevice, int playbackDevice, String[] rxOn, String[] rxOff, String[] txOn, String[] txOff) {
+            this.card = card; this.captureDevice = captureDevice; this.playbackDevice = playbackDevice;
+            this.rxOn = rxOn; this.rxOff = rxOff; this.txOn = txOn; this.txOff = txOff;
+        }
+        /** Letters, digits, space and _ - . , = only: the controls end up on a root command line. */
+        static boolean safeControl(String c) { return c != null && c.matches("[A-Za-z0-9 _.,-]{1,80}=[A-Za-z0-9 _.,-]{1,40}"); }
+        boolean valid() {
+            if (card < 0 || card > 31 || captureDevice < 0 || captureDevice > 63 || playbackDevice < 0 || playbackDevice > 63) return false;
+            for (String[] l : new String[][] { rxOn, rxOff, txOn, txOff }) { if (l == null) return false; for (String c : l) if (!safeControl(c)) return false; }
+            return true;
+        }
+        static DirectAudio fromJson(org.json.JSONObject o) throws org.json.JSONException {
+            DirectAudio d = new DirectAudio(o.getInt("card"), o.getInt("captureDevice"), o.getInt("playbackDevice"),
+                    strings(o.optJSONArray("rxOn")), strings(o.optJSONArray("rxOff")), strings(o.optJSONArray("txOn")), strings(o.optJSONArray("txOff")));
+            if (!d.valid()) throw new org.json.JSONException("directAudio: bad device number or control");
+            return d;
+        }
+    }
 
     private DeviceProfile(String name, String controlPort, int baud, Audio audio, String pcmPort, int pcmBaud,
                           String powerNode, String pttNode, String powerOnToken, String[] pttActions,
@@ -106,6 +135,15 @@ public final class DeviceProfile {
         // ptt_control 0 is its transmit state (setPttLaunch). So the PTT line goes to receive first, before the module is
         // powered, or a module left by QuickChat's power-off would come up with its PTT line asserted.
         ARMOR_26_ULTRA.id = "ulefone-armor26ultra"; ARMOR_26_ULTRA.revision = 1;
+        // Measured on the owner's Armor 2026-10-24 (stock ROM, mixer read while tinyserver received and while it sent a
+        // low-power test tone): receive is capture device 11 (8 kHz stereo) with I2S2 routed to UL2; transmit is playback
+        // device 8 with DL8 routed to I2S1, the ES8311's DAC turned up and its ADC muted. Used only when the ROM has no
+        // PrizeTinyService (custom ROMs / GSIs).
+        ARMOR_26_ULTRA.directAudio = new DirectAudio(0, 11, 8,
+                new String[] { "UL2_CH1 I2S2_CH1=1", "UL2_CH2 I2S2_CH2=1", "ADC SDP MUTE=0", "DAC VOLUME=0", "DAC SDP SRC MUX=SELECT SDP RIGHT DATA" },
+                new String[] { "UL2_CH1 I2S2_CH1=0", "UL2_CH2 I2S2_CH2=0" },
+                new String[] { "I2S1_HD_Mux=Low_Jitter", "I2S1_CH1 DL8_CH1=1", "I2S1_Out_Mux=Output_Widget", "ADC SDP MUTE=1", "DAC VOLUME=163", "DAC SDP SRC MUX=SELECT SDP LEFT DATA" },
+                new String[] { "I2S1_CH1 DL8_CH1=0", "I2S1_Out_Mux=Normal", "I2S1_HD_Mux=Normal", "DAC VOLUME=0", "ADC SDP MUTE=0", "DAC SDP SRC MUX=SELECT SDP RIGHT DATA" });
         ARMOR_20WT.id = "ulefone-armor20wt"; ARMOR_20WT.revision = 1;
         XPLORE_1.id = "blackview-xplore1"; XPLORE_1.revision = 2;
         XPLORE_1.scanDwellMs = 2500;
@@ -143,7 +181,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.minWriteGapMs = minWriteGapMs;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -156,6 +194,8 @@ public final class DeviceProfile {
         p.id = o.getString("id"); p.revision = o.getInt("revision"); p.globalSquelch = o.optBoolean("globalSquelch", false); p.scanDwellMs = o.optLong("scanDwellMs", 1500); p.minWriteGapMs = o.optLong("minWriteGapMs", 0);
         org.json.JSONArray ls = o.optJSONArray("lineSetup");
         if (ls != null) { p.lineSetup = new String[ls.length()][]; for (int i = 0; i < ls.length(); i++) p.lineSetup[i] = strings(ls.getJSONArray(i)); }
+        org.json.JSONObject da = o.optJSONObject("directAudio");
+        if (da != null) p.directAudio = DirectAudio.fromJson(da);
         return p;
     }
     private static String[] strings(org.json.JSONArray a) {

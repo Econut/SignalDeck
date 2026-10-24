@@ -46,12 +46,13 @@ public final class DmrAudioCheck {
         public boolean squelchStuck; public int closedBy = -1;      // after MON off the squelch stayed open with no signal; which step closed it (0 none)   // analog: 10 s with the squelch held open (MON): receiver noise must arrive
         public int musicVolume = -1, musicMax = -1;
         public String output = "";                      // where media plays (speaker, Bluetooth …)
+        public boolean directAudio, directKnown;       // receive audio comes straight from the sound card (no PrizeTinyService); the profile knows how
         public boolean uartPcm; public String pcmPort = ""; public boolean monRefused;   // the radio refused MON during the test (after retries)   // the profile's audio comes over a second serial port (Xplore 1), not PrizeTinyService
     }
 
     /** Where receive audio comes from on this phone, for the verdict's sentences. */
-    static String source(Facts f) { return f.uartPcm ? "the radio's audio serial port" + (f.pcmPort.isEmpty() ? "" : " (" + f.pcmPort + ")") : "the phone's radio audio service"; }
-    static String below(Facts f) { return f.uartPcm ? "The radio module is not sending audio on its audio serial port" : "The audio path below Android (the tinyservice/tinyserver daemon) is not delivering"; }
+    static String source(Facts f) { return f.uartPcm ? "the radio's audio serial port" + (f.pcmPort.isEmpty() ? "" : " (" + f.pcmPort + ")") : f.directAudio ? "the phone's sound card (read directly, this ROM has no radio audio service)" : "the phone's radio audio service"; }
+    static String below(Facts f) { return f.uartPcm ? "The radio module is not sending audio on its audio serial port" : f.directAudio ? "The sound card path (SignalDeck's sdalsa helper, through root) is not delivering" : "The audio path below Android (the tinyservice/tinyserver daemon) is not delivering"; }
 
     /** The most likely cause first, as plain sentences. Pure: host-tested. */
     public static List<String> verdict(Facts f) {
@@ -60,7 +61,12 @@ public final class DmrAudioCheck {
             v.add("The radio was still starting up (or being restarted) when the check ran, so nothing could be measured. Run the check again once the intercom says READY.");
             return v;
         }
-        if (f.classMissing && !f.uartPcm) {                        // only phones whose audio goes through PrizeTinyService need it
+        if (f.classMissing && !f.uartPcm && !f.directAudio && f.directKnown) {   // the sound card path exists for this phone but did not start
+            v.add("This ROM does not have Ulefone's PrizeTinyService framework class, so SignalDeck reads the radio audio straight from the phone's sound card instead, through root. "
+                    + "That did not start" + (f.audioError != null ? ": " + f.audioError : "") + ". Check that SignalDeck has root access in Magisk, then run this check again; if it still fails, please send this report.");
+            return v;
+        }
+        if (f.classMissing && !f.uartPcm && !f.directAudio) {      // only phones whose audio goes through PrizeTinyService need it
             v.add("This ROM does not have Ulefone's PrizeTinyService framework class, which carries the radio's receive audio on this phone. "
                     + "SignalDeck (and the stock app) can't get any receive audio on it, analog and DMR alike. "
                     + "On a custom ROM or GSI: a Magisk module that adds Ulefone's audio service and its PrizeTinyService library, taken from the phone's stock firmware, brings it back (SignalDeck already asks Android for that library); then reboot and run this check again."
@@ -142,12 +148,14 @@ public final class DmrAudioCheck {
         sys.append("  security patch ").append(Build.VERSION.SECURITY_PATCH).append(" · build type ").append(Build.TYPE).append('/').append(Build.TAGS).append('\n');
         // from the profile, not the running backend: during a module restart no audio backend runs yet (Xplore 1, 2026-10-23)
         f.uartPcm = svc.profile() != null ? svc.profile().audio == DeviceProfile.Audio.UART_PCM : "UartPcmAudio".equals(svc.audioBackendName());
+        f.directKnown = svc.profile() != null && svc.profile().directAudio != null;
         // a check started while the radio is still starting (or being restarted) waits for it, up to 30 s
         for (int w = 0; w < 30 && !svc.isReady(); w++) { p.step("Waiting for the radio to be ready (" + (30 - w) + " s)…"); Thread.sleep(1000); }
         f.notReady = !svc.isReady();
+        f.directAudio = svc.directAudio();
         if (f.uartPcm) { java.util.regex.Matcher m = java.util.regex.Pattern.compile("(/dev/\\S+)").matcher(String.valueOf(svc.audioStartResult())); if (m.find()) f.pcmPort = m.group(1); }
         try { Class.forName("android.os.PrizeTinyService"); sys.append("  framework class android.os.PrizeTinyService: present\n"); }
-        catch (Throwable t) { f.classMissing = true; sys.append("  framework class android.os.PrizeTinyService: MISSING (").append(t.getClass().getSimpleName()).append(")").append(f.uartPcm ? " (not used on this phone: its audio comes over the radio's audio serial port)" : "").append("\n"); }
+        catch (Throwable t) { f.classMissing = true; sys.append("  framework class android.os.PrizeTinyService: MISSING (").append(t.getClass().getSimpleName()).append(")").append(f.uartPcm ? " (not used on this phone: its audio comes over the radio's audio serial port)" : f.directAudio ? " (SignalDeck reads the sound card directly)" : "").append("\n"); }
         if (root) {
             String services = RootSetup.run("service list 2>/dev/null | grep -i -E 'tiny|prize' ; true");
             f.binderPresent = services.toLowerCase(Locale.US).contains("tiny");
