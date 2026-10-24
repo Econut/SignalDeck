@@ -1660,6 +1660,25 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     /** Bench: one status read of the symbol ring. Does not key. */
     public void diagSymStatus() { worker.execute(() -> logSymStatus(sym40(new byte[] { 2 }))); }
+    /** Bench: reset, append one symbol chunk, render N samples. Does not key. Writes cache/render.bin. */
+    public void diagSymRender(java.io.File f, int n) { worker.execute(() -> {
+        try {
+            byte[] data = java.nio.file.Files.readAllBytes(f.toPath());
+            if (data.length == 0 || data.length > 48 || n < 1 || n > 256) { log("render bad n=" + n + " bytes=" + data.length); return; }
+            Frame rst = sym40(new byte[] { 3 });
+            if (rst == null || rst.sr != 0) { log("render reset failed"); return; }
+            byte[] body = new byte[1 + data.length];
+            body[0] = 1;
+            System.arraycopy(data, 0, body, 1, data.length);
+            Frame ack = sym40(body);
+            if (ack == null || ack.sr != 0) { log("render append failed"); return; }
+            Frame pic = sym40(new byte[] { 4, (byte) n, (byte) (n >> 8) });
+            if (pic == null || pic.body == null) { log("render missing"); return; }
+            java.io.File out = new java.io.File(getCacheDir(), "render.bin");
+            java.nio.file.Files.write(out.toPath(), pic.body);
+            log("render bytes=" + pic.body.length + " sr=" + pic.sr);
+        } catch (Throwable t) { log("render: " + t); }
+    }); }
     private Frame sym40(byte[] body) {
         try { return engine.diag40(body); } catch (java.io.IOException e) { log("sym: " + e); return null; }
     }
