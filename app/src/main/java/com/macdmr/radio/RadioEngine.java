@@ -109,7 +109,7 @@ public final class RadioEngine implements UartPort.Listener {
     }
     /** Bench: one command 0x40, then up to n replies. Does not key. */
     public java.util.List<Frame> diag40n(byte[] body, int n, int waitMs) throws IOException {
-        if (body == null || body.length == 0 || body.length > 799 || n < 1 || n > 4) throw new IOException("body");
+        if (body == null || body.length == 0 || body.length > 799 || n < 1 || n > 6) throw new IOException("body");
         synchronized (gate40) { reply40 = null; extra40.clear(); want40 = n; }
         send(Frame.request(0x40, body));
         long end = System.currentTimeMillis() + Math.max(1, waitMs);

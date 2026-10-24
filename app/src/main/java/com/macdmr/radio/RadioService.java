@@ -1679,19 +1679,29 @@ public class RadioService extends Service implements RadioEngine.Events {
             log("render bytes=" + pic.body.length + " sr=" + pic.sr);
         } catch (Throwable t) { log("render: " + t); }
     }); }
-    /** Bench: op 5, both FM receive halves. mode 0, 2, 3 or 4. Does not key. Writes cache/rxram.bin. */
-    public void diagRxRam(int mode) { worker.execute(() -> {
+    /** Bench: op 6 applies variant 3 or 4 and leaves it, or restores it. action 1 applies, 0 restores. Does not key. */
+    public void diagHold(int mode, int action) { worker.execute(() -> {
+        try {
+            Frame pic = sym40(new byte[] { 6, (byte) mode, (byte) action }, 1000);
+            log("hold mode=" + mode + " action=" + action + (pic == null ? " missing" : " sr=" + pic.sr));
+        } catch (Throwable t) { log("hold: " + t); }
+    }); }
+    /** Bench: op 5, n FM receive halves (4 or 6). mode 0, 2, 3 or 4. Does not key. Writes cache/rxram.bin. */
+    public void diagRxRam(int mode) { diagRxRam(mode, 4); }
+    public void diagRxRam(int mode, int n) { worker.execute(() -> {
         try {
             if (mode != 0 && mode != 2 && mode != 3 && mode != 4) { log("rxram bad mode"); return; }
-            java.util.List<Frame> got = engine.diag40n(new byte[] { 5, (byte) mode }, 4, 4000);
+            if (n != 4 && n != 6) { log("rxram bad n"); return; }
+            byte[] body = n == 4 ? new byte[] { 5, (byte) mode } : new byte[] { 5, (byte) mode, (byte) n };
+            java.util.List<Frame> got = engine.diag40n(body, n, 4000);
             if (got == null || got.isEmpty()) { log("rxram missing"); return; }
             java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
             StringBuilder b = new StringBuilder();
             for (Frame pic : got) {
-                byte[] body = pic.body == null ? new byte[0] : pic.body;
-                o.write(body);
+                byte[] part = pic.body == null ? new byte[0] : pic.body;
+                o.write(part);
                 if (b.length() > 0) b.append('+');
-                b.append(body.length).append(" sr=").append(pic.sr);
+                b.append(part.length).append(" sr=").append(pic.sr);
             }
             java.nio.file.Files.write(new java.io.File(getCacheDir(), "rxram.bin").toPath(), o.toByteArray());
             log("rxram bytes=" + b + " mode=" + mode);
