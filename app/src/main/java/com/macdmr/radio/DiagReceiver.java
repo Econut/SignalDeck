@@ -65,7 +65,7 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "cmdsym": {                                                     // bench: stream packed symbols, one status read, a no-key render, or one FM receive half. Does not key.
                 if ("status".equals(i.getStringExtra("op"))) s.diagSymStatus();
                 else if ("render".equals(i.getStringExtra("op"))) s.diagSymRender(new java.io.File(i.getStringExtra("path")), i.getIntExtra("n", 0));
-                else if ("rxram".equals(i.getStringExtra("op"))) s.diagRxRam(i.getIntExtra("mode", 0));
+                else if ("rxram".equals(i.getStringExtra("op"))) s.diagRxRam(i.getIntExtra("mode", 0));   // 0, 2, 3 or 4: both FM receive halves, no key
                 else s.diagSym(new java.io.File(i.getStringExtra("path")));
                 break;
             }

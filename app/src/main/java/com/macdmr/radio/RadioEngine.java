@@ -86,6 +86,8 @@ public final class RadioEngine implements UartPort.Listener {
     }
     private final Object gate40 = new Object();
     private Frame reply40;
+    private final java.util.ArrayList<Frame> extra40 = new java.util.ArrayList<>();
+    private int want40;
     /**
      * Bench: one command 0x40, then the module's answer. Does not key.
      * The UART reader delivers the answer. The symbol stream calls this from
@@ -103,6 +105,20 @@ public final class RadioEngine implements UartPort.Listener {
                 try { gate40.wait(Math.max(1, end - System.currentTimeMillis())); } catch (InterruptedException e) { break; }
             }
             return reply40;
+        }
+    }
+    /** Bench: one command 0x40, then up to n replies. Does not key. */
+    public java.util.List<Frame> diag40n(byte[] body, int n, int waitMs) throws IOException {
+        if (body == null || body.length == 0 || body.length > 799 || n < 1 || n > 4) throw new IOException("body");
+        synchronized (gate40) { reply40 = null; extra40.clear(); want40 = n; }
+        send(Frame.request(0x40, body));
+        long end = System.currentTimeMillis() + Math.max(1, waitMs);
+        synchronized (gate40) {
+            while (extra40.size() < n && System.currentTimeMillis() < end) {
+                try { gate40.wait(Math.max(1, end - System.currentTimeMillis())); } catch (InterruptedException e) { break; }
+            }
+            want40 = 0;
+            return new java.util.ArrayList<>(extra40);
         }
     }
     private void send(Frame fr) throws IOException {
@@ -286,7 +302,11 @@ public final class RadioEngine implements UartPort.Listener {
         answered(f);
         byte[] b = f.body;
         if (f.cmd == 0x40 && f.rw == 0) {
-            synchronized (gate40) { reply40 = f; gate40.notifyAll(); }
+            synchronized (gate40) {
+                reply40 = f;
+                if (want40 > 0 && extra40.size() < want40) extra40.add(f);
+                gate40.notifyAll();
+            }
         }
         switch (f.cmd) {
             case CMD_STATUS: {

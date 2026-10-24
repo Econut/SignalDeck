@@ -1679,15 +1679,22 @@ public class RadioService extends Service implements RadioEngine.Events {
             log("render bytes=" + pic.body.length + " sr=" + pic.sr);
         } catch (Throwable t) { log("render: " + t); }
     }); }
-    /** Bench: op 5, one FM receive half. mode 0 stores WORK_MODE 0x80, mode 1 stores 0x16A. Does not key. Writes cache/rxram.bin. */
+    /** Bench: op 5, both FM receive halves. mode 0, 2, 3 or 4. Does not key. Writes cache/rxram.bin. */
     public void diagRxRam(int mode) { worker.execute(() -> {
         try {
-            if (mode != 0 && mode != 1) { log("rxram bad mode"); return; }
-            Frame pic = sym40(new byte[] { 5, (byte) mode }, 2500);
-            if (pic == null) { log("rxram missing"); return; }
-            byte[] body = pic.body == null ? new byte[0] : pic.body;
-            java.nio.file.Files.write(new java.io.File(getCacheDir(), "rxram.bin").toPath(), body);
-            log("rxram bytes=" + body.length + " sr=" + pic.sr + " mode=" + mode);
+            if (mode != 0 && mode != 2 && mode != 3 && mode != 4) { log("rxram bad mode"); return; }
+            java.util.List<Frame> got = engine.diag40n(new byte[] { 5, (byte) mode }, 2, 2500);
+            if (got == null || got.isEmpty()) { log("rxram missing"); return; }
+            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+            StringBuilder b = new StringBuilder();
+            for (Frame pic : got) {
+                byte[] body = pic.body == null ? new byte[0] : pic.body;
+                o.write(body);
+                if (b.length() > 0) b.append('+');
+                b.append(body.length).append(" sr=").append(pic.sr);
+            }
+            java.nio.file.Files.write(new java.io.File(getCacheDir(), "rxram.bin").toPath(), o.toByteArray());
+            log("rxram bytes=" + b + " mode=" + mode);
         } catch (Throwable t) { log("rxram: " + t); }
     }); }
     private Frame sym40(byte[] body) { return sym40(body, 500); }
