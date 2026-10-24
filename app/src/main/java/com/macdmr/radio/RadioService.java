@@ -1649,6 +1649,65 @@ public class RadioService extends Service implements RadioEngine.Events {
         engine.diagPcm(off, chunk);
         log(String.format(java.util.Locale.US, "pcm off=%d n=%d", off, count));
     } catch (Throwable t) { log("pcm: " + t); } }); }
+    private volatile Thread symThread;
+    /** Bench: stream a packed-symbol file on command 0x40. Does not key. Paces on the returned fill. */
+    public void diagSym(java.io.File f) {
+        Thread old = symThread;
+        if (old != null && old.isAlive()) { log("sym busy"); return; }
+        Thread t = new Thread(() -> streamSym(f), "m17-sym");
+        symThread = t;
+        t.start();
+    }
+    /** Bench: one status read of the symbol ring. Does not key. */
+    public void diagSymStatus() { worker.execute(() -> logSymStatus(sym40(new byte[] { 2 }))); }
+    private Frame sym40(byte[] body) {
+        try { return engine.diag40(body); } catch (java.io.IOException e) { log("sym: " + e); return null; }
+    }
+    private void logSymStatus(Frame f) {
+        if (f == null || f.body == null || f.body.length < 6) { log("sym status missing"); return; }
+        byte[] s = f.body;
+        int fill = (s[0] & 0xFF) | ((s[1] & 0xFF) << 8);
+        int und = (s[2] & 0xFF) | ((s[3] & 0xFF) << 8);
+        int err = (s[4] & 0xFF) | ((s[5] & 0xFF) << 8);
+        log("sym status fill=" + fill + " underrun=" + und + " err=" + err + " sr=" + f.sr);
+    }
+    private void streamSym(java.io.File f) {
+        try {
+            byte[] data = java.nio.file.Files.readAllBytes(f.toPath());
+            Frame rst = sym40(new byte[] { 3 });
+            if (rst == null || rst.sr != 0) { log("sym reset failed"); return; }
+            int off = 0, nsend = 0;
+            while (off < data.length) {
+                int n = Math.min(48, data.length - off);
+                byte[] body = new byte[1 + n];
+                body[0] = 1;
+                System.arraycopy(data, off, body, 1, n);
+                Frame ack = sym40(body);
+                int wait = 0;
+                while ((ack == null || ack.sr != 0) && wait < 8) {
+                    Thread.sleep(40);
+                    ack = sym40(body);
+                    wait++;
+                }
+                if (ack == null) { log("sym no ack at " + off); return; }
+                if (ack.sr != 0) { log("sym refused at " + off); return; }
+                int fill = ack.body != null && ack.body.length > 1 ? ((ack.body[0] & 0xFF) | ((ack.body[1] & 0xFF) << 8)) : 0;
+                off += n;
+                nsend++;
+                if (nsend == 8) log("sym ready fill=" + fill);
+                if (nsend < 8) { Thread.sleep(5); continue; }
+                int spins = 0;
+                while (fill > 1500 && spins < 150) {
+                    Thread.sleep(20);
+                    Frame s = sym40(new byte[] { 2 });
+                    if (s != null && s.body != null && s.body.length > 1) fill = (s.body[0] & 0xFF) | ((s.body[1] & 0xFF) << 8);
+                    spins++;
+                }
+                Thread.sleep(15);
+            }
+            log("sym done bytes=" + data.length);
+        } catch (Throwable t) { log("sym: " + t); }
+    }
     public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
     /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
     public String diagTxWav(java.io.File f) {

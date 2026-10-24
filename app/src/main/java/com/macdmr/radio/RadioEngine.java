@@ -84,6 +84,25 @@ public final class RadioEngine implements UartPort.Listener {
         System.arraycopy(samples, 0, body, 2, samples.length);
         send(Frame.request(0x40, body));
     }
+    private final Object gate40 = new Object();
+    private Frame reply40;
+    /**
+     * Bench: one command 0x40, then the module's answer. Does not key.
+     * The UART reader delivers the answer. The symbol stream calls this from
+     * its own thread: a key holds the radio worker for the whole playback.
+     */
+    public Frame diag40(byte[] body) throws IOException {
+        if (body == null || body.length == 0 || body.length > 799) throw new IOException("body " + (body == null ? -1 : body.length));
+        synchronized (gate40) { reply40 = null; }
+        send(Frame.request(0x40, body));
+        long end = System.currentTimeMillis() + 500;
+        synchronized (gate40) {
+            while (reply40 == null && System.currentTimeMillis() < end) {
+                try { gate40.wait(Math.max(1, end - System.currentTimeMillis())); } catch (InterruptedException e) { break; }
+            }
+            return reply40;
+        }
+    }
     private void send(Frame fr) throws IOException {
         if (fr.rw == 1 && watched(fr.cmd) && firstUnansweredAt == 0) firstUnansweredAt = System.currentTimeMillis();
         if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
@@ -264,6 +283,9 @@ public final class RadioEngine implements UartPort.Listener {
         ev.log("RX " + f);
         answered(f);
         byte[] b = f.body;
+        if (f.cmd == 0x40 && f.rw == 0) {
+            synchronized (gate40) { reply40 = f; gate40.notifyAll(); }
+        }
         switch (f.cmd) {
             case CMD_STATUS: {
                 int code = b.length > 0 ? b[0] & 0xFF : -1;
