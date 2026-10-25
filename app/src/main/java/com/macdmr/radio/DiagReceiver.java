@@ -72,7 +72,7 @@ public final class DiagReceiver extends BroadcastReceiver {
             }
             case "m17": {                                                       // bench: M17 receive on/off (--ez on); --es enc NAME: Codec 2 3200 encode cache/NAME.wav (8 kHz mono) to cache/NAME.c2
                 if (i.hasExtra("dump")) com.macdmr.radio.M17Station.benchDump = i.getBooleanExtra("dump", false);
-                if (i.hasExtra("on")) Log.i("DiagReceiver", "m17: " + s.setM17(i.getBooleanExtra("on", false)));
+                if (i.hasExtra("on")) Log.i("DiagReceiver", "m17: " + s.setM17(i.getBooleanExtra("on", false), !i.hasExtra("hold") || i.getBooleanExtra("hold", true)));
                 String nm = i.getStringExtra("enc");
                 if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) {
                     try (com.macdmr.radio.ham.Codec2 c2 = new com.macdmr.radio.ham.Codec2(com.macdmr.radio.ham.Codec2.MODE_3200)) {

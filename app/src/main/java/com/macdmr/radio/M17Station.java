@@ -13,6 +13,8 @@ import android.media.AudioTrack;
 import android.util.Log;
 
 import com.macdmr.radio.ham.Codec2;
+import com.macdmr.radio.ham.HeldPath;
+import com.macdmr.radio.ham.HeldPathReceiver;
 import com.macdmr.radio.ham.M17;
 import com.macdmr.radio.ham.M17Receiver;
 
@@ -35,7 +37,9 @@ public final class M17Station {
     }
 
     private final Context ctx; private final Host host; private final String profileId;
-    private M17Receiver rx; private Codec2 codec;
+    private M17Receiver rx; private HeldPathReceiver held; private M17Receiver.Listener dfeEar; private HeldPathReceiver.Listener heldEar;
+    private String dfeNote = "";
+    private Codec2 codec;
     private AudioTrack track;
     private volatile boolean running;
     private volatile Heard current;
@@ -54,6 +58,8 @@ public final class M17Station {
     public synchronized List<Heard> heard() { return new ArrayList<>(heard); }
     public float quality() { return quality; }
     public String calibration() { return calibration; }
+    /** The fixed-tap front end is in use (the module is holding its voice filter open). */
+    public boolean held() { return held != null; }
 
     public synchronized String start() {
         if (running) return null;
@@ -61,38 +67,81 @@ public final class M17Station {
         if (coef == null) { coef = load("m17/eq_ulefone-armor26ultra.txt"); calibration = "calibrated on the Ulefone Armor 26 Ultra (not on this phone: it may not decode)"; }
         else calibration = profileId.startsWith("ulefone-armor26") ? "calibrated on this phone model" : "calibrated for this phone";
         if (coef == null) return "M17 calibration missing";
+        dfeNote = calibration;
         try { codec = new Codec2(Codec2.MODE_3200); } catch (Throwable t) { return "Codec 2 not available: " + t.getMessage(); }
-        rx = new M17Receiver(coef, new M17Receiver.Listener() {
+        dfeEar = new M17Receiver.Listener() {
             @Override public void started(M17.Lsf l) { begin(l); }
             @Override public void frame(M17.Stream s, float q) { onFrame(s, q); }
-            @Override public void lsfFromLich(M17.Lsf l) { Heard h = current; if (h != null) { fill(h, l); host.event("📻 M17: " + h.src + " → " + h.dst + (h.meta != null ? "  “" + h.meta + "”" : "")); host.heard(h.src); host.changed(); } }
+            @Override public void lsfFromLich(M17.Lsf l) { onLink(l); }
             @Override public void ended(int frames, int good, String why) { finish(frames, good, why); }
-        });
+        };
+        heldEar = new HeldPathReceiver.Listener() {
+            @Override public void started(M17.Lsf l) { begin(l); }
+            @Override public void link(M17.Lsf l) { onLink(l); }
+            @Override public void frame(M17.Stream s, float q) { onFrame(s, q); }
+            @Override public void ended(int frames, int good, String why) { finish(frames, good, why); }
+        };
+        rx = new M17Receiver(coef, dfeEar);
         running = true; host.changed();
         return null;
     }
 
+    /**
+     * Use the fixed taps for this phone instead of the decision-feedback equalizer. No taps for the profile leaves
+     * the decision-feedback receiver in place. Called when the module has accepted the voice-filter hold, and again
+     * with false when that hold is released.
+     */
+    public synchronized void setHeldPath(boolean on) {
+        if (!running) { stopHeld(); return; }
+        if (!on) { stopHeld(); calibration = dfeNote; host.changed(); return; }
+        if (held != null) return;
+        double[] taps = loadTaps("m17/held_" + profileId + ".txt");
+        if (taps == null) { Log.i("M17Station", "held path: no taps for " + profileId); return; }
+        held = new HeldPathReceiver(taps, heldEar);
+        calibration = "fixed taps for this phone; the module's voice filter is held open";
+        host.changed();
+    }
+
     public synchronized void stop() {
         running = false; current = null;
+        stopHeld();
         if (track != null) { try { track.pause(); track.flush(); track.release(); } catch (Throwable ignored) { } track = null; }
         if (codec != null) { codec.close(); codec = null; }
         rx = null; host.changed();
     }
 
-    /** Every receive block (16-bit little-endian mono, 8 kHz), whatever the squelch: the receiver finds the preamble itself. */
-    public void feed(byte[] mono, int n) { M17Receiver r = rx; if (running && r != null) r.feed(mono, n); }
+    private void stopHeld() { HeldPathReceiver h = held; held = null; if (h != null) h.stop(); }
+
+    /** Every receive block (16-bit little-endian mono, 8 kHz), whatever the squelch. The held path locks on a sync word; the other receiver uses the preamble. */
+    public void feed(byte[] mono, int n) {
+        if (!running) return;
+        HeldPathReceiver h = held;
+        if (h != null) h.feed(mono, n);
+        else { M17Receiver r = rx; if (r != null) r.feed(mono, n); }
+    }
 
     private float[] load(String asset) {
-        try (java.io.InputStream in = ctx.getAssets().open(asset)) {
-            String[] lines = new String(readAll(in), "UTF-8").trim().split("\\s+");
-            if (lines.length != M17Receiver.NCOEF) return null;
-            float[] c = new float[lines.length]; for (int i = 0; i < c.length; i++) c[i] = Float.parseFloat(lines[i]); return c;
-        } catch (Exception e) { return null; }
+        String[] lines = readLines(asset); if (lines == null || lines.length != M17Receiver.NCOEF) return null;
+        float[] c = new float[lines.length]; for (int i = 0; i < c.length; i++) c[i] = Float.parseFloat(lines[i]); return c;
+    }
+    private double[] loadTaps(String asset) {
+        String[] lines = readLines(asset); if (lines == null || lines.length != HeldPath.TAPS) return null;
+        double[] c = new double[lines.length]; for (int i = 0; i < c.length; i++) c[i] = Double.parseDouble(lines[i]); return c;
+    }
+    private String[] readLines(String asset) {
+        try (java.io.InputStream in = ctx.getAssets().open(asset)) { return new String(readAll(in), "UTF-8").trim().split("\\s+"); }
+        catch (Exception e) { return null; }
     }
     private static byte[] readAll(java.io.InputStream in) throws java.io.IOException { java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream(); byte[] b = new byte[4096]; int k; while ((k = in.read(b)) > 0) o.write(b, 0, k); return o.toByteArray(); }
 
     private void fill(Heard h, M17.Lsf l) {
         h.src = l.src(); h.dst = l.dst(); h.meta = l.metaText(); h.encrypted = l.encryption() != 0; h.data = !l.voice();
+    }
+    private void onLink(M17.Lsf l) {
+        Heard h = current; if (h == null) return;
+        fill(h, l);
+        host.event("📻 M17: " + h.src + " → " + h.dst + (h.meta != null ? "  “" + h.meta + "”" : ""));
+        host.heard(h.src); host.changed();
     }
     private void begin(M17.Lsf l) {
         Heard h = new Heard(System.currentTimeMillis());

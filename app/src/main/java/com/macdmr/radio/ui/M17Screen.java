@@ -72,8 +72,9 @@ public final class M17Screen extends ModeScreen {
                 TextView t = Neo.text(c, line, e == h ? Neo.GREEN_LIGHT : Neo.TEXT, 13, Neo.mono(c)); t.setSingleLine(true); t.setPadding(0, dp(3), 0, dp(3));
                 list.addView(t);
             }
-            if (hl.isEmpty()) list.addView(Neo.sheetHint(c, "Nothing yet. Tune the M17 frequency (the channel or the VFO): each transmission is found by its preamble and played on the phone's speaker."));
+            if (hl.isEmpty()) list.addView(Neo.sheetHint(c, "Nothing yet. Tune the M17 frequency (the channel or the VFO). A transmission is found from its sync and played on the phone's speaker."));
         }
-        set(note.getText().length() == 0 ? note : note, "Receive only: this radio cannot transmit M17 that M17 radios decode. The radio's audio path removes the low tones M17 needs, so SignalDeck rebuilds them with an equalizer " + st.calibration() + ". It needs a fairly strong signal and the start of each transmission (its preamble).");
+        set(note.getText().length() == 0 ? note : note, "Receive only: this radio cannot transmit M17 that M17 radios decode. The radio's audio path removes the low tones M17 needs, so SignalDeck rebuilds them (" + st.calibration() + ")."
+            + (st.held() ? " The module's voice filter is held open, so a transmission already in progress can still lock." : " It needs a fairly strong signal and the start of each transmission (its preamble)."));
     }
 }

@@ -20,6 +20,15 @@ public final class Firmware {
         return reported == null ? "" : reported.trim();
     }
 
+    /**
+     * True when {@code 0x34} reports one of our bench images ({@code DMR003.XXXX.V022}) rather than stock
+     * {@code DMR003.UV4T.V022}. The data-receive hold is offered only then: stock firmware has no command {@code 0x40}.
+     */
+    public static boolean stubTag(String version) {
+        if (version == null) return false;
+        return version.trim().matches("DMR003\\.(?!UV4T)[A-Za-z0-9]{4}\\.V022");
+    }
+
     /** True when the module now reports another version than the stock one (unknown counts as not different). */
     public static boolean differs(String stock, String current) {
         return stock != null && !stock.isEmpty() && current != null && !current.isEmpty() && !stock.equals(current);

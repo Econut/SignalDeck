@@ -1346,6 +1346,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             synchronized (tunes) { tunes.addLast(new Object[] { ch, false }); }   // answered like any channel write
             engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
             if (profile.globalSquelch) engine.setSquelch(hardwareSq(ch));
+            if (dataReceive) scheduleDataHold(true);
         } catch (IOException e) { log("squelch rewrite: " + e); }
     }
 
@@ -1391,6 +1392,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             pushModes();
             describeLocation(ch);
             updateNotification();
+            if (dataReceive) scheduleDataHold(true);
             return true;
         } catch (IOException e) { log("select: " + e); return false; }
     }
@@ -2570,6 +2572,9 @@ public class RadioService extends Service implements RadioEngine.Events {
     private com.macdmr.radio.ham.FormStore forms;
     // ---- M17 receive ----
     private volatile M17Station m17;
+    /** An M17 (or later raw-discriminator) decoder wants the module's voice filter held open. */
+    private volatile boolean dataReceive;
+    private final java.util.concurrent.atomic.AtomicInteger dataHoldGen = new java.util.concurrent.atomic.AtomicInteger();
     public synchronized M17Station m17() {
         if (m17 == null) m17 = new M17Station(this, profile != null ? profile.id : "unknown", new M17Station.Host() {
             @Override public void event(String line) { history("pkt", line); }
@@ -2584,13 +2589,42 @@ public class RadioService extends Service implements RadioEngine.Events {
         return m17;
     }
     public boolean m17Running() { M17Station s = m17; return s != null && s.running(); }
-    /** M17 receive on or off (null = done, else why not). */
-    public synchronized String setM17(boolean on) {
+    /** M17 receive on or off (null = done, else why not). A stub-tagged module holds the voice filter open. */
+    public synchronized String setM17(boolean on) { return setM17(on, true); }
+
+    /**
+     * @param hold when starting, ask a stub-tagged module to hold the voice filter open and use the fixed taps.
+     *             False keeps the calibrated equalizer and releases a hold. The M17 screen's button uses true.
+     */
+    public synchronized String setM17(boolean on, boolean hold) {
         M17Station s = m17();
-        if (!on) { s.stop(); return null; }
+        if (!on) { s.stop(); dataReceive = false; scheduleDataHold(false); return null; }
         ChannelStore.Channel c = current;
         if (c == null || c.isDigital()) return "M17 needs an analog (FM) channel or the VFO";
-        return s.start();
+        String e = s.start();
+        if (e != null) return e;
+        dataReceive = hold;
+        scheduleDataHold(hold);
+        return null;
+    }
+
+    /** Re-send the voice-filter hold after a channel, VFO or tone write. Those writes put the filter back. */
+    private void scheduleDataHold(boolean apply) {
+        final int g = dataHoldGen.incrementAndGet();
+        final boolean want = apply;
+        worker.execute(() -> { if (g == dataHoldGen.get()) sendDataHold(want && dataReceive); });
+    }
+
+    private void sendDataHold(boolean apply) {
+        try {
+            if (!engine.isOpen()) { log("data hold: radio not open"); return; }
+            if (moduleVersion.trim().isEmpty()) versionHandshake(1500);
+            if (!Firmware.stubTag(moduleVersion)) { log("data hold: stock firmware, not sent"); M17Station s = m17; if (s != null) s.setHeldPath(false); return; }
+            Frame pic = sym40(new byte[] { 6, 3, (byte) (apply ? 1 : 0) }, 1000);
+            log("data hold action=" + (apply ? 1 : 0) + (pic == null ? " missing" : " sr=" + pic.sr));
+            M17Station s = m17;
+            if (s != null) s.setHeldPath(apply && pic != null && pic.sr == 0);
+        } catch (Throwable t) { log("data hold: " + t); }
     }
 
     // ---- FT8 over FM ----
@@ -2754,7 +2788,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- band scope (BandScope): receive-only sweeps ----
     final BandScope scope = new BandScope(new BandScope.Hooks() {
-        @Override public void tune(int hz) throws Exception { engine.setAnalog(hz, hz, hz < 300_000_000 ? 1 : 0, 0, scopeSq, 0, 0, 0, 0, 8, 2); }   // low power, nothing keyed
+        @Override public void tune(int hz) throws Exception { engine.setAnalog(hz, hz, hz < 300_000_000 ? 1 : 0, 0, scopeSq, 0, 0, 0, 0, 8, 2); if (dataReceive) scheduleDataHold(true); }   // low power, nothing keyed
         @Override public void query() throws Exception { engine.queryRssi(); }
         @Override public void restore() {                                   // inline (Talk waits for it on the worker thread)
             ChannelStore.Channel ch = vfo != null ? vfo : current;
