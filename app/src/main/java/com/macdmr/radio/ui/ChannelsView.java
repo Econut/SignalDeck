@@ -304,16 +304,25 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             ((TextView) row.findViewWithTag("freq")).setText(mhz(ch.rxFreq));
             LinearLayout badges = row.findViewWithTag("badges"); badges.removeAllViews();
             badges.addView(Neo.chip(c, ch.isDigital() ? "DMR" : "FM", ch.isDigital() ? Neo.VIOLET : Neo.CYAN));
-            Object[] lh = heard.get(ch.number);
-            if (lh != null) { TextView ht = Neo.text(c, "heard " + ContactEditor.ago((Long) lh[0]), Neo.DIM, 11.5f, Neo.uiMedium(c)); LayoutParams hl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl.leftMargin = (int) (6 * d); badges.addView(ht, hl); }
             if (svc != null && svc.scanPriority() == ch.number) { TextView pc = Neo.chip(c, "PRIORITY", Neo.VIOLET); LayoutParams pl2 = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl2.leftMargin = (int) (6 * d); badges.addView(pc, pl2); }
-            String det = detail(ch);
-            if (!det.isEmpty()) { TextView dc = Neo.chip(c, det, 0xFF9FB4C8); LayoutParams dl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); dl.leftMargin = (int) (6 * d); badges.addView(dc, dl); }
+            Object[] lh = heard.get(ch.number);                                   // when the channel was last heard (owner, 2026-10-25: the colour code and tone chip came off the card; the editor has the detail and the history)
+            if (lh != null) { TextView ht = Neo.text(c, "heard " + heardWhen((Long) lh[0]), Neo.DIM, 11.5f, Neo.uiMedium(c)); ht.setSingleLine(true); ht.setEllipsize(android.text.TextUtils.TruncateAt.END); LayoutParams hl = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); hl.leftMargin = (int) (6 * d); badges.addView(ht, hl); }
             ImageView star = row.findViewWithTag("star");
             star.setImageDrawable(new Neo.IconDrawable("star", fav ? Neo.AMBER : Neo.OFF, fav));
             star.setOnClickListener(x -> toggleFavourite(ch, !fav));
             return v;
         }
+    }
+
+    /** The last-heard time on a card: "14:02" (today), "yesterday 09:11", else "Oct 22, 09:11". */
+    static String heardWhen(long ts) {
+        java.util.Calendar now = java.util.Calendar.getInstance(), t = java.util.Calendar.getInstance(); t.setTimeInMillis(ts);
+        String hm = new java.text.SimpleDateFormat("HH:mm", Locale.US).format(new java.util.Date(ts));
+        if (now.get(java.util.Calendar.YEAR) == t.get(java.util.Calendar.YEAR)) {
+            int dd = now.get(java.util.Calendar.DAY_OF_YEAR) - t.get(java.util.Calendar.DAY_OF_YEAR);
+            if (dd == 0) return hm; if (dd == 1) return "yesterday " + hm;
+        }
+        return new java.text.SimpleDateFormat("MMM d, HH:mm", Locale.US).format(new java.util.Date(ts));
     }
 
     // RadioService.Listener

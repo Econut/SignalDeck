@@ -176,6 +176,19 @@ public class ChannelEditorView extends LinearLayout {
         netsBox = new LinearLayout(c); netsBox.setOrientation(VERTICAL); form.addView(netsBox);
         refreshNets();
         refreshGroups();
+        section(form, "History");
+        historyBox = new LinearLayout(c); historyBox.setOrientation(VERTICAL); form.addView(historyBox);
+        refreshHistory();
+    }
+
+    /** What was heard and sent on this channel (the same list as the card's History), newest first, grouped by day. */
+    private LinearLayout historyBox; private com.macdmr.radio.RadioService svc;
+    public void attach(com.macdmr.radio.RadioService s) { svc = s; if (historyBox != null) refreshHistory(); }
+    private void refreshHistory() {
+        final Context c = getContext(); float d = Theme.dp(c);
+        historyBox.removeAllViews();
+        if (isNew || svc == null) { TextView t = Neo.text(c, isNew ? "Once the channel is saved, everything heard and sent on it is listed here." : "Take over the radio to see the history.", Neo.DIM, 13, Neo.uiMedium(c)); t.setPadding((int) (4 * d), (int) (4 * d), (int) (4 * d), 0); historyBox.addView(t); return; }
+        try { ChannelHistoryDialog.fill(c, svc, ch, historyBox, 100, this::refreshHistory); } catch (Throwable t) { historyBox.addView(Neo.text(c, "History not available: " + t.getMessage(), Neo.DIM, 13, Neo.uiMedium(c))); }
     }
 
     /** Nets the owner added to this channel: tap one to edit or delete it, Add a net for another. */

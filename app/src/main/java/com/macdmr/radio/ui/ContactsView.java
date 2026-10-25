@@ -179,6 +179,8 @@ public class ContactsView extends LinearLayout {
                 col.addView(name);
                 LinearLayout l2 = new LinearLayout(c); l2.setGravity(Gravity.CENTER_VERTICAL); l2.setPadding(0, (int) (4 * d), 0, 0); l2.setTag("l2");
                 col.addView(l2);
+                LinearLayout l3 = new LinearLayout(c); l3.setGravity(Gravity.CENTER_VERTICAL); l3.setPadding(0, (int) (4 * d), 0, 0); l3.setTag("l3");   // identity line: callsign, pager, last heard
+                col.addView(l3);
                 row.addView(col, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
                 ImageView msg = new ImageView(c); msg.setTag("msg"); msg.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
                 int sp = (int) (12 * d); msg.setPadding(sp, sp, sp, sp); msg.setClickable(true); msg.setContentDescription("Message");
@@ -196,9 +198,11 @@ public class ContactsView extends LinearLayout {
             LinearLayout l2 = row.findViewWithTag("l2"); l2.removeAllViews();
             l2.addView(Neo.chip(c, TYPES[Math.min(2, Math.max(0, ct.type))], typeColor(ct.type)));
             TextView idv = Neo.text(c, ct.number > 0 ? String.valueOf(ct.number) : "no DMR ID", ct.number > 0 ? Neo.TEXT_SOFT : Neo.DIM, 15, Neo.mono(c)); idv.setPadding((int) (8 * d), 0, (int) (8 * d), 0); l2.addView(idv);
-            if (!ct.callsign.isEmpty()) l2.addView(Neo.chip(c, ct.callsign, Neo.GREEN));
-            if (!ct.rics.isEmpty()) { TextView pg = Neo.chip(c, "PAGER", Neo.AMBER); LayoutParams pl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl.leftMargin = (int) (6 * d); l2.addView(pg, pl); }
-            if (ct.lastTs > 0) { TextView lh = Neo.text(c, "heard " + ContactEditor.ago(ct.lastTs), Neo.DIM, 12, Neo.uiMedium(c)); lh.setPadding((int) (8 * d), 0, 0, 0); l2.addView(lh); }
+            LinearLayout l3 = row.findViewWithTag("l3"); l3.removeAllViews();
+            if (!ct.callsign.isEmpty()) l3.addView(Neo.chip(c, ct.callsign, Neo.GREEN));
+            if (!ct.rics.isEmpty()) { TextView pg = Neo.chip(c, "PAGER", Neo.AMBER); LayoutParams pl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl.leftMargin = ct.callsign.isEmpty() ? 0 : (int) (6 * d); l3.addView(pg, pl); }
+            if (ct.lastTs > 0) { TextView lh = Neo.text(c, "heard " + ContactEditor.ago(ct.lastTs), Neo.DIM, 12, Neo.uiMedium(c)); lh.setPadding(l3.getChildCount() > 0 ? (int) (8 * d) : 0, 0, 0, 0); lh.setSingleLine(true); l3.addView(lh); }
+            l3.setVisibility(l3.getChildCount() > 0 ? VISIBLE : GONE);
             row.findViewWithTag("msg").setVisibility(ct.number > 0 ? VISIBLE : INVISIBLE);
             row.findViewWithTag("msg").setOnClickListener(x -> { if (host != null && ct.number > 0) host.openThread(ct); });
             return v;

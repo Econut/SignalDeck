@@ -298,15 +298,15 @@ public final class ChannelStore extends SQLiteOpenHelper {
         return out;
     }
 
-    /** A channel's own history, newest first: [ts, kind, text, rssi, dmrId]. Captions are left out (they have their own page). */
+    /** A channel's own history, newest first: [ts, kind, text, rssi, dmrId]. Captions (their own page) and car, media, coverage and channel-change events (Last heard's event sections) are left out. */
     public List<Object[]> channelHistory(int number, int limit) {
         List<Object[]> out = new ArrayList<>();
-        try (Cursor c = getReadableDatabase().rawQuery("SELECT ts, kind, text, rssi, dmrId FROM history WHERE channel=? AND kind<>'txt' ORDER BY ts DESC LIMIT " + limit, new String[] { String.valueOf(number) })) {
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT ts, kind, text, rssi, dmrId FROM history WHERE channel=? AND kind NOT IN ('txt','car','media','cov','chan') ORDER BY ts DESC LIMIT " + limit, new String[] { String.valueOf(number) })) {
             while (c.moveToNext()) out.add(new Object[] { c.getLong(0), c.getString(1), c.getString(2), c.getInt(3), c.getInt(4) });
         }
         return out;
     }
-    public int channelHistoryCount(int number) { try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM history WHERE channel=? AND kind<>'txt'", new String[] { String.valueOf(number) })) { return c.moveToFirst() ? c.getInt(0) : 0; } }
+    public int channelHistoryCount(int number) { try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM history WHERE channel=? AND kind NOT IN ('txt','car','media','cov','chan')", new String[] { String.valueOf(number) })) { return c.moveToFirst() ? c.getInt(0) : 0; } }
     /** Removes a channel's history lines except the captions (they have their own page). */
     public void clearChannelHistory(int number) { getWritableDatabase().delete("history", "channel=? AND kind<>'txt'", new String[] { String.valueOf(number) }); }
     /** Per channel, the newest thing heard on it: channel number to [ts, kind, text]. */

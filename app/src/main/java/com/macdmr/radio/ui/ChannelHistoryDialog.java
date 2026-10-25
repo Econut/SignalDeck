@@ -29,9 +29,16 @@ public final class ChannelHistoryDialog {
     private ChannelHistoryDialog() { }
 
     public static void show(Context c, RadioService svc, ChannelStore.Channel ch) {
-        float d = Theme.dp(c);
         LinearLayout body = Neo.sheetBody(c, ch.name);
-        List<Object[]> rows = svc.store().channelHistory(ch.number, 300);
+        final AlertDialog[] self = new AlertDialog[1];
+        fill(c, svc, ch, body, 300, () -> { if (self[0] != null) self[0].dismiss(); });
+        self[0] = Neo.showSheet(c, body);
+    }
+
+    /** Fills {@code body} with the channel's history: summary line, the entries by day, and the Clear button ({@code onCleared} runs after a clear). */
+    public static void fill(Context c, RadioService svc, ChannelStore.Channel ch, LinearLayout body, int limit, Runnable onCleared) {
+        float d = Theme.dp(c);
+        List<Object[]> rows = svc.store().channelHistory(ch.number, limit);
         int total = svc.store().channelHistoryCount(ch.number);
         long lastHeard = 0; String lastWhat = "";
         int voice = 0, texts = 0, tones = 0, ids = 0, pkt = 0, tx = 0;
@@ -67,15 +74,13 @@ public final class ChannelHistoryDialog {
             body.addView(row, lp);
         }
         if (rows.isEmpty()) body.addView(Neo.label(c, "Voice, callers, texts, tones, repeater identifications, packet traffic and your own transmissions on this channel will be listed here.", 0xFFBFC8D0, 14, false));
-        final AlertDialog[] self = new AlertDialog[1];
         if (total > 0) {
             TextView clear = Neo.button(c, "Clear this channel's history", "stop", Neo.RED); clear.setTextSize(14);
             LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); bl.setMargins(0, (int) (12 * d), 0, 0);
             body.addView(clear, bl);
             clear.setOnClickListener(v -> new AlertDialog.Builder(c).setTitle("Clear the history of " + ch.name + "?").setMessage("Captions are kept; everything else heard on this channel is removed.")
-                    .setPositiveButton("Clear", (dd, w) -> { svc.store().clearChannelHistory(ch.number); if (self[0] != null) self[0].dismiss(); }).setNegativeButton("Cancel", null).show());
+                    .setPositiveButton("Clear", (dd, w) -> { svc.store().clearChannelHistory(ch.number); if (onCleared != null) onCleared.run(); }).setNegativeButton("Cancel", null).show());
         }
-        self[0] = Neo.showSheet(c, body);
     }
 
     /** What a history line was, from its kind and wording. */

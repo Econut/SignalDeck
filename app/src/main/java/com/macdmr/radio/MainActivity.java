@@ -126,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
                 if (saved && svc != null) svc.saveChannel(c2, isNew);
                 content.removeView(editor); editor = null; channels.reload();
             });
+            ((com.macdmr.radio.ui.ChannelEditorView) editor).attach(svc);
             content.addView(editor, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         });
         show(0);
