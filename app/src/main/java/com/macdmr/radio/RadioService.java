@@ -489,6 +489,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         @Override public boolean txBusy() { return pttDown; }
         @Override public void transmitPcm(short[] pcm, String label, Runnable onDone) { RadioService.this.transmitPcm(pcm, label, onDone); }
         @Override public void transmitPcmLong(short[] pcm, String label, int maxMs, Runnable onDone) { RadioService.this.transmitPcm(pcm, label, onDone, maxMs); }
+        @Override public boolean tonePath() { return RadioService.this.tonePath(); }
+        @Override public String transmitTones(java.util.List<com.macdmr.radio.ham.ToneQueue.Pair> pairs, int amplitude, String label, Runnable done) { return RadioService.this.transmitTones(pairs, amplitude, label, done); }
         @Override public String longTxWait(int ms) { return thermal.gate(ms); }
         @Override public android.location.Location location() { return lastKnownLocation(); }
         @Override public void stationHeard(String call, double lat, double lon, long ts, String detail) { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactHeard(pc.id, ts, "APRS", detail, lat, lon); }
@@ -2052,6 +2054,67 @@ public class RadioService extends Service implements RadioEngine.Events {
         }
     }
 
+    /** The module's tone queue is usable: a bench image at or after FW22 (ops 10 and 11, and the tone-only key). */
+    public boolean tonePath() { return Firmware.stubTag(moduleVersion) && Firmware.tagNumber(moduleVersion) >= com.macdmr.radio.ham.ToneQueue.FIRST_IMAGE; }
+
+    /**
+     * Plays a pair list through the module's tone queue instead of the audio path: op 3, bodies of op 10 with the
+     * last as op 11, the key after the first body, top-ups while the queue drains, then the module's own end
+     * (FW20) and the host unkey. Returns the reason it cannot start, or null; {@code done} runs after the unkey.
+     */
+    public String transmitTones(final java.util.List<com.macdmr.radio.ham.ToneQueue.Pair> pairs, final int amplitude, final String label, final Runnable done) {
+        if (!tonePath()) return "The module's tone generator needs the bench firmware (FW22 or later)";
+        if (!isReady()) return "Radio not ready";
+        if (txInhibited()) return "Receive-only channel";
+        if (pttDown || m17Tx) return "Already transmitting";
+        if (pairs == null || pairs.isEmpty()) return "Nothing to send";
+        final int ms = com.macdmr.radio.ham.ToneQueue.durationMs(pairs);
+        if (ms > TX_MAX_MS) return "Too long for this radio (" + Math.round(ms / 1000.0) + " s; it allows " + (TX_MAX_MS / 1000) + " s)";
+        if (ms > ThermalGuard.LONG_MS) { String wait = thermal.gate(ms); if (wait != null) return wait; }
+        worker.execute(() -> toneRun(pairs, amplitude, label, done, ms));
+        return null;
+    }
+
+    private void toneRun(java.util.List<com.macdmr.radio.ham.ToneQueue.Pair> pairs, int amplitude, String label, Runnable done, int ms) {
+        boolean keyed = false;
+        try {
+            if (pttDown) { log("tones " + label + " skipped: PTT busy"); return; }
+            Frame rst = sym40(new byte[] { 3 });
+            if (rst == null || rst.sr != 0) { log("tones: no symbol engine"); history("warn", "\u26A0\uFE0F This firmware did not accept a tone-queue reset"); return; }
+            if (ms > ThermalGuard.LONG_MS) thermal.beforeLong();
+            pttDown = true; txStartedAt = System.currentTimeMillis(); refreshControls();
+            if (audio != null) audio.stopRx();
+            java.util.List<byte[]> bodies = com.macdmr.radio.ham.ToneQueue.bodies(amplitude, pairs);
+            for (int i = 0; i < bodies.size(); i++) {
+                byte[] b = bodies.get(i);
+                Frame ack = sym40(b); int tries = 0;
+                while ((ack == null || ack.sr != 0) && tries < 8) { Thread.sleep(40); ack = sym40(b); tries++; }
+                if (ack == null || ack.sr != 0) { log("tones refused at body " + i + " of " + bodies.size()); history("warn", "\u26A0\uFE0F The module refused the tone queue (" + label + ")"); return; }
+                if (!keyed) { engine.ptt(true); keyed = true; log("tone key " + label + " (" + ms + " ms, " + bodies.size() + " bodies)"); }
+                if (i + 1 < bodies.size()) {                                 // top up when the queue is below the mark; the queue only drains while keyed
+                    int spins = 0;
+                    while (spins++ < 2400) { Thread.sleep(50); if (queued() <= com.macdmr.radio.ham.ToneQueue.TOP_UP_AT) break; }
+                }
+            }
+            long deadline = System.currentTimeMillis() + ms + 3000;        // the last pair plays out, then the module drops the carrier itself
+            while (System.currentTimeMillis() < deadline) { Thread.sleep(100); if (queued() == 0) break; }
+            unkeyAfterStop();
+            history("tx", "\uD83D\uDD09 " + label + " through the module's tone generator (" + Math.round(ms / 1000.0) + " s)");
+            if (done != null) done.run();
+        } catch (Throwable t) { log("tones " + label + ": " + t); }
+        finally {
+            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } }
+            pttDown = false; thermal.after(ms); refreshControls();
+            if (rxAudioOn && audio != null) audio.startRx(true);
+        }
+    }
+
+    /** Tone pairs still queued in the module (op 2 with a following byte of 1); 0 when it does not answer. */
+    private int queued() {
+        Frame s = sym40(new byte[] { 2, 1 });
+        return s != null && s.body != null && s.body.length > 1 ? ((s.body[0] & 0xFF) | ((s.body[1] & 0xFF) << 8)) : 0;
+    }
+
     private String m17Call() {
         try { if (packet != null && packet.callsignSet()) return packet.callsign(); } catch (Throwable ignored) { }
         return getSharedPreferences("packet", MODE_PRIVATE).getString("callsign", "");
@@ -2989,6 +3052,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                 @Override public long now() { return System.currentTimeMillis(); }
                 @Override public boolean canTransmit() { ChannelStore.Channel c = current; return c != null && !c.isDigital() && isReady() && !pttDown && !txInhibited(); }
                 @Override public void transmit(short[] pcm, String label, Runnable done) { transmitPcm(pcm, label, done); }
+                @Override public boolean transmitTones(int[] tones, double f0, int leadMs, String label, Runnable done) {
+                    if (!tonePath()) return false;
+                    String e = RadioService.this.transmitTones(com.macdmr.radio.ham.ToneQueue.ft8(tones, f0, leadMs), com.macdmr.radio.ham.ToneQueue.AMPLITUDE, label, done);
+                    if (e != null) log("FT8 tone path not used: " + e);
+                    return e == null;
+                }
                 @Override public String callsign() { return packet != null && packet.callsignSet() ? packet.callsign() : null; }
                 @Override public String grid() { return ft8Grid(); }
                 @Override public void event(String line) { history("pkt", line); }

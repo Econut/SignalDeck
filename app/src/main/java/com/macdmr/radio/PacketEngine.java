@@ -57,6 +57,10 @@ public final class PacketEngine {
         default void transmitPcmLong(short[] pcm, String label, int maxMs, Runnable onDone) { transmitPcm(pcm, label, onDone); }
         /** The cool-down guard's answer for a transmission of {@code ms}: why it must wait, or null. */
         default String longTxWait(int ms) { return null; }
+        /** True when the module's tone generator is there (bench firmware FW22 or later): Morse and RTTY go out through it. */
+        default boolean tonePath() { return false; }
+        /** Plays a pair list through the module's tone generator; the reason it cannot, or null when it is on its way. */
+        default String transmitTones(java.util.List<com.macdmr.radio.ham.ToneQueue.Pair> pairs, int amplitude, String label, Runnable done) { return "no tone path"; }
         Location location();
         void event(String line);                 // a history line / toast on the intercom
         void notifyUser(String title, String text, boolean alert);
@@ -452,6 +456,15 @@ public final class PacketEngine {
     private void sendPart(java.util.List<String> parts, int i, int m, double hz) {
         if (i >= parts.size()) return;
         String p = parts.get(i) + (i == parts.size() - 1 ? " " : "");
+        if (m == 1 && host.tonePath()) {                                     // RTTY through the module's tone generator; PSK31 keeps the audio path (phase reversals are not tones)
+            Runnable next = () -> {
+                if (i + 1 < parts.size()) { try { Thread.sleep(2000); } catch (InterruptedException ignored) { } sendPart(parts, i + 1, m, hz); }
+                else host.event("\u2328 RTTY sent (tone generator): " + String.join(" ", parts));
+            };
+            String e = host.transmitTones(com.macdmr.radio.ham.ToneQueue.rtty(p, hz, 1000), com.macdmr.radio.ham.ToneQueue.AMPLITUDE, "RTTY " + (i + 1) + "/" + parts.size(), next);
+            if (e == null) return;
+            host.event("\u26A0\uFE0F Tone generator not used for RTTY: " + e + "; sent through the audio path");
+        }
         short[] pcm = m == 1 ? com.macdmr.radio.ham.Rtty.encode(p, hz, 1000) : com.macdmr.radio.ham.Psk31.encode(p, hz);
         if (pcm.length > SR * 28) { short[] cut = new short[SR * 28]; System.arraycopy(pcm, 0, cut, 0, cut.length); pcm = cut; }
         host.transmitPcm(pcm, (m == 1 ? "RTTY " : "PSK31 ") + (i + 1) + "/" + parts.size(), () -> {
@@ -662,6 +675,11 @@ public final class PacketEngine {
         if (!callsignSet()) return "Set your callsign first (PKT \u2192 Settings)";
         if (!host.analogRx()) return "Morse needs an analog channel";
         lastCwIdMs = System.currentTimeMillis(); host.identified();
+        if (host.tonePath()) {                                              // bench firmware: the module's tone generator, no audio path, no 1.5 s of lead
+            String e = host.transmitTones(com.macdmr.radio.ham.ToneQueue.morse(callsign(), 20, 800), com.macdmr.radio.ham.ToneQueue.AMPLITUDE, "Morse ID", () -> host.event("\uD83D\uDD24 Sent Morse ID " + callsign() + " (tone generator)"));
+            if (e == null) return null;
+            host.event("\u26A0\uFE0F Tone generator not used for the Morse ID: " + e + "; sent through the audio path");
+        }
         short[] m = com.macdmr.radio.coverage.Morse.pcm(callsign(), 20, 800), pcm = new short[SR * 13 / 10 + m.length];   // the TX path needs ~1.5 s after key-up: silence first, or the first letters are lost
         System.arraycopy(m, 0, pcm, SR * 13 / 10, m.length);
         host.transmitPcm(pcm, "Morse ID", () -> host.event("\uD83D\uDD24 Sent Morse ID " + callsign()));

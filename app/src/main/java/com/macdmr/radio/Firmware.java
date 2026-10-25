@@ -29,6 +29,13 @@ public final class Firmware {
         return version.trim().matches("DMR003\\.(?!UV4T)[A-Za-z0-9]{4}\\.V022");
     }
 
+    /** The number of a bench image ({@code DMR003.FW22.V022} is 22); 0 for stock, an unnumbered bench tag or nothing. */
+    public static int tagNumber(String version) {
+        if (version == null) return 0;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("DMR003\\.FW(\\d{1,2})\\.V022").matcher(version.trim());
+        return m.matches() ? Integer.parseInt(m.group(1)) : 0;
+    }
+
     /** True when the module now reports another version than the stock one (unknown counts as not different). */
     public static boolean differs(String stock, String current) {
         return stock != null && !stock.isEmpty() && current != null && !current.isEmpty() && !stock.equals(current);

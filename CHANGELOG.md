@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Morse, RTTY and FT8 through the module's tone generator (bench firmware)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Review of FW21 (item 3, the host side) | On a bench image at or after FW22 the Morse ID, RTTY and FT8 go out through the module's tone queue (command `0x40` ops 10 and 11: amplitude, then pairs of frequency in eighths of a hertz and duration in milliseconds, bodies of 30 pairs, top-ups while the queue drains, op 11 last so the module ends the transmission itself) instead of the phone's audio path, which removes the audio path's low cut, pre-emphasis and limiter from those modes. Stock firmware, or any refusal before the key, falls back to the audio path with a history line. PSK31 keeps the audio path. The Morse ID no longer needs the 1.5 s lead on the tone path. | `ham/ToneQueue.java` (new), `Firmware.java` (`tagNumber`), `RadioService.java` (`tonePath`, `transmitTones`, `toneRun`), `PacketEngine.java`, `ham/Ft8Station.java`, `ui/HelpView.java` | host: `ToneQueueTest` (body layout against the stub, Morse, RTTY and FT8 timings); device: the bench pass is one Morse ID, one RTTY line and one FT8 CQ decoded from HackRF recordings on FW22+, and the FT8 DT measured, since the tone path's latency from command to carrier is not the audio path's 320 ms |
+
 ## 2026-10-25 — Long SSTV modes with the cool-down guard
 
 | Backlog | Change | Files | Test |
