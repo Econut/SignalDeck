@@ -15,6 +15,13 @@ import java.util.logging.Logger;
  * Streaming wrapper around {@link HeldPath#live}. The receive thread only appends samples. Each pass searches every
  * sync chain after the last one consumed, skips the module's muted PCM, and drops audio up to the last decoded frame.
  * A transmission opens only from a link-setup CRC or six LICH chunks, so squelch noise does not become a second contact.
+ *
+ * Three rules keep a call whole (R-I, 2026-10-25): while a call is open the audio of every frame already given to
+ * the listener is dropped from the buffer (keeping {@link #KEEP} samples for the filters' past), so a call is never
+ * cut by the buffer cap; a frame whose end sits within {@link #EDGE} samples of the newest audio is left for the
+ * next pass while audio is still arriving, because the equaliser and the matched filter would see zeros past it;
+ * and a lost sync does not end the call by itself, only the end bit or a second of silence does, so a short dropout
+ * is bridged when the sync comes back.
  */
 public final class HeldPathReceiver {
     public interface Listener {
@@ -28,11 +35,14 @@ public final class HeldPathReceiver {
     private static final Logger LOG = Logger.getLogger("HeldPath");
     private static final int CAP = 20 * 8000;
     private static final int KEEP = 800;
+    /** 8 kHz samples a frame must end before the newest audio while it is still arriving: the equaliser's 20 symbols past the frame (200 samples at 48 kHz) and the pulse span, with room. */
+    static final int EDGE = 80;
+    private static final long QUIET_MS = 1000;
+
     private final double[] taps;
     private final Listener listener;
     private final short[] buf = new short[CAP];
-    private final byte[][] chunks = new byte[6][];
-    private int len, ignore;
+    private int len, ignore, lastN;
     private boolean open, stop, lsfSent;
     private int frames, good, emitted;
     private long lastEmit;
@@ -64,19 +74,18 @@ public final class HeldPathReceiver {
 
     /** One decode of whatever is buffered. The background thread calls this; tests call it after {@link #feed}. */
     void poll() {
-        short[] snap; int from;
+        short[] snap; int from; boolean growing;
         synchronized (buf) {
-            if (len - ignore < 400) { snap = null; from = ignore; }
+            growing = len > lastN; lastN = len;
+            if (len - ignore < 800) { snap = null; from = ignore; }        // the search wants at least 100 ms past the resume point
             else { snap = Arrays.copyOf(buf, len); from = ignore; }
         }
         if (snap == null) {
-            if (open && System.currentTimeMillis() - lastEmit > 1000) finish("signal lost");
+            if (open && System.currentTimeMillis() - lastEmit > QUIET_MS) finish("signal lost");
             return;
         }
-        // Each pass decodes the whole unconsumed buffer. Advancing through an open call would start the
-        // next pass mid-frame and drop the frames a partial slice cannot hold.
-        HeldPath.Live live = HeldPath.live(snap, snap.length, taps, from);
-        take(live, snap.length);
+        HeldPath.Live live = HeldPath.live(snap, snap.length, taps, from, open);
+        take(live, snap.length, growing);
     }
 
     public void stop() { stop = true; if (thread != null) thread.interrupt(); finish("stopped"); }
@@ -90,38 +99,40 @@ public final class HeldPathReceiver {
         }
     }
 
-    private void take(HeldPath.Live live, int n) {
-        int resume = live.resume8;
-        boolean endBit = false;
+    private void take(HeldPath.Live live, int n, boolean growing) {
+        boolean endBit = false, heldBack = false;
         long now = System.currentTimeMillis();
-        int added = 0;
-        int index = 0;
+        int added = 0, index = 0, lastEnd8 = -1;
+        outer:
         for (List<HeldPath.FrameHit> chain : live.chains) {
             M17.Lsf id = identity(chain);
             if (!open) {
                 if (id == null) continue;
-                open = true; frames = 0; good = 0; emitted = 0; lsfSent = true; Arrays.fill(chunks, null); lastEmit = now;
+                open = true; frames = 0; good = 0; emitted = 0; lsfSent = true; lastEmit = now;
                 listener.started(id); added++;
             } else if (id != null && !lsfSent) { lsfSent = true; listener.link(id); }
             for (HeldPath.FrameHit h : chain) {
                 if (h.stream == null) continue;
+                int end8 = live.origin8 + (h.syncAt + 192 * HeldPath.SPS) / 6;
                 if (index >= emitted) {
+                    if (growing && end8 + EDGE > n) { heldBack = true; break outer; }   // its filters would see zeros past the newest audio: next pass
                     frames++;
                     if (h.stream.lich != null && h.stream.lichErrors <= 2) good++;
                     listener.frame(h.stream, Math.max(0f, Math.min(1f, h.score)));
                     added++; lastEmit = now;
                     endBit = h.stream.last();
+                    lastEnd8 = end8;
                 }
                 index++;
             }
         }
         if (index > emitted) emitted = index;
-        // A decoded end bit only closes the contact once the next sync is actually gone. A bad frame
-        // can set the bit in the middle of a transmission, and the rest of that transmission is still audio.
-        if (endBit && live.closed) { finish("last frame"); return; }
-        if (live.closed && open) { finish("signal lost"); return; }
-        if (!open) advance(resume, n);
-        else if (added == 0 && now - lastEmit > 1000) finish("signal lost");
+        if (!open) { advance(live.resume8, n); return; }
+        // The end bit closes the call once nothing more of it is waiting: a bad frame can set the bit mid-call,
+        // and the rest of that transmission is still audio.
+        if (endBit && !heldBack) { finish("last frame"); return; }
+        if (lastEnd8 > 0) { consumed(lastEnd8); return; }                  // the call goes on: drop what the listener already has
+        if (added == 0 && now - lastEmit > QUIET_MS) finish("signal lost");  // a lost sync alone does not end the call; silence does
     }
 
     /** The chain's link setup, from its LSF or from six LICH chunks. Null when neither checks. */
@@ -145,22 +156,34 @@ public final class HeldPathReceiver {
     /** Drop audio the search has finished with, keeping {@link #KEEP} samples so the next frame's filter has a past. */
     private void advance(int resume8, int n) {
         int end = Math.max(ignore, Math.min(resume8, n));
+        synchronized (buf) { cut(end); }
+    }
+
+    /** During a call: everything before the end of the last frame the listener has is done with; the next pass starts there. */
+    private void consumed(int end8) {
         synchronized (buf) {
-            int drop = end - KEEP;
-            if (drop <= 0) { ignore = end; return; }
-            if (drop >= len) { len = 0; ignore = 0; return; }
-            System.arraycopy(buf, drop, buf, 0, len - drop);
-            len -= drop;
-            ignore = Math.min(KEEP, len);
+            int end = Math.max(ignore, Math.min(end8, len));
+            cut(end);
+            emitted = 0;                                                   // the frames before the cut are gone from the buffer
+            lastN = len;
         }
+    }
+
+    private void cut(int end) {
+        int drop = end - KEEP;
+        if (drop <= 0) { ignore = end; return; }
+        if (drop >= len) { len = 0; ignore = 0; return; }
+        System.arraycopy(buf, drop, buf, 0, len - drop);
+        len -= drop;
+        ignore = Math.min(KEEP, len);
     }
 
     private void finish(String why) {
         int f, g;
         synchronized (buf) {
-            if (!open) { len = 0; ignore = 0; return; }
+            if (!open) { len = 0; ignore = 0; lastN = 0; return; }
             open = false; f = frames; g = good; frames = 0; good = 0; emitted = 0; lsfSent = false;
-            len = 0; ignore = 0;
+            len = 0; ignore = 0; lastN = 0;
         }
         listener.ended(f, g, why);
     }

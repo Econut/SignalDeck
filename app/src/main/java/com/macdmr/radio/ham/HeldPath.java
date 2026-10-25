@@ -20,6 +20,8 @@ import java.util.List;
 public final class HeldPath {
     public static final int TAPS = 41;
     static final int L = 20, SPS = 10;
+    /** 8 kHz samples of past context the live search keeps before its resume point (the equaliser's 20 symbols either side, the pulse span, and room). */
+    static final int PAST = 400;
     static final double THRESH = 0.95, LOST = 0.6;
     private static final double[] RRC = rrc(0.5, 8, SPS);
     private static final double[] SYNC_LSF = sync(M17.SYNC_LSF), SYNC_STR = sync(M17.SYNC_STR);
@@ -223,17 +225,28 @@ public final class HeldPath {
     static final class Live {
         final List<List<FrameHit>> chains;
         final int resume8;
+        /** The 8 kHz sample of {@code pcm} the hits' 48 kHz positions count from (the muted head skipped). */
+        final int origin8;
         /** The walk stopped because the next sync fell below the hold threshold, not because the buffer ran out. */
         final boolean closed;
-        Live(List<List<FrameHit>> chains, int resume8, boolean closed) {
-            this.chains = chains; this.resume8 = resume8; this.closed = closed;
+        Live(List<List<FrameHit>> chains, int resume8, boolean closed) { this(chains, resume8, closed, 0); }
+        Live(List<List<FrameHit>> chains, int resume8, boolean closed, int origin8) {
+            this.chains = chains; this.resume8 = resume8; this.closed = closed; this.origin8 = origin8;
         }
     }
 
-    static Live live(short[] pcm, int n, double[] taps, int from) {
+    static Live live(short[] pcm, int n, double[] taps, int from) { return live(pcm, n, taps, from, false); }
+
+    /**
+     * {@code inCall}: the receiver is already following a transmission, so a chain found here is part of it even
+     * before its link setup or six LICH chunks have been seen again, and the filters get {@link #PAST} samples of
+     * context before {@code from} instead of a cold start at the cut.
+     */
+    static Live live(short[] pcm, int n, double[] taps, int from, boolean inCall) {
         if (taps == null || taps.length != TAPS) throw new IllegalArgumentException("taps");
         if (from < 0) from = 0;
-        if (from >= n || n - from < 800) return new Live(new ArrayList<List<FrameHit>>(), n, false);
+        if (from >= n) return new Live(new ArrayList<List<FrameHit>>(), n, false);
+        if (n - from < 800) return new Live(new ArrayList<List<FrameHit>>(), from, false);   // too little new audio to search: keep it for the next pass (a pass that returned n here threw away up to 100 ms per poll)
         // The saved clips, and a transmission with the 1.6 s lead, have a loud head before the link
         // setup. Skip it only while the resume point is still in the mute. Once audio is loud, trimming
         // again would drop the next frames.
@@ -245,6 +258,10 @@ public final class HeldPath {
             if (loud > origin) origin = loud;
         }
         if (origin >= n) return new Live(new ArrayList<List<FrameHit>>(), n, false);
+        // Past context for the matched filter and the equaliser (20 symbols either side): the search itself
+        // still starts at the resume point, so frames before it are not found twice.
+        int pad = mute ? 0 : Math.min(origin, PAST);
+        origin -= pad;
         short[] part = java.util.Arrays.copyOfRange(pcm, origin, n);
         // No per-slice mean: a poll that sees only part of the transmission would shift the level and
         // drop sync in the middle of a call. The sign matches the bench clips.
@@ -253,7 +270,7 @@ public final class HeldPath {
         double[] y = equalise(matched(resample6(x)), taps);
         List<List<FrameHit>> chains = new ArrayList<List<FrameHit>>();
         int limit = y.length - 8 * SPS;
-        int from48 = 0;
+        int from48 = pad * 6;
         int resume = n;
         boolean closed = false;
         while (from48 < limit) {
@@ -273,7 +290,7 @@ public final class HeldPath {
                 double sc = score(y, pos, lsf ? SYNC_LSF : SYNC_STR, lsf ? SS_LSF : SS_STR);
                 if (lsf) chain.add(new FrameHit(pos, (float) sc, M17.decodeLsf(pay, 0), null));
                 else chain.add(new FrameHit(pos, (float) sc, null, M17.decodeStream(pay, 0)));
-                if (chain.size() >= 8 && !identified(chain)) { abandoned = true; chain.clear(); break; }
+                if (chain.size() >= 8 && !inCall && !identified(chain)) { abandoned = true; chain.clear(); break; }
                 end48 = pos + 192 * SPS;
                 int nxt = end48;
                 double best = -1; int bp = nxt; boolean bl = false;
@@ -306,9 +323,9 @@ public final class HeldPath {
             resume = origin + from48 / 6;
             // A false sync before the transmission is unidentified and the search continues. Once a real
             // transmission loses sync, the rest of this buffer is not more of that contact.
-            if (closed && identified(chain)) { resume = n; break; }
+            if (closed && (inCall || identified(chain))) { resume = n; break; }
         }
-        return new Live(chains, resume, closed);
+        return new Live(chains, resume, closed, origin);
     }
 
     /** First sync at or after {@code from48}. Returns {index, 0 lsf / 1 stream}, or null. */

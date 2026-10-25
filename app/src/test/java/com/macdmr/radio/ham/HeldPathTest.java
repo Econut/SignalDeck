@@ -119,11 +119,12 @@ public class HeldPathTest {
             short[] audio = withMutedHead(pcm, 3 * 8000);
             final List<String> started = new java.util.ArrayList<String>();
             final List<String> ended = new java.util.ArrayList<String>();
-            final int[] streams = new int[1];
+            final int[] streams = new int[3];                               // frames, LICH-good frames, frame-number steps backwards
+            final int[] prevFn = { -1 };
             HeldPathReceiver rx = new HeldPathReceiver(taps, new HeldPathReceiver.Listener() {
                 public void started(M17.Lsf l) { started.add(l.crcOk + " " + l.src() + " " + l.dst()); }
                 public void link(M17.Lsf l) { started.add("link " + l.src()); }
-                public void frame(M17.Stream s, float q) { streams[0]++; }
+                public void frame(M17.Stream s, float q) { streams[0]++; if (s.lich != null) streams[1]++; int fn = s.fn & 0x7FFF; if (fn <= prevFn[0]) streams[2]++; prevFn[0] = fn; }
                 public void ended(int frames, int good, String why) { ended.add(why + " " + frames); }
             }, false);
             byte[] block = new byte[512 * 2];
@@ -137,11 +138,13 @@ public class HeldPathTest {
             }
             rx.poll();
             for (int w = 0; ended.isEmpty() && w < 3; w++) { Thread.sleep(1100); rx.poll(); }
-            int want = REF.get(name)[0];
-            System.out.printf("live %-18s started %s frames %d ended %s%n", name, started, streams[0], ended);
+            int want = REF.get(name)[0];                                     // what the batch decoder got: the floor; the bench transmissions are under 80 frames
+            System.out.printf("live %-18s started %s frames %d (lich-good %d, backwards %d) ended %s%n", name, started, streams[0], streams[1], streams[2], ended);
             assertEquals(name + " started " + started, 1, started.size());
             assertEquals(name + " callsigns", "true " + c.getString("src") + " " + c.getString("dst"), started.get(0));
-            assertTrue(name + " frames " + streams[0] + " / " + want, streams[0] >= Math.ceil(0.95 * want) && streams[0] <= want);
+            assertTrue(name + " frames " + streams[0] + " / " + want, streams[0] >= Math.ceil(0.95 * want) && streams[0] <= 80);
+            assertTrue(name + " real frames: LICH decoded on " + streams[1] + " of " + streams[0], streams[1] >= 0.8 * streams[0]);   // noise cannot fake a Golay-decodable LICH on four in five
+            assertTrue(name + " frame numbers climb (" + streams[2] + " steps back)", streams[2] <= 3);                             // a corrupted frame number now and then, never a replay
             assertEquals(name + " ended " + ended, 1, ended.size());
             rx.stop();
         }
