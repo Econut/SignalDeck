@@ -489,6 +489,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         @Override public boolean txBusy() { return pttDown; }
         @Override public void transmitPcm(short[] pcm, String label, Runnable onDone) { RadioService.this.transmitPcm(pcm, label, onDone); }
         @Override public android.location.Location location() { return lastKnownLocation(); }
+        @Override public void stationHeard(String call, double lat, double lon, long ts, String detail) { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactHeard(pc.id, ts, "APRS", detail, lat, lon); }
+        @Override public void sentTo(String call, String source, String detail) { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactSent(pc.id, System.currentTimeMillis(), source, detail); }
         @Override public void event(String line) { history("pkt", line); }
         @Override public void notifyUser(String title, String text, boolean alert) { RadioService.this.notifyUser(title, text, alert); }
         @Override public int rssiDbm() { return rssi; }
@@ -1601,6 +1603,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (pttDown) return;
                     pttDown = true; refreshControls();
                     txChannel = current; txInCar = inCar; txCharging = charging(); txDropNoted = false; txStartedAt = System.currentTimeMillis();
+                    try { ChannelStore.Channel tc = current; if (tc != null && tc.isDigital() && tc.txContact > 0) { ChannelStore.Contact pc = store.contactByNumber(tc.txContact, tc.contactType == 0 ? 0 : 1); if (pc != null) store.contactSent(pc.id, txStartedAt, "DMR voice", "on " + tc.name); } } catch (Throwable e) { }
                     idTimerOnKey();
                     if (audio != null) audio.stopRx();              // never play the RX stream while the mic is live (feedback)
                     boolean carMic = webFeed == null && (fromCall || (inCar && carMic() && !fromWheel && startBluetoothMic()));   // a talk call: Telecom has opened the car's link   // not for the wheel's Next: the hands-free link turns the wheel into call controls and the stop press never arrives   // in the car: its microphone, through the hands-free link
@@ -2277,6 +2280,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         String t = (type == 1 ? "TG " + target : type == 2 ? "All call" : "Private") ;
         String who = callerName(caller);
         history("dmr", "📻 Voice RX " + t + " from " + (who.isEmpty() ? String.valueOf(caller) : who + " (" + caller + ")"));
+        try { ChannelStore.Contact pc = store.contactByNumber(caller, 0); if (pc != null) store.contactHeard(pc.id, System.currentTimeMillis(), "DMR voice", t + (current != null ? " on " + current.name : ""), Double.NaN, Double.NaN); } catch (Throwable e) { }
         if (logHeard()) { RadioIdStore.Record rr = radioId != null ? radioId.lookup(caller) : null; ChannelStore.Channel lc = current; if (rr != null && rr.callsign != null && !rr.callsign.isEmpty()) try { logbook().heard(rr.callsign, lc != null ? lc.rxFreq : 0, "DMR", rr.first, t + ", DMR ID " + caller); enrichCall(rr.callsign, null); } catch (Throwable x) { log("logbook: " + x); } }
         ui.post(() -> { for (Listener l : listeners) l.onCaller((who.isEmpty() ? "ID " + caller : who + "  " + caller) + "  " + t); });
         if (voiceOn() && !who.isEmpty()) say(who.split(" ")[0]);
@@ -2327,6 +2331,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         else if (group) t = 1;                                                // no talkgroup to file it under: the sender, marked as a group text
         log("text received: type " + type + (group ? " (talkgroup " + peer + ")" : " (private)") + " from " + fromId);
         store.addMessage(peer, t, false, text, 1, sender);
+        try { ChannelStore.Contact pc = store.contactByNumber(fromId, 0); if (pc != null) store.contactHeard(pc.id, System.currentTimeMillis(), "DMR text", text, Double.NaN, Double.NaN); } catch (Throwable e) { }
         String who = callerName(fromId); if (who == null || who.isEmpty()) who = String.valueOf(fromId);
         String nm = t == 1 ? talkgroupName(peer) + (sender > 0 ? " \u00B7 " + who : "") : who;
         CarMessages.dmr(this, peer, t, nm, text);   // the phone and Android Auto (read aloud, voice reply to the thread)
@@ -2347,6 +2352,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Send a DMR text to a contact (private / group / all) over the current digital channel. */
     public void sendSms(final ChannelStore.Contact to, final String text) {
         final long id = store.addMessage(to.number, to.type, true, text, 0);
+        try { ChannelStore.Contact pc = to.id > 0 ? to : store.contactByNumber(to.number, to.type); if (pc != null) store.contactSent(pc.id, System.currentTimeMillis(), "DMR text", text); } catch (Throwable e) { }
         worker.execute(() -> {
             try {
                 int msgType = to.type == 1 ? 3 : to.type == 2 ? 2 : 1;
@@ -2897,7 +2903,11 @@ public class RadioService extends Service implements RadioEngine.Events {
     public synchronized M17Station m17() {
         if (m17 == null) m17 = new M17Station(this, profile != null ? profile.id : "unknown", new M17Station.Host() {
             @Override public void event(String line) { history("pkt", line); }
-            @Override public void heard(String call) { if (call != null && !call.isEmpty() && !call.startsWith("@") && !call.startsWith("#")) logHeardStation(call, "M17", "M17"); }
+            @Override public void heard(String call) {
+                if (call == null || call.isEmpty() || call.startsWith("@") || call.startsWith("#")) return;
+                logHeardStation(call, "M17", "M17");
+                try { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactHeard(pc.id, System.currentTimeMillis(), "M17", current != null ? "on " + current.name : "", Double.NaN, Double.NaN); } catch (Throwable e) { }
+            }
             @Override public void changed() { ui.post(() -> pushModes()); }
             @Override public void voice(short[] pcm) {                       // SignalDeck Web listeners hear the decoded voice (the radio's own audio is held back)
                 com.macdmr.radio.web.WebHost w = web; if (w == null || muted) return;

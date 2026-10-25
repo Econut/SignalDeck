@@ -540,6 +540,8 @@ public final class PktDialog {
         LinearLayout body = page("⚙️  APRS & packet settings");
         final EditText call = field(body, "Your callsign", p.getString("callsign", ""), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
         final EditText ssid = field(body, "SSID (0–15; 7 = handheld, 9 = mobile)", String.valueOf(pe.ssid()), InputType.TYPE_CLASS_NUMBER);
+        final EditText myRics = field(body, "Your pager RICs (POCSAG; one or more, e.g. 1234567; 1234568)", com.macdmr.radio.Station.ricText(c), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        body.addView(hint("Your callsign, SSID and RICs are your one station identity: APRS and M17 send under the callsign, pages you send carry it as the sender tag, and the pager page listens for your RICs."));
         final EditText sym = field(body, "Symbol (table + code, e.g. /[ person, /> car, /- house)", p.getString("symTable", "/") + p.getString("symCode", "["), InputType.TYPE_CLASS_TEXT);
         final EditText comment = field(body, "Beacon comment", pe.comment(), InputType.TYPE_CLASS_TEXT);
         final EditText path = field(body, "Digipeater path", p.getString("path", "WIDE1-1,WIDE2-1"), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
@@ -603,6 +605,7 @@ public final class PktDialog {
                         .putInt("txLeadMs", PacketEngine.LEAD_CHOICES[lead[0]]).putInt("txLeadKind", kind[0]).putInt("txPower", power[0] == 1 ? 0 : 1).putInt("autoBeacon", auto[0]).putInt("beaconMin", Math.max(1, Integer.parseInt(bMin.getText().toString().trim())))
                         .putBoolean("telemetry", extra[0]).putBoolean("weather", extra[1]).putBoolean("txIgate", extra[2]).putString("groups", groups.getText().toString().trim().toUpperCase(Locale.US))
                         .putBoolean("autoAck", flags[0]).putBoolean("digipeat", flags[1]).putBoolean("dtmf", flags[2]).putBoolean("wx", flags[3]).putBoolean("cw", flags[4]).putBoolean("cwId", flags[5]).apply();
+                com.macdmr.radio.Station.setRics(c, myRics.getText().toString());
                 pe.applySettings();
                 toast("Saved"); sub.dismiss();
             } catch (NumberFormatException e) { toast("Check the numbers"); }

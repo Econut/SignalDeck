@@ -117,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
         });
         contacts = new com.macdmr.radio.ui.ContactsView(this);
         messages = new com.macdmr.radio.ui.MessagesView(this);
-        contacts.setHost(ct -> { show(3); messages.openThread(ct); });
+        contacts.setHost(this::openThread);
         channels = new com.macdmr.radio.ui.ChannelsView(this);
         channels.setHost((ch, isNew) -> {
             final ChannelStore.Channel target = isNew ? new ChannelStore.Channel() : ch;
@@ -210,6 +210,9 @@ public class MainActivity extends AppCompatActivity {
                 .setItems(names, (d, w) -> { ChannelStore.Channel ch = all.get(w); ch.lat = p[0]; ch.lon = p[1]; svc.saveChannel(ch, false); android.widget.Toast.makeText(this, ch.name + ": location set", android.widget.Toast.LENGTH_LONG).show(); })
                 .setNegativeButton("Cancel", null).show();
     }
+
+    /** The DMR text thread of a contact (the Contacts page, a contact sheet opened from any identity). */
+    public void openThread(com.macdmr.radio.ChannelStore.Contact ct) { show(3); messages.openThread(ct); }
 
     private void show(int idx) {
         tab = idx;

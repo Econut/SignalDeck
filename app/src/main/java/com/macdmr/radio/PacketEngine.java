@@ -65,6 +65,10 @@ public final class PacketEngine {
         void logHeard(String call, String mode, String note);
         /** The station identified (a Morse ID went out): restarts the ten-minute ID timer. */
         void identified();
+        /** An APRS packet from {@code call} (with its position when it had one): the contact history. */
+        default void stationHeard(String call, double lat, double lon, long ts, String detail) { }
+        /** Something went out to {@code call} (an APRS message): the contact history. */
+        default void sentTo(String call, String source, String detail) { }
     }
 
     public static final int TX_LEAD_MS = 1600, TX_REPS = 2, TX_GAP_MS = 250;
@@ -868,6 +872,7 @@ public final class PacketEngine {
                 if (!p.isValid) { host.event("📡 " + Ax25.tnc2(frame)); continue; }
                 host.logHeard(from, "PKT", "APRS");
                 long now = System.currentTimeMillis();
+                try { host.stationHeard(from, p.hasPosition ? p.latitude : Double.NaN, p.hasPosition ? p.longitude : Double.NaN, now, p.isMessage() ? "message" : p.hasPosition ? "position" : p.status != null ? "status" : "packet"); } catch (Throwable t) { }
                 if (p.hasPosition) { store.storeStation(p, now); store.log("pos", from, p.destCallsign, APRSPacketDecoder.describe(p), null, false); }
                 if (p.isMessage()) messageReceived(p, from);
                 else if (p.status != null) store.log("status", from, p.destCallsign, p.status, null, false);
@@ -1021,7 +1026,7 @@ public final class PacketEngine {
         final int id = prefs.getInt("msgId", 0) % 999 + 1; prefs.edit().putInt("msgId", id).apply();
         final String addressee = to.trim().toUpperCase(Locale.US);
         txInfo(Ax25.messageInfo(addressee, text.trim(), id), path(), "APRS message to " + addressee, TX_REPS,
-                () -> { store.log("msg-tx", myCall(), addressee, text.trim(), String.valueOf(id), false); host.event("📡 Sent to " + addressee + ": " + text.trim()); });
+                () -> { store.log("msg-tx", myCall(), addressee, text.trim(), String.valueOf(id), false); host.event("📡 Sent to " + addressee + ": " + text.trim()); try { host.sentTo(addressee, "APRS message", text.trim()); } catch (Throwable t) { } });
         return null;
     }
 

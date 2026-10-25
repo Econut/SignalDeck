@@ -1555,16 +1555,36 @@ public final class WebHost {
             }
             case "/api/contacts": {
                 if (post) {                                                     // create or update {id?, name, number, type}
-                    ChannelStore.Contact ct = new ChannelStore.Contact();
-                    ct.id = b.optLong("id", 0); ct.name = b.optString("name", "").trim(); ct.number = b.optInt("number", 0); ct.type = b.optInt("type", 0);
-                    if (ct.number <= 0 || ct.number > 0xFFFFFF) return WebServer.Response.error(400, "The DMR ID must be 1 to 16777215");
+                    ChannelStore.Contact ct = b.optLong("id", 0) > 0 ? svc.store().contactById(b.optLong("id", 0)) : new ChannelStore.Contact();
+                    if (ct == null) return WebServer.Response.error(404, "No such contact");
+                    ct.name = b.optString("name", "").trim(); ct.number = b.optInt("number", 0); ct.type = b.optInt("type", 0);
+                    String cs = b.optString("callsign", ct.callsign).trim().toUpperCase(java.util.Locale.US);
+                    if (!cs.isEmpty() && !cs.matches("[A-Z0-9]{1,9}(-[0-9]{1,2})?")) return WebServer.Response.error(400, "Callsign: letters and digits, an optional -SSID");
+                    if (!cs.equals(ct.callsign)) ct.callsignAuto = 2;
+                    ct.callsign = cs; ct.rics = ChannelStore.ricText(ChannelStore.parseRics(b.optString("rics", ct.rics))); ct.notes = b.optString("notes", ct.notes).trim(); ct.homeLabel = b.optString("homeLabel", ct.homeLabel).trim();
+                    if (b.has("home")) { String h = b.optString("home", "").trim(); double[] hp = h.isEmpty() ? null : com.macdmr.radio.ui.ContactEditor.parseLocation(h); if (!h.isEmpty() && hp == null) return WebServer.Response.error(400, "Home: a grid square or latitude, longitude"); ct.homeLat = hp == null ? Double.NaN : hp[0]; ct.homeLon = hp == null ? Double.NaN : hp[1]; }
+                    if (ct.number < 0 || ct.number > 0xFFFFFF) return WebServer.Response.error(400, "The DMR ID must be 1 to 16777215");
+                    if (ct.number == 0 && ct.callsign.isEmpty() && ct.rics.isEmpty()) return WebServer.Response.error(400, "A contact needs a DMR ID, a callsign or a pager RIC");
                     if (ct.type < 0 || ct.type > 2) return WebServer.Response.error(400, "type: 0 private, 1 group, 2 all");
+                    if (ct.name.isEmpty()) ct.name = !ct.callsign.isEmpty() ? ct.callsign : ct.number > 0 ? "ID " + ct.number : "RIC " + ct.rics;
                     if (ct.id > 0) svc.store().updateContact(ct); else svc.store().insertContact(ct);
                     return ok("Saved " + (ct.name.isEmpty() ? String.valueOf(ct.number) : ct.name));
                 }
                 JSONArray a = new JSONArray();
-                for (ChannelStore.Contact ct : svc.store().contacts()) a.put(new JSONObject().put("id", ct.id).put("name", ct.name).put("number", ct.number).put("type", ct.type));
+                for (ChannelStore.Contact ct : svc.store().contacts()) {
+                    JSONObject o = new JSONObject().put("id", ct.id).put("name", ct.name).put("number", ct.number).put("type", ct.type)
+                            .put("callsign", ct.callsign).put("rics", ct.rics).put("notes", ct.notes).put("homeLabel", ct.homeLabel).put("lastTs", ct.lastTs).put("lastSource", ct.lastSource);
+                    if (ct.hasHome()) o.put("homeLat", ct.homeLat).put("homeLon", ct.homeLon);
+                    if (ct.hasLast()) o.put("lastLat", ct.lastLat).put("lastLon", ct.lastLon);
+                    a.put(o);
+                }
                 return ok(new JSONObject().put("contacts", a));
+            }
+            case "/api/contacts/history": {                                 // ?id=N: the contact's heard/sent history, newest first
+                long id = b.optLong("id", 0); if (id <= 0) id = parse(r.param("id"), 0);
+                JSONArray a = new JSONArray();
+                for (ChannelStore.Heard h : svc.store().contactHeard(id, 200)) { JSONObject o = new JSONObject().put("ts", h.ts).put("source", h.source).put("detail", h.detail).put("sent", h.sent); if (h.hasPosition()) o.put("lat", h.lat).put("lon", h.lon); a.put(o); }
+                return ok(new JSONObject().put("history", a));
             }
             case "/api/contacts/delete": if (!post) break; {
                 long id = b.optLong("id", 0);

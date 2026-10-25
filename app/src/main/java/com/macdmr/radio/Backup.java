@@ -75,6 +75,7 @@ public final class Backup {
             w.write(CONTACTS_HEADER + "\r\n");
             java.util.HashSet<String> seen = new java.util.HashSet<>();
             for (ChannelStore.Contact c : contacts) {
+                if (c.number <= 0) continue;                                 // callsign- or pager-only contacts: SignalDeck_Extras.csv carries them
                 String row = q(c.name) + "," + c.number + "," + (c.type == 0 ? "Private" : c.type == 1 ? "Group" : "All Call") + ",-";
                 if (seen.add(row)) w.write(row + "\r\n");
             }
@@ -146,6 +147,7 @@ public final class Backup {
             }
             for (com.macdmr.radio.ham.NetFinder.Manual m : store.nets())
                 w.write(m.channel + "," + q(nameOf(channels, m.channel)) + ",net," + q(line(m.name)) + "," + m.days + "," + String.format(Locale.US, "%02d:%02d", m.minute / 60, m.minute % 60) + "," + m.durationMin + "," + q(line(m.notes)) + "\r\n");
+            for (ChannelStore.Contact ct : contacts) if (hasExtras(ct)) w.write(contactRow(ct) + "\r\n");   // callsign, RICs, notes, home location (never the module's table)
         }
         try (Writer w = writer(new File(dir, "DTMF.csv"))) { w.write("Contact Name,Code\r\n"); if (dtmf != null) for (Map.Entry<String, String> e : dtmf.entrySet()) w.write(q(e.getKey()) + "," + q(e.getValue()) + "\r\n"); }
         return dir;
@@ -153,6 +155,22 @@ public final class Backup {
 
     /** SignalDeck's extra file in a backup folder: channel notes and the nets held on channels, by channel number. */
     public static final String EXTRAS = "SignalDeck_Extras.csv";
+    /** A contact needs an extras row when it carries anything the CPS layout cannot: no DMR ID, a callsign, RICs, notes or a home location. */
+    static boolean hasExtras(ChannelStore.Contact ct) { return ct.number <= 0 || !ct.callsign.isEmpty() || !ct.rics.isEmpty() || !ct.notes.isEmpty() || ct.hasHome() || !ct.homeLabel.isEmpty(); }
+    /** Extras row of a contact: number, name, "contact", callsign, RICs, home (lat|lon|label), type, notes. */
+    static String contactRow(ChannelStore.Contact ct) {
+        String home = (ct.hasHome() ? String.format(Locale.US, "%.6f|%.6f|", ct.homeLat, ct.homeLon) : "||") + line(ct.homeLabel);
+        return ct.number + "," + q(ct.name) + ",contact," + q(ct.callsign) + "," + q(ct.rics) + "," + q(home) + "," + ct.type + "," + q(line(ct.notes));
+    }
+    /** The identity fields of an extras row onto a contact (number, name and type are matched by the caller). */
+    static void applyContactRow(ChannelStore.Contact ct, List<String> r) {
+        ct.callsign = col(r, 3).toUpperCase(Locale.US); ct.rics = ChannelStore.ricText(ChannelStore.parseRics(col(r, 4))); ct.notes = unline(col(r, 7));
+        if (!ct.callsign.isEmpty()) ct.callsignAuto = 2;
+        String[] h = col(r, 5).split("\\|", -1);
+        ct.homeLat = Double.NaN; ct.homeLon = Double.NaN; ct.homeLabel = "";
+        if (h.length >= 3) { try { if (!h[0].isEmpty() && !h[1].isEmpty()) { ct.homeLat = Double.parseDouble(h[0]); ct.homeLon = Double.parseDouble(h[1]); } } catch (Exception e) { } ct.homeLabel = unline(h[2]); }
+        else ct.homeLabel = unline(col(r, 5));
+    }
     static final String EXTRAS_HEADER = "Channel Number,Channel Name,Kind,Name,Days,Start,Minutes,Notes";
     /** One CSV line per value: newlines become \\n (the reader is line based). */
     private static String line(String s) { return s == null ? "" : s.replace("\\", "\\\\").replace("\r", "").replace("\n", "\\n"); }
@@ -369,13 +387,22 @@ public final class Backup {
             zs.add(z);
         }
         int keep = store.activeNumber();
-        int extraNotes = 0, extraNets = 0;
+        int extraNotes = 0, extraNets = 0, extraContacts = 0;
         SQLiteDatabase db = store.getWritableDatabase();
         db.beginTransaction();
         try {
             db.delete("channels", null, null); db.delete("contacts", null, null); db.delete("zones", null, null);
             for (ChannelStore.Channel ch : out) { ch.id = 0; ch.active = ch.number == keep; store.insert(ch); }
             for (ChannelStore.Contact c : cts) store.insertContact(c);
+            for (int i = 1; i < extras.size(); i++) {                           // contact identity rows: onto the matching contact, or a new one without a DMR ID
+                List<String> r = extras.get(i); if (!"contact".equalsIgnoreCase(col(r, 2))) continue;
+                int number = num(col(r, 0), 0), type = num(col(r, 6), 0); String name = col(r, 1);
+                ChannelStore.Contact target = null;
+                if (number > 0) { for (ChannelStore.Contact c : cts) if (c.number == number && c.type == type && c.name.equalsIgnoreCase(name)) { target = c; break; }
+                    if (target == null) for (ChannelStore.Contact c : cts) if (c.number == number && c.type == type) { target = c; break; } }
+                if (target != null) { applyContactRow(target, r); store.updateContact(target); extraContacts++; }
+                else { ChannelStore.Contact c = new ChannelStore.Contact(); c.number = Math.max(0, number); c.type = type; c.name = name; applyContactRow(c, r); if (c.number > 0 || !c.callsign.isEmpty() || !c.rics.isEmpty()) { store.insertContact(c); cts.add(c); extraContacts++; } }
+            }
             for (ChannelStore.Zone z : zs) { z.id = 0; store.saveZone(z); }
             db.delete("nets", null, null);                                       // they belonged to the channels just replaced
             for (int i = 1; i < extras.size(); i++) {
@@ -400,7 +427,7 @@ public final class Backup {
             }
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
-        return out.size() + " channels, " + cts.size() + " contacts, " + zs.size() + " zones" + (extras.size() > 1 ? ", " + extraNotes + " channel notes, " + extraNets + " nets" : "") + " restored from " + dir.getName()
+        return out.size() + " channels, " + cts.size() + " contacts, " + zs.size() + " zones" + (extras.size() > 1 ? ", " + extraNotes + " channel notes, " + extraNets + " nets, " + extraContacts + " contact identities" : "") + " restored from " + dir.getName()
                 + (outOfBand.isEmpty() ? "" : "\n" + outOfBand.size() + " skipped: outside what this radio can tune (136–174 and 400–480 MHz): " + String.join(", ", outOfBand.subList(0, Math.min(5, outOfBand.size()))) + (outOfBand.size() > 5 ? " …" : ""));
     }
 }

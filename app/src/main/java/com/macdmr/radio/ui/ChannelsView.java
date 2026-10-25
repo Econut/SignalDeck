@@ -27,6 +27,7 @@ import com.macdmr.radio.RadioService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Channel page: header with zone and channel count (repeaters, zone and add actions), search field, filter
@@ -47,6 +48,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
     private final java.util.Set<Integer> favs = new java.util.HashSet<>();
     private RadioService svc;
     private Host host;
+    private Map<Integer, Object[]> heard = new java.util.HashMap<>();   // channel number → newest thing heard on it
     private int filter = 0;              // 0 all, 1 favourites, 2 analog, 3 DMR
     private int activeNumber = -1;
 
@@ -124,6 +126,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
 
     public void reload() {
         if (svc == null) return;
+        try { heard = svc.store().channelLastHeard(); } catch (Throwable t) { heard = new java.util.HashMap<>(); }
         all.clear(); all.addAll(svc.zoneChannels());
         favs.clear(); ChannelStore.Zone fz = favZone(); if (fz != null) for (int n : fz.numbers) favs.add(n);
         activeNumber = svc.current() != null ? svc.current().number : svc.store().activeNumber();
@@ -207,6 +210,10 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         TextView pb = Neo.button(c, isPrio ? "Stop using as scan priority" : "Make scan priority", "scan", Neo.VIOLET); pb.setTextSize(14);
         LayoutParams pbl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); pbl.setMargins((int) (3 * d), (int) (8 * d), (int) (3 * d), 0);
         box.addView(pb, pbl);
+        final int hn = svc != null ? svc.store().channelHistoryCount(ch.number) : 0;
+        TextView hb = Neo.button(c, hn > 0 ? "History (" + hn + ")" : "History", "signal", Neo.CYAN); hb.setTextSize(14);
+        box.addView(hb, new LayoutParams(pbl));
+        hb.setOnClickListener(v -> { dlg.dismiss(); if (svc != null) ChannelHistoryDialog.show(c, svc, ch); });
         pb.setOnClickListener(v -> {
             dlg.dismiss(); if (svc == null) return;
             svc.setScanPriority(isPrio ? 0 : ch.number);
@@ -297,6 +304,8 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             ((TextView) row.findViewWithTag("freq")).setText(mhz(ch.rxFreq));
             LinearLayout badges = row.findViewWithTag("badges"); badges.removeAllViews();
             badges.addView(Neo.chip(c, ch.isDigital() ? "DMR" : "FM", ch.isDigital() ? Neo.VIOLET : Neo.CYAN));
+            Object[] lh = heard.get(ch.number);
+            if (lh != null) { TextView ht = Neo.text(c, "heard " + ContactEditor.ago((Long) lh[0]), Neo.DIM, 11.5f, Neo.uiMedium(c)); LayoutParams hl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); hl.leftMargin = (int) (6 * d); badges.addView(ht, hl); }
             if (svc != null && svc.scanPriority() == ch.number) { TextView pc = Neo.chip(c, "PRIORITY", Neo.VIOLET); LayoutParams pl2 = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl2.leftMargin = (int) (6 * d); badges.addView(pc, pl2); }
             String det = detail(ch);
             if (!det.isEmpty()) { TextView dc = Neo.chip(c, det, 0xFF9FB4C8); LayoutParams dl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); dl.leftMargin = (int) (6 * d); badges.addView(dc, dl); }

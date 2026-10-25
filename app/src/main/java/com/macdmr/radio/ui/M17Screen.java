@@ -79,6 +79,8 @@ public final class M17Screen extends ModeScreen {
                 String line = String.format(Locale.US, "%s  %-9s → %-9s %4.1f s%s", f.format(new Date(e.start)), e.src.isEmpty() ? "?" : e.src, e.dst.isEmpty() ? "?" : e.dst, (e.end - e.start) / 1000.0,
                     e.frames > 0 ? String.format(Locale.US, "  %d%%", 100 * e.good / e.frames) : "");
                 TextView t = Neo.text(c, line, e == h ? Neo.GREEN_LIGHT : Neo.TEXT, 13, Neo.mono(c)); t.setSingleLine(true); t.setPadding(0, dp(3), 0, dp(3));
+                final String src = e.src;
+                if (!src.isEmpty() && !src.startsWith("@") && !src.startsWith("#")) { t.setClickable(true); t.setOnClickListener(v -> ContactEditor.open(c, svc, ContactEditor.Identity.call(src), null)); }
                 list.addView(t);
             }
             if (hl.isEmpty()) list.addView(Neo.sheetHint(c, "Nothing yet. Tune the M17 frequency (the channel or the VFO). A transmission is found from its sync and played on the phone's speaker."));

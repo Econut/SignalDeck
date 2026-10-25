@@ -175,11 +175,11 @@ public final class AprsScreen extends ModeScreen {
             String extra = (s.speedKmh >= 0 ? String.format(Locale.US, " · %.0f mph", s.speedKmh * 0.621371) : "") + (s.alt != 0 ? " · " + Math.round(s.alt * 3.28084) + " ft" : "");
             final PacketStore.Station fs = s;
             row("📍  " + s.call + dist, ago(s.lastTs) + (s.count > 1 ? " · heard " + s.count + "×" : "") + extra + (s.via.isEmpty() ? "" : " · via " + s.via) + (s.comment.isEmpty() ? "" : "\n" + s.comment),
-                    Neo.CYAN, () -> {
+                    Neo.CYAN, () -> ContactEditor.open(c, svc, ContactEditor.Identity.call(fs.call).at(fs.lat, fs.lon, fs.lastTs, "APRS"), null), () -> {
                         try { c.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(String.format(Locale.US, "geo:%f,%f?q=%f,%f(%s)", fs.lat, fs.lon, fs.lat, fs.lon, android.net.Uri.encode(fs.call))))); } catch (Throwable t) { toast("No map app"); }
                     });
         }
-        if (st.isEmpty()) empty("No positions yet. Stations appear with their distance and direction from you, newest first; tap one to open it in your maps app.");
+        if (st.isEmpty()) empty("No positions yet. Stations appear with their distance and direction from you, newest first; tap the callsign for the contact, the rest of the card to open it in your maps app.");
     }
 
     private void showMessages(List<PacketStore.LogEntry> log) {
@@ -189,17 +189,22 @@ public final class AprsScreen extends ModeScreen {
             if (!msg) continue;
             n++;
             final String reply = e.kind.equals("msg") && e.mine ? e.from.replace(" (IS)", "") : null;
+            final String fromCall = e.kind.equals("msg-tx") || e.kind.equals("ack-tx") ? e.to : e.from.replace(" (IS)", "");
             row(icon(e) + "  " + e.from + " → " + e.to + (e.mine && e.kind.equals("msg") ? "   (for you)" : ""),
                     (DateUtilsToday(e.ts) ? hm : dhm).format(new Date(e.ts)) + "   " + kindName(e) + (e.text == null || e.text.isEmpty() ? "" : "\n" + e.text) + (reply != null ? "\nTap to reply" : ""),
                     e.mine ? Neo.AMBER : e.kind.equals("msg-tx") ? Neo.VIOLET_LIGHT : Neo.CYAN,
+                    fromCall == null || fromCall.isEmpty() ? null : () -> ContactEditor.open(c, svc, ContactEditor.Identity.call(fromCall), null),
                     reply == null ? null : () -> PktDialog.sheet(c, svc, "message:" + reply));
         }
         if (n == 0) empty("No messages yet. Messages to your callsign" + (pe.autoAck() ? " (acknowledged automatically)" : "") + ", the groups you follow, bulletins and the messages you send are listed here.");
     }
 
-    private void row(String title, String sub, int color, Runnable tap) {
+    private void row(String title, String sub, int color, Runnable tap) { row(title, sub, color, null, tap); }
+    /** A card; {@code titleTap} (the callsign's contact) is separate from the card's own tap. */
+    private void row(String title, String sub, int color, Runnable titleTap, Runnable tap) {
         LinearLayout r = new LinearLayout(c); r.setOrientation(VERTICAL); r.setBackground(Neo.rowCard(c)); r.setPadding(dp(12), dp(8), dp(12), dp(8));
         TextView t = Neo.text(c, title, color, 15, Neo.uiSemi(c)); r.addView(t);
+        if (titleTap != null) { t.setClickable(true); t.setOnClickListener(v -> titleTap.run()); }
         TextView s = Neo.text(c, sub, Neo.TEXT_SOFT, 13, Neo.uiMedium(c)); s.setPadding(0, dp(2), 0, 0); r.addView(s);
         if (tap != null) { r.setClickable(true); r.setOnClickListener(v -> tap.run()); }
         LayoutParams lp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); lp.bottomMargin = dp(6);
