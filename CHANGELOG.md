@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-24 — Bench symbol stream keys itself and ends on op 7
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| FW19 | DIAG `cmdsym` with `--ez eot` streams a packed-symbol file, keys once with the launch command after eight chunks (no 28 s watchdog, no microphone), and marks the last chunk op 7 so the module drops PTT. It does not send the unkey. A `cmdsym` without `eot` still does not key. Hidden bench extra; the in-app guide is unchanged. | `DiagReceiver.java`, `RadioService.java` | Device, Wi-Fi adb, FW19, 467.625 MHz, low power: two 45.12 s streams, last chunk op 7, module status byte 4, host did not send the unkey. The first capture decoded 1124 frames, 1123 payload-exact. |
+
 ## 2026-10-24 — M17 live receiver keeps one contact for the whole transmission
 
 | Backlog | Change | Files | Test |

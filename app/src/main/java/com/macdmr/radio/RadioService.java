@@ -1653,11 +1653,14 @@ public class RadioService extends Service implements RadioEngine.Events {
         log(String.format(java.util.Locale.US, "pcm off=%d n=%d", off, count));
     } catch (Throwable t) { log("pcm: " + t); } }); }
     private volatile Thread symThread;
-    /** Bench: stream a packed-symbol file on command 0x40. Does not key. Paces on the returned fill. */
-    public void diagSym(java.io.File f) {
+    /** Bench: stream a packed-symbol file on command 0x40. Paces on the returned fill.
+     *  eot keys with the launch command once eight chunks are in the ring (no 28 s watchdog, no microphone)
+     *  and sends the last chunk as op 7 so the module drops PTT itself. It does not send the unkey. */
+    public void diagSym(java.io.File f) { diagSym(f, false); }
+    public void diagSym(java.io.File f, boolean eot) {
         Thread old = symThread;
         if (old != null && old.isAlive()) { log("sym busy"); return; }
-        Thread t = new Thread(() -> streamSym(f), "m17-sym");
+        Thread t = new Thread(() -> streamSym(f, eot), "m17-sym");
         symThread = t;
         t.start();
     }
@@ -1722,16 +1725,18 @@ public class RadioService extends Service implements RadioEngine.Events {
         int err = (s[4] & 0xFF) | ((s[5] & 0xFF) << 8);
         log("sym status fill=" + fill + " underrun=" + und + " err=" + err + " sr=" + f.sr);
     }
-    private void streamSym(java.io.File f) {
+    private void streamSym(java.io.File f, boolean eot) {
         try {
             byte[] data = java.nio.file.Files.readAllBytes(f.toPath());
             Frame rst = sym40(new byte[] { 3 });
             if (rst == null || rst.sr != 0) { log("sym reset failed"); return; }
             int off = 0, nsend = 0;
+            boolean keyed = false;
             while (off < data.length) {
                 int n = Math.min(48, data.length - off);
                 byte[] body = new byte[1 + n];
-                body[0] = 1;
+                boolean last = eot && off + n >= data.length;
+                body[0] = (byte) (last ? 7 : 1);
                 System.arraycopy(data, off, body, 1, n);
                 Frame ack = sym40(body);
                 int wait = 0;
@@ -1745,10 +1750,19 @@ public class RadioService extends Service implements RadioEngine.Events {
                 int fill = ack.body != null && ack.body.length > 1 ? ((ack.body[0] & 0xFF) | ((ack.body[1] & 0xFF) << 8)) : 0;
                 off += n;
                 nsend++;
-                if (nsend == 8) log("sym ready fill=" + fill);
+                if (last) log("sym last op 7 fill=" + fill);
+                if (nsend == 8) {
+                    log("sym ready fill=" + fill);
+                    if (eot && !keyed) {
+                        engine.ptt(true);
+                        keyed = true;
+                        log("sym key");
+                    }
+                }
                 if (nsend < 8) { Thread.sleep(5); continue; }
                 int spins = 0;
-                while (fill > 1500 && spins < 150) {
+                int spinCap = eot ? 400 : 150;
+                while (fill > 1500 && spins < spinCap) {
                     Thread.sleep(20);
                     Frame s = sym40(new byte[] { 2 });
                     if (s != null && s.body != null && s.body.length > 1) fill = (s.body[0] & 0xFF) | ((s.body[1] & 0xFF) << 8);
@@ -1756,6 +1770,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
                 Thread.sleep(15);
             }
+            if (eot && !keyed) { engine.ptt(true); log("sym key"); }
             log("sym done bytes=" + data.length);
         } catch (Throwable t) { log("sym: " + t); }
     }

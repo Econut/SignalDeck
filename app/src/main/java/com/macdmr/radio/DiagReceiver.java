@@ -62,12 +62,12 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "cmdbyte": s.diagCmd(i.getIntExtra("b", 0), i.getIntExtra("d", 1)); break;        // bench: one command, body byte --ei d (default 1), does not key
             case "cmdsine": s.diagSine(i.getIntExtra("n", 64), i.getIntExtra("amp", 2048), i.getIntExtra("hz", 1000)); break;  // bench: store a sine on 0x40, does not key
             case "cmdpcm": s.diagPcm(new java.io.File(i.getStringExtra("path")), i.getIntExtra("off", 0), i.getIntExtra("n", 398)); break;  // bench: store one piece, does not key
-            case "cmdsym": {                                                     // bench: stream packed symbols, one status read, a no-key render, or one FM receive half. Does not key.
+            case "cmdsym": {                                                     // bench: stream packed symbols, one status read, a no-key render, or one FM receive half. --ez eot keys once the ring is primed and marks the last chunk so the module drops PTT; it does not send the unkey.
                 if ("status".equals(i.getStringExtra("op"))) s.diagSymStatus();
                 else if ("render".equals(i.getStringExtra("op"))) s.diagSymRender(new java.io.File(i.getStringExtra("path")), i.getIntExtra("n", 0));
                 else if ("hold".equals(i.getStringExtra("op"))) s.diagHold(i.getIntExtra("mode", 0), i.getIntExtra("action", 0));
                 else if ("rxram".equals(i.getStringExtra("op"))) s.diagRxRam(i.getIntExtra("mode", 0), i.getIntExtra("n", 4));
-                else s.diagSym(new java.io.File(i.getStringExtra("path")));
+                else s.diagSym(new java.io.File(i.getStringExtra("path")), i.getBooleanExtra("eot", false));
                 break;
             }
             case "m17": {                                                       // bench: M17 receive on/off (--ez on); --es enc NAME: Codec 2 3200 encode cache/NAME.wav (8 kHz mono) to cache/NAME.c2
