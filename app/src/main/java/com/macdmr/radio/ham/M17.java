@@ -131,10 +131,11 @@ public final class M17 {
         return s;
     }
 
-    /** Two end-of-transmission frames (384 symbols). The module drops the carrier when the ring drains, while the
-     *  shaping filter still holds about two frames, so the real end frame is sent ahead of this tail. */
+    /** The end-of-transmission marker: 40 ms (192 symbols) of the EOT pattern after the end-bit frame, as the
+     *  specification has it. The two-marker pad that covered the module's early carrier drop came out with FW20,
+     *  which plays the ring out before dropping. */
     public static int[] eotTail() {
-        int[] s = new int[384];
+        int[] s = new int[192];
         for (int i = 0; i < s.length; i++) s[i] = EOT_SYMBOLS[i % EOT_SYMBOLS.length];
         return s;
     }

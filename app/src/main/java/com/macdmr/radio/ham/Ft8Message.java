@@ -129,6 +129,22 @@ public final class Ft8Message {
     }
 
     /** Pack a message the way WSJT-X does; {@code null} when it does not fit any supported format. */
+    /**
+     * True when this message can only go as a type 4 (non-standard call) message, which carries no grid or report:
+     * a call with more than three suffix letters or an unusual prefix (N0CALL among them) loses its grid in a CQ,
+     * as WSJT-X does. The caller says so instead of sending silently without it.
+     */
+    public static boolean dropsGrid(String text) {
+        String t = text == null ? "" : text.trim().toUpperCase(Locale.US).replaceAll("\\s+", " ");
+        if (t.isEmpty()) return false;
+        String[] w = t.split(" ");
+        if (w.length < 3) return false;
+        String last = w[w.length - 1];
+        if (packGrid(last) < 0 || packGrid(last) == MAXGRID4 + 1) return false;   // no grid or report on the end
+        byte[] p = pack(t, null);
+        return p != null && ((p[9] >> 3) & 7) == 4;
+    }
+
     public static byte[] pack(String text, Hashes h) {
         String t = text.trim().toUpperCase(Locale.US).replaceAll("\\s+", " ");
         if (t.isEmpty()) return null;

@@ -18,7 +18,26 @@ public class Ft8Test {
         "CQ K1ABC FN42", "K1ABC W9XYZ DM79", "W9XYZ K1ABC -11", "K1ABC W9XYZ R-09", "W9XYZ K1ABC RRR",
         "K1ABC W9XYZ RR73", "K1ABC W9XYZ 73", "CQ DX K1ABC FN42", "CQ 145 K1ABC FN42", "K1ABC/R W9XYZ DM79",
         "G4ABC/P PA9XYZ JO22", "TNX BOB 73 GL", "CQ PJ4/K1ABC", "W9XYZ PJ4/K1ABC RR73", "QRZ K1ABC FN42",
+        "CQ N0CALL",   // N0CALL has a four-letter suffix: a non-standard call, type 4, which cannot carry a grid (see theBenchCqLosesItsGridAsWsjtxWould)
     };
+
+    /** The bench's "CQ N0CALL FN20" (FW21 run) came back as "CQ N0CALL": N0CALL's four-letter suffix makes it a non-standard
+     *  call, so the message is type 4 and has no grid field, as WSJT-X packs it. A standard call keeps its grid; the app can tell. */
+    @Test public void theBenchCqLosesItsGridAsWsjtxWould() {
+        byte[] p = Ft8Message.pack("CQ N0CALL FN20", null);
+        assertNotNull(p);
+        assertEquals("type 4, non-standard call", 4, (p[9] >> 3) & 7);
+        assertEquals("CQ N0CALL", Ft8Message.unpack(p, null));
+        assertTrue(Ft8Message.dropsGrid("CQ N0CALL FN20"));
+        assertFalse(Ft8Message.dropsGrid("CQ N0CALL"));
+        byte[] q = Ft8Message.pack("CQ K1ABC FN42", null);
+        assertEquals("type 1, standard call", 1, (q[9] >> 3) & 7);
+        int g = ((q[7] & 0x3F) << 10) | ((q[8] & 0xFF) << 2) | ((q[9] & 0xFF) >> 6);
+        assertEquals("FN42 as the 15-bit grid index", ((('F' - 'A') * 18 + ('N' - 'A')) * 10 + 4) * 10 + 2, g);
+        assertEquals("CQ K1ABC FN42", Ft8Message.unpack(q, null));
+        assertFalse(Ft8Message.dropsGrid("CQ K1ABC FN42"));
+        assertFalse(Ft8Message.dropsGrid("K1ABC W9XYZ -11"));
+    }
 
     @Test public void crcIsCarriedInBits77To90() {
         byte[] p = Ft8Message.pack("CQ K1ABC FN42", null), a = Ft8.addCrc(p);

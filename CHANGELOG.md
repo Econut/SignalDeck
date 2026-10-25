@@ -4,6 +4,14 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — M17 end marker, fuller M17 encoder test, FT8 grid check
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| M17 TX (review of FW20) | The two-marker pad after the last voice frame comes out: the sender ends with one end-of-transmission marker (40 ms, 192 symbols) as the specification has it; FW20 plays the ring out before dropping the carrier, so the pad that covered the early drop is no longer needed. On FW19 the last frames may again be cut, which is why FW20 is the floor for M17 voice. | `ham/M17.java` (`eotTail`) | host: `M17Test`, `M17TransmissionTest` |
+| M17 TX (review of item 2) | The fuller encoder test: a whole transmission (preamble, link setup frame, 13 stream frames over two LICH cycles, the end-bit frame, the EOT marker) decoded frame by frame with the project's decoder; the six LICH chunks rebuild the link setup frame; symbol packing byte-exact; a wrecked LICH is reported as absent while the payload still decodes. | `test/ham/M17TransmissionTest.java` (new) | host |
+| FT8 (review of FW21, item 3) | Grid check, settled: the FW21 run's `CQ N0CALL` was correct. N0CALL has a four-letter suffix, which FT8 treats as a non-standard call; such a call goes in a type 4 message, which has no grid field, exactly as WSJT-X sends it. A standard call (`CQ K1ABC FN42`) keeps its grid through pack and unpack. New: `Ft8Message.dropsGrid`, and the FT8 station's status says so when your own callsign is non-standard, instead of sending the CQ without the grid silently. | `ham/Ft8Message.java`, `ham/Ft8Station.java`, `test/ham/Ft8Test.java` | host |
+
 ## 2026-10-25 — Contacts: callsign, pager RICs, notes, two locations, history; channel history
 
 | Backlog | Change | Files | Test |

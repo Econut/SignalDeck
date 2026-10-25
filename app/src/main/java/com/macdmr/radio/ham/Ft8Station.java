@@ -222,6 +222,8 @@ public final class Ft8Station {
         String my = host.callsign();
         if (my == null || my.isEmpty() || my.equals("N0CALL")) return "Set your callsign first (APRS settings)";
         if (Ft8Message.pack("CQ " + my, null) == null) return "Your callsign cannot be sent in FT8";
+        String g0 = host.grid();
+        if (g0 != null && !g0.isEmpty() && Ft8Message.dropsGrid("CQ " + my + " " + g0)) host.event("⚠️ Your callsign is non-standard for FT8 (more than three suffix letters or an unusual prefix), so CQ goes out without your grid, as WSJT-X would send it");
         if (!running) start();
         return null;
     }
