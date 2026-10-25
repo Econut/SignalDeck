@@ -61,6 +61,7 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "restartmodule": s.diagRestartModule(); break;              // bench: the stuck-module watchdog's restart (power cycle, channel, MON, audio back)
             case "raw40": s.diagRaw40(new java.io.File(i.getStringExtra("path"))); break;  // bench: one 0x40 body from a file, reply in cache/raw40.bin, does not key
             case "fwload": s.diagFwLoad(new java.io.File(i.getStringExtra("file")), i.getBooleanExtra("abort50", false)); break;  // bench: YModem-1K into the module. abort50 closes the port halfway.
+            case "fwpage": new android.os.Handler(android.os.Looper.getMainLooper()).post(com.macdmr.radio.MainActivity.openFirmwarePage); break;
             case "cmdbyte": s.diagCmd(i.getIntExtra("b", 0), i.getIntExtra("d", 1)); break;        // bench: one command, body byte --ei d (default 1), does not key
             case "cmdsine": s.diagSine(i.getIntExtra("n", 64), i.getIntExtra("amp", 2048), i.getIntExtra("hz", 1000)); break;  // bench: store a sine on 0x40, does not key
             case "cmdpcm": s.diagPcm(new java.io.File(i.getStringExtra("path")), i.getIntExtra("off", 0), i.getIntExtra("n", 398)); break;  // bench: store one piece, does not key

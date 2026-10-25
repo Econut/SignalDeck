@@ -27,7 +27,7 @@ import com.macdmr.radio.RootSetup;
  * report, updates, help, diagnostics).
  */
 public class DeviceView extends LinearLayout implements RadioService.Listener {
-    public interface Host { void openHelp(); void openDiagnostics(); void intercomStyleChanged(); void animatedPanelChanged(boolean on); }
+    public interface Host { void openHelp(); void openDiagnostics(); void openFirmware(); void intercomStyleChanged(); void animatedPanelChanged(boolean on); }
 
     private final LinearLayout header, hero;
     private final TextView linkText, profileText, idText, firmwareText;
@@ -68,7 +68,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         profileText.setOnClickListener(v -> profileDialog());
         firmwareText = Neo.text(c, "", 0xFF9FB4C8, 13, Neo.mono(c)); firmwareText.setPadding(0, (int) (3 * d), 0, 0);
         tc.addView(firmwareText);
-        firmwareText.setOnClickListener(v -> firmwareSheet());
+        firmwareText.setOnClickListener(v -> { if (host != null) host.openFirmware(); });
         top.addView(tc, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         hero.addView(top);
         LinearLayout hb = new LinearLayout(c); hb.setBaselineAligned(false);
@@ -910,8 +910,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         String l = svc.link();
         if (!svc.profile().verified && svc.profile().supported) profileText.append(" · untested");
         String fwStock = svc.stockFirmware(), fwNow = svc.moduleVersion().trim();
-        firmwareText.setText(com.macdmr.radio.Firmware.line(fwStock, fwNow));
-        firmwareText.setVisibility(fwStock.isEmpty() ? GONE : VISIBLE);
+        firmwareText.setText(fwStock.isEmpty() ? "Module firmware" : com.macdmr.radio.Firmware.line(fwStock, fwNow));
+        firmwareText.setVisibility(VISIBLE);
         firmwareText.setTextColor(com.macdmr.radio.Firmware.differs(fwStock, fwNow) ? Neo.AMBER_LIGHT : 0xFF9FB4C8);
         boolean ready = "ready".equals(l), unsupported = "unsupported".equals(l), bad = "no root".equals(l) || unsupported;
         int accent = ready ? Neo.GREEN : bad ? Neo.AMBER : "stopped".equals(l) ? Neo.CYAN : Neo.AMBER;

@@ -1,0 +1,49 @@
+/*
+ * SignalDeck - Copyright (C) 2026 IIMacGyverII
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+package com.macdmr.radio.fw;
+
+import static org.junit.Assert.*;
+
+import org.junit.Test;
+
+public class ImageTableTest {
+    private static String ok() {
+        return ImageTable.refuse(ImageTable.FW22, ImageTable.FACTORY.tag, ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, ImageTable.FACTORY.stockVersion, true, true);
+    }
+
+    @Test public void aKnownPhoneMayLoadFw22() { assertNull(ok()); }
+
+    @Test public void anAlteredIdentityIsRefused() {
+        assertNotNull(ImageTable.refuse(ImageTable.FW22, ImageTable.FACTORY.tag, "deadbeef", ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", false, true));
+    }
+
+    @Test public void stockRemovedWithNoBackupIsRefused() {
+        String why = ImageTable.refuse(ImageTable.FACTORY, "", null, null, "Armor 26 Ultra",
+                ImageTable.FACTORY.stockPackage, "V1.0", false, false);
+        assertNotNull(why);
+        assertTrue(why.contains("stock app is gone"));
+    }
+
+    @Test public void aSilentModuleRecoversOnlyTheFactoryImage() {
+        assertNotNull(ImageTable.refuse(ImageTable.FW22, "", ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", true, true));
+        assertNull(ImageTable.refuse(ImageTable.FACTORY, "", ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", true, true));
+    }
+
+    @Test public void anUnknownTagIsRefused() {
+        assertNotNull(ImageTable.refuse(ImageTable.FACTORY, "DMR003.NOPE.V022", ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", true, true));
+    }
+
+    @Test public void theTagSitsAtTheKnownOffset() {
+        byte[] image = new byte[ImageTable.TAG_AT + 16];
+        byte[] tag = "DMR003.UV4T.V022".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        System.arraycopy(tag, 0, image, ImageTable.TAG_AT, tag.length);
+        assertEquals("DMR003.UV4T.V022", ImageTable.tagOf(image));
+    }
+}

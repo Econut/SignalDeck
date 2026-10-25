@@ -33,6 +33,8 @@ import com.macdmr.radio.ui.Theme;
 
 /** App shell: bottom navigation (Intercom · Channels · Contacts · Messages · Settings) over one content frame. */
 public class MainActivity extends AppCompatActivity {
+    /** Bench and the Device page: opens the module firmware screen on the main thread. */
+    public static Runnable openFirmwarePage = () -> { };
     private FrameLayout content;
     private IntercomView intercom;
     private DiagnosticsView diagnostics;
@@ -105,9 +107,11 @@ public class MainActivity extends AppCompatActivity {
         intercom = new IntercomView(this);
         diagnostics = new DiagnosticsView(this);
         device = new com.macdmr.radio.ui.DeviceView(this);
+        openFirmwarePage = () -> { RadioService s = svc; if (s == null) return; showOverlay(new com.macdmr.radio.ui.FirmwareScreen(MainActivity.this, s, MainActivity.this::closeOverlay)); };
         device.setHost(new com.macdmr.radio.ui.DeviceView.Host() {
             @Override public void openHelp() { showOverlay(new com.macdmr.radio.ui.HelpView(MainActivity.this, MainActivity.this::closeOverlay)); }
             @Override public void openDiagnostics() { showOverlay(diagnostics); }
+            @Override public void openFirmware() { openFirmwarePage.run(); }
             @Override public void intercomStyleChanged() { rebuildIntercom(); }
             @Override public void animatedPanelChanged(boolean on) { intercom.setAnimatedPanel(on); }
         });

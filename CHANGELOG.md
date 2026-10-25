@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Module firmware page
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Phase E | Device → the firmware line opens Module firmware. It shows the installed image, the chosen image and the factory backup, and a pre-flight list. Load runs only when every check is green, then a seven-phase bar with blocks, bytes, rate, time and retries. Handshake log opens the transfer record. A tag that does not match restores the factory image. When the module has not answered, only the factory image is offered. The guide's Device topic describes the page. | `ui/FirmwareScreen.java`, `fw/ImageTable.java`, `fw/FirmwareVault.java`, `fw/FirmwareSession.java`, `fw/YModemSender.java`, `RadioService.java`, `DeviceView.java`, `MainActivity.java`, `HelpView.java`, `DiagReceiver.java` | Host: `ImageTableTest`. Device, Wi-Fi adb: the page opened on FW22, the factory backup verified from the stock app, and all seven pre-flight checks were green (100% charging, stock app paused, hash `90e361fda108`). The five loads from the page are not run yet. |
+
+
 ## 2026-10-25 — Bench firmware load
 
 | Backlog | Change | Files | Test |

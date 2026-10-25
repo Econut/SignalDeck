@@ -36,13 +36,28 @@ public final class YModemSender {
         @Override public String toString() { return detail.isEmpty() ? code : code + "(" + detail + ")"; }
     }
 
+    /** Named stages of a load, for the firmware page. */
+    public interface Watch {
+        void phase(String name);
+        void block(int done, int total, long ackMs);
+        void retry();
+    }
+
+    /** Polled before each data block. When it returns true the port is closed and the load stops. */
+    public interface Halt { boolean halt(); }
+
     private final Pause pause;
     private final Log log;
+    private Watch watch;
+    private Halt halt;
 
     public YModemSender(Pause pause, Log log) {
         this.pause = pause == null ? ms -> Thread.sleep(ms) : pause;
         this.log = log == null ? s -> { } : log;
     }
+
+    public YModemSender watch(Watch watch) { this.watch = watch; return this; }
+    public YModemSender halt(Halt halt) { this.halt = halt; return this; }
 
     /** CRC-16-CCITT, init 0, polynomial 0x1021, not reflected. The value covers the data bytes only. */
     public static int crc16(byte[] data, int off, int len) {
@@ -81,13 +96,21 @@ public final class YModemSender {
     public Result send(byte[] image, String name, String pwd, String ptt, Wire wire, Pins pins, boolean abort50, Tag tag) {
         long t0 = System.currentTimeMillis();
         try {
+            if (watch != null) watch.phase("update");
             if (!prompt(pwd, ptt, wire, pins)) return fail("no-prompt", "no bootloader prompt", t0);
+            if (watch != null) watch.phase("handshake");
             byte[] header = nameBlock(name, image.length);
             if (!ack(wire, header, true)) return lastFail(t0);
+            if (watch != null) watch.phase("transfer");
             int blocks = (image.length + 1023) / 1024;
             int stopAt = abort50 ? Math.max(1, blocks / 2) : Integer.MAX_VALUE;
             int seq = 1;
             for (int i = 0; i < blocks; i++) {
+                if (halt != null && halt.halt()) {
+                    log.line("stopped after block " + i + " of " + blocks);
+                    try { wire.close(); } catch (IOException e) { log.line("close: " + e.getMessage()); }
+                    return new Result("aborted", "stopped after block " + i);
+                }
                 pause.ms(300);
                 drain(wire);
                 byte[] data = new byte[1024];
@@ -95,7 +118,9 @@ public final class YModemSender {
                 System.arraycopy(image, i * 1024, data, 0, n);
                 long sent = System.currentTimeMillis();
                 if (!ack(wire, block(STX, seq & 0xFF, data), false)) return lastFail(t0);
-                log.line("block " + (i + 1) + "/" + blocks + " ack " + (System.currentTimeMillis() - sent) + " ms");
+                long ackMs = System.currentTimeMillis() - sent;
+                log.line("block " + (i + 1) + "/" + blocks + " ack " + ackMs + " ms");
+                if (watch != null) watch.block(i + 1, blocks, ackMs);
                 seq++;
                 if (i + 1 == stopAt) {
                     log.line("abort50 after block " + stopAt + " of " + blocks);
@@ -103,9 +128,11 @@ public final class YModemSender {
                     return new Result("aborted", "closed after block " + stopAt);
                 }
             }
+            if (watch != null) watch.phase("finish");
             if (!eot(wire)) return lastFail(t0);
             byte[] end = block(SOH, 0, new byte[128]);
             if (!ack(wire, end, false)) return lastFail(t0);
+            if (watch != null) watch.phase("restart");
             pins.set(pwd, false);
             pause.ms(500);
             pins.set(pwd, true);
@@ -201,6 +228,7 @@ public final class YModemSender {
             }
             if (attempt == RETRIES) return false;
             log.line("retry " + (attempt + 1));
+            if (watch != null) watch.retry();
         }
         return false;
     }

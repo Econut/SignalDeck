@@ -1717,6 +1717,21 @@ public class RadioService extends Service implements RadioEngine.Events {
         job.start();
     }
 
+    private final java.util.concurrent.atomic.AtomicBoolean fwHalt = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /** The firmware page: load one known image. {@code treatTagAsWrong} forces the factory restore after a good transfer. */
+    public void loadFirmware(com.macdmr.radio.fw.ImageTable.Row row, byte[] image, com.macdmr.radio.fw.FirmwareSession.Ui ui, boolean treatTagAsWrong) {
+        Thread old = fwThread;
+        if (old != null && old.isAlive()) { ui.finished("A load is already running"); return; }
+        fwHalt.set(false);
+        Thread job = new Thread(() -> com.macdmr.radio.fw.FirmwareSession.run(this, row, image, ui, fwHalt, treatTagAsWrong), "fwpage");
+        fwThread = job;
+        job.start();
+    }
+
+    /** Close the port at the next block. The page's Stop button. */
+    public void haltFirmware() { fwHalt.set(true); }
+
     private byte[] imageBytes(java.io.File f) throws java.io.IOException {
         try { return java.nio.file.Files.readAllBytes(f.toPath()); }
         catch (java.io.IOException e) {
@@ -1728,6 +1743,9 @@ public class RadioService extends Service implements RadioEngine.Events {
             return java.nio.file.Files.readAllBytes(dst.toPath());
         }
     }
+
+    /** The module's version, after asking. Used by the firmware page once the packet reader is running again. */
+    public String readModuleTag() throws java.io.IOException { return waitForTag(); }
 
     private String waitForTag() throws java.io.IOException {
         try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new java.io.IOException("interrupted"); }
