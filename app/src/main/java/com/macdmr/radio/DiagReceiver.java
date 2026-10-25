@@ -70,7 +70,8 @@ public final class DiagReceiver extends BroadcastReceiver {
                 else s.diagSym(new java.io.File(i.getStringExtra("path")), i.getBooleanExtra("eot", false));
                 break;
             }
-            case "m17": {                                                       // bench: M17 receive on/off (--ez on); --es enc NAME: Codec 2 3200 encode cache/NAME.wav (8 kHz mono) to cache/NAME.c2
+            case "m17": {                                                       // bench: M17 receive on/off (--ez on); --ei tx ms: a short Codec 2 tone through the symbol engine; --es enc NAME: Codec 2 3200 encode cache/NAME.wav to cache/NAME.c2; --es dec NAME: decode cache/NAME.c2 back to cache/NAME.wav
+                if (i.hasExtra("tx")) { s.m17BenchTone(i.getIntExtra("tx", 1500)); break; }
                 if (i.hasExtra("dump")) com.macdmr.radio.M17Station.benchDump = i.getBooleanExtra("dump", false);
                 if (i.hasExtra("on")) Log.i("DiagReceiver", "m17: " + s.setM17(i.getBooleanExtra("on", false), !i.hasExtra("hold") || i.getBooleanExtra("hold", true)));
                 String nm = i.getStringExtra("enc");
@@ -84,6 +85,29 @@ public final class DiagReceiver extends BroadcastReceiver {
                         java.nio.file.Files.write(new java.io.File(c.getCacheDir(), nm + ".c2").toPath(), o.toByteArray());
                         Log.i("DiagReceiver", "m17 enc: " + o.size() + " bytes, " + o.size() / c2.bytes + " frames");
                     } catch (Throwable t) { Log.w("DiagReceiver", "m17 enc: " + t); }
+                }
+                String decNm = i.getStringExtra("dec");
+                if (decNm != null && decNm.matches("[A-Za-z0-9_-]{1,40}")) {
+                    try (com.macdmr.radio.ham.Codec2 c2 = new com.macdmr.radio.ham.Codec2(com.macdmr.radio.ham.Codec2.MODE_3200)) {
+                        byte[] bits = java.nio.file.Files.readAllBytes(new java.io.File(c.getCacheDir(), decNm + ".c2").toPath());
+                        int nf = bits.length / c2.bytes;
+                        short[] pcm = new short[nf * c2.samples];
+                        byte[] frb = new byte[c2.bytes];
+                        for (int k = 0; k < nf; k++) {
+                            System.arraycopy(bits, k * c2.bytes, frb, 0, c2.bytes);
+                            short[] speech = c2.decode(frb);
+                            System.arraycopy(speech, 0, pcm, k * c2.samples, speech.length);
+                        }
+                        byte[] raw = new byte[pcm.length * 2];
+                        for (int j = 0; j < pcm.length; j++) { raw[2 * j] = (byte) pcm[j]; raw[2 * j + 1] = (byte) (pcm[j] >> 8); }
+                        java.nio.ByteBuffer bb = java.nio.ByteBuffer.allocate(44 + raw.length).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+                        bb.put("RIFF".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(36 + raw.length);
+                        bb.put("WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(16).putShort((short) 1).putShort((short) 1);
+                        bb.putInt(8000).putInt(16000).putShort((short) 2).putShort((short) 16);
+                        bb.put("data".getBytes(java.nio.charset.StandardCharsets.US_ASCII)).putInt(raw.length).put(raw);
+                        java.nio.file.Files.write(new java.io.File(c.getCacheDir(), decNm + ".wav").toPath(), bb.array());
+                        Log.i("DiagReceiver", "m17 dec: " + nf + " frames");
+                    } catch (Throwable t) { Log.w("DiagReceiver", "m17 dec: " + t); }
                 }
                 com.macdmr.radio.M17Station m = s.m17();
                 for (com.macdmr.radio.M17Station.Heard h : m.heard()) Log.i("DiagReceiver", "m17 heard " + h.src + " -> " + h.dst + " frames " + h.frames + " good " + h.good + (h.meta != null ? " meta " + h.meta : ""));

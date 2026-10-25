@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-24 — M17 voice transmit, module time-out 120 s
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| M17 TX | Hold to talk on the M17 page sends Codec 2 3200 as an M17 stream to everyone (@ALL), using the callsign from APRS settings. The button is there only when the module version is a bench firmware with the symbol engine. The sender keys after eight symbol chunks, sets the end bit on the last frame, marks the last chunk op 7, and sends the unkey after the module's status byte 4. It stops by itself at 28 s. Stock firmware stays receive only. A bench extra plays a short Codec 2 tone (`DIAG m17 --ei tx`) and can decode a `.c2` file back to wav. | `M17.java`, `M17Screen.java`, `RadioService.java`, `DiagReceiver.java`, `HelpView.java`, `M17Test.java` | Host: `M17Test` matches the research encoder for N0CALL to W9XYZ. Device, Wi-Fi adb, FW19, 467.625 MHz, low power, HackRF LNA 16 / VGA 16: a 1.5 s 1 kHz tone. Carrier 1.63 s, SNR 66.7 dB, clip 0, body peak 83 of 127, body p99 3206 Hz. Link setup [callsign] to @ALL, CRC ok. Frames 0–35 payload-exact against the phone's Codec 2 bytes. Codec 2 decode of those frames peaks at 1003 Hz. |
+| FW19 | The boot handshake sends `setTot(120)` and never 0. Help that said the radio ends a voice transmission after 30 seconds now says SignalDeck ends it after 28 s and the radio's own limit is 120 s. A symbol stream that ends on op 7 sends the unkey after status byte 4, so the module timer does not keep running. The voice watchdog stays 28 s. Long SSTV modes stay off. | `RadioEngine.java`, `RadioService.java`, `HelpView.java` | The same key: status byte 3 at the key, status byte 4 at 1.54 s, then the unkey. |
+
 ## 2026-10-24 — Bench symbol stream keys itself and ends on op 7
 
 | Backlog | Change | Files | Test |

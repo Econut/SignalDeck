@@ -220,7 +220,7 @@ public final class RadioEngine implements UartPort.Listener {
         queryVersion(); pause(150);
         setChannel.run(); pause(250);
         if (digital) setInterrupt(false); else setMic(4); pause(150);
-        setTot(0); pause(150);
+        setTot(120); pause(150);   // 0 turns the module timer off; 120 is its own default and FW19's ceiling
         ev.log("boot handshake sent");
     }
 

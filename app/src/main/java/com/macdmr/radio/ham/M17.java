@@ -97,6 +97,40 @@ public final class M17 {
         int c = crc16(d, 28); d[28] = (byte) (c >> 8); d[29] = (byte) c;
         return d;
     }
+    /** A callsign the air will accept: the charset, at most 9 characters, SSID removed. Empty becomes N0CALL. */
+    public static String voiceCall(String raw) {
+        if (raw == null) return "N0CALL";
+        String u = raw.trim().toUpperCase(Locale.US);
+        int dash = u.indexOf('-');
+        if (dash >= 0) u = u.substring(0, dash);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < u.length() && sb.length() < 9; i++) if (CHARS.indexOf(u.charAt(i)) >= 0) sb.append(u.charAt(i));
+        return sb.length() == 0 ? "N0CALL" : sb.toString();
+    }
+
+    /** Four symbols per byte, first symbol in bits 7:6. 01 = +3, 00 = +1, 10 = -1, 11 = -3. */
+    public static byte[] packSymbols(int[] syms) {
+        if ((syms.length & 3) != 0) throw new IllegalArgumentException("symbol count " + syms.length);
+        byte[] o = new byte[syms.length / 4];
+        for (int i = 0, n = 0; i < syms.length; i += 4, n++) {
+            int b = 0;
+            for (int k = 0; k < 4; k++) {
+                int s = syms[i + k];
+                int d = s == 3 ? 1 : s == 1 ? 0 : s == -1 ? 2 : 3;
+                b = (b << 2) | d;
+            }
+            o[n] = (byte) b;
+        }
+        return o;
+    }
+
+    /** 40 ms of the +3/−3 preamble the specification puts in front of a voice transmission. */
+    public static int[] preamble() {
+        int[] s = new int[192];
+        for (int i = 0; i < s.length; i += 2) { s[i] = 3; s[i + 1] = -3; }
+        return s;
+    }
+
     public static int[] lsfSymbols(byte[] lsf) { return frameSymbols(SYNC_LSF, convEncode(bits(lsf, 240), P1, 368)); }
     public static int[] streamSymbols(byte[] lsf, int fn, byte[] payload16, int lichCnt) {
         byte[] lich = new byte[6]; System.arraycopy(lsf, 5 * lichCnt, lich, 0, 5); lich[5] = (byte) (lichCnt << 5);

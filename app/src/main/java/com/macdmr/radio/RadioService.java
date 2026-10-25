@@ -1653,6 +1653,9 @@ public class RadioService extends Service implements RadioEngine.Events {
         log(String.format(java.util.Locale.US, "pcm off=%d n=%d", off, count));
     } catch (Throwable t) { log("pcm: " + t); } }); }
     private volatile Thread symThread;
+    private volatile boolean m17Down, m17Tx;
+    private volatile long status4At;
+    private volatile short[] m17Script;
     /** Bench: stream a packed-symbol file on command 0x40. Paces on the returned fill.
      *  eot keys with the launch command once eight chunks are in the ring (no 28 s watchdog, no microphone)
      *  and sends the last chunk as op 7 so the module drops PTT itself. It does not send the unkey. */
@@ -1770,9 +1773,170 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
                 Thread.sleep(15);
             }
-            if (eot && !keyed) { engine.ptt(true); log("sym key"); }
+            if (eot && !keyed) { engine.ptt(true); keyed = true; log("sym key"); }
             log("sym done bytes=" + data.length);
+            if (eot && keyed) unkeyAfterStop();
         } catch (Throwable t) { log("sym: " + t); }
+    }
+
+    /** This firmware image has the symbol engine (command 0x40). Stock UV4T does not. */
+    public boolean m17CanSend() { return Firmware.stubTag(moduleVersion); }
+
+    /** Hold to talk on the M17 screen. The voice limit stays 28 s. Does nothing on stock firmware. */
+    public void m17Voice(boolean down) {
+        if (!down) { m17Down = false; return; }
+        if (!m17CanSend()) { log("m17 voice: stock firmware"); history("warn", "⚠️ M17 transmit needs the module firmware with the symbol engine"); return; }
+        if (current != null && current.isDigital()) { log("m17 voice: digital channel"); history("warn", "⚠️ M17 transmit needs an analog channel"); return; }
+        if (symThread != null && symThread.isAlive()) { log("m17 voice: busy"); return; }
+        m17Down = true;
+        Thread t = new Thread(this::m17VoiceRun, "m17-voice");
+        symThread = t;
+        t.start();
+    }
+
+    /** Bench: one short Codec 2 tone through the symbol engine. Not a long key. */
+    public void m17BenchTone(int ms) {
+        ms = Math.max(800, Math.min(4000, ms));
+        short[] pcm = new short[8000 * ms / 1000];
+        for (int i = 0; i < pcm.length; i++) pcm[i] = (short) (8000 * Math.sin(2 * Math.PI * 1000 * i / 8000.0));
+        m17Script = pcm;
+        m17Voice(true);
+    }
+
+    private void m17VoiceRun() {
+        android.media.AudioRecord rec = null;
+        com.macdmr.radio.ham.Codec2 c2 = null;
+        boolean keyed = false;
+        m17Tx = true;
+        try {
+            Frame rst = sym40(new byte[] { 3 });
+            if (rst == null || rst.sr != 0) { log("m17 voice: symbol engine did not answer"); history("warn", "⚠️ This firmware did not accept an M17 symbol reset"); return; }
+            String src = com.macdmr.radio.ham.M17.voiceCall(m17Call());
+            byte[] lsf = com.macdmr.radio.ham.M17.lsf(src, "@ALL", 0x0005, null);
+            int[] head = new int[192 + 192];
+            System.arraycopy(com.macdmr.radio.ham.M17.preamble(), 0, head, 0, 192);
+            System.arraycopy(com.macdmr.radio.ham.M17.lsfSymbols(lsf), 0, head, 192, 192);
+            java.io.ByteArrayOutputStream pending = new java.io.ByteArrayOutputStream();
+            pending.write(com.macdmr.radio.ham.M17.packSymbols(head));
+            c2 = new com.macdmr.radio.ham.Codec2(com.macdmr.radio.ham.Codec2.MODE_3200);
+            int spf = c2.samples;
+            short[] script = m17Script;
+            if (script == null) {
+                rec = new android.media.AudioRecord(android.media.MediaRecorder.AudioSource.MIC, 8000, android.media.AudioFormat.CHANNEL_IN_MONO, android.media.AudioFormat.ENCODING_PCM_16BIT, Math.max(spf * 8, android.media.AudioRecord.getMinBufferSize(8000, android.media.AudioFormat.CHANNEL_IN_MONO, android.media.AudioFormat.ENCODING_PCM_16BIT)));
+                if (rec.getState() != android.media.AudioRecord.STATE_INITIALIZED) { log("m17 voice: no microphone"); return; }
+                rec.startRecording();
+            }
+            byte[] primed = pending.toByteArray();
+            int sent = 0;
+            while (sent + 48 <= primed.length) {
+                int fill = sendSymChunk(primed, sent, 48, false);
+                if (fill < 0) return;
+                sent += 48;
+                if (sent / 48 == 8 && !keyed) { engine.ptt(true); keyed = true; log("m17 voice key " + src); }
+                paceSym(fill, keyed);
+            }
+            short[] buf = new short[spf];
+            byte[] half = null;
+            int fn = 0, scriptAt = 0;
+            long t0 = System.currentTimeMillis();
+            boolean closed = false;
+            while (!closed && fn < 700) {
+                boolean release = !m17Down || System.currentTimeMillis() - t0 > 27500;
+                if (script != null) {
+                    int n = Math.min(spf, script.length - scriptAt);
+                    if (n <= 0) release = true;
+                    else { System.arraycopy(script, scriptAt, buf, 0, n); scriptAt += n; if (n < spf) java.util.Arrays.fill(buf, n, spf, (short) 0); }
+                    if (scriptAt >= script.length) release = true;
+                } else {
+                    int n = rec.read(buf, 0, spf);
+                    if (n < spf) java.util.Arrays.fill(buf, Math.max(0, n), spf, (short) 0);
+                }
+                byte[] enc = c2.encode(buf);
+                if (half == null) {
+                    half = enc;
+                    if (!release) continue;
+                    enc = c2.encode(new short[spf]);
+                }
+                byte[] pay = new byte[16];
+                System.arraycopy(half, 0, pay, 0, Math.min(8, half.length));
+                System.arraycopy(enc, 0, pay, 8, Math.min(8, enc.length));
+                half = null;
+                int frameNo = fn | (release ? 0x8000 : 0);
+                if (script != null) {
+                    StringBuilder hx = new StringBuilder(32);
+                    for (byte b : pay) hx.append(String.format(java.util.Locale.US, "%02X", b & 0xFF));
+                    log("m17 pay " + frameNo + " " + hx);
+                }
+                pending.write(com.macdmr.radio.ham.M17.packSymbols(com.macdmr.radio.ham.M17.streamSymbols(lsf, frameNo, pay, fn % 6)));
+                fn++;
+                byte[] data = pending.toByteArray();
+                while (sent + 48 <= data.length) {
+                    boolean last = release && sent + 48 >= data.length;
+                    int fill = sendSymChunk(data, sent, 48, last);
+                    if (fill < 0) return;
+                    sent += 48;
+                    if (sent / 48 == 8 && !keyed) { engine.ptt(true); keyed = true; log("m17 voice key " + src); }
+                    paceSym(fill, keyed);
+                }
+                if (release) closed = true;
+            }
+            byte[] data = pending.toByteArray();
+            if (sent < data.length) {
+                int fill = sendSymChunk(data, sent, data.length - sent, true);
+                if (fill < 0) return;
+                if (!keyed) { engine.ptt(true); keyed = true; log("m17 voice key " + src); }
+                paceSym(fill, keyed);
+            }
+            log("m17 voice frames " + fn);
+            if (keyed) unkeyAfterStop();
+        } catch (Throwable t) { log("m17 voice: " + t); }
+        finally {
+            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } }
+            m17Down = false; m17Tx = false; m17Script = null;
+            if (rec != null) { try { rec.stop(); } catch (Throwable ignored) { } rec.release(); }
+            if (c2 != null) c2.close();
+        }
+    }
+
+    private String m17Call() {
+        try { if (packet != null && packet.callsignSet()) return packet.callsign(); } catch (Throwable ignored) { }
+        return getSharedPreferences("packet", MODE_PRIVATE).getString("callsign", "");
+    }
+
+    /** Send one symbol chunk. The last chunk of a transmission is op 7 so the module drops the carrier.
+     *  Returns the ring fill, or -1 if the module refused. Does not wait for the ring: it only drains while the transmitter is keyed, so the caller keys on the eighth chunk and then paces. */
+    private int sendSymChunk(byte[] data, int off, int n, boolean last) throws InterruptedException {
+        byte[] body = new byte[1 + n];
+        body[0] = (byte) (last ? 7 : 1);
+        System.arraycopy(data, off, body, 1, n);
+        Frame ack = sym40(body);
+        int wait = 0;
+        while ((ack == null || ack.sr != 0) && wait < 8) { Thread.sleep(40); ack = sym40(body); wait++; }
+        if (ack == null || ack.sr != 0) { log("m17 voice refused at " + off); return -1; }
+        if (last) log("m17 voice last op 7");
+        return ack.body != null && ack.body.length > 1 ? ((ack.body[0] & 0xFF) | ((ack.body[1] & 0xFF) << 8)) : 0;
+    }
+
+    /** Before the key, a short pause. After it, wait while the ring is over 1500 symbols, the same pace as a symbol-file stream. */
+    private void paceSym(int fill, boolean keyed) throws InterruptedException {
+        if (!keyed) { Thread.sleep(5); return; }
+        int spins = 0;
+        while (fill > 1500 && spins < 400) {
+            Thread.sleep(20);
+            Frame s = sym40(new byte[] { 2 });
+            if (s != null && s.body != null && s.body.length > 1) fill = (s.body[0] & 0xFF) | ((s.body[1] & 0xFF) << 8);
+            spins++;
+        }
+        Thread.sleep(15);
+    }
+
+    /** Op 7 drops the carrier and leaves the module timer running. The unkey stops that timer. */
+    private void unkeyAfterStop() throws InterruptedException, java.io.IOException {
+        long seen = status4At;
+        long t0 = System.currentTimeMillis();
+        while (status4At == seen && System.currentTimeMillis() - t0 < 2500) Thread.sleep(20);
+        engine.ptt(false);
+        log("sym unkey");
     }
     public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
     /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
@@ -1870,7 +2034,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 break;
             }
             case 3: transmitting = true; refreshControls(); if (coverage != null) coverage.onTxStart(); ui.post(() -> { for (Listener l : listeners) l.onTx(true); }); break;
-            case 4: transmitting = false; refreshControls(); if (coverage != null) coverage.onTxEnd(); history("tx", "📻 Voice TX"); ui.post(() -> { for (Listener l : listeners) l.onTx(false); }); break;
+            case 4: status4At = System.currentTimeMillis(); transmitting = false; refreshControls(); if (coverage != null) coverage.onTxEnd(); history(m17Tx ? "m17" : "tx", m17Tx ? "📻 M17 TX" : "📻 Voice TX"); ui.post(() -> { for (Listener l : listeners) l.onTx(false); }); break;
             case 5: try { engine.fetchSms(); } catch (IOException ignored) { } break;             // SMS_RECEIVED -> ask for it
             case 8: smsResult(true); break;
             case 9: smsResult(false); break;

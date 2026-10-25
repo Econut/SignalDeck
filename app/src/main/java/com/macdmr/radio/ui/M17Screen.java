@@ -42,6 +42,15 @@ public final class M17Screen extends ModeScreen {
         note = Neo.sheetHint(c, ""); body.addView(note);
         content.addView(sv);
         LinearLayout r = buttonRow();
+        if (svc.m17CanSend()) {
+            android.widget.TextView talk = button(r, "Hold to talk", "voice", Neo.RED, null);
+            talk.setOnTouchListener((v, e) -> {
+                int a = e.getAction();
+                if (a == android.view.MotionEvent.ACTION_DOWN) { svc.m17Voice(true); return true; }
+                if (a == android.view.MotionEvent.ACTION_UP || a == android.view.MotionEvent.ACTION_CANCEL) { svc.m17Voice(false); return true; }
+                return false;
+            });
+        }
         button(r, "Stop M17", "stop", Neo.RED, v -> { svc.setM17(false); close(); });
         refresh();
     }
@@ -74,7 +83,10 @@ public final class M17Screen extends ModeScreen {
             }
             if (hl.isEmpty()) list.addView(Neo.sheetHint(c, "Nothing yet. Tune the M17 frequency (the channel or the VFO). A transmission is found from its sync and played on the phone's speaker."));
         }
-        set(note.getText().length() == 0 ? note : note, "Receive only: this radio cannot transmit M17 that M17 radios decode. The radio's audio path removes the low tones M17 needs, so SignalDeck rebuilds them (" + st.calibration() + ")."
+        set(note.getText().length() == 0 ? note : note, (svc.m17CanSend()
+            ? "Hold to talk sends your voice as M17, to everyone (@ALL), for up to 28 seconds. Your callsign is the one in APRS settings. "
+            : "Receive only on this firmware: transmitting M17 needs the module firmware with the symbol engine. ")
+            + "The radio's audio path removes the low tones M17 needs, so SignalDeck rebuilds them on receive (" + st.calibration() + ")."
             + (st.held() ? " The module's voice filter is held open, so a transmission already in progress can still lock." : " It needs a fairly strong signal and the start of each transmission (its preamble)."));
     }
 }

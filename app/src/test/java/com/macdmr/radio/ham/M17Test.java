@@ -29,6 +29,22 @@ public class M17Test {
         assertEquals(137, M17.INTRL[1]);
     }
 
+    @Test public void voiceSymbolsMatchTheResearchEncoder() {
+        assertEquals("N0CALL", M17.voiceCall("n0call-7"));
+        assertEquals("N0CALL", M17.voiceCall(""));
+        assertArrayEquals(new byte[] { 0x4B }, M17.packSymbols(new int[] { 3, 1, -1, -3 }));
+        byte[] lsf = M17.lsf("N0CALL", "W9XYZ", 0x0005, null);
+        int[] got = M17.lsfSymbols(lsf);
+        int[] py = { 3,3,3,3,-3,-3,3,-3,-1,3,3,-1,1,-3,-3,3,-1,-1,-1,-1,-1,3,1,1 };
+        for (int i = 0; i < py.length; i++) assertEquals("lsf " + i, py[i], got[i]);
+        byte[] pay = new byte[16]; for (int i = 0; i < 16; i++) pay[i] = (byte) i;
+        int[] st = M17.streamSymbols(lsf, 0x8000, pay, 5);
+        int[] pySt = { -3,-3,-3,-3,3,3,-3,3,-3,-3,1,1,-1,-1,-1,3 };
+        for (int i = 0; i < pySt.length; i++) assertEquals("str " + i, pySt[i], st[i]);
+        assertEquals((byte) 0x55, M17.packSymbols(got)[0]);
+        assertEquals((byte) 0xF7, M17.packSymbols(got)[1]);
+    }
+
     @Test public void loopbackThroughTheCodes() {
         byte[] lsf = M17.lsf("W9XYZ", "@ALL", 0x0005, "HELLO M17".getBytes());
         M17.Lsf l = M17.decodeLsf(toFloat(M17.lsfSymbols(lsf)), 8);
