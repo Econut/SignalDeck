@@ -436,8 +436,9 @@ public final class PktDialog {
 
     private void sstvSend() {
         if (!(c instanceof com.macdmr.radio.MainActivity)) { toast("Open from the main screen"); return; }
-        final String[] names = { "Robot 24 Color (\u224824 s)", "Robot 12 BW (\u224812 s)", "Robot 8 BW (\u22488 s)" };
-        final int[] modes = { SSTVEncoder.ROBOT_24_COLOR, SSTVEncoder.ROBOT_12_BW, SSTVEncoder.ROBOT_8_BW };
+        final int[] modes = SSTVEncoder.MODES;
+        final String[] names = new String[modes.length];
+        for (int i = 0; i < modes.length; i++) names[i] = SSTVEncoder.label(modes[i]) + (SSTVEncoder.isLong(modes[i]) ? "  \u00B7 long" : "");
         new AlertDialog.Builder(c).setTitle("SSTV mode").setItems(names, (dd, w) -> ((com.macdmr.radio.MainActivity) c).pickImage(uri -> {
             try (java.io.InputStream in = c.getContentResolver().openInputStream(uri)) {
                 android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(in);

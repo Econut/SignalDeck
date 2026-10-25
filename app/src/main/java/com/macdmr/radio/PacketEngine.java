@@ -53,6 +53,10 @@ public final class PacketEngine {
         boolean txBusy();
         /** Key, play the 8 kHz mono PCM, release; {@code onDone} runs after release (on the service worker). */
         void transmitPcm(short[] pcm, String label, Runnable onDone);
+        /** The same with the caller's own limit (the long SSTV modes, up to the radio's 120 s less a margin); the cool-down guard applies past 30 s. */
+        default void transmitPcmLong(short[] pcm, String label, int maxMs, Runnable onDone) { transmitPcm(pcm, label, onDone); }
+        /** The cool-down guard's answer for a transmission of {@code ms}: why it must wait, or null. */
+        default String longTxWait(int ms) { return null; }
         Location location();
         void event(String line);                 // a history line / toast on the intercom
         void notifyUser(String title, String text, boolean alert);
@@ -209,18 +213,25 @@ public final class PacketEngine {
         sstvPost("listening for a VIS header", null, 0, 0, false);
     }
 
-    /** Encode and transmit a picture (Robot 24 Color / 12 BW / 8 BW fit the 30 s limit). Returns an error or null. */
+    /**
+     * Encode and transmit a picture. The short Robot modes go as before; the long modes (Robot 36, Martin, Scottie,
+     * PD 90) run up to the radio's own 120 s time-out less a margin and pass the cool-down guard first. Returns an
+     * error, the guard's wait, or null when the picture is on its way.
+     */
     public String sendSstv(android.graphics.Bitmap bmp, int mode) {
         if (bmp == null) return "No picture";
         if (!SSTVEncoder.isSupported(mode)) return "Unsupported mode";
         if (!host.analogRx()) return "SSTV needs an analog channel";
+        final int total = SSTVEncoder.durationMs(mode) + TX_LEAD_MS;
+        if (total > 118_000) return SSTVEncoder.name(mode) + " runs " + Math.round(total / 1000.0) + " s, past what this radio allows (118 s)";
+        if (total > 30_000) { String wait = host.longTxWait(total); if (wait != null) return wait; }
         new Thread(() -> {
             short[] pcm = SSTVEncoder.encode(bmp, mode);
             int lead = SR * TX_LEAD_MS / 1000;
             short[] src = new short[lead + pcm.length];
             for (int i = 0; i < lead; i++) src[i] = (short) (30000 * Math.sin(2.0 * Math.PI * 1900 * i / SR));   // leader tone while the TX path settles
             System.arraycopy(pcm, 0, src, lead, pcm.length);
-            host.transmitPcm(src, "SSTV " + SSTVEncoder.name(mode), () -> host.event("\uD83D\uDCFA Sent SSTV " + SSTVEncoder.name(mode)));
+            host.transmitPcmLong(src, "SSTV " + SSTVEncoder.name(mode), total > 30_000 ? 118_000 : 28_500, () -> host.event("\uD83D\uDCFA Sent SSTV " + SSTVEncoder.name(mode)));
         }, "sstv-encode").start();
         return null;
     }

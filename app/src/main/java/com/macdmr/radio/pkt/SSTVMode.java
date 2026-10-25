@@ -22,6 +22,7 @@ public class SSTVMode {
     public static final int MODE_SCOTTIE_S1 = 0x3C;  // VIS code 60
     public static final int MODE_SCOTTIE_S2 = 0x38;  // VIS code 56
     public static final int MODE_SCOTTIE_DX = 0x4C;  // VIS code 76
+    public static final int MODE_PD_90 = 0x63;       // VIS code 99
     public static final int MODE_PD_120 = 0x5F;      // VIS code 95
     public static final int MODE_PD_180 = 0x60;      // VIS code 96
     public static final int MODE_ROBOT_8_BW  = 0x02; // VIS code 2
@@ -93,6 +94,7 @@ public class SSTVMode {
         new Mode(MODE_SCOTTIE_DX, "Scottie DX", 320, 256, true, 316000, 345.600f, 1050.300f, 3, SYNC_FAMILY_NINE_MS),
 
         // PD modes (RGB) — fullLine = 20 + 2.08 + 3*ch (approximate)
+        new Mode(MODE_PD_90,  "PD 90",  320, 256, true,  90000, 170.24f, 703.04f, 3, SYNC_FAMILY_TWENTY_MS),
         new Mode(MODE_PD_120, "PD 120", 640, 496, true, 126000, 121.9f, 369.78f, 3, SYNC_FAMILY_TWENTY_MS),
         new Mode(MODE_PD_180, "PD 180", 640, 496, true, 188000, 183.04f, 573.2f,  3, SYNC_FAMILY_TWENTY_MS),
 

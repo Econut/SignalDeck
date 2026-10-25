@@ -4,6 +4,14 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Long SSTV modes with the cool-down guard
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Review of the FW19 bench (held since the transmit-length finding) | SSTV send gains the long modes: Robot 36 (37 s), Martin M2 (59 s), Scottie S2 (72 s), PD 90 (91 s), Scottie S1 (111 s) and Martin M1 (115 s), next to the three short Robot modes, on the phone's picker and SignalDeck Web (select order shortest first; the web API's mode index changed with it). A transmission may run up to 118 s (`TX_MAX_MS`: the module's 120 s time-out less a margin); everything that is not a long picture keeps the 28.5 s refusal and the 28 s voice watchdog. PD 90 joins the decoder's mode table too. | `pkt/SSTVEncoder.java` (Martin, Scottie, PD and Robot 36 line timings; `MODES`, `label`, `isLong`, `encodePixels`), `pkt/SSTVMode.java`, `PacketEngine.java` (`sendSstv`, `Host.transmitPcmLong`/`longTxWait`), `RadioService.java` (`transmitPcm(…, maxMs)`), `ui/PktDialog.java`, `web/WebHost.java`, `web/index.html` | host: `SstvEncoderTest` (durations against the mode standards, VIS bits, sample counts per line); device: not yet, the phone is with the bench; a HackRF decode of each long mode is the pass |
+| same | The cool-down guard the bench measured: after any transmission longer than 30 s, the next one longer than 30 s waits until the phone's AP thermal zone (`mtktsAP`, read over su) is back within 1 °C of its value before that key, or 17 minutes when the zone cannot be read; the send returns the wait with the reason and the excess, the history says why, short transmissions are never held, and a long transmission writes a history line with the zone's state. | `ThermalGuard.java` (new), `RadioService.java` | host build; device later |
+| same | A status 4 that arrives while SignalDeck still holds PTT after 100 s is the radio's own time-out and now gets a history line. | `RadioService.java` | device later |
+
 ## 2026-10-25 — M17 end marker, fuller M17 encoder test, FT8 grid check
 
 | Backlog | Change | Files | Test |

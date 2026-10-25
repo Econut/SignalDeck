@@ -488,6 +488,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         @Override public String channelName() { ChannelStore.Channel c = current; return c == null ? "" : c.name; }
         @Override public boolean txBusy() { return pttDown; }
         @Override public void transmitPcm(short[] pcm, String label, Runnable onDone) { RadioService.this.transmitPcm(pcm, label, onDone); }
+        @Override public void transmitPcmLong(short[] pcm, String label, int maxMs, Runnable onDone) { RadioService.this.transmitPcm(pcm, label, onDone, maxMs); }
+        @Override public String longTxWait(int ms) { return thermal.gate(ms); }
         @Override public android.location.Location location() { return lastKnownLocation(); }
         @Override public void stationHeard(String call, double lat, double lon, long ts, String detail) { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactHeard(pc.id, ts, "APRS", detail, lat, lon); }
         @Override public void sentTo(String call, String source, String detail) { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactSent(pc.id, System.currentTimeMillis(), source, detail); }
@@ -631,21 +633,39 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Hands-free one-shot transmission: key, play the PCM through the TX path, release, resume RX. */
     public void transmitPcm(final short[] pcm, final String label, final Runnable onDone) { transmitPcm(pcm, label, onDone, false); }
     /** liftLimit is the one bench tone that may run to 40 s. It uses engine.ptt, so the 28 s voice watchdog is not in this path. */
-    private void transmitPcm(final short[] pcm, final String label, final Runnable onDone, final boolean liftLimit) {
+    private void transmitPcm(final short[] pcm, final String label, final Runnable onDone, final boolean liftLimit) { transmitPcm(pcm, label, onDone, liftLimit ? 40000 : 28500); }
+
+    /** The cool-down guard for transmissions longer than 30 s (the bench's heat table, 2026-10-25). */
+    public final ThermalGuard thermal = new ThermalGuard();
+    /** The longest one transmission may run: the module's own 120 s time-out less a margin (FW19 ceiling 120.3 s, stock firmware 120 s start-up value, `setTot(120)` since 2026-10-25). */
+    public static final int TX_MAX_MS = 118_000;
+
+    /**
+     * Key, play 8 kHz PCM, release. {@code maxMs} is the caller's limit: 28.5 s for everything that has not been
+     * measured longer (the voice watchdog stays 28 s), up to {@link #TX_MAX_MS} for the long SSTV modes, which also
+     * pass the cool-down guard first.
+     */
+    private void transmitPcm(final short[] pcm, final String label, final Runnable onDone, final int maxMs) {
         worker.execute(() -> {
             try {
                 if (!isReady()) { log("TX " + label + " skipped: radio not ready"); return; }
                 if (txInhibited()) { log("TX " + label + " blocked: receive-only channel"); history("warn", "\u26D4 TX blocked on a receive-only channel"); return; }
                 if (pttDown) { log("TX " + label + " skipped: PTT busy"); return; }
                 int ms = pcm.length / 8;
-                int cap = liftLimit ? 40000 : 28500;
-                if (ms > cap) { log("TX " + label + " refused: " + ms + " ms"); if (!liftLimit) history("warn", "\u26D4 Too long for this radio's 30 s transmit limit (" + label + ")"); return; }
+                int cap = Math.min(maxMs, TX_MAX_MS);
+                if (ms > cap) { log("TX " + label + " refused: " + ms + " ms over " + cap); history("warn", "\u26D4 Too long to send (" + label + ", " + Math.round(ms / 1000.0) + " s; the radio allows " + (cap / 1000) + " s)"); return; }
+                if (ms > ThermalGuard.LONG_MS) {
+                    String wait = thermal.gate(ms);
+                    if (wait != null) { log("TX " + label + " held: " + wait); history("warn", "\u23F3 " + wait); return; }
+                    thermal.beforeLong();
+                }
                 pttDown = true;
                 if (audio != null) audio.stopRx();
                 engine.ptt(true);
                 log("TX " + label + " (" + ms + " ms)");
                 try { Thread.sleep(200); if (audio != null) log(audio.playPcm(pcm)); }
-                finally { engine.ptt(false); pttDown = false; if (rxAudioOn && audio != null) audio.startRx(true); }
+                finally { engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null) audio.startRx(true); }
+                if (ms > ThermalGuard.LONG_MS) history("tx", "\uD83D\uDCFB Long transmission " + Math.round(ms / 1000.0) + " s (" + label + "); " + thermal.state());
                 if (onDone != null) onDone.run();
             } catch (Throwable t) { log("TX " + label + ": " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
         });
@@ -2176,7 +2196,8 @@ public class RadioService extends Service implements RadioEngine.Events {
                 break;
             }
             case 3: transmitting = true; refreshControls(); if (coverage != null) coverage.onTxStart(); ui.post(() -> { for (Listener l : listeners) l.onTx(true); }); break;
-            case 4: status4At = System.currentTimeMillis(); transmitting = false; refreshControls(); if (coverage != null) coverage.onTxEnd(); history(m17Tx ? "m17" : "tx", m17Tx ? "📻 M17 TX" : "📻 Voice TX"); ui.post(() -> { for (Listener l : listeners) l.onTx(false); }); break;
+            case 4: status4At = System.currentTimeMillis(); transmitting = false; refreshControls(); if (coverage != null) coverage.onTxEnd(); history(m17Tx ? "m17" : "tx", m17Tx ? "📻 M17 TX" : "📻 Voice TX");
+                if (pttDown && !m17Tx && System.currentTimeMillis() - txStartedAt > 100_000) history("warn", "\u23F1 The radio ended the transmission itself: its 120 s time-out"); ui.post(() -> { for (Listener l : listeners) l.onTx(false); }); break;
             case 5: try { engine.fetchSms(); } catch (IOException ignored) { } break;             // SMS_RECEIVED -> ask for it
             case 8: smsResult(true); break;
             case 9: smsResult(false); break;

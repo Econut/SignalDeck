@@ -1158,8 +1158,8 @@ public final class WebHost {
             }
             case "/api/sstv/send": if (!post) break; {                          // body: the picture's bytes (PNG/JPEG); ?mode=0..2
                 if (!allowTx()) return WebServer.Response.error(403, TX_OFF);
-                int[] modes = { com.macdmr.radio.pkt.SSTVEncoder.ROBOT_24_COLOR, com.macdmr.radio.pkt.SSTVEncoder.ROBOT_12_BW, com.macdmr.radio.pkt.SSTVEncoder.ROBOT_8_BW };
-                int m = parse(r.param("mode"), 0); if (m < 0 || m >= modes.length) return WebServer.Response.error(400, "mode: 0 Robot 24 Color, 1 Robot 12 BW, 2 Robot 8 BW");
+                int[] modes = com.macdmr.radio.pkt.SSTVEncoder.MODES;                 // the page's select lists them in this order
+                int m = parse(r.param("mode"), 2); if (m < 0 || m >= modes.length) return WebServer.Response.error(400, "mode: 0 Robot 8 BW, 1 Robot 12 BW, 2 Robot 24 Color, 3 Robot 36, 4 Martin M2, 5 Scottie S2, 6 PD 90, 7 Scottie S1, 8 Martin M1");
                 android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(r.body, 0, r.body.length);
                 if (bmp == null) return WebServer.Response.error(400, "That is not a picture this phone can read (use PNG or JPEG)");
                 String e = onMain(() -> svc.packet().sendSstv(bmp, modes[m]));

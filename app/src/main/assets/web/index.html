@@ -236,10 +236,10 @@
           <span class="label" style="display:block;margin-top:18px">SEND A PICTURE</span>
           <form id="sstvSend" class="row wrap" style="margin-top:10px">
             <input type="file" id="sstvFile" accept="image/png,image/jpeg,image/webp" class="grow">
-            <select id="sstvMode"><option value="0">Robot 24 Color (≈24 s)</option><option value="1">Robot 12 BW (≈12 s)</option><option value="2">Robot 8 BW (≈8 s)</option></select>
+            <select id="sstvMode"><option value="0">Robot 8 BW (≈8 s)</option><option value="1">Robot 12 BW (≈12 s)</option><option value="2" selected>Robot 24 Color (≈24 s)</option><option value="3">Robot 36 (≈37 s, long)</option><option value="4">Martin M2 (≈59 s, long)</option><option value="5">Scottie S2 (≈72 s, long)</option><option value="6">PD 90 (≈91 s, long)</option><option value="7">Scottie S1 (≈111 s, long)</option><option value="8">Martin M1 (≈115 s, long)</option></select>
             <button class="btn primary">Send</button>
           </form>
-          <p id="sstvSendNote" class="muted small">Sends on the current analog channel. The radio stops any transmission after 30 seconds, so only these short modes are offered.</p>
+          <p id="sstvSendNote" class="muted small">Sends on the current analog channel. The long modes run up to the radio's own 120 s time-out; after one of them the phone cools down before the next long picture (a short mode can go meanwhile).</p>
         </div>
         <div class="panel"><div class="row between"><span class="label">PICTURES</span><button class="btn small-btn" id="picSelect">Select</button></div>
           <div id="selBar" class="sel-bar hidden"><span id="selCount" class="mono">0 selected</span><div class="row wrap"><button class="btn small-btn" id="selAll">All</button><button class="btn small-btn" id="selComb" title="Combine receptions of the same picture">Combine</button><button class="btn small-btn" id="selShare">Share</button><button class="btn small-btn danger" id="selDel">Delete</button><button class="btn small-btn" id="selDone">Done</button></div></div>
