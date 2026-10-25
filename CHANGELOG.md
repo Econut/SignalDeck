@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Firmware page review fixes
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Phase E | The wrong-tag drill is a diagnostics command (`fwbadtag`), not a button on the page. While a load runs the intercom, the widget, SignalDeck Web and Android Auto say the radio is busy loading firmware, and Talk does nothing. The bar adds Erasing, which fills over 12 seconds, and Transfer fills with the blocks sent. The header waits up to 60 seconds. A stock-app version that differs is a warning when the firmware file matches, and a refusal only when the file does not. | `ui/FirmwareScreen.java`, `fw/YModemSender.java`, `fw/ImageTable.java`, `fw/FirmwareSession.java`, `RadioService.java`, `DiagReceiver.java`, `ui/IntercomView.java`, `ui/ModeScreen.java`, `RadioWidget.java`, `web/WebHost.java`, `assets/web/app.js`, `ui/HelpView.java` | Host: `ImageTableTest` (version mismatch with a matching file is allowed and warned). Device: the page no longer shows the drill, and the seven pre-flight checks are still green. |
+
+
 ## 2026-10-25 — Module firmware page
 
 | Backlog | Change | Files | Test |

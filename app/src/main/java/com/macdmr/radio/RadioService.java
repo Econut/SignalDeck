@@ -1594,6 +1594,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (scope.running()) { scope.stop(); log("band scope stopped for Talk"); }   // back on the channel before keying
                     final boolean fromWheel = wheelPtt, fromCall = callPtt; wheelPtt = false; callPtt = false;      // read once, whatever happens next
                     final AudioBackend.TxFeed webFeed = webFeedNext; webFeedNext = null;
+                    if (firmwareBusy) { log("PTT blocked: loading firmware"); history("warn", "Radio busy, loading firmware"); return; }
                     if (!isReady()) { log("PTT ignored: radio not ready"); return; }
                     if (!profile.verified) { log("PTT blocked: untested profile"); history("warn", "⛔ Transmit is off on this phone until its profile has been tested"); return; }
                     if (txInhibited()) { log("PTT blocked: receive-only channel"); history("warn", "⛔ TX blocked on a receive-only channel"); return; }
@@ -1681,6 +1682,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         boolean allowed = path.startsWith("/sdcard/Download/DMR/Firmware/")
                 || path.startsWith("/storage/emulated/0/Download/DMR/Firmware/");
         if (!allowed) { log("fwload refused " + path); return; }
+        setFirmwareBusy(true);
         Thread job = new Thread(() -> {
             boolean diverted = false;
             try {
@@ -1711,6 +1713,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             } finally {
                 if (diverted) engine.stopDivert();
                 try { if (!engine.isOpen()) engine.open(); } catch (java.io.IOException e) { log("fwload reopen " + e.getMessage()); }
+                setFirmwareBusy(false);
             }
         }, "fwload");
         fwThread = job;
@@ -1718,13 +1721,25 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     private final java.util.concurrent.atomic.AtomicBoolean fwHalt = new java.util.concurrent.atomic.AtomicBoolean();
+    private volatile boolean firmwareBusy;
+    /** True while a firmware load owns the radio. Talk is refused and every screen says so. */
+    public boolean firmwareLoading() { return firmwareBusy; }
+    private void setFirmwareBusy(boolean on) {
+        firmwareBusy = on;
+        ui.post(() -> { for (Listener l : listeners) l.onLink(link); });
+        updateNotification();
+    }
 
     /** The firmware page: load one known image. {@code treatTagAsWrong} forces the factory restore after a good transfer. */
     public void loadFirmware(com.macdmr.radio.fw.ImageTable.Row row, byte[] image, com.macdmr.radio.fw.FirmwareSession.Ui ui, boolean treatTagAsWrong) {
         Thread old = fwThread;
         if (old != null && old.isAlive()) { ui.finished("A load is already running"); return; }
         fwHalt.set(false);
-        Thread job = new Thread(() -> com.macdmr.radio.fw.FirmwareSession.run(this, row, image, ui, fwHalt, treatTagAsWrong), "fwpage");
+        setFirmwareBusy(true);
+        Thread job = new Thread(() -> {
+            try { com.macdmr.radio.fw.FirmwareSession.run(this, row, image, ui, fwHalt, treatTagAsWrong); }
+            finally { setFirmwareBusy(false); }
+        }, "fwpage");
         fwThread = job;
         job.start();
     }

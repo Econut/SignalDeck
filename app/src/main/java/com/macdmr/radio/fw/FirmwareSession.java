@@ -24,8 +24,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class FirmwareSession {
     public static final class Check {
         public final String name, detail;
-        public final boolean ok;
-        public Check(String name, boolean ok, String detail) { this.name = name; this.ok = ok; this.detail = detail; }
+        public final boolean ok, warn;
+        public Check(String name, boolean ok, String detail) { this(name, ok, detail, false); }
+        public Check(String name, boolean ok, String detail, boolean warn) { this.name = name; this.ok = ok; this.detail = detail; this.warn = warn; }
     }
 
     public interface Ui {
@@ -51,6 +52,7 @@ public final class FirmwareSession {
         boolean fileOk = image != null && row != null && image.length == row.size && row.sha256.equals(FirmwareVault.sha256(image)) && row.tag.equals(ImageTable.tagOf(image));
         boolean busy = svc.isTransmitting() || svc.scanning() || svc.m17Running() || svc.ft8Running() || svc.packetActive() || svc.scope().running();
         String policy = fileOk ? ImageTable.refuse(row, module, backup.sha256, backup.tag, android.os.Build.MODEL, svc.profile().stockApp, pkgVer, backup.verified, stockThere) : "The file does not match the known image";
+        String versionNote = ImageTable.versionWarning(backup.sha256, pkgVer);
         List<Check> checks = new ArrayList<>();
         checks.add(new Check("Module answers", !module.isEmpty() || (row != null && row.factory), module.isEmpty() ? "No version yet" : module));
         checks.add(new Check("Radio is idle", !busy, busy ? "Stop the transmission, scan or data mode first" : "Idle"));
@@ -58,7 +60,7 @@ public final class FirmwareSession {
         checks.add(new Check("Battery", (pct > 40 && charging) || pct > 60, pct + "% " + (charging ? "charging" : "on battery")));
         checks.add(new Check("Image hash", fileOk, fileOk ? row.sha256.substring(0, 12) : "The file does not match the known image"));
         checks.add(new Check("Factory backup", backup.verified, backup.verified ? backup.source : "Missing or it does not match"));
-        checks.add(new Check("This phone", policy == null, policy == null ? svc.profile().name : policy));
+        checks.add(new Check("This phone", policy == null, policy == null ? svc.profile().name + (versionNote == null ? "" : " · " + versionNote) : policy, versionNote != null && policy == null));
         return checks;
     }
 

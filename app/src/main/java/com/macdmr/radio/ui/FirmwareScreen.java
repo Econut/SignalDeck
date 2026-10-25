@@ -25,20 +25,28 @@ import java.util.Locale;
 
 /** The module firmware page: what is loaded, the pre-flight, the transfer, and recovery on the same screen. */
 public final class FirmwareScreen extends LinearLayout {
-    private static final String[] PHASES = { "preparing", "update", "handshake", "transfer", "finish", "restart", "verify" };
-    private static final String[] PHASE_LABELS = { "Prepare", "Update", "Hello", "Transfer", "Finish", "Restart", "Verify" };
+    private static final String[] PHASES = { "preparing", "update", "handshake", "erasing", "transfer", "finish", "restart", "verify" };
+    private static final String[] PHASE_LABELS = { "Prepare", "Update", "Hello", "Erasing", "Transfer", "Finish", "Restart", "Verify" };
 
     private final RadioService svc;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final TextView installed, chosen, backupLine, result, figures, log;
     private final LinearLayout checks, images, confirm;
     private final PhaseBar bar;
-    private final TextView load, restore, stop, mismatch, logToggle;
+    private final TextView load, restore, stop, logToggle;
     private ImageTable.Row selected = ImageTable.FACTORY;
     private final java.util.HashSet<String> onPhone = new java.util.HashSet<>();
     private boolean logOpen, running, recovery;
     private int retries;
-    private long startedAt, lastAck = 600;
+    private long startedAt, eraseAt, lastAck = 590;
+    private final Runnable eraseTick = new Runnable() { @Override public void run() {
+        if (!"erasing".equals(bar.phaseName())) return;
+        bar.setFill(Math.min(1f, (System.currentTimeMillis() - eraseAt) / 12000f));
+        long leftErase = Math.max(0, 12000 - (System.currentTimeMillis() - eraseAt));
+        long left = leftErase + 370L * lastAck;
+        figures.setText(String.format(Locale.US, "Erasing\n%d s left in this phase", (leftErase + 999) / 1000));
+        ui.postDelayed(this, 200);
+    } };
 
     public FirmwareScreen(Context c, RadioService svc, Runnable onClose) {
         super(c);
@@ -86,27 +94,20 @@ public final class FirmwareScreen extends LinearLayout {
         stop.setEnabled(false);
         row.addView(load, weight()); row.addView(restore, weight()); row.addView(stop, weight());
         body.addView(row);
-        mismatch = Neo.button(c, "Check a wrong tag", "alert", Neo.AMBER);
-        body.addView(mismatch, buttonPad());
-
         confirm = new LinearLayout(c); confirm.setOrientation(VERTICAL); confirm.setVisibility(GONE);
         confirm.setPadding(dp(12), dp(12), dp(12), dp(12)); confirm.setBackground(Neo.card(c, Neo.AMBER, 14));
         body.addView(confirm, buttonPad());
 
-        load.setOnClickListener(v -> ask(false, false));
-        restore.setOnClickListener(v -> { selected = ImageTable.FACTORY; showChosen(); ask(false, false); });
+        load.setOnClickListener(v -> ask(false));
+        restore.setOnClickListener(v -> { selected = ImageTable.FACTORY; showChosen(); ask(false); });
         stop.setOnClickListener(v -> svc.haltFirmware());
-        mismatch.setOnClickListener(v -> ask(true, false));
         refreshFacts();
     }
 
-    private void ask(boolean wrongTag, boolean recoveryOnly) {
+    private void ask(boolean wrongTag) {
         if (running) return;
-        recovery = recoveryOnly;
         confirm.removeAllViews();
-        TextView q = Neo.text(getContext(), wrongTag
-                ? "This loads the chosen image, then treats the tag as wrong and restores the factory image. Two full loads."
-                : "Load " + selected.tag + "? The module keeps that image until you load another one, including after a reboot.",
+        TextView q = Neo.text(getContext(), "Load " + selected.tag + "? The module keeps that image until you load another one, including after a reboot. While it loads, the radio shows busy and Talk does nothing.",
                 Neo.TEXT, 15, Neo.uiMedium(getContext()));
         confirm.addView(q);
         LinearLayout r = new LinearLayout(getContext());
@@ -127,11 +128,16 @@ public final class FirmwareScreen extends LinearLayout {
             byte[] image = FirmwareVault.bytesFor(getContext(), selected);
             if (image == null) { onUi(() -> finishUi(selected.factory ? "The factory copy is not on this phone" : "That image is not in Download/DMR/Firmware")); return; }
             svc.loadFirmware(selected, image, new FirmwareSession.Ui() {
-                public void phase(String name) { onUi(() -> { bar.setPhase(name); }); }
+                public void phase(String name) { onUi(() -> {
+                    bar.setPhase(name);
+                    if ("erasing".equals(name)) { eraseAt = System.currentTimeMillis(); ui.removeCallbacks(eraseTick); ui.post(eraseTick); }
+                    else ui.removeCallbacks(eraseTick);
+                }); }
                 public void log(String line) { onUi(() -> log.append(line + "\n")); }
                 public void block(int done, int total, long ackMs, int nretry) {
                     onUi(() -> {
                         retries = nretry; lastAck = Math.max(200, ackMs + 300);
+                        bar.setFill(total == 0 ? 0 : done / (float) total);
                         long elapsed = System.currentTimeMillis() - startedAt;
                         long bytes = Math.min(selected.size, (long) done * 1024);
                         long left = (long) (total - done) * lastAck;
@@ -195,7 +201,7 @@ public final class FirmwareScreen extends LinearLayout {
     private void showChecks(List<FirmwareSession.Check> list) {
         checks.removeAllViews();
         for (FirmwareSession.Check c : list) {
-            TextView t = Neo.text(getContext(), (c.ok ? "● " : "● ") + c.name + " — " + c.detail, c.ok ? Neo.GREEN_LIGHT : Neo.RED, 14, Neo.uiMedium(getContext()));
+            TextView t = Neo.text(getContext(), "● " + c.name + " — " + c.detail, !c.ok ? Neo.RED : c.warn ? Neo.AMBER_LIGHT : Neo.GREEN_LIGHT, 14, Neo.uiMedium(getContext()));
             t.setPadding(0, dp(3), 0, 0);
             checks.addView(t);
         }
@@ -221,27 +227,37 @@ public final class FirmwareScreen extends LinearLayout {
     private static final class PhaseBar extends View {
         private final Paint track = new Paint(Paint.ANTI_ALIAS_FLAG), fill = new Paint(Paint.ANTI_ALIAS_FLAG), label = new Paint(Paint.ANTI_ALIAS_FLAG);
         private int phase;
+        private float part = 1f;
+        private String name = "preparing";
 
         PhaseBar(Context c) {
             super(c);
             track.setColor(Neo.TRACK); fill.setColor(Neo.CYAN); label.setColor(Neo.MUTED);
-            label.setTextSize(Theme.dp(c, 9)); label.setTextAlign(Paint.Align.CENTER); label.setTypeface(Neo.ui(c));
+            label.setTextSize(Theme.dp(c, 8)); label.setTextAlign(Paint.Align.CENTER); label.setTypeface(Neo.ui(c));
         }
 
-        void setPhase(String name) {
-            for (int i = 0; i < PHASES.length; i++) if (PHASES[i].equals(name)) phase = i;
+        String phaseName() { return name; }
+
+        void setPhase(String next) {
+            name = next;
+            for (int i = 0; i < PHASES.length; i++) if (PHASES[i].equals(next)) phase = i;
+            part = "transfer".equals(next) || "erasing".equals(next) ? 0f : 1f;
             invalidate();
         }
 
+        void setFill(float fraction) { part = Math.max(0f, Math.min(1f, fraction)); invalidate(); }
+
         @Override protected void onDraw(Canvas canvas) {
             float d = Theme.dp(getContext());
-            float y = d * 14, h = d * 6, gap = d * 3;
+            float y = d * 16, h = d * 6, gap = d * 2;
             float w = (getWidth() - gap * (PHASES.length - 1)) / PHASES.length;
             for (int i = 0; i < PHASES.length; i++) {
                 float x = i * (w + gap);
-                canvas.drawRoundRect(x, y, x + w, y + h, h, h, i <= phase ? fill : track);
+                canvas.drawRoundRect(x, y, x + w, y + h, h, h, track);
+                float lit = i < phase ? 1f : i == phase ? part : 0f;
+                if (lit > 0f) canvas.drawRoundRect(x, y, x + w * lit, y + h, h, h, fill);
                 label.setColor(i == phase ? Neo.CYAN_LIGHT : Neo.MUTED);
-                canvas.drawText(PHASE_LABELS[i], x + w / 2f, y + h + d * 14, label);
+                canvas.drawText(PHASE_LABELS[i], x + w / 2f, y + h + d * 12, label);
             }
         }
     }

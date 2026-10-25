@@ -14,7 +14,7 @@ import java.io.IOException;
  */
 public final class YModemSender {
     public static final int SOH = 0x01, STX = 0x02, EOT = 0x04, ACK = 0x06, NAK = 0x15, CAN = 0x18, CRC_REQ = 0x43;
-    private static final int PROMPT_MS = 10_000, BLOCK_MS = 15_000, TRIES = 3, RETRIES = 6;
+    private static final int PROMPT_MS = 10_000, BLOCK_MS = 15_000, HEADER_MS = 60_000, TRIES = 3, RETRIES = 6;
 
     /** The open control port. {@code read} returns 0–255, or −1 when the wait expires. */
     public interface Wire {
@@ -211,7 +211,8 @@ public final class YModemSender {
         for (int attempt = 0; attempt <= RETRIES; attempt++) {
             log.line(String.format("tx %02X seq %d len %d", packet[0] & 0xFF, packet[1] & 0xFF, packet.length));
             wire.write(packet);
-            long end = System.currentTimeMillis() + BLOCK_MS;
+            if (thenC && watch != null) watch.phase("erasing");
+            long end = System.currentTimeMillis() + (thenC ? HEADER_MS : BLOCK_MS);
             boolean sawAck = false;
             while (System.currentTimeMillis() < end) {
                 int b = wire.read((int) Math.max(1, end - System.currentTimeMillis()));

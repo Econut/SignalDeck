@@ -88,7 +88,7 @@ public class RadioControlScreen extends Screen {
             return new PaneTemplate.Builder(pane.build()).setHeaderAction(Action.APP_ICON).setTitle("Radio controls").build();
         }
         ChannelStore.Channel ch = s.current();
-        String status = s.isReady() ? com.macdmr.radio.RadioWidget.status(s).replace("Mapping coverage · ", "") : "Radio " + s.link();
+        String status = s.firmwareLoading() ? "Radio busy, loading firmware" : s.isReady() ? com.macdmr.radio.RadioWidget.status(s).replace("Mapping coverage · ", "") : "Radio " + s.link();
         if (s.hearing() && s.lastRssi() != -999) status += " · " + CoverageMath.sUnits(s.lastRssi());
         pane.addRow(new Row.Builder().setTitle(ch == null ? "No channel" : "Ch " + ch.number + " · " + ch.name).addText(status).build());
         String caller = s.currentCaller();
@@ -108,11 +108,11 @@ public class RadioControlScreen extends Screen {
 
         boolean tx = s.pttHeld();
         pane.addAction(new Action.Builder()
-                .setTitle(tx ? "STOP TALKING" : "TALK")
+                .setTitle(s.firmwareLoading() ? "LOADING FIRMWARE" : tx ? "STOP TALKING" : "TALK")
                 .setIcon(icon(c, "ptt", 0xFFFFFFFF))
                 .setBackgroundColor(CarColor.createCustom(tx ? Neo.RED : 0xFF1FAE5C, tx ? Neo.RED : 0xFF1FAE5C))
                 .setFlags(Action.FLAG_PRIMARY)
-                .setOnClickListener(() -> { RadioService r = svc(); if (r == null) return; if (r.pttHeld()) r.ptt(false); else r.ptt(true); ui.postDelayed(this::invalidate, 300); })
+                .setOnClickListener(() -> { RadioService r = svc(); if (r == null) return; if (r.firmwareLoading()) return; if (r.pttHeld()) r.ptt(false); else r.ptt(true); ui.postDelayed(this::invalidate, 300); })
                 .build());
         pane.addAction(new Action.Builder()
                 .setTitle("Channels")

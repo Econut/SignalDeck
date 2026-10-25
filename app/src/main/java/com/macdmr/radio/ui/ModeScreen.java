@@ -178,8 +178,9 @@ public abstract class ModeScreen extends LinearLayout implements RadioService.Li
     }
     private void showState() {
         if (waiting) return;
-        int col = tx ? Neo.RED : rx ? Neo.GREEN : Neo.CYAN;
-        set(stateText, tx ? "TRANSMITTING" : rx ? "RECEIVING" : "LISTENING"); color(stateText, col);
+        boolean loading = svc.firmwareLoading();
+        int col = loading ? Neo.AMBER : tx ? Neo.RED : rx ? Neo.GREEN : Neo.CYAN;
+        set(stateText, loading ? "RADIO BUSY, LOADING FIRMWARE" : tx ? "TRANSMITTING" : rx ? "RECEIVING" : "LISTENING"); color(stateText, col);
         stateDot.setBackground(Neo.outline(c, col, 0xFF, 6, 0));
     }
 

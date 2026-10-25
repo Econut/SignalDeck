@@ -105,8 +105,6 @@ public final class ImageTable {
         if (!FACTORY.tag.equals(running.baseTag) && !FACTORY.tag.equals(running.tag)) return "Firmware variant not yet supported (" + tag + ")";
         if (!modelMatches(model)) return "This phone model is not the one that image was built for";
         if (pkg == null || !FACTORY.stockPackage.equals(pkg)) return "The stock radio app on this phone is not the one this image belongs to";
-        if (stockPresent && FACTORY.stockVersion != null && !FACTORY.stockVersion.isEmpty() && !FACTORY.stockVersion.equals(pkgVersion))
-            return "The stock app version is " + pkgVersion + ", not " + FACTORY.stockVersion;
         boolean assetOk = FACTORY.sha256.equals(assetSha) && FACTORY.tag.equals(assetTag);
         if (!assetOk && !backupVerified)
             return stockPresent
@@ -115,5 +113,15 @@ public final class ImageTable {
         if (!image.factory && !backupVerified) return "Load the factory backup onto this phone before any other image";
         if (!image.factory && !FACTORY.tag.equals(image.baseTag)) return "That image was not built from this phone's factory firmware";
         return null;
+    }
+
+    /**
+     * A note when the stock app's version name is not the one the table recorded, but only when the asset
+     * itself matches. A different file is a refusal from {@link #refuse}, not a warning.
+     */
+    public static String versionWarning(String assetSha, String pkgVersion) {
+        if (!FACTORY.sha256.equals(assetSha)) return null;
+        if (pkgVersion == null || FACTORY.stockVersion.equals(pkgVersion)) return null;
+        return "Stock app is " + pkgVersion + ", not " + FACTORY.stockVersion + ". The firmware file matches, so the load can continue";
     }
 }

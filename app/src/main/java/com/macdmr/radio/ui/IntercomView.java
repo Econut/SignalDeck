@@ -497,7 +497,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
 
     private void refreshHeadline() {
         if (neo) { refreshNeoHeadline(); return; }
-        if (tx) { headline.setText("🔴 Transmitting"); headline.setTextColor(Theme.RED); }
+        if (svc != null && svc.firmwareLoading()) { headline.setText("Radio busy, loading firmware"); headline.setTextColor(Theme.AMBER); }
+        else if (tx) { headline.setText("🔴 Transmitting"); headline.setTextColor(Theme.RED); }
         else if (receivingNow()) { headline.setText("📻 Receiving..."); headline.setTextColor(Theme.GREEN); }
         else if (svc != null && "no root".equals(svc.link())) { headline.setText("🔒 Root needed — allow in Magisk, then Device → Bring radio up"); headline.setTextColor(Theme.AMBER); }
         else if (svc != null && "unsupported".equals(svc.link())) { headline.setText("📱 This phone is not supported yet — Device → Device report"); headline.setTextColor(Theme.AMBER); }
@@ -508,7 +509,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
 
     private void refreshNeoHeadline() {
         String t; int col;
-        if (tx) { t = "TRANSMITTING"; col = Neo.RED; }
+        if (svc != null && svc.firmwareLoading()) { t = "RADIO BUSY, LOADING FIRMWARE"; col = Neo.AMBER; }
+        else if (tx) { t = "TRANSMITTING"; col = Neo.RED; }
         else if (receivingNow()) { t = "RECEIVING"; col = Neo.GREEN; }
         else if (svc != null && "no root".equals(svc.link())) { t = "ROOT NEEDED · allow in Magisk, then Device → Take over"; col = Neo.AMBER; }
         else if (svc != null && "unsupported".equals(svc.link())) { t = "PHONE NOT SUPPORTED YET · Device → Device report"; col = Neo.AMBER; }

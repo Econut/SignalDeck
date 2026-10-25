@@ -112,17 +112,17 @@ function renderStatus() {
   if (document.activeElement !== $('sqLevel')) $('sqLevel').value = s.softSqLevel; $('sqVal').textContent = s.softSqLevel;
   const z = $('zoneSel'); if (z.dataset.loaded !== '1') loadZones(); else z.value = String(s.zoneId);
   const cz = $('chZone'); if (cz && cz.options.length && cz.value !== String(s.zoneId)) { cz.value = String(s.zoneId); if (S.page === 'channels') loadChannels(); }   // changed elsewhere (phone, intercom)
-  const ptt = $('ptt'); const canTx = s.webTx && s.ready && !s.txInhibited && !(s.sat && s.sat.tracking && s.sat.listenOnly && !s.sat.waiting);
+  const ptt = $('ptt'); const canTx = s.webTx && s.ready && !s.txInhibited && !s.firmwareLoad && !(s.sat && s.sat.tracking && s.sat.listenOnly && !s.sat.waiting);
   ptt.disabled = !canTx;
   const secureUrl = 'https://' + location.hostname + ':' + (s.tlsPort || 8443) + '/';
-  $('pttNote').innerHTML = !s.webTx ? 'Transmit from the web is off. Turn it on at the phone: Device → SignalDeck Web.' : s.txInhibited ? 'This channel is receive-only.'
+  $('pttNote').innerHTML = s.firmwareLoad ? 'Radio busy, loading firmware.' : !s.webTx ? 'Transmit from the web is off. Turn it on at the phone: Device → SignalDeck Web.' : s.txInhibited ? 'This channel is receive-only.'
     : TALK.usable() ? 'Hold to talk with this computer\'s microphone (or hold the space bar).'
     : 'Hold to talk (or the space bar): the phone\'s microphone transmits.' + (s.tls ? ' To talk with this computer\'s microphone open <a href="' + secureUrl + '">' + esc(secureUrl) + '</a> (accept the certificate warning once).' : '');
   renderState(); renderMeter(); renderModebar(); renderAprsState(); renderSstvState(); renderSendState();
 }
 function renderState() {
   const s = S.status; const b = $('rxtx');
-  if (s.transmitting) { b.textContent = 'TX'; b.className = 'badge tx'; } else if (s.hearing) { b.textContent = 'RX'; b.className = 'badge rx'; } else { b.textContent = 'IDLE'; b.className = 'badge'; }
+  if (s.firmwareLoad) { b.textContent = 'LOADING FIRMWARE'; b.className = 'badge tx'; } else if (s.transmitting) { b.textContent = 'TX'; b.className = 'badge tx'; } else if (s.hearing) { b.textContent = 'RX'; b.className = 'badge rx'; } else { b.textContent = 'IDLE'; b.className = 'badge'; }
   $('caller').textContent = s.hearing || s.transmitting ? (s.caller || '') : '';
 }
 function renderMeter() {

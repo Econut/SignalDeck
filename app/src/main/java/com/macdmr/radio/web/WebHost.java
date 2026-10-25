@@ -157,6 +157,7 @@ public final class WebHost {
             RadioService.SatState sat = svc.satState();
             if (sat != null && sat.listenOnly && !sat.waiting) { peer.sendText(state("rx", "Receive only during this satellite pass")); return; }
             if (svc.txInhibited()) { peer.sendText(state("rx", "This channel is receive-only")); return; }
+            if (svc.firmwareLoading()) { peer.sendText(state("rx", "Radio busy, loading firmware")); return; }
             if (!svc.isReady()) { peer.sendText(state("rx", "The radio is not ready")); return; }
             TalkSession other = talker;
             if ((other != null && other != this) || svc.isTransmitting()) { peer.sendText(state("rx", "Someone is already transmitting")); return; }
@@ -358,7 +359,7 @@ public final class WebHost {
     private JSONObject statusJson() throws Exception {
         JSONObject o = new JSONObject();
         o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current()));
-        o.put("transmitting", svc.isTransmitting()).put("hearing", svc.hearing()).put("rssi", svc.lastRssi()).put("caller", svc.currentCaller());
+        o.put("transmitting", svc.isTransmitting()).put("firmwareLoad", svc.firmwareLoading()).put("hearing", svc.hearing()).put("rssi", svc.lastRssi()).put("caller", svc.currentCaller());
         o.put("softSq", svc.softSqOn()).put("softSqLevel", svc.softSqLevel()).put("monitor", svc.monitorOn()).put("record", svc.recordOn())
                 .put("scanning", svc.scanning()).put("vfo", svc.vfoActive()).put("zone", svc.zoneName()).put("zoneId", svc.zoneId())
                 .put("txInhibited", svc.txInhibited()).put("webTx", allowTx()).put("tls", tlsRunning()).put("tlsPort", TLS_PORT);
@@ -751,6 +752,7 @@ public final class WebHost {
                     return ok(new JSONObject().put("channel", channelFull(svc.vfoChannel())).put("active", svc.vfoActive()).put("step", svc.vfoStepHz()).put("steps", steps)
                             .put("help", help).put("tones", toneLists()));
                 }
+                if (svc.firmwareLoading()) return WebServer.Response.error(409, "Radio busy, loading firmware");
                 if (svc.isTransmitting()) return WebServer.Response.error(409, "Not while transmitting");
                 ChannelStore.Channel v = svc.vfoChannel();
                 if (!b.has("lat")) b.put("lat", ""); if (!b.has("lon")) b.put("lon", "");
@@ -767,6 +769,7 @@ public final class WebHost {
             case "/api/channel/delete": if (!post) break; {
                 ChannelStore.Channel ch = svc.store().byNumber(b.optInt("number", 0));
                 if (ch == null) return WebServer.Response.error(404, "No such channel");
+                if (svc.firmwareLoading()) return WebServer.Response.error(409, "Radio busy, loading firmware");
                 if (svc.isTransmitting()) return WebServer.Response.error(409, "Not while transmitting");
                 onMain(() -> { svc.deleteChannel(ch); return null; });
                 return ok("Deleted " + (ch.name.isEmpty() ? "channel " + ch.number : ch.name));
@@ -1064,6 +1067,7 @@ public final class WebHost {
             }
             case "/api/radio": if (!post) break; {                              // take over / hand back the radio
                 String a = b.optString("action", "");
+                if (svc.firmwareLoading()) return WebServer.Response.error(409, "Radio busy, loading firmware");
                 if (svc.isTransmitting()) return WebServer.Response.error(409, "Not while transmitting");
                 if (a.equals("takeover")) { svc.bringUp(); return ok("Taking over the radio"); }
                 if (a.equals("handback")) { svc.shutDown(true); return ok("Handing the radio back to the stock app"); }
@@ -1495,6 +1499,7 @@ public final class WebHost {
                 x.headers.put("Content-Disposition", "attachment; filename=\"" + dir.getName() + ".zip\""); return x;
             }
             case "/api/restore": if (!post) break; {                            // {name} an existing backup, or {files: {"Channels.csv": text, …}} uploaded from the computer
+                if (svc.firmwareLoading()) return WebServer.Response.error(409, "Radio busy, loading firmware");
                 if (svc.isTransmitting()) return WebServer.Response.error(409, "Not while transmitting");
                 File dir;
                 if (b.has("files")) {

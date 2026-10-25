@@ -40,6 +40,15 @@ public class ImageTableTest {
                 "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", true, true));
     }
 
+    @Test public void aDifferentStockAppVersionWarnsWhenTheFileMatches() {
+        assertNull(ImageTable.refuse(ImageTable.FW22, ImageTable.FACTORY.tag, ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V9.9", true, true));
+        String warn = ImageTable.versionWarning(ImageTable.FACTORY.sha256, "V9.9");
+        assertNotNull(warn);
+        assertTrue(warn.contains("V9.9"));
+        assertNull(ImageTable.versionWarning("deadbeef", "V9.9"));
+    }
+
     @Test public void theTagSitsAtTheKnownOffset() {
         byte[] image = new byte[ImageTable.TAG_AT + 16];
         byte[] tag = "DMR003.UV4T.V022".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
