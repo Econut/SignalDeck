@@ -315,7 +315,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
     }
 
     /** The last-heard time on a card: "14:02" (today), "yesterday 09:11", else "Oct 22, 09:11". */
-    static String heardWhen(long ts) {
+    public static String heardWhen(long ts) {
         java.util.Calendar now = java.util.Calendar.getInstance(), t = java.util.Calendar.getInstance(); t.setTimeInMillis(ts);
         String hm = new java.text.SimpleDateFormat("HH:mm", Locale.US).format(new java.util.Date(ts));
         if (now.get(java.util.Calendar.YEAR) == t.get(java.util.Calendar.YEAR)) {

@@ -201,7 +201,7 @@ public class ContactsView extends LinearLayout {
             LinearLayout l3 = row.findViewWithTag("l3"); l3.removeAllViews();
             if (!ct.callsign.isEmpty()) l3.addView(Neo.chip(c, ct.callsign, Neo.GREEN));
             if (!ct.rics.isEmpty()) { TextView pg = Neo.chip(c, "PAGER", Neo.AMBER); LayoutParams pl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl.leftMargin = ct.callsign.isEmpty() ? 0 : (int) (6 * d); l3.addView(pg, pl); }
-            if (ct.lastTs > 0) { TextView lh = Neo.text(c, "heard " + ContactEditor.ago(ct.lastTs), Neo.DIM, 12, Neo.uiMedium(c)); lh.setPadding(l3.getChildCount() > 0 ? (int) (8 * d) : 0, 0, 0, 0); lh.setSingleLine(true); l3.addView(lh); }
+            if (ct.lastTs > 0) { TextView lh = Neo.text(c, "heard " + ChannelsView.heardWhen(ct.lastTs), Neo.DIM, 12, Neo.uiMedium(c));   // the same form as the channel cards (owner, 2026-10-25) lh.setPadding(l3.getChildCount() > 0 ? (int) (8 * d) : 0, 0, 0, 0); lh.setSingleLine(true); l3.addView(lh); }
             l3.setVisibility(l3.getChildCount() > 0 ? VISIBLE : GONE);
             row.findViewWithTag("msg").setVisibility(ct.number > 0 ? VISIBLE : INVISIBLE);
             row.findViewWithTag("msg").setOnClickListener(x -> { if (host != null && ct.number > 0) host.openThread(ct); });
