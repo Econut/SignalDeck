@@ -70,7 +70,15 @@ public final class DiagReceiver extends BroadcastReceiver {
                 else s.diagSym(new java.io.File(i.getStringExtra("path")), i.getBooleanExtra("eot", false), i.getBooleanExtra("key", false), i.getBooleanExtra("nounkey", false));
                 break;
             }
-            case "m17": {                                                       // bench: M17 receive on/off (--ez on); --ei tx ms: a short Codec 2 tone through the symbol engine; --es enc NAME: Codec 2 3200 encode cache/NAME.wav to cache/NAME.c2; --es dec NAME: decode cache/NAME.c2 back to cache/NAME.wav
+            case "m17": {                                                       // bench: M17 receive on/off (--ez on); --ei tx ms: a short Codec 2 tone through the symbol engine; --ei mic ms: hold the microphone path (not the tone) for that long, at most 12 s; --es enc NAME: Codec 2 3200 encode cache/NAME.wav to cache/NAME.c2; --es dec NAME: decode cache/NAME.c2 back to cache/NAME.wav
+                if (i.hasExtra("mic")) {
+                    int ms = Math.max(1000, Math.min(12000, i.getIntExtra("mic", 10000)));
+                    playAlarmWav(new java.io.File("/sdcard/Download/sdvoice.wav"));
+                    s.m17Voice(true);
+                    new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> s.m17Voice(false), ms);
+                    Log.i("DiagReceiver", "m17 mic " + ms + " ms");
+                    break;
+                }
                 if (i.hasExtra("tx")) { s.m17BenchTone(i.getIntExtra("tx", 1500)); break; }
                 if (i.hasExtra("dump")) com.macdmr.radio.M17Station.benchDump = i.getBooleanExtra("dump", false);
                 if (i.hasExtra("on")) Log.i("DiagReceiver", "m17: " + s.setM17(i.getBooleanExtra("on", false), !i.hasExtra("hold") || i.getBooleanExtra("hold", true)));
@@ -203,5 +211,29 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "pkt": if (s.packet() != null) Log.i("DiagReceiver", "pkt " + i.getStringExtra("what") + ": " + s.packet().diagSend(i.getStringExtra("what"))); break;
             default: Log.w("DiagReceiver", "unknown cmd " + cmd);
         }
+    }
+
+    /** Bench only. Plays a wav on the alarm stream so the handset speaker reaches the microphone. */
+    private static void playAlarmWav(java.io.File f) {
+        new Thread(() -> {
+            try {
+                byte[] w = java.nio.file.Files.readAllBytes(f.toPath());
+                int rate = (w[24] & 0xFF) | (w[25] & 0xFF) << 8 | (w[26] & 0xFF) << 16 | (w[27] & 0xFF) << 24;
+                int data = 12;
+                while (data + 8 < w.length && !(w[data] == 'd' && w[data + 1] == 'a' && w[data + 2] == 't' && w[data + 3] == 'a'))
+                    data += 8 + ((w[data + 4] & 0xFF) | (w[data + 5] & 0xFF) << 8);
+                int n = Math.min(w.length - data - 8, (w[data + 4] & 0xFF) | (w[data + 5] & 0xFF) << 8 | (w[data + 6] & 0xFF) << 16);
+                int buf = Math.max(rate, 4096);
+                android.media.AudioTrack t = new android.media.AudioTrack(
+                        android.media.AudioManager.STREAM_ALARM, rate, android.media.AudioFormat.CHANNEL_OUT_MONO,
+                        android.media.AudioFormat.ENCODING_PCM_16BIT, buf, android.media.AudioTrack.MODE_STREAM);
+                t.play();
+                for (int at = 0; at < n; at += buf) t.write(w, data + 8 + at, Math.min(buf, n - at));
+                Log.i("DiagReceiver", "m17 mic wav " + n + " bytes at " + rate);
+                Thread.sleep(Math.max(1000, n / 2 * 1000L / rate) + 500);
+                t.stop();
+                t.release();
+            } catch (Throwable e) { Log.w("DiagReceiver", "m17 mic wav: " + e); }
+        }, "m17-mic-wav").start();
     }
 }

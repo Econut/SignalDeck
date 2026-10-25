@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Bench microphone hold
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| M17 TX | DIAG `m17 --ei mic` holds the microphone path (not the tone extra) for the given time, at most 12 s, and releases it. If `/sdcard/Download/sdvoice.wav` is present it is played on the alarm stream during that hold. Hidden bench extra; the in-app guide is unchanged. | `DiagReceiver.java` | Device, Wi-Fi adb, FW20, 467.625 MHz, low power: a 10 s hold. 247 of 247 frames, end bit set, EOT score 0.978. The host unkey followed the first status byte 4 by 13 ms, and the module sent status byte 4 again at 0.32 s. Codec 2 output is speech. |
+
 ## 2026-10-24 — Bench keys for the 120 s ceiling, and an M17 tail
 
 | Backlog | Change | Files | Test |
