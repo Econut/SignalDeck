@@ -1,6 +1,6 @@
 {
  "format": 1,
- "serial": 3,
+ "serial": 4,
  "generated": "2026-10-25",
  "base": "https://raw.githubusercontent.com/IIMacGyverII/AndroidRadio_Firmware_Project/main/",
  "images": [
@@ -74,7 +74,10 @@
      "source": "measured",
      "notes": "The reference phone. The stock app sends a time-out byte of 0 at start, which turns the module's own 120 s timer off."
     }
-   ]
+   ],
+   "buildModel": "Armor 26 Ultra",
+   "vendor": "Ulefone",
+   "model": "Armor 26 Ultra"
   },
   {
    "device": "unihertz-atom-xl",

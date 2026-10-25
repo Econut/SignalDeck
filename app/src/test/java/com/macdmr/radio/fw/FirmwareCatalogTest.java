@@ -23,12 +23,13 @@ public class FirmwareCatalogTest {
         assertTrue(ProfileRegistry.verify(json(), sig(), ProfileRegistry.PUBLIC_KEY));
         FirmwareCatalog.Doc doc = FirmwareCatalog.accept(json(), sig(), 0);
         assertNotNull(doc);
-        assertEquals(3, doc.serial);
+        assertTrue(doc.serial >= 4);
         assertEquals(1, doc.images.size());
         assertEquals(ImageTable.FACTORY.tag, doc.images.get(0).tag);
         assertEquals(ImageTable.FACTORY.sha256, doc.images.get(0).sha256);
         assertTrue(doc.images.get(0).factory);
         assertTrue(doc.variants.stream().anyMatch(v -> v.supportedBase && "com.pri.prizeinterphone".equals(v.stockPackage)));
+        assertTrue("serial 4 names the phone in the Armor block", doc.variants.stream().anyMatch(v -> "ulefone-armor-26-ultra".equals(v.device) && "Armor 26 Ultra".equals(v.buildModel)));
     }
 
     @Test public void aBadSignatureIsIgnored() throws Exception {
@@ -36,7 +37,8 @@ public class FirmwareCatalogTest {
     }
 
     @Test public void anOlderSerialIsIgnored() throws Exception {
-        assertNull(FirmwareCatalog.accept(json(), sig(), 4));
-        assertNotNull(FirmwareCatalog.accept(json(), sig(), 3));
+        FirmwareCatalog.Doc doc = FirmwareCatalog.accept(json(), sig(), 0);
+        assertNull(FirmwareCatalog.accept(json(), sig(), doc.serial + 1));
+        assertNotNull(FirmwareCatalog.accept(json(), sig(), doc.serial - 1));
     }
 }

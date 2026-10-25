@@ -40,10 +40,13 @@ public final class FirmwareCatalog {
 
     public static final class Variant {
         public final String device, moduleVersion, stockPackage, stockVersion;
+        /** The phone's Build.MODEL for this device block (catalogue serial 4 on), "" when the block has none. */
+        public final String buildModel;
         public final boolean supportedBase;
 
-        Variant(String device, String moduleVersion, String stockPackage, String stockVersion, boolean supportedBase) {
-            this.device = device; this.moduleVersion = moduleVersion; this.stockPackage = stockPackage;
+        Variant(String device, String moduleVersion, String stockPackage, String stockVersion, boolean supportedBase) { this(device, "", moduleVersion, stockPackage, stockVersion, supportedBase); }
+        Variant(String device, String buildModel, String moduleVersion, String stockPackage, String stockVersion, boolean supportedBase) {
+            this.device = device; this.buildModel = buildModel == null ? "" : buildModel; this.moduleVersion = moduleVersion; this.stockPackage = stockPackage;
             this.stockVersion = stockVersion; this.supportedBase = supportedBase;
         }
     }
@@ -86,14 +89,14 @@ public final class FirmwareCatalog {
         if (devices != null) for (int i = 0; i < devices.length(); i++) {
             JSONObject dev = devices.optJSONObject(i);
             if (dev == null) continue;
-            String id = dev.optString("device");
+            String id = dev.optString("device"), buildModel = dev.isNull("buildModel") ? "" : dev.optString("buildModel", "");
             JSONArray vs = dev.optJSONArray("variants");
             if (vs == null) continue;
             for (int k = 0; k < vs.length(); k++) {
                 JSONObject v = vs.optJSONObject(k);
                 if (v == null) continue;
                 JSONObject app = v.optJSONObject("stockApp");
-                variants.add(new Variant(id, v.optString("moduleVersion", ""),
+                variants.add(new Variant(id, buildModel, v.optString("moduleVersion", ""),
                         app == null ? "" : app.optString("package"),
                         app == null ? "" : app.optString("version"),
                         v.optBoolean("supportedBase")));
@@ -150,7 +153,8 @@ public final class FirmwareCatalog {
         Doc doc = cached(c);
         if (doc == null || model == null) return null;
         String device = null;
-        for (Image im : doc.images) if (model.equals(im.model) || model.endsWith(im.model)) device = im.device;
+        for (Variant v : doc.variants) if (!v.buildModel.isEmpty() && (model.equals(v.buildModel) || model.endsWith(v.buildModel))) device = v.device;   // serial 4 on: the block names the phone
+        if (device == null) for (Image im : doc.images) if (model.equals(im.model) || model.endsWith(im.model)) device = im.device;              // older catalogues: through an image row
         if (device == null) return null;
         boolean seen = false, supported = false;
         for (Variant v : doc.variants) {
