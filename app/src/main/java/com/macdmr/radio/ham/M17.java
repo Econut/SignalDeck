@@ -131,6 +131,14 @@ public final class M17 {
         return s;
     }
 
+    /** Two end-of-transmission frames (384 symbols). The module drops the carrier when the ring drains, while the
+     *  shaping filter still holds about two frames, so the real end frame is sent ahead of this tail. */
+    public static int[] eotTail() {
+        int[] s = new int[384];
+        for (int i = 0; i < s.length; i++) s[i] = EOT_SYMBOLS[i % EOT_SYMBOLS.length];
+        return s;
+    }
+
     public static int[] lsfSymbols(byte[] lsf) { return frameSymbols(SYNC_LSF, convEncode(bits(lsf, 240), P1, 368)); }
     public static int[] streamSymbols(byte[] lsf, int fn, byte[] payload16, int lichCnt) {
         byte[] lich = new byte[6]; System.arraycopy(lsf, 5 * lichCnt, lich, 0, 5); lich[5] = (byte) (lichCnt << 5);

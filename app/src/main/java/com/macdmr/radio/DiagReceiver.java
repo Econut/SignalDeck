@@ -62,12 +62,12 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "cmdbyte": s.diagCmd(i.getIntExtra("b", 0), i.getIntExtra("d", 1)); break;        // bench: one command, body byte --ei d (default 1), does not key
             case "cmdsine": s.diagSine(i.getIntExtra("n", 64), i.getIntExtra("amp", 2048), i.getIntExtra("hz", 1000)); break;  // bench: store a sine on 0x40, does not key
             case "cmdpcm": s.diagPcm(new java.io.File(i.getStringExtra("path")), i.getIntExtra("off", 0), i.getIntExtra("n", 398)); break;  // bench: store one piece, does not key
-            case "cmdsym": {                                                     // bench: stream packed symbols, one status read, a no-key render, or one FM receive half. --ez eot keys once the ring is primed, marks the last chunk so the module drops PTT, and sends the unkey after status byte 4.
+            case "cmdsym": {                                                     // bench: stream packed symbols. --ez eot marks the last chunk op 7 and unkeys after status 4. --ez key keys with no end bit. --ez nounkey leaves the unkey unsent.
                 if ("status".equals(i.getStringExtra("op"))) s.diagSymStatus();
                 else if ("render".equals(i.getStringExtra("op"))) s.diagSymRender(new java.io.File(i.getStringExtra("path")), i.getIntExtra("n", 0));
                 else if ("hold".equals(i.getStringExtra("op"))) s.diagHold(i.getIntExtra("mode", 0), i.getIntExtra("action", 0));
                 else if ("rxram".equals(i.getStringExtra("op"))) s.diagRxRam(i.getIntExtra("mode", 0), i.getIntExtra("n", 4));
-                else s.diagSym(new java.io.File(i.getStringExtra("path")), i.getBooleanExtra("eot", false));
+                else s.diagSym(new java.io.File(i.getStringExtra("path")), i.getBooleanExtra("eot", false), i.getBooleanExtra("key", false), i.getBooleanExtra("nounkey", false));
                 break;
             }
             case "m17": {                                                       // bench: M17 receive on/off (--ez on); --ei tx ms: a short Codec 2 tone through the symbol engine; --es enc NAME: Codec 2 3200 encode cache/NAME.wav to cache/NAME.c2; --es dec NAME: decode cache/NAME.c2 back to cache/NAME.wav
@@ -143,9 +143,10 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "smsbench": s.sms(i.getIntExtra("type", 0), i.getIntExtra("from", 0), "[bench] " + i.getStringExtra("text")); break;   // bench: a DMR text as if received (0x2D type, sender ID)
             case "smsbenchclear": Log.i("DiagReceiver", "smsbenchclear: " + s.store().deleteBenchMessages()); break;
             case "formtext": s.onFormText(i.getStringExtra("from"), i.getStringExtra("text"), "bench"); break;   // bench: a text as if it arrived (form parts)
-            case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s) on the current channel or VFO
-                int ms = Math.max(200, Math.min(5000, i.getIntExtra("ms", 2000)));
-                Log.i("DiagReceiver", "testtone " + ms + " ms"); s.diagTestTone(ms); break;
+            case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s, or ≤ 40 s with --ez lift) on the current channel or VFO
+                boolean lift = i.getBooleanExtra("lift", false);
+                int ms = Math.max(200, Math.min(lift ? 40000 : 5000, i.getIntExtra("ms", 2000)));
+                Log.i("DiagReceiver", "testtone " + ms + " ms" + (lift ? " lift" : "")); s.diagTestTone(ms, lift); break;
             }
             case "vfooff": s.diagVfoOff(); break;
             case "audiopath": { String pth = i.getStringExtra("path"); if ("auto".equals(pth) || "vendor".equals(pth) || "direct".equals(pth)) s.diagAudioPath(pth); else Log.w("DiagReceiver", "audiopath: auto | vendor | direct"); break; }   // bench: the receive/transmit audio path

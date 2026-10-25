@@ -627,14 +627,17 @@ public class RadioService extends Service implements RadioEngine.Events {
     public int issRepeat() { return issRepeatMode; }
 
     /** Hands-free one-shot transmission: key, play the PCM through the TX path, release, resume RX. */
-    public void transmitPcm(final short[] pcm, final String label, final Runnable onDone) {
+    public void transmitPcm(final short[] pcm, final String label, final Runnable onDone) { transmitPcm(pcm, label, onDone, false); }
+    /** liftLimit is the one bench tone that may run to 40 s. It uses engine.ptt, so the 28 s voice watchdog is not in this path. */
+    private void transmitPcm(final short[] pcm, final String label, final Runnable onDone, final boolean liftLimit) {
         worker.execute(() -> {
             try {
                 if (!isReady()) { log("TX " + label + " skipped: radio not ready"); return; }
                 if (txInhibited()) { log("TX " + label + " blocked: receive-only channel"); history("warn", "\u26D4 TX blocked on a receive-only channel"); return; }
                 if (pttDown) { log("TX " + label + " skipped: PTT busy"); return; }
                 int ms = pcm.length / 8;
-                if (ms > 28500) { log("TX " + label + " refused: " + ms + " ms exceeds the 30 s transmit limit"); history("warn", "\u26D4 Too long for this radio's 30 s transmit limit (" + label + ")"); return; }
+                int cap = liftLimit ? 40000 : 28500;
+                if (ms > cap) { log("TX " + label + " refused: " + ms + " ms"); if (!liftLimit) history("warn", "\u26D4 Too long for this radio's 30 s transmit limit (" + label + ")"); return; }
                 pttDown = true;
                 if (audio != null) audio.stopRx();
                 engine.ptt(true);
@@ -1657,13 +1660,14 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile long status4At;
     private volatile short[] m17Script;
     /** Bench: stream a packed-symbol file on command 0x40. Paces on the returned fill.
-     *  eot keys with the launch command once eight chunks are in the ring (no 28 s watchdog, no microphone)
-     *  and sends the last chunk as op 7 so the module drops PTT itself. It does not send the unkey. */
-    public void diagSym(java.io.File f) { diagSym(f, false); }
-    public void diagSym(java.io.File f, boolean eot) {
+     *  eot or forceKey keys once eight chunks are in the ring (no 28 s watchdog, no microphone).
+     *  eot sends the last chunk as op 7 so the module drops the carrier. Unless nounkey, eot then sends the unkey after status byte 4. */
+    public void diagSym(java.io.File f) { diagSym(f, false, false, false); }
+    public void diagSym(java.io.File f, boolean eot) { diagSym(f, eot, false, false); }
+    public void diagSym(java.io.File f, boolean eot, boolean forceKey, boolean nounkey) {
         Thread old = symThread;
         if (old != null && old.isAlive()) { log("sym busy"); return; }
-        Thread t = new Thread(() -> streamSym(f, eot), "m17-sym");
+        Thread t = new Thread(() -> streamSym(f, eot, forceKey, nounkey), "m17-sym");
         symThread = t;
         t.start();
     }
@@ -1728,13 +1732,14 @@ public class RadioService extends Service implements RadioEngine.Events {
         int err = (s[4] & 0xFF) | ((s[5] & 0xFF) << 8);
         log("sym status fill=" + fill + " underrun=" + und + " err=" + err + " sr=" + f.sr);
     }
-    private void streamSym(java.io.File f, boolean eot) {
+    private void streamSym(java.io.File f, boolean eot, boolean forceKey, boolean nounkey) {
         try {
             byte[] data = java.nio.file.Files.readAllBytes(f.toPath());
             Frame rst = sym40(new byte[] { 3 });
             if (rst == null || rst.sr != 0) { log("sym reset failed"); return; }
             int off = 0, nsend = 0;
             boolean keyed = false;
+            boolean arm = eot || forceKey;
             while (off < data.length) {
                 int n = Math.min(48, data.length - off);
                 byte[] body = new byte[1 + n];
@@ -1756,7 +1761,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 if (last) log("sym last op 7 fill=" + fill);
                 if (nsend == 8) {
                     log("sym ready fill=" + fill);
-                    if (eot && !keyed) {
+                    if (arm && !keyed) {
                         engine.ptt(true);
                         keyed = true;
                         log("sym key");
@@ -1764,7 +1769,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
                 if (nsend < 8) { Thread.sleep(5); continue; }
                 int spins = 0;
-                int spinCap = eot ? 400 : 150;
+                int spinCap = arm ? 400 : 150;
                 while (fill > 1500 && spins < spinCap) {
                     Thread.sleep(20);
                     Frame s = sym40(new byte[] { 2 });
@@ -1773,9 +1778,10 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
                 Thread.sleep(15);
             }
-            if (eot && !keyed) { engine.ptt(true); keyed = true; log("sym key"); }
+            if (arm && !keyed) { engine.ptt(true); keyed = true; log("sym key"); }
             log("sym done bytes=" + data.length);
-            if (eot && keyed) unkeyAfterStop();
+            if (eot && keyed && !nounkey) unkeyAfterStop();
+            else if (keyed && nounkey) log("sym nounkey");
         } catch (Throwable t) { log("sym: " + t); }
     }
 
@@ -1869,6 +1875,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
                 pending.write(com.macdmr.radio.ham.M17.packSymbols(com.macdmr.radio.ham.M17.streamSymbols(lsf, frameNo, pay, fn % 6)));
                 fn++;
+                if (release) pending.write(com.macdmr.radio.ham.M17.packSymbols(com.macdmr.radio.ham.M17.eotTail()));
                 byte[] data = pending.toByteArray();
                 while (sent + 48 <= data.length) {
                     boolean last = release && sent + 48 >= data.length;
@@ -1948,7 +1955,15 @@ public class RadioService extends Service implements RadioEngine.Events {
             transmitPcm(pcm, "bench wav", null); return "transmitting " + n / 8 + " ms";
         } catch (Exception e) { return "txwav: " + e; }
     }
-    public void diagTestTone(int ms) { short[] pcm = new short[8000 * ms / 1000]; for (int i = 0; i < pcm.length; i++) pcm[i] = (short) (12000 * Math.sin(2 * Math.PI * 1000 * i / 8000.0)); transmitPcm(pcm, "1 kHz test tone " + ms + " ms", null); }
+    public void diagTestTone(int ms) { diagTestTone(ms, false); }
+    /** lift is one bench run, at most 40 s, past the 28.5 s refusal. The voice watchdog stays 28 s for every other transmission. */
+    public void diagTestTone(int ms, boolean lift) {
+        if (ms < 200) ms = 200;
+        if (lift) ms = Math.min(ms, 40000); else ms = Math.min(ms, 5000);
+        short[] pcm = new short[8000 * ms / 1000];
+        for (int i = 0; i < pcm.length; i++) pcm[i] = (short) (12000 * Math.sin(2 * Math.PI * 1000 * i / 8000.0));
+        transmitPcm(pcm, "1 kHz test tone " + ms + " ms", null, lift);
+    }
 
     /** Ask the module for the signal strength (on the radio worker: never a serial write on the main thread). */
     public void pollRssi() { if (scope.running()) return; worker.execute(() -> { try { if (engine.isOpen()) engine.queryRssi(); } catch (IOException ignored) { } }); }

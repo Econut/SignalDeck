@@ -33,6 +33,10 @@ public class M17Test {
         assertEquals("N0CALL", M17.voiceCall("n0call-7"));
         assertEquals("N0CALL", M17.voiceCall(""));
         assertArrayEquals(new byte[] { 0x4B }, M17.packSymbols(new int[] { 3, 1, -1, -3 }));
+        int[] eot = M17.eotTail();
+        assertEquals(384, eot.length);
+        int[] pat = { 3, 3, 3, 3, 3, 3, -3, 3 };
+        for (int i = 0; i < eot.length; i++) assertEquals("eot " + i, pat[i % 8], eot[i]);
         byte[] lsf = M17.lsf("N0CALL", "W9XYZ", 0x0005, null);
         int[] got = M17.lsfSymbols(lsf);
         int[] py = { 3,3,3,3,-3,-3,3,-3,-1,3,3,-1,1,-3,-3,3,-1,-1,-1,-1,-1,3,1,1 };

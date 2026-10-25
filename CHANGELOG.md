@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-24 — Bench keys for the 120 s ceiling, and an M17 tail
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| FW19 | DIAG `cmdsym --ez key` keys a symbol stream with no end bit and does not unkey. `cmdsym --ez eot --ez nounkey` still ends on op 7 and does not send the unkey, for the timer measurement. `testtone --ez lift --ei ms 40000` is the one 40 s FM tone: it skips the 28.5 s refusal and uses the raw key, so the 28 s voice watchdog stays on every other transmission. | `DiagReceiver.java`, `RadioService.java` | Host: `M17Test` passed. Device, FW19, 467.625 MHz, high power, HackRF LNA 0 / VGA 0: `eot` + `nounkey` ran the 45 s stream to op 7 and status byte 4 at 45.03 s. The heat stop then sent the unkey. The 120 s stream and the 40 s tone were not run. |
+| M17 TX | A voice transmission sends two end-of-transmission frames (384 symbols) after the real last frame. The module drops the carrier when the ring drains, while the shaping filter still holds about two frames, so the last of the voice goes out before that drop. | `M17.java`, `RadioService.java`, `M17Screen.java`, `HelpView.java`, `M17Test.java` | Host: `M17Test` checks the 384-symbol tail against the specification pattern. |
+
 ## 2026-10-24 — M17 voice transmit, module time-out 120 s
 
 | Backlog | Change | Files | Test |
