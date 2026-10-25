@@ -1,0 +1,3 @@
+# Signed test fixtures are byte-exact: never convert their line endings.
+app/src/test/resources/fw/firmware.json -text
+app/src/test/resources/fw/*.sig -text

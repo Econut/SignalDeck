@@ -31,7 +31,7 @@ public final class LastHeardDialog {
     public static void show(Context c, RadioService svc) {
         float d = Theme.dp(c);
         LinearLayout body = Neo.sheetBody(c, "Last heard");
-        TextView hint = Neo.label(c, "Newest first across every channel: alerts and car events, then who called, text and APRS traffic, what was recorded. Tap an alert or event for what it means; tap a heard line to switch to that channel.", 0xFF8A98A6, 12, false);
+        TextView hint = Neo.label(c, "Newest first across every channel: alerts and car events, then who called, text and APRS traffic, what was recorded. Tap an alert or event for what it means; tap a caller for the contact; tap a heard line to switch to that channel.", 0xFF8A98A6, 12, false);
         hint.setPadding(0, (int) (4 * d), 0, (int) (8 * d)); body.addView(hint);
         LinearLayout tools = new LinearLayout(c); tools.setGravity(Gravity.CENTER);
         tools.setBaselineAligned(false);
@@ -66,7 +66,8 @@ public final class LastHeardDialog {
             LinearLayout rowv = new LinearLayout(c); rowv.setOrientation(LinearLayout.VERTICAL);
             rowv.setBackground(Neo.rowCard(c)); rowv.setPadding((int) (12 * d), (int) (8 * d), (int) (12 * d), (int) (8 * d));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); lp.bottomMargin = (int) (6 * d);
-            rowv.addView(Neo.label(c, title, r.dmrId > 0 ? Theme.AMBER : Theme.CYAN, 15, true));
+            TextView tl = Neo.label(c, title, r.dmrId > 0 ? Theme.AMBER : Theme.CYAN, 15, true); rowv.addView(tl);
+            if (r.dmrId > 0) { final int did = r.dmrId; tl.setClickable(true); tl.setOnClickListener(v -> ContactEditor.open(c, svc, ContactEditor.Identity.dmr(did), null)); }
             rowv.addView(Neo.label(c, f.format(new Date(r.ts)) + "  ·  " + chName + (r.count > 1 ? "  ·  " + r.count + "×" : "") + (r.dmrId > 0 && !r.text.isEmpty() ? "\n" + r.text : ""), 0xFFBFC8D0, 12, false));
             final int chNum = r.channel;
             rowv.setClickable(true);

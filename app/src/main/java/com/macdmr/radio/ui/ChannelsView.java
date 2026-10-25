@@ -27,6 +27,7 @@ import com.macdmr.radio.RadioService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Channel page: header with zone and channel count (repeaters, zone and add actions), search field, filter
@@ -47,6 +48,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
     private final java.util.Set<Integer> favs = new java.util.HashSet<>();
     private RadioService svc;
     private Host host;
+    private Map<Integer, Object[]> heard = new java.util.HashMap<>();   // channel number → newest thing heard on it
     private int filter = 0;              // 0 all, 1 favourites, 2 analog, 3 DMR
     private int activeNumber = -1;
 
@@ -124,6 +126,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
 
     public void reload() {
         if (svc == null) return;
+        try { heard = svc.store().channelLastHeard(); } catch (Throwable t) { heard = new java.util.HashMap<>(); }
         all.clear(); all.addAll(svc.zoneChannels());
         favs.clear(); ChannelStore.Zone fz = favZone(); if (fz != null) for (int n : fz.numbers) favs.add(n);
         activeNumber = svc.current() != null ? svc.current().number : svc.store().activeNumber();
@@ -207,6 +210,10 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         TextView pb = Neo.button(c, isPrio ? "Stop using as scan priority" : "Make scan priority", "scan", Neo.VIOLET); pb.setTextSize(14);
         LayoutParams pbl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); pbl.setMargins((int) (3 * d), (int) (8 * d), (int) (3 * d), 0);
         box.addView(pb, pbl);
+        final int hn = svc != null ? svc.store().channelHistoryCount(ch.number) : 0;
+        TextView hb = Neo.button(c, hn > 0 ? "History (" + hn + ")" : "History", "signal", Neo.CYAN); hb.setTextSize(14);
+        box.addView(hb, new LayoutParams(pbl));
+        hb.setOnClickListener(v -> { dlg.dismiss(); if (svc != null) ChannelHistoryDialog.show(c, svc, ch); });
         pb.setOnClickListener(v -> {
             dlg.dismiss(); if (svc == null) return;
             svc.setScanPriority(isPrio ? 0 : ch.number);
@@ -298,13 +305,24 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             LinearLayout badges = row.findViewWithTag("badges"); badges.removeAllViews();
             badges.addView(Neo.chip(c, ch.isDigital() ? "DMR" : "FM", ch.isDigital() ? Neo.VIOLET : Neo.CYAN));
             if (svc != null && svc.scanPriority() == ch.number) { TextView pc = Neo.chip(c, "PRIORITY", Neo.VIOLET); LayoutParams pl2 = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl2.leftMargin = (int) (6 * d); badges.addView(pc, pl2); }
-            String det = detail(ch);
-            if (!det.isEmpty()) { TextView dc = Neo.chip(c, det, 0xFF9FB4C8); LayoutParams dl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); dl.leftMargin = (int) (6 * d); badges.addView(dc, dl); }
+            Object[] lh = heard.get(ch.number);                                   // when the channel was last heard (owner, 2026-10-25: the colour code and tone chip came off the card; the editor has the detail and the history)
+            if (lh != null) { TextView ht = Neo.text(c, "heard " + heardWhen((Long) lh[0]), Neo.DIM, 11.5f, Neo.uiMedium(c)); ht.setSingleLine(true); ht.setEllipsize(android.text.TextUtils.TruncateAt.END); LayoutParams hl = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); hl.leftMargin = (int) (6 * d); badges.addView(ht, hl); }
             ImageView star = row.findViewWithTag("star");
             star.setImageDrawable(new Neo.IconDrawable("star", fav ? Neo.AMBER : Neo.OFF, fav));
             star.setOnClickListener(x -> toggleFavourite(ch, !fav));
             return v;
         }
+    }
+
+    /** The last-heard time on a card: "14:02" (today), "yesterday 09:11", else "Oct 22, 09:11". */
+    public static String heardWhen(long ts) {
+        java.util.Calendar now = java.util.Calendar.getInstance(), t = java.util.Calendar.getInstance(); t.setTimeInMillis(ts);
+        String hm = new java.text.SimpleDateFormat("HH:mm", Locale.US).format(new java.util.Date(ts));
+        if (now.get(java.util.Calendar.YEAR) == t.get(java.util.Calendar.YEAR)) {
+            int dd = now.get(java.util.Calendar.DAY_OF_YEAR) - t.get(java.util.Calendar.DAY_OF_YEAR);
+            if (dd == 0) return hm; if (dd == 1) return "yesterday " + hm;
+        }
+        return new java.text.SimpleDateFormat("MMM d, HH:mm", Locale.US).format(new java.util.Date(ts));
     }
 
     // RadioService.Listener

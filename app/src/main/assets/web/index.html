@@ -193,8 +193,15 @@
             <label>Name<input id="ctName" maxlength="32"></label>
             <label>DMR ID or talkgroup<input id="ctNumber" inputmode="numeric" maxlength="8"></label>
             <label>Type<select id="ctType"><option value="0">Private call</option><option value="1">Group call (talkgroup)</option><option value="2">All call</option></select></label>
+            <label>Callsign (APRS, M17, pager tag; -SSID optional)<input id="ctCall" maxlength="12" style="text-transform:uppercase"></label>
+            <label>Pager RICs (one or more, e.g. 1234567, 1234568)<input id="ctRics" maxlength="80"></label>
+            <label>Home location (grid square or lat, lon)<input id="ctHome" maxlength="40"></label>
+            <label>Home label<input id="ctHomeLabel" maxlength="40"></label>
+            <label>Notes<textarea id="ctNotes" rows="2" maxlength="500"></textarea></label>
+            <div class="sub" id="ctLast"></div>
             <div class="row"><button class="btn primary">Save</button><button type="button" class="btn" id="ctNew">Clear</button><button type="button" class="btn danger hidden" id="ctDel">Delete</button><button type="button" class="btn hidden" id="ctText">Text</button></div>
           </form>
+          <span class="label">HISTORY</span><div id="ctHistory" class="list"></div>
         </div>
       </div>
     </section>

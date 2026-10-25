@@ -36,7 +36,7 @@ import java.util.Locale;
 public class ContactsView extends LinearLayout {
     public interface Host { void openThread(ChannelStore.Contact c); }
 
-    private static final String[] TYPES = { "Private", "Group", "All call" };
+    static final String[] TYPES = { "Private", "Group", "All call" };
     private final ListView list;
     private final Adapter adapter = new Adapter();
     private final EditText search;
@@ -61,7 +61,7 @@ public class ContactsView extends LinearLayout {
         sf.setBackground(Neo.card(c, Neo.alpha(Neo.CYAN, 0x33), 12)); sf.setPadding((int) (14 * d), 0, (int) (10 * d), 0);
         ImageView si = new ImageView(c); si.setImageDrawable(new Neo.IconDrawable("search", Neo.MUTED));
         sf.addView(si, new LayoutParams((int) (18 * d), (int) (18 * d)));
-        search = new EditText(c); search.setHint("Name or DMR ID"); search.setSingleLine(true); search.setTextSize(16); search.setTypeface(Neo.uiSemi(c));
+        search = new EditText(c); search.setHint("Name, callsign, DMR ID or RIC"); search.setSingleLine(true); search.setTextSize(16); search.setTypeface(Neo.uiSemi(c));
         search.setTextColor(Neo.TEXT); search.setHintTextColor(Neo.DIM); search.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         search.setBackground(null); search.setPadding((int) (10 * d), 0, 0, 0);
         search.addTextChangedListener(new TextWatcher() {
@@ -109,6 +109,7 @@ public class ContactsView extends LinearLayout {
     public void reload() {
         if (svc == null) return;
         all.clear(); all.addAll(svc.store().contacts());
+        fillCallsigns();
         int groups = 0; for (ChannelStore.Contact ct : all) if (ct.type != 0) groups++;
         Neo.headerSubtitle(header).setText(((all.size() - groups) + " private · " + groups + (groups == 1 ? " talkgroup" : " talkgroups")).toUpperCase(Locale.US));
         filter();
@@ -120,9 +121,26 @@ public class ContactsView extends LinearLayout {
         for (ChannelStore.Contact ct : all) {
             if (filter == 1 && ct.type != 0) continue;
             if (filter == 2 && ct.type == 0) continue;
-            if (q.isEmpty() || ct.name.toLowerCase(Locale.US).contains(q) || String.valueOf(ct.number).contains(q)) shown.add(ct);
+            if (q.isEmpty() || ct.name.toLowerCase(Locale.US).contains(q) || (ct.number > 0 && String.valueOf(ct.number).contains(q))
+                    || ct.callsign.toLowerCase(Locale.US).contains(q) || (!ct.rics.isEmpty() && (";" + ct.rics + ";").contains(";" + q))) shown.add(ct);
         }
         adapter.notifyDataSetChanged();
+    }
+
+    /**
+     * A private contact with a DMR ID and no callsign gets the callsign the RadioID list knows for that ID, once; the
+     * user can change or clear it afterwards and it is not filled again (callsignAuto 2).
+     */
+    private void fillCallsigns() {
+        com.macdmr.radio.RadioIdStore ids = svc.radioId();
+        if (ids == null) return;
+        for (ChannelStore.Contact ct : all) {
+            if (ct.type != 0 || ct.number <= 0 || !ct.callsign.isEmpty() || ct.callsignAuto != 0) continue;
+            try {
+                com.macdmr.radio.RadioIdStore.Record r = ids.lookup(ct.number);
+                if (r != null && r.callsign != null && !r.callsign.trim().isEmpty()) { ct.callsign = r.callsign.trim().toUpperCase(Locale.US); ct.callsignAuto = 1; svc.store().updateContact(ct); }
+            } catch (Throwable t) { }
+        }
     }
 
     /** Colour of a contact type: cyan private, violet talkgroup, amber all-call. */
@@ -138,69 +156,9 @@ public class ContactsView extends LinearLayout {
         return t;
     }
 
-    private void menu(final ChannelStore.Contact ct) {
-        final Context c = getContext(); float d = Theme.dp(c);
-        final android.app.Dialog dlg = new android.app.Dialog(c);
-        LinearLayout box = new LinearLayout(c); box.setOrientation(VERTICAL);
-        box.setBackground(Neo.sheet(c, Neo.alpha(typeColor(ct.type), 0x99), 18)); box.setPadding((int) (18 * d), (int) (16 * d), (int) (18 * d), (int) (14 * d));
-        LinearLayout top = new LinearLayout(c); top.setGravity(Gravity.CENTER_VERTICAL);
-        top.addView(avatar(c, ct.type, ct.name, 48), new LayoutParams((int) (48 * d), (int) (48 * d)));
-        LinearLayout col = new LinearLayout(c); col.setOrientation(VERTICAL); col.setPadding((int) (12 * d), 0, 0, 0);
-        col.addView(Neo.text(c, ct.name, Neo.TEXT, 20, Neo.ui(c)));
-        LinearLayout l2 = new LinearLayout(c); l2.setGravity(Gravity.CENTER_VERTICAL); l2.setPadding(0, (int) (4 * d), 0, 0);
-        l2.addView(Neo.chip(c, TYPES[Math.min(2, Math.max(0, ct.type))], typeColor(ct.type)));
-        TextView idv = Neo.text(c, String.valueOf(ct.number), Neo.TEXT_SOFT, 15, Neo.mono(c)); idv.setPadding((int) (8 * d), 0, 0, 0); l2.addView(idv);
-        col.addView(l2);
-        top.addView(col, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        box.addView(top);
-        LinearLayout btns = new LinearLayout(c); btns.setBaselineAligned(false);
-        String[] names = { "Message", "Edit", "Delete" }; int[] accents = { Neo.GREEN, Neo.CYAN, Neo.RED };
-        for (int i = 0; i < 3; i++) {
-            final int k = i;
-            TextView b = Neo.button(c, names[i], null, accents[i]); b.setTextSize(14);
-            LayoutParams lp = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (16 * d), (int) (3 * d), 0);
-            btns.addView(b, lp);
-            b.setOnClickListener(v -> {
-                dlg.dismiss();
-                if (k == 0 && host != null) host.openThread(ct);
-                else if (k == 1) edit(ct);
-                else if (k == 2) new android.app.AlertDialog.Builder(c).setTitle("Delete " + ct.name + "?").setPositiveButton("Delete", (dd, w) -> { svc.store().deleteContact(ct); reload(); }).setNegativeButton("Cancel", null).show();
-            });
-        }
-        box.addView(btns);
-        dlg.setContentView(box);
-        if (dlg.getWindow() != null) dlg.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0));
-        dlg.show();
-    }
+    private void menu(final ChannelStore.Contact ct) { ContactEditor.sheet(getContext(), svc, ct, this::reload); }
 
-    private void edit(final ChannelStore.Contact existing) {
-        final Context c = getContext(); float d = Theme.dp(c);
-        final ChannelStore.Contact ct = existing != null ? existing : new ChannelStore.Contact();
-        LinearLayout box = new LinearLayout(c); box.setOrientation(VERTICAL); box.setPadding((int) (20 * d), (int) (8 * d), (int) (20 * d), 0);
-        final EditText name = new EditText(c); name.setHint("Name"); name.setText(ct.name); name.setTextColor(Neo.TEXT); name.setTypeface(Neo.uiSemi(c)); box.addView(name);
-        final EditText num = new EditText(c); num.setHint("DMR ID or talkgroup"); num.setInputType(InputType.TYPE_CLASS_NUMBER); if (ct.number > 0) num.setText(String.valueOf(ct.number)); num.setTextColor(Neo.TEXT); num.setTypeface(Neo.mono(c)); box.addView(num);
-        LinearLayout types = new LinearLayout(c); types.setBaselineAligned(false);
-        final int[] t = { Math.min(2, Math.max(0, ct.type)) };
-        final TextView[] tb = new TextView[3];
-        for (int i = 0; i < 3; i++) {
-            final int k = i;
-            tb[i] = Neo.button(c, TYPES[i], null, typeColor(i)); tb[i].setTextSize(14);
-            LayoutParams lp = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f); lp.setMargins(i == 0 ? 0 : (int) (3 * d), (int) (12 * d), i == 2 ? 0 : (int) (3 * d), 0);
-            types.addView(tb[i], lp);
-            tb[i].setOnClickListener(v -> { t[0] = k; for (int j = 0; j < 3; j++) tb[j].setAlpha(j == k ? 1f : 0.45f); });
-        }
-        for (int j = 0; j < 3; j++) tb[j].setAlpha(j == t[0] ? 1f : 0.45f);
-        box.addView(types);
-        new android.app.AlertDialog.Builder(c).setTitle(existing == null ? "New contact" : "Edit contact").setView(box)
-                .setPositiveButton("Save", (dd, w) -> {
-                    try {
-                        ct.name = name.getText().toString().trim(); ct.number = Integer.parseInt(num.getText().toString().trim()); ct.type = t[0];
-                        if (ct.number < 1 || ct.number > 16776415) throw new IllegalArgumentException("ID must be 1 … 16776415");
-                        if (existing == null) svc.store().insertContact(ct); else svc.store().updateContact(ct);
-                        reload();
-                    } catch (Exception e) { android.widget.Toast.makeText(c, "Not saved: " + e.getMessage(), android.widget.Toast.LENGTH_LONG).show(); }
-                }).setNegativeButton("Cancel", null).show();
-    }
+    private void edit(final ChannelStore.Contact existing) { ContactEditor.edit(getContext(), svc, existing != null ? existing : new ChannelStore.Contact(), x -> reload()); }
 
     private final class Adapter extends BaseAdapter {
         @Override public int getCount() { return shown.size(); }
@@ -221,6 +179,8 @@ public class ContactsView extends LinearLayout {
                 col.addView(name);
                 LinearLayout l2 = new LinearLayout(c); l2.setGravity(Gravity.CENTER_VERTICAL); l2.setPadding(0, (int) (4 * d), 0, 0); l2.setTag("l2");
                 col.addView(l2);
+                LinearLayout l3 = new LinearLayout(c); l3.setGravity(Gravity.CENTER_VERTICAL); l3.setPadding(0, (int) (4 * d), 0, 0); l3.setTag("l3");   // identity line: callsign, pager, last heard
+                col.addView(l3);
                 row.addView(col, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
                 ImageView msg = new ImageView(c); msg.setTag("msg"); msg.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
                 int sp = (int) (12 * d); msg.setPadding(sp, sp, sp, sp); msg.setClickable(true); msg.setContentDescription("Message");
@@ -237,8 +197,14 @@ public class ContactsView extends LinearLayout {
             ((TextView) row.findViewWithTag("name")).setText(ct.name);
             LinearLayout l2 = row.findViewWithTag("l2"); l2.removeAllViews();
             l2.addView(Neo.chip(c, TYPES[Math.min(2, Math.max(0, ct.type))], typeColor(ct.type)));
-            TextView idv = Neo.text(c, String.valueOf(ct.number), Neo.TEXT_SOFT, 15, Neo.mono(c)); idv.setPadding((int) (8 * d), 0, 0, 0); l2.addView(idv);
-            row.findViewWithTag("msg").setOnClickListener(x -> { if (host != null) host.openThread(ct); });
+            TextView idv = Neo.text(c, ct.number > 0 ? String.valueOf(ct.number) : "no DMR ID", ct.number > 0 ? Neo.TEXT_SOFT : Neo.DIM, 15, Neo.mono(c)); idv.setPadding((int) (8 * d), 0, (int) (8 * d), 0); l2.addView(idv);
+            LinearLayout l3 = row.findViewWithTag("l3"); l3.removeAllViews();
+            if (!ct.callsign.isEmpty()) l3.addView(Neo.chip(c, ct.callsign, Neo.GREEN));
+            if (!ct.rics.isEmpty()) { TextView pg = Neo.chip(c, "PAGER", Neo.AMBER); LayoutParams pl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl.leftMargin = ct.callsign.isEmpty() ? 0 : (int) (6 * d); l3.addView(pg, pl); }
+            if (ct.lastTs > 0) { TextView lh = Neo.text(c, "heard " + ChannelsView.heardWhen(ct.lastTs), Neo.DIM, 12, Neo.uiMedium(c)); lh.setPadding(l3.getChildCount() > 0 ? (int) (8 * d) : 0, 0, 0, 0); lh.setSingleLine(true); l3.addView(lh); }   // the same form as the channel cards (owner, 2026-10-25)
+            l3.setVisibility(l3.getChildCount() > 0 ? VISIBLE : GONE);
+            row.findViewWithTag("msg").setVisibility(ct.number > 0 ? VISIBLE : INVISIBLE);
+            row.findViewWithTag("msg").setOnClickListener(x -> { if (host != null && ct.number > 0) host.openThread(ct); });
             return v;
         }
     }

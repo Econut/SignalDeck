@@ -37,7 +37,34 @@ public final class ChannelStore extends SQLiteOpenHelper {
         public String freqText(int hz) { return String.format(java.util.Locale.US, "%.3f", hz / 1e6); }
     }
 
-    public static final class Contact { public long id; public String name = ""; public int number; public int type; }   // type 0 private, 1 group, 2 all
+    /**
+     * A contact: a DMR ID or talkgroup (type 0 private, 1 group, 2 all) plus SignalDeck's own identity fields, which the
+     * module's contact table never sees: a callsign (optional -SSID), pager RICs, notes, a home location the user enters
+     * and a last-heard position the app fills by itself (APRS). The two locations are separate on purpose: an automatic
+     * fix never overwrites what the user typed.
+     */
+    public static final class Contact {
+        public long id; public String name = ""; public int number; public int type;
+        public String callsign = "", rics = "", notes = "", homeLabel = "";
+        /** 0 nothing filled yet, 1 the callsign came from the RadioID list, 2 the user set or cleared it (never refilled). */
+        public int callsignAuto;
+        public double homeLat = Double.NaN, homeLon = Double.NaN, lastLat = Double.NaN, lastLon = Double.NaN;
+        public long lastTs; public String lastSource = "";
+        public boolean hasHome() { return !Double.isNaN(homeLat) && !Double.isNaN(homeLon); }
+        public boolean hasLast() { return !Double.isNaN(lastLat) && !Double.isNaN(lastLon) && lastTs > 0; }
+        /** The RICs as numbers, in the order typed; junk and out-of-range values dropped. */
+        public int[] ricList() { return parseRics(rics); }
+        /** The callsign without its SSID, upper case. */
+        public String baseCall() { String c = callsign.trim().toUpperCase(java.util.Locale.US); int d = c.indexOf('-'); return d > 0 ? c.substring(0, d) : c; }
+    }
+    /** "123, 456;789" to {123, 456, 789}; a RIC is 0 to 2097151 (21 bits). */
+    public static int[] parseRics(String s) {
+        List<Integer> out = new ArrayList<>();
+        if (s != null) for (String x : s.split("[,;\\s]+")) { try { int r = Integer.parseInt(x.trim()); if (r >= 0 && r <= 2097151 && !out.contains(r)) out.add(r); } catch (Exception e) { } }
+        int[] a = new int[out.size()]; for (int i = 0; i < a.length; i++) a[i] = out.get(i); return a;
+    }
+    /** The canonical text of a RIC list: "123;456". */
+    public static String ricText(int[] rics) { StringBuilder b = new StringBuilder(); for (int r : rics) { if (b.length() > 0) b.append(';'); b.append(r); } return b.toString(); }
     public static final class Message { public long id; public int peer, type; public boolean outgoing; public long ts; public String text; public int status; public int sender; }   // sender: who wrote a talkgroup text (0 = the peer)   // status 0 pending 1 sent 2 failed
     public static final class Conversation { public int peer, type; public String name, lastText; public long lastTs; public boolean outgoing; }
 
@@ -83,6 +110,16 @@ public final class ChannelStore extends SQLiteOpenHelper {
         boolean hasSender = false;                                             // talkgroup texts: the thread is the talkgroup, each message keeps who wrote it
         try (Cursor c = db.rawQuery("PRAGMA table_info(messages)", null)) { while (c.moveToNext()) if ("sender".equals(c.getString(1))) hasSender = true; }
         if (!hasSender) db.execSQL("ALTER TABLE messages ADD COLUMN sender INTEGER DEFAULT 0");
+        // contact identity fields (2026-10-25): SignalDeck's own, never written to the module's contact table
+        java.util.Set<String> cc = new java.util.HashSet<>();
+        try (Cursor c = db.rawQuery("PRAGMA table_info(contacts)", null)) { while (c.moveToNext()) cc.add(c.getString(1)); }
+        String[][] cols = { { "callsign", "TEXT DEFAULT ''" }, { "rics", "TEXT DEFAULT ''" }, { "notes", "TEXT DEFAULT ''" }, { "homeLabel", "TEXT DEFAULT ''" },
+                { "callsignAuto", "INTEGER DEFAULT 0" }, { "homeLat", "REAL" }, { "homeLon", "REAL" }, { "lastLat", "REAL" }, { "lastLon", "REAL" },
+                { "lastTs", "INTEGER DEFAULT 0" }, { "lastSource", "TEXT DEFAULT ''" } };
+        for (String[] k : cols) if (!cc.contains(k[0])) db.execSQL("ALTER TABLE contacts ADD COLUMN " + k[0] + " " + k[1]);
+        // when and how each contact was heard, with the position when the transmission carried one (owner, 2026-10-25)
+        db.execSQL("CREATE TABLE IF NOT EXISTS contact_heard (_id INTEGER PRIMARY KEY AUTOINCREMENT, contactId INTEGER, ts INTEGER, source TEXT, detail TEXT, lat REAL, lon REAL, dir INTEGER DEFAULT 0)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS contact_heard_ix ON contact_heard (contactId, ts)");
     }
 
     /** A named talkgroup list (the module's TG lists): a set of talkgroups to drop into a channel's RX group list. */
@@ -261,6 +298,26 @@ public final class ChannelStore extends SQLiteOpenHelper {
         return out;
     }
 
+    /** A channel's own history, newest first: [ts, kind, text, rssi, dmrId]. Captions (their own page) and car, media, coverage and channel-change events (Last heard's event sections) are left out. */
+    public List<Object[]> channelHistory(int number, int limit) {
+        List<Object[]> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT ts, kind, text, rssi, dmrId FROM history WHERE channel=? AND kind NOT IN ('txt','car','media','cov','chan') ORDER BY ts DESC LIMIT " + limit, new String[] { String.valueOf(number) })) {
+            while (c.moveToNext()) out.add(new Object[] { c.getLong(0), c.getString(1), c.getString(2), c.getInt(3), c.getInt(4) });
+        }
+        return out;
+    }
+    public int channelHistoryCount(int number) { try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM history WHERE channel=? AND kind NOT IN ('txt','car','media','cov','chan')", new String[] { String.valueOf(number) })) { return c.moveToFirst() ? c.getInt(0) : 0; } }
+    /** Removes a channel's history lines except the captions (they have their own page). */
+    public void clearChannelHistory(int number) { getWritableDatabase().delete("history", "channel=? AND kind<>'txt'", new String[] { String.valueOf(number) }); }
+    /** Per channel, the newest thing heard on it: channel number to [ts, kind, text]. */
+    public java.util.Map<Integer, Object[]> channelLastHeard() {
+        java.util.Map<Integer, Object[]> out = new java.util.HashMap<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT channel, MAX(ts), kind, text FROM history WHERE kind IN ('rx','dmr','sms','pkt','tone','rec','m17') GROUP BY channel", null)) {
+            while (c.moveToNext()) out.put(c.getInt(0), new Object[] { c.getLong(1), c.getString(2), c.getString(3) });
+        }
+        return out;
+    }
+
     /** Newest events first for Last heard: [ts, channel, kind, text, dmrId]. */
     public List<Object[]> lastHeard(int limit) {
         List<Object[]> out = new ArrayList<>();
@@ -395,17 +452,114 @@ public final class ChannelStore extends SQLiteOpenHelper {
     // ---- contacts ----
     public List<Contact> contacts() {
         List<Contact> out = new ArrayList<>();
-        try (Cursor c = getReadableDatabase().query("contacts", null, null, null, null, null, "name COLLATE NOCASE")) {
-            while (c.moveToNext()) { Contact ct = new Contact(); ct.id = c.getLong(0); ct.name = c.getString(1) == null ? "" : c.getString(1); ct.number = c.getInt(2); ct.type = c.getInt(3); out.add(ct); }
-        }
+        try (Cursor c = getReadableDatabase().query("contacts", null, null, null, null, null, "name COLLATE NOCASE")) { while (c.moveToNext()) out.add(readContact(c)); }
         return out;
     }
+    private static Contact readContact(Cursor c) {
+        Contact ct = new Contact();
+        ct.id = c.getLong(c.getColumnIndexOrThrow("_id")); ct.name = col(c, "name", ""); ct.number = coli(c, "number", 0); ct.type = coli(c, "type", 0);
+        ct.callsign = col(c, "callsign", ""); ct.rics = col(c, "rics", ""); ct.notes = col(c, "notes", ""); ct.homeLabel = col(c, "homeLabel", "");
+        ct.callsignAuto = coli(c, "callsignAuto", 0); ct.homeLat = cold(c, "homeLat"); ct.homeLon = cold(c, "homeLon"); ct.lastLat = cold(c, "lastLat"); ct.lastLon = cold(c, "lastLon");
+        int i = c.getColumnIndex("lastTs"); ct.lastTs = i >= 0 && !c.isNull(i) ? c.getLong(i) : 0; ct.lastSource = col(c, "lastSource", "");
+        return ct;
+    }
+    private static double cold(Cursor c, String name) { int i = c.getColumnIndex(name); return i >= 0 && !c.isNull(i) ? c.getDouble(i) : Double.NaN; }
+    private static Double dbl(double v) { return Double.isNaN(v) ? null : v; }
     public String contactName(int number, int type) {
         try (Cursor c = getReadableDatabase().rawQuery("SELECT name FROM contacts WHERE number=? ORDER BY (type=?) DESC LIMIT 1", new String[] { String.valueOf(number), String.valueOf(type) })) { return c.moveToFirst() ? c.getString(0) : ""; }
     }
-    public void insertContact(Contact ct) { ContentValues v = new ContentValues(); v.put("name", ct.name); v.put("number", ct.number); v.put("type", ct.type); ct.id = getWritableDatabase().insert("contacts", null, v); }
-    public void updateContact(Contact ct) { ContentValues v = new ContentValues(); v.put("name", ct.name); v.put("number", ct.number); v.put("type", ct.type); getWritableDatabase().update("contacts", v, "_id=?", new String[] { String.valueOf(ct.id) }); }
-    public void deleteContact(Contact ct) { getWritableDatabase().delete("contacts", "_id=?", new String[] { String.valueOf(ct.id) }); }
+    public Contact contactById(long id) {
+        try (Cursor c = getReadableDatabase().query("contacts", null, "_id=?", new String[] { String.valueOf(id) }, null, null, null)) { return c.moveToFirst() ? readContact(c) : null; }
+    }
+    /** The contact with this number of the wanted type first, else any contact with the number. */
+    public Contact contactByNumber(int number, int type) {
+        try (Cursor c = getReadableDatabase().query("contacts", null, "number=?", new String[] { String.valueOf(number) }, null, null, "(type=" + Math.max(0, Math.min(2, type)) + ") DESC LIMIT 1")) { return c.moveToFirst() ? readContact(c) : null; }
+    }
+    /** The contact whose callsign is this one: exact (with SSID) first, else the same base callsign. */
+    public Contact contactByCallsign(String call) {
+        if (call == null) return null;
+        String want = call.trim().toUpperCase(java.util.Locale.US); if (want.isEmpty()) return null;
+        int d = want.indexOf('-'); String base = d > 0 ? want.substring(0, d) : want;
+        Contact sameBase = null;
+        for (Contact ct : contacts()) {
+            if (ct.callsign.isEmpty()) continue;
+            String have = ct.callsign.trim().toUpperCase(java.util.Locale.US);
+            if (have.equals(want)) return ct;
+            if (sameBase == null && ct.baseCall().equals(base)) sameBase = ct;
+        }
+        return sameBase;
+    }
+    /** The contact that has this pager RIC. */
+    public Contact contactByRic(int ric) {
+        for (Contact ct : contacts()) for (int r : ct.ricList()) if (r == ric) return ct;
+        return null;
+    }
+    private static ContentValues contactValues(Contact ct) {
+        ContentValues v = new ContentValues();
+        v.put("name", ct.name); v.put("number", ct.number); v.put("type", ct.type);
+        v.put("callsign", ct.callsign == null ? "" : ct.callsign.trim().toUpperCase(java.util.Locale.US)); v.put("rics", ricText(parseRics(ct.rics)));
+        v.put("notes", ct.notes == null ? "" : ct.notes); v.put("homeLabel", ct.homeLabel == null ? "" : ct.homeLabel); v.put("callsignAuto", ct.callsignAuto);
+        v.put("homeLat", dbl(ct.homeLat)); v.put("homeLon", dbl(ct.homeLon)); v.put("lastLat", dbl(ct.lastLat)); v.put("lastLon", dbl(ct.lastLon));
+        v.put("lastTs", ct.lastTs); v.put("lastSource", ct.lastSource == null ? "" : ct.lastSource);
+        return v;
+    }
+    public void insertContact(Contact ct) { ct.id = getWritableDatabase().insert("contacts", null, contactValues(ct)); }
+    public void updateContact(Contact ct) { getWritableDatabase().update("contacts", contactValues(ct), "_id=?", new String[] { String.valueOf(ct.id) }); }
+    /** One entry of a contact's history: heard from them (dir 0) or sent to them (dir 1); how (APRS, DMR voice, DMR text, M17, pager), what, and where when the transmission said. */
+    public static final class Heard { public long id, contactId, ts; public String source = "", detail = ""; public double lat = Double.NaN, lon = Double.NaN; public boolean sent; public boolean hasPosition() { return !Double.isNaN(lat) && !Double.isNaN(lon); } }
+    private static final int HEARD_KEEP = 300;
+    /**
+     * Records that a contact was heard (automatic data: the home location and everything the user typed stay as they
+     * are). With a position it also becomes the contact's last-heard position; without one only the time and source
+     * move. Repeats inside 20 s from the same source are folded into one entry. The history keeps the last 300 per contact.
+     */
+    public void contactHeard(long id, long ts, String source, String detail, double lat, double lon) {
+        if (id <= 0) return;
+        boolean pos = !Double.isNaN(lat) && !Double.isNaN(lon);
+        SQLiteDatabase db = getWritableDatabase();
+        try (Cursor c = db.rawQuery("SELECT _id, ts, lat FROM contact_heard WHERE contactId=? AND source=? AND dir=0 ORDER BY ts DESC LIMIT 1", new String[] { String.valueOf(id), source == null ? "" : source })) {
+            if (c.moveToFirst() && ts - c.getLong(1) < 20_000 && (pos || c.isNull(2))) {
+                ContentValues u = new ContentValues(); u.put("ts", ts); if (pos) { u.put("lat", lat); u.put("lon", lon); } if (detail != null && !detail.isEmpty()) u.put("detail", detail);
+                db.update("contact_heard", u, "_id=?", new String[] { String.valueOf(c.getLong(0)) });
+                touchLastHeard(db, id, ts, source, pos, lat, lon); return;
+            }
+        }
+        ContentValues v = new ContentValues(); v.put("contactId", id); v.put("ts", ts); v.put("source", source == null ? "" : source); v.put("detail", detail == null ? "" : detail);
+        if (pos) { v.put("lat", lat); v.put("lon", lon); }
+        db.insert("contact_heard", null, v);
+        db.execSQL("DELETE FROM contact_heard WHERE contactId=? AND _id NOT IN (SELECT _id FROM contact_heard WHERE contactId=? ORDER BY ts DESC LIMIT " + HEARD_KEEP + ")", new Object[] { id, id });
+        touchLastHeard(db, id, ts, source, pos, lat, lon);
+    }
+    /** Records something sent to a contact: a text, a voice call keyed to their ID, an APRS message, an M17 call, a page. */
+    public void contactSent(long id, long ts, String source, String detail) {
+        if (id <= 0) return;
+        ContentValues v = new ContentValues(); v.put("contactId", id); v.put("ts", ts); v.put("source", source == null ? "" : source); v.put("detail", detail == null ? "" : detail); v.put("dir", 1);
+        SQLiteDatabase db = getWritableDatabase(); db.insert("contact_heard", null, v);
+        db.execSQL("DELETE FROM contact_heard WHERE contactId=? AND _id NOT IN (SELECT _id FROM contact_heard WHERE contactId=? ORDER BY ts DESC LIMIT " + HEARD_KEEP + ")", new Object[] { id, id });
+    }
+    private static void touchLastHeard(SQLiteDatabase db, long id, long ts, String source, boolean pos, double lat, double lon) {
+        ContentValues v = new ContentValues(); v.put("lastTs", ts); v.put("lastSource", source == null ? "" : source);
+        if (pos) { v.put("lastLat", lat); v.put("lastLon", lon); }
+        db.update("contacts", v, "_id=?", new String[] { String.valueOf(id) });
+    }
+    /** The history of a contact, heard and sent, newest first. */
+    public List<Heard> contactHeard(long id, int limit) {
+        List<Heard> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().query("contact_heard", null, "contactId=?", new String[] { String.valueOf(id) }, null, null, "ts DESC", String.valueOf(limit))) {
+            while (c.moveToNext()) {
+                Heard h = new Heard(); h.id = c.getLong(0); h.contactId = c.getLong(1); h.ts = c.getLong(2); h.source = c.getString(3) == null ? "" : c.getString(3); h.detail = c.getString(4) == null ? "" : c.getString(4);
+                if (!c.isNull(5)) h.lat = c.getDouble(5); if (!c.isNull(6)) h.lon = c.getDouble(6); h.sent = coli(c, "dir", 0) == 1; out.add(h);
+            }
+        }
+        return out;
+    }
+    public int contactHeardCount(long id) { try (Cursor c = getReadableDatabase().rawQuery("SELECT COUNT(*) FROM contact_heard WHERE contactId=?", new String[] { String.valueOf(id) })) { return c.moveToFirst() ? c.getInt(0) : 0; } }
+    public void clearContactHeard(long id) {
+        getWritableDatabase().delete("contact_heard", "contactId=?", new String[] { String.valueOf(id) });
+        ContentValues v = new ContentValues(); v.putNull("lastLat"); v.putNull("lastLon"); v.put("lastTs", 0); v.put("lastSource", "");
+        getWritableDatabase().update("contacts", v, "_id=?", new String[] { String.valueOf(id) });
+    }
+    public void deleteContact(Contact ct) { getWritableDatabase().delete("contact_heard", "contactId=?", new String[] { String.valueOf(ct.id) }); getWritableDatabase().delete("contacts", "_id=?", new String[] { String.valueOf(ct.id) }); }
 
     // ---- messages ----
     public long addMessage(int peer, int type, boolean outgoing, String text, int status) { return addMessage(peer, type, outgoing, text, status, 0); }

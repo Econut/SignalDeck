@@ -50,20 +50,32 @@ S.editing = null;
 async function loadContacts() { try { const j = await api('contacts'); S.contacts = j.contacts; renderContacts(); } catch (e) { } }
 function renderContacts() {
   const q = $('ctSearch').value.trim().toLowerCase();
-  const rows = S.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || String(c.number).includes(q));
-  $('ctList').innerHTML = rows.map(c => '<div class="item click' + (S.editing && S.editing.id === c.id ? ' cur' : '') + '" data-id="' + c.id + '"><div class="main"><b>' + esc(c.name || '—') + '</b><div class="sub mono">' + (c.type === 1 ? 'TG ' : c.type === 2 ? 'ALL ' : 'ID ') + c.number + '</div></div><span class="chip dim">' + TYPE_NAMES[c.type].toUpperCase() + '</span></div>').join('') || '<div class="empty">No contacts</div>';
+  const rows = S.contacts.filter(c => !q || c.name.toLowerCase().includes(q) || (c.number > 0 && String(c.number).includes(q)) || (c.callsign || '').toLowerCase().includes(q) || (c.rics || '').split(';').includes(q));
+  $('ctList').innerHTML = rows.map(c => '<div class="item click' + (S.editing && S.editing.id === c.id ? ' cur' : '') + '" data-id="' + c.id + '"><div class="main"><b>' + esc(c.name || '—') + '</b><div class="sub mono">' + (c.number > 0 ? (c.type === 1 ? 'TG ' : c.type === 2 ? 'ALL ' : 'ID ') + c.number : 'no DMR ID') + (c.callsign ? ' · ' + esc(c.callsign) : '') + (c.rics ? ' · pager ' + esc(c.rics.replace(/;/g, ', ')) : '') + (c.lastTs ? ' · heard ' + ago(c.lastTs) : '') + '</div></div><span class="chip dim">' + TYPE_NAMES[c.type].toUpperCase() + '</span></div>').join('') || '<div class="empty">No contacts</div>';
 }
 function editContact(c) {
   S.editing = c || null; $('ctFormTitle').textContent = c ? 'EDIT CONTACT' : 'NEW CONTACT';
-  $('ctName').value = c ? c.name : ''; $('ctNumber').value = c ? c.number : ''; $('ctType').value = c ? c.type : 0;
-  $('ctDel').classList.toggle('hidden', !c); $('ctText').classList.toggle('hidden', !c); renderContacts();
+  $('ctName').value = c ? c.name : ''; $('ctNumber').value = c && c.number > 0 ? c.number : ''; $('ctType').value = c ? c.type : 0;
+  $('ctCall').value = c ? (c.callsign || '') : ''; $('ctRics').value = c ? (c.rics || '').replace(/;/g, ', ') : ''; $('ctNotes').value = c ? (c.notes || '') : '';
+  $('ctHome').value = c && c.homeLat != null ? c.homeLat.toFixed(5) + ', ' + c.homeLon.toFixed(5) : ''; $('ctHomeLabel').value = c ? (c.homeLabel || '') : '';
+  $('ctLast').textContent = c && c.lastTs ? 'Last heard ' + ago(c.lastTs) + (c.lastSource ? ' by ' + c.lastSource : '') + (c.lastLat != null ? ' at ' + c.lastLat.toFixed(4) + ', ' + c.lastLon.toFixed(4) : '') : '';
+  $('ctDel').classList.toggle('hidden', !c); $('ctText').classList.toggle('hidden', !c || !(c.number > 0)); renderContacts();
+  const hist = $('ctHistory'); hist.innerHTML = '';
+  if (c) api('contacts/history?id=' + c.id).then(j => { if (!S.editing || S.editing.id !== c.id) return; hist.innerHTML = j.history.length ? j.history.map(h => '<div class="item"><div class="main"><b>' + (h.sent ? '⬆ Sent ' : '⬇ Heard ') + esc(h.source) + (h.detail ? ' · ' + esc(h.detail) : '') + '</b><div class="sub mono">' + new Date(h.ts).toLocaleString() + (h.lat != null ? ' · ' + h.lat.toFixed(4) + ', ' + h.lon.toFixed(4) : '') + '</div></div></div>').join('') : '<div class="empty">Nothing heard from or sent to this contact yet</div>'; }).catch(() => { });
+}
+/** Add or open a contact for an identity shown anywhere on the web pages (a callsign or a DMR ID). */
+function contactFor(call, dmrId) {
+  const c = S.contacts.find(x => (call && x.callsign && (x.callsign === call || x.callsign.split('-')[0] === call.split('-')[0])) || (dmrId && x.number === dmrId && x.type === 0));
+  location.hash = 'contacts';
+  setTimeout(() => { if (c) editContact(c); else { editContact(null); $('ctCall').value = call || ''; $('ctNumber').value = dmrId || ''; $('ctName').value = call || ''; toast('Not in your contacts: fill in what you know and Save'); } }, 50);
 }
 $('ctSearch').oninput = renderContacts;
 $('ctList').onclick = e => { const it = e.target.closest('.item'); if (it) editContact(S.contacts.find(c => c.id === +it.dataset.id)); };
 $('ctNew').onclick = () => editContact(null);
 $('ctForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const j = await act('contacts', { id: S.editing ? S.editing.id : 0, name: $('ctName').value, number: +$('ctNumber').value, type: +$('ctType').value });
+  const j = await act('contacts', { id: S.editing ? S.editing.id : 0, name: $('ctName').value, number: +$('ctNumber').value || 0, type: +$('ctType').value,
+    callsign: $('ctCall').value, rics: $('ctRics').value, notes: $('ctNotes').value, home: $('ctHome').value, homeLabel: $('ctHomeLabel').value });
   if (j) { await loadContacts(); if (!S.editing) editContact(null); }
 });
 $('ctDel').onclick = async () => {
@@ -238,7 +250,7 @@ function showMark(m) {
   if (m.kind === 'rpt') { showRepeater(m); return; }
   if (m.kind === 'aprs') {
     const s = m.s;
-    h = '<b class="pk-from">' + esc(s.call) + '</b> <span class="sub">' + ago(s.lastTs) + ' · heard ' + s.count + '×</span><div>' + esc(s.comment) + '</div><div class="sub mono">' + s.lat.toFixed(4) + ', ' + s.lon.toFixed(4)
+    h = '<b class="pk-from click" title="Contact" onclick="contactFor(' + JSON.stringify(s.call) + ')">' + esc(s.call) + '</b> <span class="sub">' + ago(s.lastTs) + ' · heard ' + s.count + '×</span><div>' + esc(s.comment) + '</div><div class="sub mono">' + s.lat.toFixed(4) + ', ' + s.lon.toFixed(4)
       + (s.speedKmh != null ? ' · ' + Math.round(s.speedKmh) + ' km/h' : '') + (s.course != null ? ' · ' + s.course + '°' : '') + (s.alt ? ' · ' + s.alt + ' m' : '') + (s.via ? ' · via ' + esc(s.via) : '') + '</div>';
   } else {
     const ch = m.c;
