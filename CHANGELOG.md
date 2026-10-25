@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Bench firmware load
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Phase E | DIAG `fwload --es file` sends an image to the module with SignalDeck's own YModem sender (GPIO knock, then the byte `0x31`, then 1024-byte blocks). While that runs, signal polls and the module watchdog stay off the UART. `fwload --ez abort50` closes the port after half the blocks. The file has to be under `Download/DMR/Firmware/`. `raw40` sends one command `0x40` body from a file and does not key. Hidden bench extras; the in-app guide is unchanged. | `fw/YModemSender.java`, `UartPort.java`, `RadioEngine.java`, `RadioService.java`, `DiagReceiver.java` | Host: `YModemSenderTest`. Device, Wi-Fi adb, 467.625 MHz low power: FW22 over itself (tag and a 4 KiB opcode 12 sample), the factory image (tag and a 10 s tone), FW22 again, then an abort after half the blocks and a full load. Boot captures were silent. The numbers are in the phonedmrapp bench notes. |
+
+
 ## 2026-10-25 — Bench microphone hold
 
 | Backlog | Change | Files | Test |

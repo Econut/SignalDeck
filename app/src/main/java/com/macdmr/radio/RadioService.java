@@ -1671,6 +1671,92 @@ public class RadioService extends Service implements RadioEngine.Events {
         symThread = t;
         t.start();
     }
+    private volatile Thread fwThread;
+    /** Bench: load a module image with our own YModem sender. {@code abort50} closes the port halfway. */
+    public void diagFwLoad(java.io.File f, boolean abort50) {
+        Thread old = fwThread;
+        if (old != null && old.isAlive()) { log("fwload busy"); return; }
+        if (f == null) { log("fwload refused"); return; }
+        String path = f.getAbsolutePath();
+        boolean allowed = path.startsWith("/sdcard/Download/DMR/Firmware/")
+                || path.startsWith("/storage/emulated/0/Download/DMR/Firmware/");
+        if (!allowed) { log("fwload refused " + path); return; }
+        Thread job = new Thread(() -> {
+            boolean diverted = false;
+            try {
+                byte[] image = imageBytes(f);
+                if (image.length < 1024 || image.length > 2_000_000) { log("fwload bad length " + image.length); return; }
+                if (!engine.isOpen()) engine.open();
+                engine.startDivert();
+                diverted = true;
+                final boolean[] still = { true };
+                com.macdmr.radio.fw.YModemSender.Result r = new com.macdmr.radio.fw.YModemSender(null, s -> log("fwload " + s)).send(
+                        image, f.getName(), engine.powerNode(), engine.pttNode(),
+                        new com.macdmr.radio.fw.YModemSender.Wire() {
+                            public void write(byte[] b) throws java.io.IOException { engine.writeRaw(b); }
+                            public int read(int ms) throws java.io.IOException { return engine.readRaw(ms); }
+                            public void close() { engine.close(); }
+                        },
+                        (node, high) -> SysfsGpio.write(node, high ? "1" : "0"),
+                        abort50,
+                        () -> {
+                            engine.stopDivert();
+                            still[0] = false;
+                            return waitForTag();
+                        });
+                diverted = still[0];
+                log("fwload " + r);
+            } catch (Throwable t) {
+                log("fwload io-error " + t.getMessage());
+            } finally {
+                if (diverted) engine.stopDivert();
+                try { if (!engine.isOpen()) engine.open(); } catch (java.io.IOException e) { log("fwload reopen " + e.getMessage()); }
+            }
+        }, "fwload");
+        fwThread = job;
+        job.start();
+    }
+
+    private byte[] imageBytes(java.io.File f) throws java.io.IOException {
+        try { return java.nio.file.Files.readAllBytes(f.toPath()); }
+        catch (java.io.IOException e) {
+            java.io.File dst = new java.io.File(getCacheDir(), "fwload.bin");
+            String r = RootSetup.run("cp '" + f.getAbsolutePath() + "' '" + dst.getAbsolutePath()
+                    + "' && chown " + android.os.Process.myUid() + ":" + android.os.Process.myUid()
+                    + " '" + dst.getAbsolutePath() + "' && echo ok");
+            if (!r.endsWith("ok")) throw new java.io.IOException(r);
+            return java.nio.file.Files.readAllBytes(dst.toPath());
+        }
+    }
+
+    private String waitForTag() throws java.io.IOException {
+        try { Thread.sleep(3000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new java.io.IOException("interrupted"); }
+        for (int pass = 0; pass < 3; pass++) {
+            if (!engine.isOpen()) engine.open();
+            long asked = System.currentTimeMillis();
+            try { engine.queryVersion(); }
+            catch (java.io.IOException e) { engine.close(); continue; }
+            long end = asked + 8000;
+            while (System.currentTimeMillis() < end) {
+                if (versionAt >= asked && moduleVersion != null && moduleVersion.contains("DMR")) return moduleVersion.trim();
+                try { Thread.sleep(100); } catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new java.io.IOException("interrupted"); }
+            }
+            engine.close();
+        }
+        return moduleVersion == null ? "" : moduleVersion.trim();
+    }
+
+    /** Bench: one command 0x40 whose body is the file. Does not key. */
+    public void diagRaw40(java.io.File f) { worker.execute(() -> {
+        try {
+            byte[] body = java.nio.file.Files.readAllBytes(f.toPath());
+            if (body.length == 0 || body.length > 400) { log("raw40 bad " + body.length); return; }
+            Frame pic = engine.diag40(body, 800);
+            if (pic == null || pic.body == null) { log("raw40 none"); return; }
+            java.nio.file.Files.write(new java.io.File(getCacheDir(), "raw40.bin").toPath(), pic.body);
+            log("raw40 sr=" + pic.sr + " len=" + pic.body.length);
+        } catch (Throwable t) { log("raw40: " + t); }
+    }); }
     /** Bench: one status read of the symbol ring. Does not key. */
     public void diagSymStatus() { worker.execute(() -> logSymStatus(sym40(new byte[] { 2 }))); }
     /** Bench: reset, append one symbol chunk, render N samples. Does not key. Writes cache/render.bin. */
@@ -1966,7 +2052,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Ask the module for the signal strength (on the radio worker: never a serial write on the main thread). */
-    public void pollRssi() { if (scope.running()) return; worker.execute(() -> { try { if (engine.isOpen()) engine.queryRssi(); } catch (IOException ignored) { } }); }
+    public void pollRssi() { if (scope.running() || engine.rawSession()) return; worker.execute(() -> { try { if (engine.isOpen() && !engine.rawSession()) engine.queryRssi(); } catch (IOException ignored) { } }); }
 
     // ---- listeners ----------------------------------------------------------------------------------
 
@@ -2105,7 +2191,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile long lastRecoverAt; private volatile boolean recovering;
     private final Runnable moduleWatch = new Runnable() { @Override public void run() {
         ui.postDelayed(this, 2000);
-        if (exiting || !isReady() || recovering || isTransmitting() || engine.unansweredForMs() < 6000 || System.currentTimeMillis() - lastRecoverAt < 120_000) return;
+        if (exiting || engine.rawSession() || !isReady() || recovering || isTransmitting() || engine.unansweredForMs() < 6000 || System.currentTimeMillis() - lastRecoverAt < 120_000) return;
         recovering = true;
         worker.execute(() -> {
             try {

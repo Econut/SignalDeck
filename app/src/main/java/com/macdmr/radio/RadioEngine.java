@@ -121,7 +121,13 @@ public final class RadioEngine implements UartPort.Listener {
             return new java.util.ArrayList<>(extra40);
         }
     }
+    private volatile boolean rawHold;
+
+    /** True while a firmware load owns the port. Ordinary commands are dropped so they cannot land in the bootloader. */
+    public boolean rawSession() { return rawHold; }
+
     private void send(Frame fr) throws IOException {
+        if (rawHold) return;
         if (fr.rw == 1 && watched(fr.cmd) && firstUnansweredAt == 0) firstUnansweredAt = System.currentTimeMillis();
         if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
         port.send(fr);
@@ -158,6 +164,14 @@ public final class RadioEngine implements UartPort.Listener {
 
     public void open() throws IOException { port.open(profile.serialLib != null && VendorSerial.isLoaded() ? profile.baud : 0); }
     public void close() { port.close(); }
+
+    /** Pause framing so a firmware load can use the same port. Ordinary commands are held until {@link #stopDivert}. */
+    public void startDivert() { rawHold = true; firstUnansweredAt = 0; port.startDivert(); }
+    public void stopDivert() { port.stopDivert(); rawHold = false; }
+    public void writeRaw(byte[] b) throws IOException { port.writeRaw(b); }
+    public int readRaw(int timeoutMs) throws IOException { return port.readRaw(timeoutMs); }
+    public String powerNode() { return profile.powerNode; }
+    public String pttNode() { return profile.pttNode; }
 
     public String powerState() { return power.read(); }
 

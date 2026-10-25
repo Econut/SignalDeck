@@ -9,6 +9,8 @@ package com.macdmr.radio;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The MCU control UART as plain files. The line is configured by the stock app's own serial JNI
@@ -30,6 +32,11 @@ public final class UartPort {
     private VendorSerial.Port native_;
     private Thread reader;
     private volatile boolean running;
+    /** While set, received bytes are queued for the firmware loader instead of being framed. */
+    private volatile boolean divert;
+    private final LinkedBlockingQueue<byte[]> diverted = new LinkedBlockingQueue<>();
+    private byte[] divertCur;
+    private int divertPos;
 
     public UartPort(String path, Listener l) { this.path = path; this.listener = l; }
 
@@ -64,6 +71,40 @@ public final class UartPort {
 
     public boolean isOpen() { return in != null; }
 
+    /** Hand the byte stream to {@link #readRaw} until {@link #stopDivert}. */
+    public synchronized void startDivert() {
+        divert = true;
+        diverted.clear();
+        divertCur = null;
+        divertPos = 0;
+    }
+
+    public synchronized void stopDivert() { divert = false; diverted.clear(); divertCur = null; }
+
+    public synchronized void writeRaw(byte[] b) throws IOException {
+        if (out == null) throw new IOException("port closed");
+        out.write(b);
+        out.flush();
+    }
+
+    /** One diverted byte, or −1 when {@code timeoutMs} expires. */
+    public int readRaw(int timeoutMs) throws IOException {
+        try {
+            long end = System.currentTimeMillis() + timeoutMs;
+            while (true) {
+                if (divertCur != null && divertPos < divertCur.length) return divertCur[divertPos++] & 0xFF;
+                long left = end - System.currentTimeMillis();
+                if (left <= 0) return -1;
+                divertCur = diverted.poll(left, TimeUnit.MILLISECONDS);
+                divertPos = 0;
+                if (divertCur == null) return -1;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted");
+        }
+    }
+
     public synchronized void send(Frame f) throws IOException {
         if (out == null) throw new IOException("port closed");
         byte[] b = f.encode();
@@ -79,6 +120,13 @@ public final class UartPort {
             int r;
             try { r = in.read(chunk); } catch (IOException e) { if (running) listener.onLog("UART read: " + e.getMessage()); break; }
             if (r <= 0) continue;
+            if (divert) {
+                byte[] c = new byte[r];
+                System.arraycopy(chunk, 0, c, 0, r);
+                diverted.offer(c);
+                n = 0;
+                continue;
+            }
             if (n + r > buf.length) n = 0;                    // garbage flood: resync
             System.arraycopy(chunk, 0, buf, n, r); n += r;
             int off = 0, rawStart = -1;
