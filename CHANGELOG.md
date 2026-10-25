@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Signed firmware catalogue
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Phase E | Download factory image, shown when the backup is not verified, fetches the signed firmware catalogue (the same key as the profile list) and saves the factory image only when the signature and the hash match. A stock or released catalogue row that is not already built in is offered. A phone the catalogue lists with no supported base is refused. DIAG `fwcatalog` checks the list. DIAG `fwload --ei pause` sets the gap before each data block; the page still waits 300 ms. | `fw/FirmwareCatalog.java`, `fw/FirmwareVault.java`, `fw/FirmwareSession.java`, `fw/ImageTable.java`, `fw/YModemSender.java`, `ui/FirmwareScreen.java`, `ui/HelpView.java`, `ProfileRegistry.java`, `RadioService.java`, `DiagReceiver.java` | Host: `FirmwareCatalogTest` verifies the published catalogue (serial 3, the factory image), and rejects a bad signature and an older serial. |
+
 ## 2026-10-25 — Firmware page review fixes
 
 | Backlog | Change | Files | Test |

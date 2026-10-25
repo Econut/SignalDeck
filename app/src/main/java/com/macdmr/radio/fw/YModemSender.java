@@ -50,6 +50,7 @@ public final class YModemSender {
     private final Log log;
     private Watch watch;
     private Halt halt;
+    private int blockPauseMs = 300;
 
     public YModemSender(Pause pause, Log log) {
         this.pause = pause == null ? ms -> Thread.sleep(ms) : pause;
@@ -58,6 +59,8 @@ public final class YModemSender {
 
     public YModemSender watch(Watch watch) { this.watch = watch; return this; }
     public YModemSender halt(Halt halt) { this.halt = halt; return this; }
+    /** Milliseconds to wait after an ACK before the next data block. The page uses 300 until a shorter pause is measured. */
+    public YModemSender blockPause(int ms) { this.blockPauseMs = Math.max(0, ms); return this; }
 
     /** CRC-16-CCITT, init 0, polynomial 0x1021, not reflected. The value covers the data bytes only. */
     public static int crc16(byte[] data, int off, int len) {
@@ -111,7 +114,7 @@ public final class YModemSender {
                     try { wire.close(); } catch (IOException e) { log.line("close: " + e.getMessage()); }
                     return new Result("aborted", "stopped after block " + i);
                 }
-                pause.ms(300);
+                pause.ms(blockPauseMs);
                 drain(wire);
                 byte[] data = new byte[1024];
                 int n = Math.min(1024, image.length - i * 1024);

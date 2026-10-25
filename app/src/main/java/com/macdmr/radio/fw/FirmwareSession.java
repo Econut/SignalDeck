@@ -52,6 +52,10 @@ public final class FirmwareSession {
         boolean fileOk = image != null && row != null && image.length == row.size && row.sha256.equals(FirmwareVault.sha256(image)) && row.tag.equals(ImageTable.tagOf(image));
         boolean busy = svc.isTransmitting() || svc.scanning() || svc.m17Running() || svc.ft8Running() || svc.packetActive() || svc.scope().running();
         String policy = fileOk ? ImageTable.refuse(row, module, backup.sha256, backup.tag, android.os.Build.MODEL, svc.profile().stockApp, pkgVer, backup.verified, stockThere) : "The file does not match the known image";
+        if (policy == null) {
+            String variant = FirmwareCatalog.variantRefusal(c, android.os.Build.MODEL, svc.profile().stockApp);
+            if (variant != null) policy = variant;
+        }
         String versionNote = ImageTable.versionWarning(backup.sha256, pkgVer);
         List<Check> checks = new ArrayList<>();
         checks.add(new Check("Module answers", !module.isEmpty() || (row != null && row.factory), module.isEmpty() ? "No version yet" : module));

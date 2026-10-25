@@ -101,6 +101,13 @@ public final class FirmwareVault {
         catch (Exception e) { return null; }
     }
 
+    /** Keep a downloaded factory image that already matches the known hash and tag. */
+    public static boolean keepFactory(Context c, byte[] image) {
+        if (image == null || !ImageTable.FACTORY.sha256.equals(sha256(image)) || !ImageTable.FACTORY.tag.equals(ImageTable.tagOf(image))) return false;
+        save(c, image);
+        return true;
+    }
+
     private static void save(Context c, byte[] asset) {
         try {
             File f = privateFile(c);

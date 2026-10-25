@@ -9,8 +9,8 @@ import java.util.Locale;
 
 /**
  * The known module images. A load is refused unless the file's hash is one of these rows and the phone's
- * vendor image, model and stock app agree with that row's base. FW21 and FW22 are listed only by the hash
- * that was loaded and read back; a public catalogue waits until those images rebuild from the repository.
+ * vendor image, model and stock app agree with that row's base. FW22 stays a built-in bench row.
+ * The signed catalogue adds stock and released images; bench images are not taken from it.
  */
 public final class ImageTable {
     /** The version string sits at this file offset in every image built from the stock UV4T image. */

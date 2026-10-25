@@ -1,0 +1,100 @@
+{
+ "format": 1,
+ "serial": 3,
+ "generated": "2026-10-25",
+ "base": "https://raw.githubusercontent.com/IIMacGyverII/AndroidRadio_Firmware_Project/main/",
+ "images": [
+  {
+   "tag": "DMR003.UV4T.V022",
+   "file": "DMR003.UV4T.V022.bin",
+   "size": 378620,
+   "sha256": "90e361fda1082cdd010f8f2127eab97786f2a078f2f7590821c26867526c8c10",
+   "md5": "4426035392262ca54583c230c9e268e0",
+   "device": "ulefone-armor-26-ultra",
+   "model": "Armor 26 Ultra",
+   "module": "hr-c7000",
+   "base": "DMR003.UV4T.V022",
+   "factory": true,
+   "readBack": false,
+   "stockPackage": "com.pri.prizeinterphone",
+   "stockVersion": "V1.0",
+   "summary": "The firmware this phone shipped with. Loading it puts the module back the way it was. The image stays until another one is loaded, including across a reboot.",
+   "changes": [],
+   "transmitLimitSeconds": 120,
+   "persistsAcrossReboot": true,
+   "status": "stock",
+   "measured": "2026-10-23",
+   "builtFrom": {
+    "kind": "stock-asset",
+    "package": "com.pri.prizeinterphone",
+    "version": "V1.0",
+    "asset": "assets/DMR003.UV4T.V022.bin",
+    "assetSha256": "90e361fda1082cdd010f8f2127eab97786f2a078f2f7590821c26867526c8c10"
+   },
+   "results": "phonedmrapp/docs/grok-deep-dive/11-firmware-fw0-results.md",
+   "url": "https://raw.githubusercontent.com/IIMacGyverII/AndroidRadio_Firmware_Project/main/firmware/ulefone-armor-26-ultra/DMR003.UV4T.V022/DMR003.UV4T.V022.bin"
+  }
+ ],
+ "variants": [
+  {
+   "device": "ulefone-armor-20wt",
+   "variants": [
+    {
+     "moduleVersion": null,
+     "stockApp": {
+      "package": "com.pri.prizeinterphone",
+      "version": null
+     },
+     "assetSha256": null,
+     "assetSize": null,
+     "supportedBase": false,
+     "reports": 1,
+     "firstSeen": "2026-10-24",
+     "lastSeen": "2026-10-24",
+     "source": "report",
+     "notes": "The module was powered off during the report's probe, so no version string yet. Same stock-app family as the Armor 26 Ultra."
+    }
+   ]
+  },
+  {
+   "device": "ulefone-armor-26-ultra",
+   "variants": [
+    {
+     "moduleVersion": "DMR003.UV4T.V022",
+     "stockApp": {
+      "package": "com.pri.prizeinterphone",
+      "version": "V1.0"
+     },
+     "assetSha256": "90e361fda1082cdd010f8f2127eab97786f2a078f2f7590821c26867526c8c10",
+     "assetSize": 378620,
+     "supportedBase": true,
+     "reports": 1,
+     "firstSeen": "2026-10-13",
+     "lastSeen": "2026-10-25",
+     "source": "measured",
+     "notes": "The reference phone. The stock app sends a time-out byte of 0 at start, which turns the module's own 120 s timer off."
+    }
+   ]
+  },
+  {
+   "device": "unihertz-atom-xl",
+   "variants": [
+    {
+     "moduleVersion": "DMR006.U4A.V082",
+     "stockApp": {
+      "package": "com.agold.intercom",
+      "version": "2.0"
+     },
+     "assetSha256": null,
+     "assetSize": null,
+     "supportedBase": false,
+     "reports": 2,
+     "firstSeen": "2026-10-24",
+     "lastSeen": "2026-10-24",
+     "source": "report",
+     "notes": "Different module build from the Armor's; its stock image has not been extracted, so no base and no patches yet."
+    }
+   ]
+  }
+ ]
+}

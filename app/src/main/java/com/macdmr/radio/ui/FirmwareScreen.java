@@ -16,6 +16,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import com.macdmr.radio.RadioService;
+import com.macdmr.radio.fw.FirmwareCatalog;
 import com.macdmr.radio.fw.FirmwareSession;
 import com.macdmr.radio.fw.FirmwareVault;
 import com.macdmr.radio.fw.ImageTable;
@@ -33,7 +34,7 @@ public final class FirmwareScreen extends LinearLayout {
     private final TextView installed, chosen, backupLine, result, figures, log;
     private final LinearLayout checks, images, confirm;
     private final PhaseBar bar;
-    private final TextView load, restore, stop, logToggle;
+    private final TextView load, restore, stop, logToggle, download;
     private ImageTable.Row selected = ImageTable.FACTORY;
     private final java.util.HashSet<String> onPhone = new java.util.HashSet<>();
     private boolean logOpen, running, recovery;
@@ -98,10 +99,26 @@ public final class FirmwareScreen extends LinearLayout {
         confirm.setPadding(dp(12), dp(12), dp(12), dp(12)); confirm.setBackground(Neo.card(c, Neo.AMBER, 14));
         body.addView(confirm, buttonPad());
 
+        download = Neo.button(c, "Download factory image", "update", Neo.AMBER);
+        download.setVisibility(GONE);
+        download.setOnClickListener(v -> downloadFactory());
+        body.addView(download, buttonPad());
+
         load.setOnClickListener(v -> ask(false));
         restore.setOnClickListener(v -> { selected = ImageTable.FACTORY; showChosen(); ask(false); });
         stop.setOnClickListener(v -> svc.haltFirmware());
         refreshFacts();
+    }
+
+    private void downloadFactory() {
+        if (running) return;
+        result.setText("Checking the firmware catalogue");
+        new Thread(() -> {
+            String msg = FirmwareCatalog.fetch(getContext());
+            byte[] got = msg.startsWith("Firmware catalogue") ? FirmwareCatalog.download(getContext(), ImageTable.FACTORY.tag) : null;
+            String line = got != null ? "Factory image downloaded" : msg;
+            onUi(() -> { result.setText(line); refreshFacts(); });
+        }, "fw-catalog").start();
     }
 
     private void ask(boolean wrongTag) {
@@ -165,7 +182,7 @@ public final class FirmwareScreen extends LinearLayout {
             String now = svc.moduleVersion() == null ? "" : svc.moduleVersion().trim();
             java.util.HashSet<String> present = new java.util.HashSet<>();
             byte[] chosenBytes = null;
-            for (ImageTable.Row row : ImageTable.rows()) {
+            for (ImageTable.Row row : FirmwareCatalog.rows(getContext())) {
                 byte[] b = FirmwareVault.bytesFor(getContext(), row);
                 if (b != null) { present.add(row.tag); if (row.tag.equals(selected.tag)) chosenBytes = b; }
             }
@@ -180,8 +197,9 @@ public final class FirmwareScreen extends LinearLayout {
                 if (recovery) selected = ImageTable.FACTORY;
                 backupLine.setText(copy.verified ? "Verified · " + copy.source + "\nDownload/DMR/Firmware/factory-" + ImageTable.FACTORY.tag + "-" + ImageTable.FACTORY.sha256.substring(0, 8) + ".bin"
                         : "Not verified yet. " + (copy.sha256.isEmpty() ? "The stock app's copy could not be read." : "The stock copy does not match the known factory image."));
+                download.setVisibility(copy.verified || running ? GONE : VISIBLE);
                 images.removeAllViews();
-                for (ImageTable.Row row : ImageTable.rows()) {
+                for (ImageTable.Row row : FirmwareCatalog.rows(getContext())) {
                     if (recovery && !row.factory) continue;
                     TextView t = Neo.button(getContext(), row.tag, row.factory ? "restore" : "update", row == selected ? Neo.GREEN : Neo.CYAN);
                     t.setOnClickListener(v -> { if (!running) { selected = row; showChosen(); refreshFacts(); } });

@@ -1674,7 +1674,10 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     private volatile Thread fwThread;
     /** Bench: load a module image with our own YModem sender. {@code abort50} closes the port halfway. */
-    public void diagFwLoad(java.io.File f, boolean abort50) {
+    public void diagFwLoad(java.io.File f, boolean abort50) { diagFwLoad(f, abort50, -1); }
+
+    /** {@code pauseMs} &lt; 0 keeps the 300 ms pause before each data block. */
+    public void diagFwLoad(java.io.File f, boolean abort50, int pauseMs) {
         Thread old = fwThread;
         if (old != null && old.isAlive()) { log("fwload busy"); return; }
         if (f == null) { log("fwload refused"); return; }
@@ -1692,7 +1695,9 @@ public class RadioService extends Service implements RadioEngine.Events {
                 engine.startDivert();
                 diverted = true;
                 final boolean[] still = { true };
-                com.macdmr.radio.fw.YModemSender.Result r = new com.macdmr.radio.fw.YModemSender(null, s -> log("fwload " + s)).send(
+                com.macdmr.radio.fw.YModemSender sender = new com.macdmr.radio.fw.YModemSender(null, s -> log("fwload " + s));
+                if (pauseMs >= 0) sender.blockPause(pauseMs);
+                com.macdmr.radio.fw.YModemSender.Result r = sender.send(
                         image, f.getName(), engine.powerNode(), engine.pttNode(),
                         new com.macdmr.radio.fw.YModemSender.Wire() {
                             public void write(byte[] b) throws java.io.IOException { engine.writeRaw(b); }

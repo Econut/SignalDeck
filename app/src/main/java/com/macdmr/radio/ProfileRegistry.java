@@ -42,7 +42,7 @@ import java.util.function.Predicate;
 public final class ProfileRegistry {
     public static final String LIST_URL = "https://raw.githubusercontent.com/IIMacGyverII/SignalDeck/main/profiles/profiles.json";
     /** ECDSA P-256 public key of the profile list's signing key (the private key never leaves the maintainer's PC). */
-    static final String PUBLIC_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESoOXZsfoRfdkCfyCAdZjNm6gL6MOU42q08UQGUYonPEgZruRBwTh1uo+9toFUqopphqIb9i7WV2zuSBRZRB6GQ==";
+    public static final String PUBLIC_KEY = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESoOXZsfoRfdkCfyCAdZjNm6gL6MOU42q08UQGUYonPEgZruRBwTh1uo+9toFUqopphqIb9i7WV2zuSBRZRB6GQ==";
 
     /** One advisory as it applies to this phone. */
     public static final class Advisory {
@@ -118,7 +118,7 @@ public final class ProfileRegistry {
 
     // ---- signature ----------------------------------------------------------------------------------------------------
 
-    static boolean verify(byte[] data, String sigB64, String publicKeyB64) {
+    public static boolean verify(byte[] data, String sigB64, String publicKeyB64) {
         try {
             PublicKey k = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(java.util.Base64.getDecoder().decode(publicKeyB64)));
             Signature v = Signature.getInstance("SHA256withECDSA"); v.initVerify(k); v.update(data);

@@ -60,7 +60,8 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel
             case "restartmodule": s.diagRestartModule(); break;              // bench: the stuck-module watchdog's restart (power cycle, channel, MON, audio back)
             case "raw40": s.diagRaw40(new java.io.File(i.getStringExtra("path"))); break;  // bench: one 0x40 body from a file, reply in cache/raw40.bin, does not key
-            case "fwload": s.diagFwLoad(new java.io.File(i.getStringExtra("file")), i.getBooleanExtra("abort50", false)); break;  // bench: YModem-1K into the module. abort50 closes the port halfway.
+            case "fwload": s.diagFwLoad(new java.io.File(i.getStringExtra("file")), i.getBooleanExtra("abort50", false), i.hasExtra("pause") ? i.getIntExtra("pause", 300) : -1); break;  // bench: YModem-1K into the module. abort50 closes the port halfway. --ei pause sets the gap before each data block.
+            case "fwcatalog": new Thread(() -> android.util.Log.i("DiagReceiver", "fwcatalog " + com.macdmr.radio.fw.FirmwareCatalog.fetch(c)), "fwcatalog").start(); break;
             case "fwpage": new android.os.Handler(android.os.Looper.getMainLooper()).post(com.macdmr.radio.MainActivity.openFirmwarePage); break;
             case "fwbadtag": {                                                                 // bench: load FW22, then treat the tag as wrong so the page's restore runs
                 byte[] image = com.macdmr.radio.fw.FirmwareVault.bytesFor(c, com.macdmr.radio.fw.ImageTable.FW22);
