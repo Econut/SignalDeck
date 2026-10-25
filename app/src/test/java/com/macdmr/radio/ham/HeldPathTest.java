@@ -106,6 +106,58 @@ public class HeldPathTest {
         return t;
     }
 
+    @Test public void liveReceiverOneTransmission() throws Exception {
+        String dirEnv = System.getenv("M17_RF_DIR");
+        Path dir = Paths.get(dirEnv != null ? dirEnv : "C:\\Users\\Joshua\\AppData\\Local\\Temp\\fw1718\\rf");
+        Assume.assumeTrue("R-F clips are not on this machine", Files.isDirectory(dir) && Files.exists(dir.resolve("expected.json")));
+        double[] taps = taps();
+        JSONArray clips = new JSONObject(new String(Files.readAllBytes(dir.resolve("expected.json")), "UTF-8")).getJSONArray("clips");
+        for (int i = 0; i < clips.length(); i++) {
+            JSONObject c = clips.getJSONObject(i);
+            String name = c.getString("name");
+            short[] pcm = M17Test.wav(Files.newInputStream(dir.resolve(name + ".wav")));
+            short[] audio = withMutedHead(pcm, 3 * 8000);
+            final List<String> started = new java.util.ArrayList<String>();
+            final List<String> ended = new java.util.ArrayList<String>();
+            final int[] streams = new int[1];
+            HeldPathReceiver rx = new HeldPathReceiver(taps, new HeldPathReceiver.Listener() {
+                public void started(M17.Lsf l) { started.add(l.crcOk + " " + l.src() + " " + l.dst()); }
+                public void link(M17.Lsf l) { started.add("link " + l.src()); }
+                public void frame(M17.Stream s, float q) { streams[0]++; }
+                public void ended(int frames, int good, String why) { ended.add(why + " " + frames); }
+            }, false);
+            byte[] block = new byte[512 * 2];
+            boolean mid = false;
+            for (int off = 0; off < audio.length; off += 512) {
+                int n = Math.min(512, audio.length - off);
+                for (int k = 0; k < n; k++) { block[2 * k] = (byte) audio[off + k]; block[2 * k + 1] = (byte) (audio[off + k] >> 8); }
+                rx.feed(block, n * 2);
+                // Once, while the transmission is still arriving, the way the receiver thread polls.
+                if (!mid && off >= 40000) { rx.poll(); mid = true; }
+            }
+            rx.poll();
+            for (int w = 0; ended.isEmpty() && w < 3; w++) { Thread.sleep(1100); rx.poll(); }
+            int want = REF.get(name)[0];
+            System.out.printf("live %-18s started %s frames %d ended %s%n", name, started, streams[0], ended);
+            assertEquals(name + " started " + started, 1, started.size());
+            assertEquals(name + " callsigns", "true " + c.getString("src") + " " + c.getString("dst"), started.get(0));
+            assertTrue(name + " frames " + streams[0] + " / " + want, streams[0] >= Math.ceil(0.95 * want) && streams[0] <= want);
+            assertEquals(name + " ended " + ended, 1, ended.size());
+            rx.stop();
+        }
+    }
+
+    /** Three seconds of this clip's own muted head, then the clip from where it gets loud. */
+    private static short[] withMutedHead(short[] pcm, int headN) {
+        int muteEnd = 0;
+        while (muteEnd < pcm.length && Math.abs(pcm[muteEnd]) <= HeldPath.MUTE_PEAK) muteEnd++;
+        short mute = muteEnd > 0 ? pcm[0] : 4;
+        short[] out = new short[headN + pcm.length - muteEnd];
+        for (int i = 0; i < headN; i++) out[i] = mute;
+        System.arraycopy(pcm, muteEnd, out, headN, pcm.length - muteEnd);
+        return out;
+    }
+
     private static byte[] hex(String s) {
         byte[] o = new byte[s.length() / 2];
         for (int i = 0; i < o.length; i++) o[i] = (byte) Integer.parseInt(s.substring(2 * i, 2 * i + 2), 16);

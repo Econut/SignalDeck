@@ -1628,6 +1628,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         if (id != null && audio != null) { log("Morse ID after the transmission"); audio.playPcm(id); history("pkt", "\uD83D\uDD24 Morse ID " + packet.callsign()); }   // the station identification every ten minutes
                     } finally { engine.ptt(false); }
                     if (rxAudioOn && audio != null) audio.startRx(true);
+                    if (dataReceive) scheduleDataHold(true);   // the unkey path rewrites the voice filter; put the hold back
                 }
             } catch (Throwable t) { log("ptt: " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
         });

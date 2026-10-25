@@ -64,20 +64,24 @@ public final class HeldPath {
         return o;
     }
 
-    static double[] loud(short[] pcm, int n) {
-        int i0 = 0;
+    /** First sample of the trimmed signal: the squelch-open window, plus a quarter second. */
+    static int loudStart(short[] pcm, int n) {
         for (int i = 0; i + 400 <= n; i += 80) {
             double m = 0; for (int k = 0; k < 400; k++) m += pcm[i + k]; m /= 400;
-            double e = 0; for (int k = 0; k < 400; k++) { double d = pcm[i + k] - m; e += d * d; }
-            if (Math.sqrt(e / 400) > 800) { i0 = i + 2000; break; }
+            double e = 0; int quiet = 0;
+            for (int k = 0; k < 400; k++) {
+                double d = pcm[i + k] - m; e += d * d;
+                if (Math.abs(pcm[i + k]) <= MUTE_PEAK) quiet++;
+            }
+            if (quiet <= 40 && Math.sqrt(e / 400) > 800) return Math.min(n, i + 2000);
         }
+        return 0;
+    }
+
+    static double[] loud(short[] pcm, int n) {
+        int i0 = loudStart(pcm, n);
         if (i0 >= n) return new double[0];
-        int m = n - i0; double mean = 0;
-        for (int i = 0; i < m; i++) mean += pcm[i0 + i];
-        mean /= m;
-        double[] o = new double[m];
-        for (int i = 0; i < m; i++) o[i] = -(pcm[i0 + i] - mean);
-        return o;
+        return signed(java.util.Arrays.copyOfRange(pcm, i0, n), n - i0);
     }
 
     /** Linear upsample 8 kHz to 48 kHz, six samples per input sample. Past the last input sample the value holds. */
@@ -211,4 +215,144 @@ public final class HeldPath {
 
     /** The root-raised-cosine centre tap, for the host check against the research filter. */
     static double rrcCentre() { return RRC[RRC.length / 2]; }
+
+    /** Raw PCM at or under this peak is the module holding the speaker mute (about 5 counts). Sync is not searched there. */
+    static final int MUTE_PEAK = 20;
+
+    /** Every sync chain in {@code pcm}, starting at 8 kHz sample {@code from}. {@code resume8} is where the next pass should start. */
+    static final class Live {
+        final List<List<FrameHit>> chains;
+        final int resume8;
+        /** The walk stopped because the next sync fell below the hold threshold, not because the buffer ran out. */
+        final boolean closed;
+        Live(List<List<FrameHit>> chains, int resume8, boolean closed) {
+            this.chains = chains; this.resume8 = resume8; this.closed = closed;
+        }
+    }
+
+    static Live live(short[] pcm, int n, double[] taps, int from) {
+        if (taps == null || taps.length != TAPS) throw new IllegalArgumentException("taps");
+        if (from < 0) from = 0;
+        if (from >= n || n - from < 800) return new Live(new ArrayList<List<FrameHit>>(), n, false);
+        // The saved clips, and a transmission with the 1.6 s lead, have a loud head before the link
+        // setup. Skip it only while the resume point is still in the mute. Once audio is loud, trimming
+        // again would drop the next frames.
+        int origin = from;
+        boolean mute = true;
+        for (int i = from; i < Math.min(n, from + 80); i++) if (Math.abs(pcm[i]) > MUTE_PEAK) { mute = false; break; }
+        if (mute) {
+            int loud = loudStart(pcm, n);
+            if (loud > origin) origin = loud;
+        }
+        if (origin >= n) return new Live(new ArrayList<List<FrameHit>>(), n, false);
+        short[] part = java.util.Arrays.copyOfRange(pcm, origin, n);
+        // No per-slice mean: a poll that sees only part of the transmission would shift the level and
+        // drop sync in the middle of a call. The sign matches the bench clips.
+        double[] x = new double[part.length];
+        for (int i = 0; i < part.length; i++) x[i] = -part[i];
+        double[] y = equalise(matched(resample6(x)), taps);
+        List<List<FrameHit>> chains = new ArrayList<List<FrameHit>>();
+        int limit = y.length - 8 * SPS;
+        int from48 = 0;
+        int resume = n;
+        boolean closed = false;
+        while (from48 < limit) {
+            int[] at = firstSync(y, part, part.length, from48, limit);
+            if (at == null) {
+                resume = chains.isEmpty() ? n : Math.max(origin, origin + from48 / 6 - 2);
+                break;
+            }
+            int pos = at[0]; boolean lsf = at[1] == 0;
+            List<FrameHit> chain = new ArrayList<FrameHit>();
+            int end48 = pos;
+            boolean abandoned = false, needMore = false, lost = false;
+            while (pos + 192 * SPS <= y.length + 8 * SPS) {
+                int start = pos + 8 * SPS;
+                float[] pay = payload(y, start, lsf ? SYNC_LSF : SYNC_STR);
+                if (pay == null) { needMore = true; break; }
+                double sc = score(y, pos, lsf ? SYNC_LSF : SYNC_STR, lsf ? SS_LSF : SS_STR);
+                if (lsf) chain.add(new FrameHit(pos, (float) sc, M17.decodeLsf(pay, 0), null));
+                else chain.add(new FrameHit(pos, (float) sc, null, M17.decodeStream(pay, 0)));
+                if (chain.size() >= 8 && !identified(chain)) { abandoned = true; chain.clear(); break; }
+                end48 = pos + 192 * SPS;
+                int nxt = end48;
+                double best = -1; int bp = nxt; boolean bl = false;
+                for (int d = -(SPS / 2); d <= SPS / 2; d++) {
+                    if (!loudAt(part, part.length, nxt + d)) continue;
+                    for (int kind = 0; kind < 2; kind++) {
+                        boolean useLsf = kind == 1;
+                        double c = score(y, nxt + d, useLsf ? SYNC_LSF : SYNC_STR, useLsf ? SS_LSF : SS_STR);
+                        if (c > best) { best = c; bp = nxt + d; bl = useLsf; }
+                    }
+                }
+                if (best < LOST) {
+                    // The receiver polls while audio is still arriving. A sync within a few frames of the
+                    // end of this slice has not ended the transmission; the rest of the frame is not in yet.
+                    if (nxt + 3 * 192 * SPS > y.length) needMore = true;
+                    else lost = true;
+                    break;
+                }
+                pos = bp; lsf = bl;
+            }
+            if (!chain.isEmpty()) chains.add(chain);
+            closed = lost && !abandoned && !needMore;
+            if (needMore) {
+                // The next frame runs off the buffer. Keep what decoded and retry this sync when more audio arrives.
+                int hold = chain.isEmpty() ? at[0] : end48;
+                resume = Math.max(origin, origin + Math.max(0, hold) / 6 - 2);
+                break;
+            }
+            from48 = abandoned ? at[0] + 1 : Math.max(end48, at[0] + SPS);
+            resume = origin + from48 / 6;
+            // A false sync before the transmission is unidentified and the search continues. Once a real
+            // transmission loses sync, the rest of this buffer is not more of that contact.
+            if (closed && identified(chain)) { resume = n; break; }
+        }
+        return new Live(chains, resume, closed);
+    }
+
+    /** First sync at or after {@code from48}. Returns {index, 0 lsf / 1 stream}, or null. */
+    private static int[] firstSync(double[] y, short[] pcm, int n, int from48, int limit) {
+        int bestB = -1; int bestKind = 0;
+        for (int kind = 0; kind < 2; kind++) {
+            double[] s = kind == 0 ? SYNC_LSF : SYNC_STR; double ss = kind == 0 ? SS_LSF : SS_STR;
+            int a = -1;
+            for (int i = Math.max(0, from48); i < limit; i++) {
+                if (!loudAt(pcm, n, i)) continue;
+                if (score(y, i, s, ss) > THRESH) { a = i; break; }
+            }
+            if (a < 0) continue;
+            int b = a; double sb = -1;
+            int hi = Math.min(limit, a + SPS);
+            for (int i = a; i < hi; i++) {
+                if (!loudAt(pcm, n, i)) continue;
+                double sc = score(y, i, s, ss);
+                if (sc > sb) { sb = sc; b = i; }
+            }
+            if (bestB < 0 || b < bestB) { bestB = b; bestKind = kind; }
+        }
+        return bestB < 0 ? null : new int[] { bestB, bestKind };
+    }
+
+    /** A real transmission shows a link-setup CRC, or six LICH chunks, within the first frames. */
+    private static boolean identified(List<FrameHit> chain) {
+        byte[][] part = new byte[6][];
+        for (FrameHit h : chain) {
+            if (h.link != null && h.link.crcOk) return true;
+            if (h.stream == null || h.stream.lich == null) continue;
+            int c = h.stream.lichCount();
+            if (c >= 0 && c <= 5) part[c] = h.stream.lich;
+        }
+        for (byte[] p : part) if (p == null) return false;
+        byte[] raw = new byte[30];
+        for (int i = 0; i < 6; i++) System.arraycopy(part[i], 0, raw, 5 * i, 5);
+        return M17.crc16(raw, 28) == (((raw[28] & 0xFF) << 8) | (raw[29] & 0xFF));
+    }
+
+    private static boolean loudAt(short[] pcm, int n, int i48) {
+        if (i48 < 0) return false;
+        int a = i48 / 6, b = Math.min(n - 1, (i48 + 8 * SPS) / 6);
+        for (int i = Math.max(0, a); i <= b; i++) if (Math.abs(pcm[i]) > MUTE_PEAK) return true;
+        return false;
+    }
 }
