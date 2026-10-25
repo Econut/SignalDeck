@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Firmware load pause is 0
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Phase E | The wait before each firmware data block is 0. A 0 ms pause and a 50 ms pause each loaded FW22 three times; 0 ms finished in 148 s and 50 ms in 160 s. The page's remaining-time estimate uses the measured block time. | `fw/YModemSender.java`, `ui/FirmwareScreen.java`, `RadioService.java` | Device, Wi-Fi adb, DIAG `fwload --ei pause`: 0 ms 147.9 / 147.8 / 147.6 s, all `ok(DMR003.FW22.V022)`; 50 ms 160.1 / 160.3 / 160.0 s, the same tag. |
+
 ## 2026-10-25 — Signed firmware catalogue
 
 | Backlog | Change | Files | Test |

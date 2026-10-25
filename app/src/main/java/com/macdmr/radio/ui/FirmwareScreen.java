@@ -138,7 +138,7 @@ public final class FirmwareScreen extends LinearLayout {
     }
 
     private void begin(boolean wrongTag) {
-        running = true; stop.setEnabled(true); retries = 0; startedAt = System.currentTimeMillis(); lastAck = 600;
+        running = true; stop.setEnabled(true); retries = 0; startedAt = System.currentTimeMillis(); lastAck = 300;
         result.setText(""); log.setText("");
         bar.setPhase("preparing");
         new Thread(() -> {
@@ -153,7 +153,7 @@ public final class FirmwareScreen extends LinearLayout {
                 public void log(String line) { onUi(() -> log.append(line + "\n")); }
                 public void block(int done, int total, long ackMs, int nretry) {
                     onUi(() -> {
-                        retries = nretry; lastAck = Math.max(200, ackMs + 300);
+                        retries = nretry; lastAck = Math.max(200, ackMs);
                         bar.setFill(total == 0 ? 0 : done / (float) total);
                         long elapsed = System.currentTimeMillis() - startedAt;
                         long bytes = Math.min(selected.size, (long) done * 1024);

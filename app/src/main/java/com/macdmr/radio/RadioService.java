@@ -1676,7 +1676,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Bench: load a module image with our own YModem sender. {@code abort50} closes the port halfway. */
     public void diagFwLoad(java.io.File f, boolean abort50) { diagFwLoad(f, abort50, -1); }
 
-    /** {@code pauseMs} &lt; 0 keeps the 300 ms pause before each data block. */
+    /** {@code pauseMs} &lt; 0 keeps the measured pause before each data block, which is 0. */
     public void diagFwLoad(java.io.File f, boolean abort50, int pauseMs) {
         Thread old = fwThread;
         if (old != null && old.isAlive()) { log("fwload busy"); return; }
