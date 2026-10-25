@@ -36,7 +36,14 @@ public class ImageTableTest {
     }
 
     @Test public void anUnknownTagIsRefused() {
+        assertNotNull(ImageTable.refuse(ImageTable.FW22, "DMR003.NOPE.V022", ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", true, true));
         assertNotNull(ImageTable.refuse(ImageTable.FACTORY, "DMR003.NOPE.V022", ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
+                "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", false, true));
+    }
+
+    @Test public void aVerifiedBackupMayRestoreFactoryOverAnUnknownTag() {
+        assertNull(ImageTable.refuse(ImageTable.FACTORY, "DMR003.UNL1.V022", ImageTable.FACTORY.sha256, ImageTable.FACTORY.tag,
                 "Armor 26 Ultra", ImageTable.FACTORY.stockPackage, "V1.0", true, true));
     }
 
@@ -47,6 +54,12 @@ public class ImageTableTest {
         assertNotNull(warn);
         assertTrue(warn.contains("V9.9"));
         assertNull(ImageTable.versionWarning("deadbeef", "V9.9"));
+    }
+
+    @Test public void anUnlistedFileNeedsTheFactoryBackup() {
+        assertNotNull(ImageTable.unlistedPolicy(ImageTable.FW22.tag, false, "Armor 26 Ultra", ImageTable.FACTORY.stockPackage));
+        assertNull(ImageTable.unlistedPolicy(ImageTable.FW22.tag, true, "Armor 26 Ultra", ImageTable.FACTORY.stockPackage));
+        assertNotNull(ImageTable.unlistedPolicy("DMR003.NOPE.V022", true, "Armor 26 Ultra", ImageTable.FACTORY.stockPackage));
     }
 
     @Test public void theTagSitsAtTheKnownOffset() {

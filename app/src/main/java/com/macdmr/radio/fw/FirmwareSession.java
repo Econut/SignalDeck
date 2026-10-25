@@ -51,7 +51,11 @@ public final class FirmwareSession {
         boolean charging = batteryCharging(c);
         boolean fileOk = image != null && row != null && image.length == row.size && row.sha256.equals(FirmwareVault.sha256(image)) && row.tag.equals(ImageTable.tagOf(image));
         boolean busy = svc.isTransmitting() || svc.scanning() || svc.m17Running() || svc.ft8Running() || svc.packetActive() || svc.scope().running();
-        String policy = fileOk ? ImageTable.refuse(row, module, backup.sha256, backup.tag, android.os.Build.MODEL, svc.profile().stockApp, pkgVer, backup.verified, stockThere) : "The file does not match the known image";
+        String policy;
+        if (!fileOk) policy = "The file does not match the known image";
+        else if (row.unlisted && !Unlisted.allowed(c)) policy = "That file is not a known module image";
+        else if (row.unlisted) policy = ImageTable.unlistedPolicy(module, backup.verified, android.os.Build.MODEL, svc.profile().stockApp);
+        else policy = ImageTable.refuse(row, module, backup.sha256, backup.tag, android.os.Build.MODEL, svc.profile().stockApp, pkgVer, backup.verified, stockThere);
         if (policy == null) {
             String variant = FirmwareCatalog.variantRefusal(c, android.os.Build.MODEL, svc.profile().stockApp);
             if (variant != null) policy = variant;
@@ -80,6 +84,7 @@ public final class FirmwareSession {
         PowerManager.WakeLock lock = ((PowerManager) c.getSystemService(Context.POWER_SERVICE)).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "signaldeck:firmware");
         lock.acquire(20 * 60 * 1000L);
         try {
+            if (row.unlisted) Unlisted.allow(c, false);
             String got = send(svc, row, image, ui, halt);
             if (got == null) return;
             if (treatTagAsWrong) got = "DMR003.NOPE.V022";
@@ -102,7 +107,10 @@ public final class FirmwareSession {
                     return;
                 }
             }
-            svc.history("fw", "Firmware loaded: " + got);
+            if (row.unlisted) {
+                svc.history("fw", "unlisted image " + row.sha256);
+                svc.log("unlisted image " + row.sha256);
+            } else svc.history("fw", "Firmware loaded: " + got);
             ui.finished(got + (row.readBack ? " · flash sample matched" : ""));
         } finally {
             if (lock.isHeld()) lock.release();

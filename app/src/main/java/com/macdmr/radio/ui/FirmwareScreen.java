@@ -11,6 +11,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -20,6 +21,7 @@ import com.macdmr.radio.fw.FirmwareCatalog;
 import com.macdmr.radio.fw.FirmwareSession;
 import com.macdmr.radio.fw.FirmwareVault;
 import com.macdmr.radio.fw.ImageTable;
+import com.macdmr.radio.fw.Unlisted;
 
 import java.util.List;
 import java.util.Locale;
@@ -34,7 +36,8 @@ public final class FirmwareScreen extends LinearLayout {
     private final TextView installed, chosen, backupLine, result, figures, log;
     private final LinearLayout checks, images, confirm;
     private final PhaseBar bar;
-    private final TextView load, restore, stop, logToggle, download;
+    private final TextView load, restore, stop, logToggle, download, allowUnlisted;
+    private final EditText hashEntry;
     private ImageTable.Row selected = ImageTable.FACTORY;
     private final java.util.HashSet<String> onPhone = new java.util.HashSet<>();
     private boolean logOpen, running, recovery;
@@ -104,6 +107,18 @@ public final class FirmwareScreen extends LinearLayout {
         download.setOnClickListener(v -> downloadFactory());
         body.addView(download, buttonPad());
 
+        body.addView(Neo.caps(c, "Advanced"));
+        allowUnlisted = Neo.button(c, "Allow unlisted images · off", "lock", Neo.AMBER);
+        allowUnlisted.setOnClickListener(v -> toggleUnlisted());
+        body.addView(allowUnlisted, buttonPad());
+        hashEntry = new EditText(c);
+        hashEntry.setHint("First 8 characters of the hash");
+        hashEntry.setSingleLine(true);
+        hashEntry.setTextColor(Neo.TEXT);
+        hashEntry.setHintTextColor(Neo.MUTED);
+        hashEntry.setVisibility(GONE);
+        body.addView(hashEntry, buttonPad());
+
         load.setOnClickListener(v -> ask(false));
         restore.setOnClickListener(v -> { selected = ImageTable.FACTORY; showChosen(); ask(false); });
         stop.setOnClickListener(v -> svc.haltFirmware());
@@ -121,8 +136,28 @@ public final class FirmwareScreen extends LinearLayout {
         }, "fw-catalog").start();
     }
 
+    private void toggleUnlisted() {
+        if (running) return;
+        if (Unlisted.allowed(getContext())) { Unlisted.allow(getContext(), false); refreshFacts(); return; }
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Allow unlisted images? (1 of 2)")
+                .setMessage("An unlisted file is not from the catalogue. It cannot be verified after loading beyond its version string. This project does not cover it, and you are responsible for what the radio transmits.")
+                .setPositiveButton("Continue", (d, w) -> new android.app.AlertDialog.Builder(getContext()).setTitle("Your decision (2 of 2)")
+                        .setMessage("It is your radio and your decision. The switch turns itself off after a load. You can turn it on again later.")
+                        .setPositiveButton("I understand, allow it", (d2, w2) -> { Unlisted.allow(getContext(), true); refreshFacts(); })
+                        .setNegativeButton("Cancel", null).show())
+                .setNegativeButton("Cancel", null).show();
+    }
+
     private void ask(boolean wrongTag) {
         if (running) return;
+        if (selected.unlisted && Unlisted.allowed(getContext())) {
+            String typed = hashEntry.getText() == null ? "" : hashEntry.getText().toString().trim().toLowerCase(java.util.Locale.US);
+            if (typed.length() < 8 || !selected.sha256.startsWith(typed.substring(0, 8))) {
+                result.setText("Type the first 8 characters of the hash");
+                result.setTextColor(Neo.AMBER_LIGHT);
+                return;
+            }
+        }
         confirm.removeAllViews();
         TextView q = Neo.text(getContext(), "Load " + selected.tag + "? The module keeps that image until you load another one, including after a reboot. While it loads, the radio shows busy and Talk does nothing.",
                 Neo.TEXT, 15, Neo.uiMedium(getContext()));
@@ -184,9 +219,11 @@ public final class FirmwareScreen extends LinearLayout {
             byte[] chosenBytes = null;
             for (ImageTable.Row row : FirmwareCatalog.rows(getContext())) {
                 byte[] b = FirmwareVault.bytesFor(getContext(), row);
-                if (b != null) { present.add(row.tag); if (row.tag.equals(selected.tag)) chosenBytes = b; }
+                if (b != null) { present.add(row.tag); if (row.tag.equals(selected.tag) && !selected.unlisted) chosenBytes = b; }
             }
+            if (selected.unlisted) chosenBytes = FirmwareVault.bytesFor(getContext(), selected);
             List<FirmwareSession.Check> preview = FirmwareSession.inspect(svc, selected, chosenBytes);
+            List<ImageTable.Row> unlistedRows = Unlisted.files(getContext());
             onUi(() -> {
                 onPhone.clear(); onPhone.addAll(present);
                 if (!running) showChecks(preview);
@@ -205,15 +242,22 @@ public final class FirmwareScreen extends LinearLayout {
                     t.setOnClickListener(v -> { if (!running) { selected = row; showChosen(); refreshFacts(); } });
                     images.addView(t, buttonPad());
                 }
+                allowUnlisted.setText(Unlisted.allowed(getContext()) ? "Allow unlisted images · on" : "Allow unlisted images · off");
+                if (!recovery) for (ImageTable.Row row : unlistedRows) {
+                    TextView t = Neo.button(getContext(), row.tag, "update", row.tag.equals(selected.tag) && selected.unlisted ? Neo.GREEN : Neo.AMBER);
+                    t.setOnClickListener(v -> { if (!running) { selected = row; showChosen(); refreshFacts(); } });
+                    images.addView(t, buttonPad());
+                }
                 showChosen();
             });
         }, "fw-facts").start();
     }
 
     private void showChosen() {
-        boolean here = onPhone.contains(selected.tag);
+        boolean here = onPhone.contains(selected.tag) || selected.unlisted;
         chosen.setText(selected.tag + "\n" + selected.summary + "\n" + String.format(Locale.US, "%,d bytes · hash %s · %s",
-                selected.size, selected.sha256.substring(0, 12), here ? "file on this phone" : "file not on this phone"));
+                selected.size, selected.sha256, here ? "file on this phone" : "file not on this phone"));
+        hashEntry.setVisibility(selected.unlisted && Unlisted.allowed(getContext()) ? VISIBLE : GONE);
     }
 
     private void showChecks(List<FirmwareSession.Check> list) {

@@ -19,12 +19,16 @@ public final class ImageTable {
     public static final class Row {
         public final String tag, sha256, summary, baseTag, model, stockPackage, stockVersion;
         public final int size;
-        public final boolean factory, readBack;
+        public final boolean factory, readBack, unlisted;
 
         Row(String tag, String sha256, int size, String summary, String baseTag, String model, String stockPackage, String stockVersion, boolean factory, boolean readBack) {
+            this(tag, sha256, size, summary, baseTag, model, stockPackage, stockVersion, factory, readBack, false);
+        }
+
+        Row(String tag, String sha256, int size, String summary, String baseTag, String model, String stockPackage, String stockVersion, boolean factory, boolean readBack, boolean unlisted) {
             this.tag = tag; this.sha256 = sha256; this.size = size; this.summary = summary; this.baseTag = baseTag;
             this.model = model; this.stockPackage = stockPackage; this.stockVersion = stockVersion;
-            this.factory = factory; this.readBack = readBack;
+            this.factory = factory; this.readBack = readBack; this.unlisted = unlisted;
         }
     }
 
@@ -101,8 +105,11 @@ public final class ImageTable {
         }
         String tag = moduleTag.trim();
         Row running = byTag(tag);
-        if (running == null) return "Firmware variant not yet supported (" + tag + ")";
-        if (!FACTORY.tag.equals(running.baseTag) && !FACTORY.tag.equals(running.tag)) return "Firmware variant not yet supported (" + tag + ")";
+        if (running == null) {
+            if (!(image.factory && backupVerified)) return "Firmware variant not yet supported (" + tag + ")";
+        } else if (!FACTORY.tag.equals(running.baseTag) && !FACTORY.tag.equals(running.tag)) {
+            return "Firmware variant not yet supported (" + tag + ")";
+        }
         if (!modelMatches(model)) return "This phone model is not the one that image was built for";
         if (pkg == null || !FACTORY.stockPackage.equals(pkg)) return "The stock radio app on this phone is not the one this image belongs to";
         boolean assetOk = FACTORY.sha256.equals(assetSha) && FACTORY.tag.equals(assetTag);
@@ -112,6 +119,22 @@ public final class ImageTable {
                     : "The stock app is gone and there is no verified factory copy on this phone";
         if (!image.factory && !backupVerified) return "Load the factory backup onto this phone before any other image";
         if (!image.factory && !FACTORY.tag.equals(image.baseTag)) return "That image was not built from this phone's factory firmware";
+        return null;
+    }
+
+    /**
+     * Why an unlisted file must not be loaded, or null when the identity checks still pass.
+     * The file is not in the catalogue, so the known-image check does not apply. The factory backup does.
+     */
+    public static String unlistedPolicy(String moduleTag, boolean backupVerified, String model, String pkg) {
+        if (!backupVerified) return "Load the factory backup onto this phone before any other image";
+        if (moduleTag == null || moduleTag.trim().isEmpty()) return "The module did not answer. Recovery loads the factory image only";
+        String tag = moduleTag.trim();
+        Row running = byTag(tag);
+        if (running == null) return "Firmware variant not yet supported (" + tag + ")";
+        if (!FACTORY.tag.equals(running.baseTag) && !FACTORY.tag.equals(running.tag)) return "Firmware variant not yet supported (" + tag + ")";
+        if (!modelMatches(model)) return "This phone model is not the one that image was built for";
+        if (pkg == null || !FACTORY.stockPackage.equals(pkg)) return "The stock radio app on this phone is not the one this image belongs to";
         return null;
     }
 

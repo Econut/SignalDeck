@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Allow unlisted images
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Phase E | Allow unlisted images, under Advanced, stays off until it is confirmed twice. A file in Download/DMR/Firmware of the factory size, with a version string, that is not a known image can then load after the first eight characters of its hash are typed. The factory backup has to be present and the phone has to be a known one. The switch turns off when the transfer starts. The history line is "unlisted image" and the hash. A version string that does not match restores the factory image. Restore factory still loads the factory image over an unlisted version when the backup is verified. | `fw/Unlisted.java`, `fw/FirmwareSession.java`, `fw/ImageTable.java`, `ui/FirmwareScreen.java`, `ui/HelpView.java`, `DiagReceiver.java` | Host: `ImageTableTest`. Device, Wi-Fi adb: the switch was off; an unknown file was refused in 12.4 s with the switch off; with it on, the module read back `DMR003.UNL1.V022` at 16:12 and the history line carried the hash; with no factory backup the same file was refused, the switch stayed on, and nothing was transferred; DIAG `fwunlistedbad` read the file back in 137 s, treated the tag as wrong, and restored the factory image in 138 s. |
+
 ## 2026-10-25 — Firmware load pause is 0
 
 | Backlog | Change | Files | Test |

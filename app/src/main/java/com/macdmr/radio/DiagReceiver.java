@@ -62,6 +62,22 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "raw40": s.diagRaw40(new java.io.File(i.getStringExtra("path"))); break;  // bench: one 0x40 body from a file, reply in cache/raw40.bin, does not key
             case "fwload": s.diagFwLoad(new java.io.File(i.getStringExtra("file")), i.getBooleanExtra("abort50", false), i.hasExtra("pause") ? i.getIntExtra("pause", 300) : -1); break;  // bench: YModem-1K into the module. abort50 closes the port halfway. --ei pause sets the gap before each data block.
             case "fwcatalog": new Thread(() -> android.util.Log.i("DiagReceiver", "fwcatalog " + com.macdmr.radio.fw.FirmwareCatalog.fetch(c)), "fwcatalog").start(); break;
+            case "fwunlistedbad": {                                                                 // bench: load the first unlisted file, then treat the tag as wrong
+                java.util.List<com.macdmr.radio.fw.ImageTable.Row> files = com.macdmr.radio.fw.Unlisted.files(c);
+                if (files.isEmpty()) { android.util.Log.w("DiagReceiver", "fwunlistedbad: no unlisted file"); break; }
+                com.macdmr.radio.fw.ImageTable.Row row = files.get(0);
+                byte[] image = com.macdmr.radio.fw.FirmwareVault.bytesFor(c, row);
+                if (image == null) { android.util.Log.w("DiagReceiver", "fwunlistedbad: file not readable"); break; }
+                com.macdmr.radio.fw.Unlisted.allow(c, true);
+                s.loadFirmware(row, image, new com.macdmr.radio.fw.FirmwareSession.Ui() {
+                    public void phase(String name) { android.util.Log.i("DiagReceiver", "fwunlistedbad phase " + name); }
+                    public void log(String line) { android.util.Log.i("DiagReceiver", "fwunlistedbad " + line); }
+                    public void block(int done, int total, long ackMs, int retries) { if (done == 1 || done == total || done % 50 == 0) android.util.Log.i("DiagReceiver", "fwunlistedbad block " + done + "/" + total); }
+                    public void checks(java.util.List<com.macdmr.radio.fw.FirmwareSession.Check> checks) { for (com.macdmr.radio.fw.FirmwareSession.Check k : checks) android.util.Log.i("DiagReceiver", "fwunlistedbad check " + (k.ok ? "ok" : "no") + " " + k.name + " " + k.detail); }
+                    public void finished(String line) { android.util.Log.i("DiagReceiver", "fwunlistedbad done " + line); }
+                }, true);
+                break;
+            }
             case "fwpage": new android.os.Handler(android.os.Looper.getMainLooper()).post(com.macdmr.radio.MainActivity.openFirmwarePage); break;
             case "fwbadtag": {                                                                 // bench: load FW22, then treat the tag as wrong so the page's restore runs
                 byte[] image = com.macdmr.radio.fw.FirmwareVault.bytesFor(c, com.macdmr.radio.fw.ImageTable.FW22);
