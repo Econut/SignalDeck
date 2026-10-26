@@ -28,7 +28,7 @@ import java.util.Locale;
  * Receive only: this radio's transmit path cannot produce M17 that M17 radios decode.
  */
 public final class M17Station {
-    public interface Host { void event(String line); void heard(String call); void changed(); default void voice(short[] pcm) { } }
+    public interface Host { void event(String line); void heard(String call); void changed(); default void voice(short[] pcm) { } default int meter() { return -999; } }
 
     /** One transmission heard. */
     public static final class Heard {
@@ -48,8 +48,11 @@ public final class M17Station {
     /** Bench: also append the decoded voice to cache/m17_out.raw (8 kHz 16-bit mono). */
     public static volatile boolean benchDump;
     private volatile String calibration = "";
+    private final HeldCal cal;
+    private double[] heldTaps;
+    private boolean swapping;
 
-    public M17Station(Context c, String profileId, Host h) { ctx = c.getApplicationContext(); this.profileId = profileId; host = h; }
+    public M17Station(Context c, String profileId, Host h) { ctx = c.getApplicationContext(); this.profileId = profileId; host = h; cal = new HeldCal(ctx, profileId); }
 
     public boolean running() { return running; }
     /** A transmission is being decoded (the radio's own audio is held back). */
@@ -58,6 +61,7 @@ public final class M17Station {
     public synchronized List<Heard> heard() { return new ArrayList<>(heard); }
     public float quality() { return quality; }
     public String calibration() { return calibration; }
+    public void resetCalibration() { if (cal != null) cal.reset(); stopHeld(); setHeldPath(true); host.changed(); }
     /** The fixed-tap front end is in use (the module is holding its voice filter open). */
     public boolean held() { return held != null; }
 
@@ -95,10 +99,12 @@ public final class M17Station {
         if (!running) { stopHeld(); return; }
         if (!on) { stopHeld(); calibration = dfeNote; host.changed(); return; }
         if (held != null) return;
-        double[] taps = loadTaps("m17/held_" + profileId + ".txt");
+        double[] taps = cal.accepted();
+        if (taps == null) taps = loadTaps("m17/held_" + profileId + ".txt");
         if (taps == null) { Log.i("M17Station", "held path: no taps for " + profileId); return; }
+        heldTaps = taps;
         held = new HeldPathReceiver(taps, heldEar);
-        calibration = "fixed taps for this phone; the module's voice filter is held open";
+        calibration = cal.line().isEmpty() ? "fixed taps for this phone; the module's voice filter is held open" : cal.line();
         host.changed();
     }
 
@@ -171,7 +177,16 @@ public final class M17Station {
         if (h.frames % 12 == 0) host.changed();
     }
     private void finish(int frames, int good, String why) {
+        if (swapping) return;
         Heard h = current; current = null;
+        HeldPathReceiver hr = held;
+        if (hr != null) {
+            try {
+                boolean kept = cal.onCall(hr.takeFrames(), hr.takeAudio(), h != null ? h.src : "", host.meter(), heldTaps);
+                calibration = cal.line().isEmpty() ? calibration : cal.line();
+                if (kept) { swapping = true; stopHeld(); setHeldPath(true); swapping = false; }
+            } catch (Throwable t) { Log.w("M17Station", "fit: " + t); }
+        }
         if (h != null) {
             h.end = System.currentTimeMillis();
             host.event(String.format(Locale.US, "📻 M17 %s ended: %.1f s, %d frames%s", h.src.isEmpty() ? "transmission" : "from " + h.src, (h.end - h.start) / 1000.0, frames,

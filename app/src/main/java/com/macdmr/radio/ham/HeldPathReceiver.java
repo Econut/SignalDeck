@@ -46,6 +46,9 @@ public final class HeldPathReceiver {
     private boolean open, stop, lsfSent;
     private int frames, good, emitted;
     private long lastEmit;
+    private final java.util.ArrayList<HeldFit.Frame> kept = new java.util.ArrayList<HeldFit.Frame>();
+    private final short[] ring = new short[8 * 8000];
+    private int ringAt, callMark = -1;
     private final Thread thread;
 
     public HeldPathReceiver(double[] taps, Listener listener) { this(taps, listener, true); }
@@ -67,8 +70,28 @@ public final class HeldPathReceiver {
         synchronized (buf) {
             for (int i = 0; i + 1 < n; i += 2) {
                 if (len >= CAP) return;
-                buf[len++] = (short) ((mono[i] & 0xFF) | (mono[i + 1] << 8));
+                short s = (short) ((mono[i] & 0xFF) | (mono[i + 1] << 8));
+                buf[len++] = s;
+                ring[ringAt] = s;
+                ringAt = (ringAt + 1) % ring.length;
             }
+        }
+    }
+
+    /** Frames kept for a fit, and the audio of the call. Cleared after it is read. */
+    public java.util.List<HeldFit.Frame> takeFrames() {
+        java.util.List<HeldFit.Frame> out;
+        synchronized (buf) { out = new java.util.ArrayList<HeldFit.Frame>(kept); kept.clear(); }
+        return out;
+    }
+    public short[] takeAudio() {
+        synchronized (buf) {
+            if (callMark < 0) return new short[0];
+            int n = (ringAt - callMark + ring.length) % ring.length;
+            short[] o = new short[n];
+            for (int i = 0; i < n; i++) o[i] = ring[(callMark + i) % ring.length];
+            callMark = -1;
+            return o;
         }
     }
 
@@ -85,7 +108,7 @@ public final class HeldPathReceiver {
             return;
         }
         HeldPath.Live live = HeldPath.live(snap, snap.length, taps, from, open);
-        take(live, snap.length, growing);
+        take(live, snap, growing);
     }
 
     public void stop() { stop = true; if (thread != null) thread.interrupt(); finish("stopped"); }
@@ -99,7 +122,8 @@ public final class HeldPathReceiver {
         }
     }
 
-    private void take(HeldPath.Live live, int n, boolean growing) {
+    private void take(HeldPath.Live live, short[] snap, boolean growing) {
+        int n = snap.length;
         boolean endBit = false, heldBack = false;
         long now = System.currentTimeMillis();
         int added = 0, index = 0, lastEnd8 = -1;
@@ -108,7 +132,8 @@ public final class HeldPathReceiver {
             M17.Lsf id = identity(chain);
             if (!open) {
                 if (id == null) continue;
-                open = true; frames = 0; good = 0; emitted = 0; lsfSent = true; lastEmit = now;
+                open = true; frames = 0; good = 0; emitted = 0; lsfSent = true; lastEmit = now; kept.clear();
+                callMark = (ringAt - 8000 + ring.length) % ring.length;
                 listener.started(id); added++;
             } else if (id != null && !lsfSent) { lsfSent = true; listener.link(id); }
             for (HeldPath.FrameHit h : chain) {
@@ -118,6 +143,7 @@ public final class HeldPathReceiver {
                     if (growing && end8 + EDGE > n) { heldBack = true; break outer; }   // its filters would see zeros past the newest audio: next pass
                     frames++;
                     if (h.stream.lich != null && h.stream.lichErrors <= 2) good++;
+                    keep(snap, live, h);
                     listener.frame(h.stream, Math.max(0f, Math.min(1f, h.score)));
                     added++; lastEmit = now;
                     endBit = h.stream.last();
@@ -133,6 +159,18 @@ public final class HeldPathReceiver {
         if (endBit && !heldBack) { finish("last frame"); return; }
         if (lastEnd8 > 0) { consumed(lastEnd8); return; }                  // the call goes on: drop what the listener already has
         if (added == 0 && now - lastEmit > QUIET_MS) finish("signal lost");  // a lost sync alone does not end the call; silence does
+    }
+
+    /** Keep a frame whose re-encoded symbols agree with the equalised slice. The raw window is what a later fit uses. */
+    private void keep(short[] snap, HeldPath.Live live, HeldPath.FrameHit h) {
+        if (h.stream == null || h.stream.lich == null || h.stream.lichErrors != 0 || h.stream.payload == null) return;
+        if (kept.size() >= 400) return;
+        int[] known = M17.streamSymbolsFromLich(h.stream.lich, h.stream.fn, h.stream.payload);
+        double[] raw = HeldPath.rawWindow(snap, live.origin8, h.syncAt);
+        if (raw == null) return;
+        double[] eq = HeldFit.equalise(raw, known, taps);
+        if (!HeldFit.targetOk(eq, known)) return;
+        kept.add(new HeldFit.Frame(raw, known));
     }
 
     /** The chain's link setup, from its LSF or from six LICH chunks. Null when neither checks. */

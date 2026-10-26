@@ -39,7 +39,7 @@ public final class M17Screen extends ModeScreen {
         stats = Neo.text(c, "", Neo.MUTED, 13, Neo.mono(c)); stats.setGravity(Gravity.CENTER); stats.setPadding(0, dp(6), 0, dp(10)); body.addView(stats);
         body.addView(Neo.sheetSection(c, "Heard"));
         list = new LinearLayout(c); list.setOrientation(VERTICAL); body.addView(list);
-        note = Neo.sheetHint(c, ""); body.addView(note);
+        note = Neo.sheetHint(c, ""); note.setOnLongClickListener(v -> { st.resetCalibration(); refresh(); return true; }); body.addView(note);
         content.addView(sv);
         LinearLayout r = buttonRow();
         if (svc.m17CanSend()) {

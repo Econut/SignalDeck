@@ -215,6 +215,22 @@ public final class HeldPath {
         return h;
     }
 
+    /** Unequalised symbol-rate samples around one sync: 20 symbols of context, the 192-symbol frame, 20 more. {@code syncAt48} is the sync's sample in the 48 kHz matched-filter output of {@code pcm} from {@code origin8}. */
+    static double[] rawWindow(short[] pcm, int origin8, int syncAt48) {
+        if (pcm == null || origin8 < 0 || origin8 >= pcm.length) return null;
+        int n = pcm.length - origin8;
+        double[] x = new double[n];
+        for (int i = 0; i < n; i++) x[i] = -pcm[origin8 + i];
+        double[] m = matched(resample6(x));
+        int lo = syncAt48 - L * SPS;
+        double[] w = new double[HeldFit.L + HeldFit.FRAME + HeldFit.L];
+        for (int i = 0; i < w.length; i++) {
+            int at = lo + i * SPS;
+            w[i] = at >= 0 && at < m.length ? m[at] : 0;
+        }
+        return w;
+    }
+
     /** The root-raised-cosine centre tap, for the host check against the research filter. */
     static double rrcCentre() { return RRC[RRC.length / 2]; }
 

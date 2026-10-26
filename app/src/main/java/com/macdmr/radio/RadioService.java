@@ -3124,6 +3124,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 try { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactHeard(pc.id, System.currentTimeMillis(), "M17", current != null ? "on " + current.name : "", Double.NaN, Double.NaN); } catch (Throwable e) { }
             }
             @Override public void changed() { ui.post(() -> { pushModes(); publishM17Line(); }); }
+            @Override public int meter() { return rssi; }
             @Override public void voice(short[] pcm) {                       // SignalDeck Web listeners hear the decoded voice (the radio's own audio is held back)
                 com.macdmr.radio.web.WebHost w = web; if (w == null || muted) return;
                 byte[] b = new byte[pcm.length * 2]; for (int i = 0; i < pcm.length; i++) { b[2 * i] = (byte) pcm[i]; b[2 * i + 1] = (byte) (pcm[i] >> 8); }
