@@ -61,6 +61,50 @@ public class FirmwareVariantCheckTest {
         assertFalse("nothing but the listed fields", u.contains("+"));
     }
 
+    private static java.io.File zip(String... entries) throws Exception {
+        java.io.File f = java.io.File.createTempFile("stock", ".apk");
+        try (java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(f))) {
+            for (String e : entries) { z.putNextEntry(new java.util.zip.ZipEntry(e)); z.write(("image " + e).getBytes(StandardCharsets.US_ASCII)); z.closeEntry(); }
+        }
+        return f;
+    }
+
+    @Test public void theStockFileIsTakenFromTheApk() throws Exception {
+        java.io.File one = zip("classes.dex", "assets/DMR009.TEST.V009.bin", "res/raw/beep.ogg"), two = zip("assets/DMR1.bin", "assets/DMR2.bin"), none = zip("classes.dex");
+        try {
+            assertArrayEquals("image assets/DMR009.TEST.V009.bin".getBytes(StandardCharsets.US_ASCII), FirmwareVariantCheck.assetFrom(one));
+            assertEquals("DMR009.TEST.V009.bin", FirmwareVariantCheck.assetName(one));
+            assertNull("two candidates: none is taken", FirmwareVariantCheck.assetFrom(two));
+            assertNull(FirmwareVariantCheck.assetFrom(none));
+        } finally { one.delete(); two.delete(); none.delete(); }
+    }
+
+    @Test public void theFileIsCopiedOnlyWhenItsHashMatches() throws Exception {
+        java.io.File dir = java.nio.file.Files.createTempDirectory("found").toFile();
+        try {
+            byte[] img = "a module image".getBytes(StandardCharsets.US_ASCII);
+            String sha = com.macdmr.radio.fw.FirmwareVault.sha256(img);
+            assertNull(FirmwareVariantCheck.writeFile(img, "x.bin", x32("01"), "pkg!assets/x.bin", new java.io.File(dir, "a")));
+            assertFalse(new java.io.File(dir, "a").exists());
+            assertEquals("DMR009_TEST.bin", FirmwareVariantCheck.writeFile(img, "DMR009 TEST.bin", sha.toUpperCase(), "pkg!assets/DMR009 TEST.bin", new java.io.File(dir, "b")));
+            assertArrayEquals(img, java.nio.file.Files.readAllBytes(new java.io.File(dir, "b/DMR009_TEST.bin").toPath()));
+            String src = new String(java.nio.file.Files.readAllBytes(new java.io.File(dir, "b/SOURCES.txt").toPath()), StandardCharsets.UTF_8);
+            assertTrue(src, src.contains("sha256 " + sha) && src.contains("public"));
+        } finally { for (java.io.File f : new java.io.File[] { new java.io.File(dir, "b/DMR009_TEST.bin"), new java.io.File(dir, "b/SOURCES.txt"), new java.io.File(dir, "b"), dir }) f.delete(); }
+    }
+
+    @Test public void theIssueSaysWhereTheFileIs() {
+        String u = FirmwareVariantCheck.withFileNote("https://x/new?template=t", "Maker_Phone_1", "DMR009.TEST.V009.bin");
+        assertTrue(u, u.startsWith("https://x/new?template=t&report=The%20stock%20firmware%20file%20DMR009.TEST.V009.bin%20was%20copied"));
+        assertTrue(u, u.contains("Download%2FDMR%2FFoundFirmware%2FMaker_Phone_1%2F") && u.contains("public"));
+    }
+
+    @Test public void onlyANewReadableFileIsOffered() {
+        assertTrue(new FirmwareVariantCheck.Finding("k", "u", "w", "p", x32("01"), true, false).fileToAttach());
+        assertFalse("the catalogue has the file", new FirmwareVariantCheck.Finding("k", "u", "w", "p", x32("01"), false, false).fileToAttach());
+        assertFalse("not read", new FirmwareVariantCheck.Finding("k", "u", "w", "p", "", true, false).fileToAttach());
+    }
+
     @Test public void oneKeyPerVariant() {
         assertEquals(facts("DMR009.TEST.V009", x32("01")).key(), new FirmwareVariantCheck.Facts("Other", " DMR009.TEST.V009 ", "x", "y", x32("01").toUpperCase()).key());
         assertNotEquals(facts("DMR009.TEST.V009", x32("01")).key(), facts("DMR009.TEST.V009", x32("02")).key());

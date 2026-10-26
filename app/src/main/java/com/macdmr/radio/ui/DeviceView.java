@@ -939,13 +939,22 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                 .setMessage("This phone's radio firmware is not in the SignalDeck firmware catalogue yet: " + f.why + ".\n\n"
                         + "Submitting it lets the firmware project catalogue it, so SignalDeck recognises it and firmware work can cover it later. "
                         + "GitHub opens in your browser with the phone model, the module version, the stock app's version and the firmware file's fingerprint filled in. "
-                        + "Check them and press Submit there (it needs a GitHub account). Nothing is sent unless you submit, nothing in it identifies you, and the firmware file itself stays on this phone.\n\n"
+                        + "Check them and press Submit there (it needs a GitHub account). Nothing is sent unless you submit, and nothing in it identifies you.\n\n"
+                        + (f.fileToAttach() ? "The firmware file itself is new too: SignalDeck copies it to Download/DMR/FoundFirmware on this phone, and the issue says where it is. Attaching it is up to you: an attachment on the issue is public, anyone can download it, and the file belongs to the phone maker.\n\n"
+                                            : "The firmware file itself stays on this phone.\n\n")
                         + "The notice stays on the Device page until the catalogue lists this firmware.")
                 .setPositiveButton("Open GitHub", (d, w) -> {
                     com.macdmr.radio.FirmwareVariantCheck.markOpened(c, f.key);
-                    try { c.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(f.url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); }
-                    catch (Throwable t) { android.widget.Toast.makeText(c, "No browser to open GitHub", android.widget.Toast.LENGTH_LONG).show(); }
-                    if (after != null) after.run();
+                    final android.os.Handler h = new android.os.Handler(android.os.Looper.getMainLooper());
+                    new Thread(() -> {
+                        final String url = com.macdmr.radio.FirmwareVariantCheck.prepareAttachment(c, f);
+                        h.post(() -> {
+                            if (!url.equals(f.url)) android.widget.Toast.makeText(c, "Firmware file copied to Download/DMR/FoundFirmware: attach it in the issue if you choose", android.widget.Toast.LENGTH_LONG).show();
+                            try { c.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); }
+                            catch (Throwable t) { android.widget.Toast.makeText(c, "No browser to open GitHub", android.widget.Toast.LENGTH_LONG).show(); }
+                            if (after != null) after.run();
+                        });
+                    }, "fwvariant-file").start();
                 })
                 .setNegativeButton("Not now", null).show();
     }

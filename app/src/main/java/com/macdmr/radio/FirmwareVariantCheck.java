@@ -25,7 +25,8 @@ import java.util.regex.Pattern;
  * Compares the version the module first reported (its stock firmware) and the stock app's firmware file hash with the
  * catalogue's images and variants. A variant the catalogue lacks is offered once for submission to the firmware
  * project's "Firmware variant seen" issue form, filled in, in the browser; the user checks it and presses Submit.
- * Nothing is sent by the app, and the firmware file itself never leaves the phone.
+ * Nothing is sent by the app. When the stock app's firmware file is new, it is copied to Download/DMR/FoundFirmware so the
+ * user can attach it to the issue by hand if they choose (an attachment there is public); the app never uploads it.
  */
 public final class FirmwareVariantCheck {
     private FirmwareVariantCheck() { }
@@ -99,6 +100,79 @@ public final class FirmwareVariantCheck {
                 + "&model=" + enc(f.model) + "&version=" + enc(f.stockTag) + "&stockapp=" + enc(stockApp)
                 + "&hash=" + enc(f.assetSha) + "&message=" + enc(msg);
     }
+    /** The issue's attachment box, filled in with where the copied file is (the user attaches it, or not). */
+    public static String withFileNote(String url, String folder, String name) {
+        return url + "&report=" + enc("The stock firmware file " + name + " was copied on the phone to Download/DMR/FoundFirmware/" + folder
+                + "/. Attach it here only if you choose to: an attachment on this issue is public, and the file belongs to the phone maker.");
+    }
+
+    /** The single assets/DMR*.bin in an APK (the stock app's firmware file), or null when there is none or more than one. */
+    static byte[] assetFrom(File apk) {
+        try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(apk)) {
+            java.util.zip.ZipEntry one = null; int n = 0;
+            for (java.util.Enumeration<? extends java.util.zip.ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
+                java.util.zip.ZipEntry ze = e.nextElement();
+                if (!ze.isDirectory() && ze.getName().startsWith("assets/DMR") && ze.getName().endsWith("bin")) { one = ze; n++; }
+            }
+            if (n != 1 || one.getSize() > (32L << 20)) return null;
+            try (java.io.InputStream in = z.getInputStream(one)) {
+                java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream(); byte[] b = new byte[65536]; int r;
+                while ((r = in.read(b)) > 0) o.write(b, 0, r);
+                return o.toByteArray();
+            }
+        } catch (Exception e) { return null; }
+    }
+    static String assetName(File apk) {
+        try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(apk)) {
+            for (java.util.Enumeration<? extends java.util.zip.ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
+                String n = e.nextElement().getName();
+                if (n.startsWith("assets/DMR") && n.endsWith("bin")) return n.substring(n.lastIndexOf('/') + 1);
+            }
+        } catch (Exception ignored) { }
+        return "firmware.bin";
+    }
+
+    /** Put the stock firmware file into dir, with a SOURCES.txt, only when its hash is the one reported. @return the file name, or null */
+    static String writeFile(byte[] image, String name, String expectSha, String source, File dir) throws Exception {
+        if (image == null || !expectSha.equalsIgnoreCase(com.macdmr.radio.fw.FirmwareVault.sha256(image))) return null;
+        if (!dir.mkdirs() && !dir.isDirectory()) throw new Exception("cannot create " + dir);
+        String safe = FirmwareFinder.safe(name);
+        java.nio.file.Files.write(new File(dir, safe).toPath(), image);
+        String src = "Stock firmware file copied by SignalDeck for the firmware project's \"Firmware variant seen\" issue.\n"
+                + safe + "  <-  " + source + "  " + image.length + " bytes  sha256 " + expectSha.toLowerCase(Locale.US) + "\n"
+                + "It belongs to the phone maker. Attaching it to the issue is your choice; an attachment there is public.\n";
+        java.nio.file.Files.write(new File(dir, "SOURCES.txt").toPath(), src.getBytes(StandardCharsets.UTF_8));
+        return safe;
+    }
+
+    /**
+     * Worker thread: copy the stock app's firmware file to Download/DMR/FoundFirmware/&lt;model&gt;/ when its hash matches
+     * the finding. Reads the APK directly, or through root when the app cannot. @return the issue URL to open (with the note when copied)
+     */
+    public static String prepareAttachment(Context c, Finding f) {
+        if (!f.fileToAttach() || f.pkg.isEmpty()) return f.url;
+        File tmp = new File(c.getCacheDir(), "fwvariant.apk");
+        try {
+            android.content.pm.ApplicationInfo ai = c.getPackageManager().getApplicationInfo(f.pkg, 0);
+            List<String> apks = new ArrayList<>(); apks.add(ai.sourceDir); if (ai.splitSourceDirs != null) java.util.Collections.addAll(apks, ai.splitSourceDirs);
+            for (String apk : apks) {
+                File a = new File(apk);
+                byte[] img = assetFrom(a); String name = img == null ? null : assetName(a);
+                if (img == null && RootSetup.haveRoot()) {
+                    RootSetup.run("cat '" + apk + "' > '" + tmp.getAbsolutePath() + "' && chmod 644 '" + tmp.getAbsolutePath() + "'");
+                    img = assetFrom(tmp); name = img == null ? null : assetName(tmp);
+                }
+                if (img == null) continue;
+                String folder = FirmwareFinder.safe(android.os.Build.MANUFACTURER + "_" + android.os.Build.MODEL);
+                File dir = new File(new File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS), "DMR/FoundFirmware"), folder);
+                String written = writeFile(img, name, f.sha, f.pkg + "!" + "assets/" + name, dir);
+                if (written != null) return withFileNote(f.url, folder, written);
+            }
+        } catch (Throwable ignored) {
+        } finally { tmp.delete(); }
+        return f.url;
+    }
+
     static String enc(String s) {
         try { return URLEncoder.encode(s == null ? "" : s, "UTF-8").replace("+", "%20"); } catch (Exception e) { return ""; }
     }
@@ -107,15 +181,20 @@ public final class FirmwareVariantCheck {
 
     /** The open finding: key, url and message, or null when the catalogue lists this phone's firmware. */
     public static final class Finding {
-        public final String key, url, why; public final boolean opened;
-        Finding(String key, String url, String why, boolean opened) { this.key = key; this.url = url; this.why = why; this.opened = opened; }
+        public final String key, url, why, pkg, sha; public final boolean opened, fileNew;
+        Finding(String key, String url, String why, String pkg, String sha, boolean fileNew, boolean opened) {
+            this.key = key; this.url = url; this.why = why; this.pkg = pkg; this.sha = sha; this.fileNew = fileNew; this.opened = opened;
+        }
+        /** The stock firmware file can be offered for attaching: it was read, and the catalogue does not have it. */
+        public boolean fileToAttach() { return fileNew && sha.length() == 64; }
     }
 
     public static Finding finding(Context c) {
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String key = p.getString("fwVariantKey", "");
         if (key.isEmpty()) return null;
-        return new Finding(key, p.getString("fwVariantUrl", ""), p.getString("fwVariantWhy", ""), p.getBoolean("fwVariantOpened:" + key, false));
+        return new Finding(key, p.getString("fwVariantUrl", ""), p.getString("fwVariantWhy", ""), p.getString("fwVariantPkg", ""),
+                p.getString("fwVariantSha", ""), p.getBoolean("fwVariantFileNew", false), p.getBoolean("fwVariantOpened:" + key, false));
     }
 
     /** The user opened the issue form for this variant (the notice then says it is waiting for the catalogue). */
@@ -144,11 +223,13 @@ public final class FirmwareVariantCheck {
         try { if (!builtIn && !dp.stockApp.isEmpty() && RootSetup.haveRoot()) sha = com.macdmr.radio.fw.FirmwareVault.factory(c).sha256; } catch (Throwable ignored) { }
         Facts f = new Facts(android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL, svc.stockFirmware(), dp.stockApp,
                 com.macdmr.radio.fw.FirmwareVault.stockVersion(c, dp.stockApp), sha);
-        String why = missing(f, known(body));
-        if (why == null) { p.edit().remove("fwVariantKey").remove("fwVariantUrl").remove("fwVariantWhy").apply(); return null; }
+        Known k = known(body);
+        String why = missing(f, k);
+        if (why == null) { p.edit().remove("fwVariantKey").remove("fwVariantUrl").remove("fwVariantWhy").remove("fwVariantPkg").remove("fwVariantSha").remove("fwVariantFileNew").apply(); return null; }
         String ver; try { ver = c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName; } catch (Throwable t) { ver = ""; }
         String url = issueUrl(f, why, ver);
-        p.edit().putString("fwVariantKey", f.key()).putString("fwVariantUrl", url).putString("fwVariantWhy", why).apply();
+        p.edit().putString("fwVariantKey", f.key()).putString("fwVariantUrl", url).putString("fwVariantWhy", why).putString("fwVariantPkg", f.stockPkg)
+                .putString("fwVariantSha", f.assetSha).putBoolean("fwVariantFileNew", !f.assetSha.isEmpty() && !k.shas.contains(f.assetSha)).apply();
         if (p.getBoolean("fwVariantAsked:" + f.key(), false)) return null;
         p.edit().putBoolean("fwVariantAsked:" + f.key(), true).apply();
         return finding(c);
