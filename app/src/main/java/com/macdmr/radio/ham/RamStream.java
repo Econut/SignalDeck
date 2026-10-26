@@ -26,11 +26,11 @@ public final class RamStream {
     /** The re-arm period the stream is started with: a {@code WORK_MODE} store every this many halves (bench 2026-10-26: 8 keeps every half). */
     public static final int PERIOD = 8;
     /**
-     * The module's capture clock: a 1 kHz tone reads 987.25 Hz when the halves are taken as 8 kHz (bench 2026-10-26 15:23),
-     * so the stream runs at about 8103 samples a second, 31.65 halves a second. The receiver resamples to 8000 before the
-     * decoder, which would otherwise drift two and a half symbols across one 40 ms frame.
+     * The module's capture clock. Measured 2026-10-26 16:13 (a 4 s FFT of a 1 kHz HackRF tone peaks at 1000.00 Hz): 8000 Hz,
+     * 31.25 halves a second, so the halves pass through unchanged. An earlier 987.25 Hz reading was a file's noise floor.
+     * The receiver keeps a resampler for a module whose clock is off: give it the measured rate and it interpolates to 8000.
      */
-    public static final int STREAM_HZ = 8103;
+    public static final int STREAM_HZ = 8000;
     public static final int OUT_HZ = 8000;
     public static final int SAMPLES = 256;
     public static final int BODY = 2 * SAMPLES + 2;   // op 5's reply: 512 sample bytes, sequence, half id
