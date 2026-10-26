@@ -47,8 +47,10 @@ public final class HeldPathReceiver {
     private int frames, good, emitted;
     private long lastEmit;
     private final java.util.ArrayList<HeldFit.Frame> kept = new java.util.ArrayList<HeldFit.Frame>();
-    private final short[] ring = new short[8 * 8000];
-    private int ringAt, callMark = -1;
+    /** Longest call the receiver keeps (20 s) plus the second before it. */
+    static final int RING = 21 * 8000;
+    private final short[] ring = new short[RING];
+    private int ringAt, callMark = -1, callWritten, callGap;
     private final Thread thread;
 
     public HeldPathReceiver(double[] taps, Listener listener) { this(taps, listener, true); }
@@ -74,6 +76,7 @@ public final class HeldPathReceiver {
                 buf[len++] = s;
                 ring[ringAt] = s;
                 ringAt = (ringAt + 1) % ring.length;
+                if (callMark >= 0) callWritten++;
             }
         }
     }
@@ -87,12 +90,20 @@ public final class HeldPathReceiver {
     public short[] takeAudio() {
         synchronized (buf) {
             if (callMark < 0) return new short[0];
-            int n = (ringAt - callMark + ring.length) % ring.length;
+            int total = callGap + callWritten;
+            int start, n;
+            if (total >= ring.length) { start = ringAt; n = ring.length; }   // the call overran the ring: the whole ring, oldest sample first
+            else { start = callMark; n = total; }
             short[] o = new short[n];
-            for (int i = 0; i < n; i++) o[i] = ring[(callMark + i) % ring.length];
-            callMark = -1;
+            for (int i = 0; i < n; i++) o[i] = ring[(start + i) % ring.length];
+            callMark = -1; callWritten = 0; callGap = 0;
             return o;
         }
+    }
+
+    /** Test: the next samples are the call, marked at the first of them. */
+    void beginCallForTest() {
+        synchronized (buf) { callMark = ringAt; callWritten = 0; callGap = 0; }
     }
 
     /** One decode of whatever is buffered. The background thread calls this; tests call it after {@link #feed}. */
@@ -134,6 +145,7 @@ public final class HeldPathReceiver {
                 if (id == null) continue;
                 open = true; frames = 0; good = 0; emitted = 0; lsfSent = true; lastEmit = now; kept.clear();
                 callMark = (ringAt - 8000 + ring.length) % ring.length;
+                callWritten = 0; callGap = 8000;
                 listener.started(id); added++;
             } else if (id != null && !lsfSent) { lsfSent = true; listener.link(id); }
             for (HeldPath.FrameHit h : chain) {
