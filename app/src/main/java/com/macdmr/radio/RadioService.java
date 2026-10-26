@@ -1727,6 +1727,68 @@ public class RadioService extends Service implements RadioEngine.Events {
         symThread = t;
         t.start();
     }
+
+    /**
+     * One POCSAG transmission: every RIC gets the same text, in one key-up, through the symbol engine
+     * (op 8 hold mode, then the bit stream). Null when it has started. Stock firmware cannot send pages.
+     * A frequency that is not the current FM channel is tuned on the VFO at low power, then the key waits
+     * out the retune.
+     */
+    public String sendPage(int baud, int hz, int[] rics, int func, String text, boolean sign) {
+        if (rics == null || rics.length == 0) return "Add at least one RIC";
+        if (text == null || text.trim().isEmpty()) return "Write the message";
+        if (!ChannelStore.inBand(hz)) return "Frequency must be 136–174 or 400–480 MHz";
+        if (firmwareBusy) return "Radio busy, loading firmware";
+        if (!isReady()) return "Radio not ready";
+        if (txInhibited()) return "Transmit is off on this channel";
+        if (!(com.macdmr.radio.Firmware.stubTag(moduleVersion) && com.macdmr.radio.Firmware.tagNumber(moduleVersion) >= 21))
+            return "Pages send only when the module firmware has the symbol engine (FW21 or later)";
+        Thread old = symThread;
+        if (old != null && old.isAlive()) return "The symbol engine is busy";
+        String body = sign ? com.macdmr.radio.ham.Pocsag.sign(com.macdmr.radio.Station.callsign(this), text.trim()) : text.trim();
+        java.util.List<com.macdmr.radio.ham.Pocsag.Page> pages = new java.util.ArrayList<>();
+        for (int ric : rics) pages.add(new com.macdmr.radio.ham.Pocsag.Page(ric, func, body));
+        int[] bits;
+        try { bits = com.macdmr.radio.ham.Pocsag.bits(pages); }
+        catch (IllegalArgumentException e) { return e.getMessage(); }
+        int rate = baud == 512 || baud == 2400 ? baud : 1200;
+        if (com.macdmr.radio.ham.Pocsag.seconds(bits, rate) > 25) return "That page is longer than 25 seconds";
+        final int[] packedBits = bits;
+        Thread t = new Thread(() -> streamPage(rate, hz, packedBits, rics.length), "pocsag");
+        symThread = t;
+        t.start();
+        return null;
+    }
+
+    private void streamPage(int baud, int hz, int[] bits, int nRic) {
+        boolean keyed = false;
+        try {
+            ChannelStore.Channel cur = current;
+            boolean same = cur != null && !cur.isDigital() && Math.abs(cur.rxFreq - hz) < 500 && Math.abs(cur.txFreq - hz) < 500;
+            if (!same) {
+                ChannelStore.Channel v = new ChannelStore.Channel();
+                v.type = 1; v.rxFreq = v.txFreq = hz; v.band = 1; v.power = 0; v.sq = 2; v.name = "Pager";
+                applyVfo(v, false);
+                Thread.sleep(3500);
+            }
+            Frame setup = sym40(com.macdmr.radio.ham.Pocsag.waveform(baud));
+            if (setup == null || setup.sr != 0) { history("warn", "⚠️ This firmware did not accept the pager waveform"); return; }
+            byte[] packed = com.macdmr.radio.ham.Pocsag.pack(bits);
+            int sent = 0;
+            while (sent < packed.length) {
+                int n = Math.min(48, packed.length - sent);
+                boolean last = sent + n >= packed.length;
+                int fill = sendSymChunk(packed, sent, n, last);
+                if (fill < 0) return;
+                sent += n;
+                if (!keyed && (sent >= 48 * 8 || last)) { engine.ptt(true); keyed = true; log("page key"); }
+                paceSym(fill, keyed);
+            }
+            history("pkt", "📟 Page sent to " + nRic + (nRic == 1 ? " RIC" : " RICs") + " at " + baud + " baud");
+            if (keyed) unkeyAfterStop();
+        } catch (Throwable t) { log("page: " + t); history("warn", "⚠️ Page failed: " + t.getMessage()); }
+        finally { if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } } }
+    }
     private volatile Thread fwThread;
     /** Bench: load a module image with our own YModem sender. {@code abort50} closes the port halfway. */
     public void diagFwLoad(java.io.File f, boolean abort50) { diagFwLoad(f, abort50, -1); }

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — POCSAG page: compose and send
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Route-list item 8, host part | PKT → POCSAG page. A page is a frequency, a speed (512, 1200 or 2400 baud, 1200 the default), one or more RICs (typed, or a contact's name or callsign) and alphanumeric text. Several RICs go out in one transmission, each address in the frame its number names. Sign, on by default, puts the station callsign and a colon at the start of the text. Send tunes the VFO to that frequency at low power when it is not already there, waits out the retune, and sends the bits through the symbol engine (op 8, hold shaping, two levels at the amplitude measured on FW21). Stock firmware is told the page needs the symbol engine and is not keyed. Hearing pages is not in this build. | `ham/Pocsag.java`, `ui/PagerScreen.java`, `RadioService.java`, `ui/PktDialog.java`, `MainActivity.java`, `ui/HelpView.java` | host: `PocsagTest` (one page, three RICs, frame placement, sender tag, op 8 body). Not installed. |
+
 ## 2026-10-25 — M17 as a channel type
 
 | Backlog | Change | Files | Test |

@@ -219,6 +219,11 @@ public final class PktDialog {
         int nSch = com.macdmr.radio.Scheduler.list(c).size();
         button(sch, nSch == 0 ? "Schedules\u2026" : "Schedules (" + nSch + ")\u2026", Theme.SOFTSQ, x -> { dlg.dismiss(); ScheduleDialog.show(c, svc); });
         body.addView(sch);
+        body.addView(section("Pager"));
+        LinearLayout pg = row();
+        button(pg, "POCSAG page", Theme.PKT, x -> { dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openPager(); });
+        body.addView(pg);
+        body.addView(hint("Send an alphanumeric page to one RIC or several in one transmission. Your pager RICs are in APRS settings. On the firmware the phone shipped with, the page says it needs the symbol engine."));
         body.addView(section("SSTV pictures"));
         body.addView(hint("\uD83D\uDD38 " + pe.sstvStatus()));
         LinearLayout s1 = row();
