@@ -131,7 +131,7 @@ public final class Pocsag {
         b[0] = 8; b[1] = 0; b[2] = 2;
         b[3] = (byte) num; b[4] = (byte) (num >> 8);
         b[5] = (byte) den; b[6] = (byte) (den >> 8);
-        put16(b, 7, LEVEL); put16(b, 9, -LEVEL);
+        put16(b, 7, -LEVEL); put16(b, 9, LEVEL);   // a positive count deviates low on this radio, so a 0 bit is the negative count and comes out positive
         return b;
     }
 

@@ -68,7 +68,7 @@ public final class PagerScreen extends ModeScreen {
         signBtn.setOnClickListener(v -> { sign = !sign; signBtn.setText(signLine()); });
         signBtn.setText(signLine());
         body.addView(signBtn);
-        body.addView(Neo.sheetHint(c, "Alphanumeric function 3. Signing puts your callsign and a colon at the start of the text, which is how a reply finds you. A pager that is not SignalDeck shows that as part of the message. On the firmware the phone shipped with, Send explains that pages need the symbol engine."));
+        body.addView(Neo.sheetHint(c, "Alphanumeric pagers, function 3. A numeric-only pager is not sent yet. Signing puts your callsign and a colon at the start of the text, which is how a reply finds you. A pager that is not SignalDeck shows that as part of the message. On the firmware the phone shipped with, Send explains that pages need the symbol engine."));
         status = Neo.text(c, "", Neo.MUTED, 14, Neo.uiMedium(c));
         status.setPadding(0, dp(8), 0, 0);
         body.addView(status);

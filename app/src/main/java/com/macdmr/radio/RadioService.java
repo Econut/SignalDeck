@@ -1762,13 +1762,17 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     private void streamPage(int baud, int hz, int[] bits, int nRic) {
         boolean keyed = false;
+        boolean hopped = false;
         try {
             ChannelStore.Channel cur = current;
-            boolean same = cur != null && !cur.isDigital() && Math.abs(cur.rxFreq - hz) < 500 && Math.abs(cur.txFreq - hz) < 500;
+            int home = cur != null ? cur.number : 0;
+            boolean same = cur != null && !cur.isDigital() && cur.power == 0 && cur.band == 1
+                    && Math.abs(cur.rxFreq - hz) < 500 && Math.abs(cur.txFreq - hz) < 500;
             if (!same) {
                 ChannelStore.Channel v = new ChannelStore.Channel();
                 v.type = 1; v.rxFreq = v.txFreq = hz; v.band = 1; v.power = 0; v.sq = 2; v.name = "Pager";
                 applyVfo(v, false);
+                hopped = true;
                 Thread.sleep(3500);
             }
             Frame setup = sym40(com.macdmr.radio.ham.Pocsag.waveform(baud));
@@ -1784,10 +1788,13 @@ public class RadioService extends Service implements RadioEngine.Events {
                 if (!keyed && (sent >= 48 * 8 || last)) { engine.ptt(true); keyed = true; log("page key"); }
                 paceSym(fill, keyed);
             }
-            history("pkt", "📟 Page sent to " + nRic + (nRic == 1 ? " RIC" : " RICs") + " at " + baud + " baud");
+            history(home, "pkt", "📟 Page sent to " + nRic + (nRic == 1 ? " RIC" : " RICs") + " at " + baud + " baud");
             if (keyed) unkeyAfterStop();
         } catch (Throwable t) { log("page: " + t); history("warn", "⚠️ Page failed: " + t.getMessage()); }
-        finally { if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } } }
+        finally {
+            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } }
+            if (hopped) exitVfo();
+        }
     }
     private volatile Thread fwThread;
     /** Bench: load a module image with our own YModem sender. {@code abort50} closes the port halfway. */
@@ -2317,9 +2324,11 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (current != null && !current.isDigital() && len >= 700) history("rx", "📻 Received " + Math.round(len / 1000.0) + " s");
     }
 
-    public void history(String kind, String text) {
+    public void history(String kind, String text) { history(current != null ? current.number : 0, kind, text); }
+
+    /** {@code chNum} is the channel the line belongs to. A page sent from a temporary VFO still records on the channel the radio left. */
+    public void history(int chNum, String kind, String text) {
         text = text.replaceAll("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]", "\u00B7");   // no control characters on screen (they also break screen readers)
-        int chNum = current != null ? current.number : 0;
         store.addHistory(chNum, kind, text, rssi, lastCaller);
         String line = new java.text.SimpleDateFormat("HH:mm:ss", Locale.US).format(new java.util.Date()) + " " + text + (rssi != -999 ? " " + rssi + " dBm" : "");
         ui.post(() -> { for (Listener l : listeners) l.onHistory(line); });

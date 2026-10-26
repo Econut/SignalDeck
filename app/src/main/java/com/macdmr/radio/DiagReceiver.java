@@ -102,6 +102,17 @@ public final class DiagReceiver extends BroadcastReceiver {
                 else s.diagSym(new java.io.File(i.getStringExtra("path")), i.getBooleanExtra("eot", false), i.getBooleanExtra("key", false), i.getBooleanExtra("nounkey", false));
                 break;
             }
+            case "page": {                                                      // bench: one POCSAG page, unsigned. --ei baud, --ei hz, --es rics "1000001,1000002", --es text
+                String ricText = i.getStringExtra("rics"); String text = i.getStringExtra("text");
+                if (ricText == null || text == null || text.isEmpty()) { Log.w("DiagReceiver", "page: rics and text"); break; }
+                String[] parts = ricText.split("[, ]+");
+                int[] rics = new int[parts.length];
+                try { for (int k = 0; k < parts.length; k++) rics[k] = Integer.parseInt(parts[k]); }
+                catch (NumberFormatException e) { Log.w("DiagReceiver", "page: bad ric"); break; }
+                String err = s.sendPage(i.getIntExtra("baud", 1200), i.getIntExtra("hz", 467_625_000), rics, 3, text, false);
+                Log.i("DiagReceiver", err == null ? "page started " + rics.length + " at " + i.getIntExtra("baud", 1200) : "page: " + err);
+                break;
+            }
             case "m17": {                                                       // bench: M17 receive on/off (--ez on); --ei tx ms: a short Codec 2 tone through the symbol engine; --ei mic ms: hold the microphone path (not the tone) for that long, at most 12 s; --es enc NAME: Codec 2 3200 encode cache/NAME.wav to cache/NAME.c2; --es dec NAME: decode cache/NAME.c2 back to cache/NAME.wav
                 if (i.hasExtra("mic")) {
                     int ms = Math.max(1000, Math.min(12000, i.getIntExtra("mic", 10000)));
