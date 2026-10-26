@@ -163,7 +163,21 @@ public final class RadioEngine implements UartPort.Listener {
     public DeviceProfile profile() { return profile; }
     public boolean isOpen() { return port.isOpen(); }
 
-    public void open() throws IOException { port.open(profile.serialLib != null && VendorSerial.isLoaded() ? profile.baud : 0); }
+    public void open() throws IOException { port.open(profile.serialLib != null && VendorSerial.isLoaded() ? (baudOverride > 0 ? baudOverride : profile.baud) : 0); }
+    /** A session-only line rate (the FW27 stream runs the UART at 230400); 0 = the profile's rate. Forgotten with the process, so the next open is the profile's rate again. */
+    private volatile int baudOverride;
+    public int baudOverride() { return baudOverride; }
+    /** Close and reopen the port at {@code baud} (0 = the profile's rate). The module must already be at that rate (op 16). */
+    public synchronized void reopenAt(int baud) throws IOException {
+        baudOverride = baud;
+        port.close();
+        open();
+    }
+
+    /** Unsolicited 0x40 frames of the receive-RAM stream (op 17 halves) go here instead of the bench reply capture. */
+    public interface StreamSink { void half(com.macdmr.radio.ham.RamStream.Half half); }
+    private volatile StreamSink streamSink;
+    public void setStreamSink(StreamSink sink) { streamSink = sink; }
     public void close() { port.close(); }
 
     /** Pause framing so a firmware load can use the same port. Ordinary commands are held until {@link #stopDivert}. */
@@ -332,6 +346,9 @@ public final class RadioEngine implements UartPort.Listener {
         answered(f);
         byte[] b = f.body;
         if (f.cmd == 0x40 && f.rw == 0) {
+            StreamSink sink = streamSink;
+            com.macdmr.radio.ham.RamStream.Half half = sink != null ? com.macdmr.radio.ham.RamStream.parse(b) : null;
+            if (half != null) { sink.half(half); return; }        // a stream half is not an answer to anything
             synchronized (gate40) {
                 reply40 = f;
                 if (want40 > 0 && extra40.size() < want40) extra40.add(f);

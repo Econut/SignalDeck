@@ -10,6 +10,12 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 |---|---|---|---|
 | R-I, live receiver | A call longer than 20 seconds is one listing. Audio already given to the listener is dropped, keeping a short margin, so the buffer cap does not cut the call. A frame is decoded only when the equaliser's look-ahead is already in the buffer. Up to three missing frames are coasted, and the call ends on the end of transmission or two seconds of silence, so a one-second gap stays in the same listing. | `ham/HeldPath.java`, `ham/HeldPathReceiver.java`, `ui/HelpView.java` | host: `HeldPathReceiverTest` (30 s payload-exact, a three-frame dropout, a one-second gap, a pass after every block, two calls). The on-air pass follows. |
 
+## 2026-10-26 — Receive-RAM stream (bench, FW27): a second M17 receiver fed from the module's FM receive memory
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Route R-C reopened (owner 2026-10-26), SignalDeck side; firmware FW27 by Grok Build | DIAG `ramstream` (`--ez on`, `--ez plain`): with the bench firmware FW27 or later and M17 receive on, SignalDeck applies the module's mode 5 (the voice-filter bypass with the receive mirror enabled), asks the module for 230400 (op 16) and reopens the serial line at that rate for the session, checks the version at the new rate (falls back to 57600 if it does not answer), starts the half stream (op 17), sends a keepalive every 10 s, routes the unsolicited 0x40 halves to a `RamStream.Receiver` that counts missed halves and feeds a second held-path receiver (no equaliser, or the shipped taps for comparison) reporting to the M17 page's listener; off reverses it and puts the audio-path hold back. The audio-path receiver stays the default. History lines carry the half and miss counts. | `ham/RamStream.java`, `RadioEngine.java` (stream sink before the reply capture, session rate override, `reopenAt`), `RadioService.java` (`ramStream`), `M17Station.java` (`ear`, `heldTapsForStream`), `DiagReceiver.java`, `ui/HelpView.java`, `RamStreamTest.java` | host: `RamStreamTest` (frame parse, miss count incl. the half-id rule and the 16-bit wrap, identity taps, little-endian feed); device: waits for FW27's bench (phonedmrapp `radio_firmware/plan-rx-ram-stream.md` §4) |
+
 ## 2026-10-25 — Promiscuous DMR receive: MON on FW26, colour code and slot shown
 
 | Backlog | Change | Files | Test |

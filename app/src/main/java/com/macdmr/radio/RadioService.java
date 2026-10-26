@@ -3208,6 +3208,86 @@ public class RadioService extends Service implements RadioEngine.Events {
         worker.execute(() -> { if (g == dataHoldGen.get()) sendDataHold(want && dataReceive); });
     }
 
+    // ---- FW27 receive-RAM stream (bench): mode 5, the UART at 230400, op 17 halves into a second held-path receiver ----
+    static final int RAM_STREAM_FW = 27, RAM_STREAM_BAUD = 230400;
+    private volatile com.macdmr.radio.ham.RamStream.Receiver ramStream;
+    private volatile com.macdmr.radio.ham.HeldPathReceiver ramStreamRx;
+    private volatile boolean ramStreamOn;
+    private final Runnable ramKeepalive = new Runnable() { @Override public void run() {
+        if (!ramStreamOn) return;
+        worker.execute(() -> { try { Frame k = engine.diag40(new byte[] { 17, 2 }, 500); if (k == null || k.sr != 0) log("ram stream keepalive: " + (k == null ? "no answer" : "sr=" + k.sr)); } catch (java.io.IOException e) { log("ram stream keepalive: " + e); } });
+        ui.postDelayed(this, 10_000);
+    } };
+    public boolean ramStreamOn() { return ramStreamOn; }
+    public String ramStreamStats() { com.macdmr.radio.ham.RamStream.Receiver r = ramStream; return r == null ? "" : r.stats(); }
+    /**
+     * Bench: the module's FM receive RAM streamed over the UART and decoded as M17 beside the audio-path receiver.
+     * Needs the bench firmware FW27 or later and the M17 receiver running. {@code plain} decodes the stream with no
+     * equaliser (the RAM baseband is flat); otherwise the phone's shipped taps are used for comparison.
+     * Returns null when started or stopped, else the reason.
+     */
+    public String ramStream(final boolean on, final boolean plain) {
+        if (!on) {
+            if (!ramStreamOn) return "The stream is not running";
+            ramStreamOn = false; ui.removeCallbacks(ramKeepalive);
+            final com.macdmr.radio.ham.RamStream.Receiver r = ramStream; final com.macdmr.radio.ham.HeldPathReceiver rx = ramStreamRx;
+            worker.execute(() -> {
+                try {
+                    Frame st = engine.diag40(new byte[] { 17, 0 }, 1000); log("ram stream stop: " + (st == null ? "no answer" : "sr=" + st.sr));
+                    engine.setStreamSink(null);
+                    Frame rt = engine.diag40(new byte[] { 16, 0 }, 1000); log("ram stream rate 57600: " + (rt == null ? "no answer" : "sr=" + rt.sr));
+                    engine.reopenAt(0);
+                    if (!versionHandshake(3000)) log("ram stream: no version at 57600 after the switch back");
+                    Frame m = engine.diag40(new byte[] { 6, 5, 0 }, 1000); log("ram stream mode 5 off: " + (m == null ? "no answer" : "sr=" + m.sr));
+                    if (dataReceive) scheduleDataHold(true);           // the audio-path hold again, as after any register write
+                } catch (Throwable t) { log("ram stream stop: " + t); }
+                if (rx != null) rx.stop();
+                ramStream = null; ramStreamRx = null;
+                history("pkt", "\uD83D\uDCFB RAM stream stopped: " + (r == null ? "" : r.stats()));
+            });
+            return null;
+        }
+        if (ramStreamOn) return "The stream is already running";
+        if (firmwareBusy) return "Radio busy, loading firmware";
+        if (!isReady()) return "Radio not ready";
+        if (!Firmware.stubTag(moduleVersion) || Firmware.tagNumber(moduleVersion) < RAM_STREAM_FW) return "Needs the bench firmware FW" + RAM_STREAM_FW + " or later (the module reports " + moduleVersion + ")";
+        M17Station st = m17;
+        if (st == null || !st.running() || st.ear() == null) return "Turn M17 receive on first";
+        final com.macdmr.radio.ham.HeldPathReceiver.Listener ear = st.ear();
+        ramStreamOn = true;
+        worker.execute(() -> {
+            try {
+                Frame m = engine.diag40(new byte[] { 6, 5, 1 }, 1000);
+                if (m == null || m.sr != 0) { ramStreamOn = false; history("warn", "\u26A0 The module did not take mode 5 (" + (m == null ? "no answer" : "sr=" + m.sr) + ")"); return; }
+                Frame rt = engine.diag40(new byte[] { 16, 1 }, 1000);
+                if (rt == null || rt.sr != 0) { ramStreamOn = false; engine.diag40(new byte[] { 6, 5, 0 }, 1000); history("warn", "\u26A0 The module refused the 230400 switch (" + (rt == null ? "no answer" : "sr=" + rt.sr) + ")"); return; }
+                engine.reopenAt(RAM_STREAM_BAUD);
+                if (!versionHandshake(3000)) {
+                    log("ram stream: no version at 230400, back to 57600");
+                    engine.reopenAt(0); versionHandshake(3000);
+                    ramStreamOn = false; engine.diag40(new byte[] { 6, 5, 0 }, 1000);
+                    history("warn", "\u26A0 No answer at 230400: back at 57600"); return;
+                }
+                double[] taps = plain ? com.macdmr.radio.ham.RamStream.identityTaps() : null;
+                if (taps == null) { taps = st.heldTapsForStream(); }
+                if (taps == null) taps = com.macdmr.radio.ham.RamStream.identityTaps();
+                final com.macdmr.radio.ham.HeldPathReceiver rx = new com.macdmr.radio.ham.HeldPathReceiver(taps, ear);
+                final com.macdmr.radio.ham.RamStream.Receiver r = new com.macdmr.radio.ham.RamStream.Receiver(rx::feed);
+                ramStreamRx = rx; ramStream = r;
+                engine.setStreamSink(r::half);
+                Frame go = engine.diag40(new byte[] { 17, 1 }, 1000);
+                if (go == null || go.sr != 0) {
+                    engine.setStreamSink(null); rx.stop(); ramStream = null; ramStreamRx = null; ramStreamOn = false;
+                    engine.diag40(new byte[] { 16, 0 }, 1000); engine.reopenAt(0); versionHandshake(3000); engine.diag40(new byte[] { 6, 5, 0 }, 1000);
+                    history("warn", "\u26A0 The module did not start the stream (" + (go == null ? "no answer" : "sr=" + go.sr) + ")"); return;
+                }
+                ui.post(ramKeepalive);
+                history("pkt", "\uD83D\uDCFB RAM stream on at 230400, " + (plain ? "no equaliser" : "shipped taps"));
+            } catch (Throwable t) { ramStreamOn = false; log("ram stream: " + t); history("warn", "\u26A0 RAM stream failed: " + t.getMessage()); }
+        });
+        return null;
+    }
+
     private void sendDataHold(boolean apply) {
         try {
             if (!engine.isOpen()) { log("data hold: radio not open"); return; }

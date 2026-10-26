@@ -55,6 +55,10 @@ public final class M17Station {
     public M17Station(Context c, String profileId, Host h) { ctx = c.getApplicationContext(); this.profileId = profileId; host = h; cal = new HeldCal(ctx, profileId); }
 
     public boolean running() { return running; }
+    /** The listener the held-path receiver reports to; a receiver fed from the module's RAM stream reports to the same one, so its calls are listed and played the same way. Null until the station runs. */
+    public HeldPathReceiver.Listener ear() { return heldEar; }
+    /** The fixed taps the held-path receiver would use on this phone (accepted fit, else the shipped table), or null. */
+    public double[] heldTapsForStream() { double[] t = cal.accepted(); return t != null ? t : loadTaps("m17/held_" + profileId + ".txt"); }
     /** A transmission is being decoded (the radio's own audio is held back). */
     public boolean receiving() { return running && current != null; }
     public Heard current() { return current; }
