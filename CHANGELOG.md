@@ -4,6 +4,14 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Soft SQ: the slider during a scan, the scan's level in the help, a clip bench for level 1
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Queue item 1 (owner 2026-10-25) | Moving the Soft SQ slider while a scan was held on a channel that has Soft SQ only because of the scan (Soft SQ while scanning) switched that channel's gate off until the next channel change: `setSoftSqLevel` configured the gate from the channel's own switch. It now uses the same rule as every other path (`softSqFor`: the channel's switch, or scanning with the setting on, never digital), kept in one static `softSqApplies`. | `RadioService.java`, `SoftSqScanTest.java` (new) | Host: the rule's six cases, new channels at level 5. Found by reading the code, not reproduced. **Device test owed.** |
+| Queue item 2 (owner asked 2026-10-25) | Help → Scanning and zones → Soft SQ while scanning now says which level the scan uses: each channel's own level (5 if never set, 1 lenient to 9 strict), applied on every step, a channel with a receive tone opens on its tone, and the slider during a held scan changes that channel's level. Help → Soft SQ → The slider: new channels start at 5, and the gate stays open until the signal is clearly gone. Device → Radio settings and the web Settings row: "(5 if never set)". | `ui/HelpView.java`, `ui/DeviceView.java`, `web/WebHost.java` | Read against `NoiseSquelchDetector` and `RadioService`. |
+| Queue item 6, host part (owner 2026-10-22) | Bench for the "level 1 is too strict" report: `SoftSqClipBench` (env `SQ_CLIP_DIR`, DIAG `rxclip` clips recorded with MON open, names starting with `static` for plain static) prints per clip how much each level 1–9 lets through and the smoothed noise readings, then sweeps open thresholds 16–46 over all clips with the detector's own gate replayed. The web slider was checked: 1–9, the same scale as the phone. **To do: the level 1 threshold itself, chosen from clips of readable weak signals recorded in a phone window (after the hotspot session).** | `dsp/SoftSqClipBench.java` (new, test sources), `dsp/SoftSqClipBenchTest.java` (new) | Host: the replayed gate matches the real detector at every level on synthetic hiss + tone. No clips yet. |
+
 ## 2026-10-25 — Morse, RTTY and FT8 through the module's tone generator (bench firmware)
 
 | Backlog | Change | Files | Test |

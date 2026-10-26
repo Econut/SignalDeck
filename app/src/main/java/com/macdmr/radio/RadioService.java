@@ -1144,7 +1144,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         level = Math.max(1, Math.min(9, level));                             // 1-9 everywhere (the web slider once sent 0-100)
         ChannelStore.Channel ch = current; if (ch == null) return;
         ch.softSqLevel = level; store.update(ch);
-        softSq.configure(ch.softSq, level, ch.rxType, ch.rxSubCode);
+        softSq.configure(softSqFor(ch), level, ch.rxType, ch.rxSubCode);   // the scan's Soft SQ counts too, or moving the slider would switch its gate off
         pushModes();
     }
 
@@ -1350,7 +1350,8 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Soft SQ applies to an analog channel when it is switched on for that channel, or on every analog channel while scanning (setting, default on). */
-    private boolean softSqFor(ChannelStore.Channel ch) { return !ch.isDigital() && (ch.softSq || (scanner.isScanning() && scanSoftSq())); }
+    private boolean softSqFor(ChannelStore.Channel ch) { return softSqApplies(ch.isDigital(), ch.softSq, scanner.isScanning(), scanSoftSq()); }
+    static boolean softSqApplies(boolean digital, boolean channelSoftSq, boolean scanning, boolean scanSoftSq) { return !digital && (channelSoftSq || (scanning && scanSoftSq)); }
     /** The scan priority channel number (0 = none). */
     public int scanPriority() { return getSharedPreferences("radio", MODE_PRIVATE).getInt("scanPriority", 0); }
     public void setScanPriority(int number) { getSharedPreferences("radio", MODE_PRIVATE).edit().putInt("scanPriority", number).apply(); }

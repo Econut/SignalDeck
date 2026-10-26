@@ -116,7 +116,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         keyRow.setOnClickListener(v -> learnKeySheet());                      // the row learns; the switch turns the learned key on and off
         customPttSw.setOnChange(on -> { if (on && com.macdmr.radio.CustomPttKey.saved(c) == null) { customPttSw.setChecked(false); learnKeySheet(); return; } com.macdmr.radio.CustomPttKey.setEnabled(c, on); if (svc != null) svc.customPttChanged(); });
         addRow(set, keyRow);
-        addRow(set, Neo.switchRow(c, "softsq", Neo.CYAN, "Soft SQ while scanning", "Every analog channel, each at its own level", scanSqSw));
+        addRow(set, Neo.switchRow(c, "softsq", Neo.CYAN, "Soft SQ while scanning", "Every analog channel, each at its own level (5 if never set)", scanSqSw));
         addRow(set, Neo.switchRow(c, "voice", Neo.VIOLET, "Voice announcements", "Channel changes, caller names, keyword alerts", voiceSw));
         addRow(set, rogerRow(c));
         addRow(set, Neo.switchRow(c, "intercom", Neo.CYAN, "New intercom look", "Off: the classic intercom page", styleSw));
