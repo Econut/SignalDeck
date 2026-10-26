@@ -970,7 +970,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (audio == null) {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
-                audio.setGate(() -> squelchOpen && !muted && !(m17 != null && m17.receiving()));   // M17: its decoded voice plays instead
+                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()));   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
             }
             String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -1014,7 +1014,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (open != squelchOpen && softSq.isEnabled()) log("soft squelch " + (open ? "open" : "closed") + (current != null && current.rxType == 1 ? " (CTCSS " + com.macdmr.radio.dsp.ToneTable.ctcssLabel(current.rxSubCode) + ")" : ""));
         if (open != squelchOpen && softSq.isEnabled()) { softGateHistory(open); squelchOpen = open; pushModes(); }   // pages see the gate (activity box, Soft SQ number colour)
         squelchOpen = open;
-        if (web != null && open && !muted && !pttDown && !(m17 != null && m17.receiving())) web.rxAudio(mono, n);      // SignalDeck Web listeners hear what the speaker plays (M17: its decoded voice instead)
+        boolean m17Channel = current != null && current.isM17();
+        if (web != null && open && !muted && !pttDown && !m17Channel) web.rxAudio(mono, n);      // an M17 channel sends decoded voice, not the raw FM
         ClipRecorder clip = this.clip;                                            // listen check: what arrived, before the speaker
         if (clip != null && (!clipOnlyHeard || rxActive()) && !clip.write(mono, n)) this.clip = null;
         int peak = 0;
@@ -1053,12 +1054,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                 recorder.write(mono, n);
             } catch (Throwable t) { log("record: " + t); recorder = null; }
         }
-        final int p = peak;
+        final int p = m17Channel ? 0 : peak;
         ui.post(() -> { for (Listener l : listeners) l.onAudioLevel(p); });
         // the intercom bars (phone and web): the spectrum of what the speaker plays; zeros once, when it stops
-        float[] sb = open && !muted ? spectrum.feed(mono, n) : null;
+        float[] sb = !m17Channel && open && !muted ? spectrum.feed(mono, n) : null;
         if (sb != null) { final float[] copy = sb.clone(); spectrumZero = false; ui.post(() -> { for (Listener l : listeners) l.onSpectrum(copy); }); }
-        else if (!(open && !muted) && !spectrumZero) { spectrumZero = true; spectrum.reset(); final float[] z = new float[com.macdmr.radio.dsp.Spectrum.BANDS]; ui.post(() -> { for (Listener l : listeners) l.onSpectrum(z); }); }
+        else if ((m17Channel || !(open && !muted)) && !spectrumZero) { spectrumZero = true; spectrum.reset(); final float[] z = new float[com.macdmr.radio.dsp.Spectrum.BANDS]; ui.post(() -> { for (Listener l : listeners) l.onSpectrum(z); }); }
     }
 
     private final com.macdmr.radio.dsp.Spectrum spectrum = new com.macdmr.radio.dsp.Spectrum();
@@ -1331,8 +1332,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         rememberZoneChannel(number);
     }
 
-    /** Squelch byte for the module: with Soft SQ on the radio's squelch is held open (0) and the app decides; otherwise the channel's own level. */
-    private int hardwareSq(ChannelStore.Channel ch) { return softSqFor(ch) ? 0 : ch.sq; }
+    /** Squelch byte for the module: with Soft SQ on, or on an M17 channel, the radio's squelch is held open (0). An M17 channel needs the audio below the module's one threshold; the speaker gate keeps that raw FM out and only the decoded voice is played. */
+    private int hardwareSq(ChannelStore.Channel ch) { return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq; }
     /** APRS, SSTV and satellite channels: the radio's squelch wide open (its single threshold sits near -90 dBm, far
      *  above a satellite or a distant digipeater), so the decoders get every signal; Soft SQ keeps the speaker quiet
      *  until something is really there. */

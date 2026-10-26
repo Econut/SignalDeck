@@ -31,8 +31,8 @@ public class M17ChannelTest {
 
     @Test public void channel_access_number_is_in_the_voice_type_word() {
         assertEquals(0x0005, M17.streamVoice(0));
-        assertEquals(0x0305, M17.streamVoice(3));
-        assertEquals(0x0F05, M17.streamVoice(99));
+        assertEquals(0x0185, M17.streamVoice(3));
+        assertEquals(0x0785, M17.streamVoice(99));
     }
 
     @Test public void backup_type_cell_round_trips() {
@@ -51,7 +51,7 @@ public class M17ChannelTest {
         assertEquals(m.type, back.type);
         assertEquals(m.can(), back.can());
         assertEquals(m.m17Dest(), back.m17Dest());
-        assertEquals(M17.streamVoice(back.can()), 0x0205);
+        assertEquals(0x0105, M17.streamVoice(back.can()));
     }
 
     @Test public void web_save_keeps_an_m17_channel() throws Exception {

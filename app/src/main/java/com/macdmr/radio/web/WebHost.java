@@ -305,6 +305,7 @@ public final class WebHost {
                 ch.band = 1;
                 ch.cc = Math.max(0, Math.min(15, b.optInt("cc", ch.cc)));
                 if (b.has("m17dest")) ch.m17dest = ChannelStore.Channel.cleanM17Dest(b.optString("m17dest", ""));
+                ch.sq = 0;
                 ch.txType = 0; ch.rxType = 0; ch.txSubCode = 0; ch.rxSubCode = 0;
                 ch.softSq = false;
             } else {

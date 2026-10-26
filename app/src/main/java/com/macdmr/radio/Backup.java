@@ -357,6 +357,7 @@ public final class Backup {
                 if (ch.isM17()) {
                     ch.cc = Math.max(0, Math.min(15, num(col(r, off + 6), 0)));
                     ch.band = 1; ch.rxType = 0; ch.txType = 0; ch.rxSubCode = 0; ch.txSubCode = 0;
+                    ch.sq = 0;
                     ch.m17dest = ChannelStore.Channel.cleanM17Dest(m17Col >= 0 ? col(r, m17Col) : "");
                 }
             }

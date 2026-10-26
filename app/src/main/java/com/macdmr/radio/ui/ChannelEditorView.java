@@ -444,6 +444,7 @@ public class ChannelEditorView extends LinearLayout {
             if (ch.isM17()) {
                 ch.m17dest = com.macdmr.radio.ChannelStore.Channel.cleanM17Dest(m17Dest.getText().toString());
                 ch.band = 1;
+                ch.sq = 0;
                 ch.cc = ch.can();
             } else if (ch.isDigital()) {
                 ch.txContact = call.getText().toString().trim().isEmpty() ? 0 : Integer.parseInt(call.getText().toString().trim());
