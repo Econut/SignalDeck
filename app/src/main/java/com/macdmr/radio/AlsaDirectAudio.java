@@ -217,20 +217,23 @@ public final class AlsaDirectAudio implements AudioBackend {
     }
 
     /** Play 8 kHz mono PCM into the TX path; blocks until the helper has played it out. */
+    private volatile boolean abortPlay;
+    @Override public void abortPlay() { abortPlay = true; }
     @Override public String playPcm(short[] mono) {
         Process p;
+        abortPlay = false;
         synchronized (this) { takeErrors(); try { p = start(false); } catch (Throwable t) { return "playPcm: " + t; } }
         try (OutputStream out = p.getOutputStream()) {
             byte[] st = new byte[BLOCK];
-            for (int pos = 0; pos < mono.length; pos += BLOCK / 4) {
+            for (int pos = 0; pos < mono.length && !abortPlay; pos += BLOCK / 4) {
                 int k = 0;
                 for (int i = pos; i < Math.min(mono.length, pos + BLOCK / 4); i++) { short v = mono[i]; st[k++] = (byte) v; st[k++] = (byte) (v >> 8); st[k++] = (byte) v; st[k++] = (byte) (v >> 8); }
                 out.write(st, 0, k);                                     // the pipe fills and the helper's playback paces it to real time
             }
         } catch (Throwable t) { finish(p, 500); return "playPcm: " + t; }
-        finish(p, 3000);                                                 // end of input: the helper drains the last periods, then exits
+        finish(p, abortPlay ? 500 : 3000);                               // end of input: the helper drains the last periods, then exits
         String e = takeErrors();
-        return "played " + mono.length + " samples" + (e.isEmpty() ? "" : " (" + e + ")");
+        return (abortPlay ? "aborted after part of " : "played ") + mono.length + " samples" + (e.isEmpty() ? "" : " (" + e + ")");
     }
 
     /** 8 kHz mono little-endian bytes to stereo-duplicated frames; returns the stereo byte count. */

@@ -39,4 +39,6 @@ public interface AudioBackend {
     String stopTx();
     /** Play 8 kHz mono PCM into the TX path, paced to real time; blocks until done. */
     String playPcm(short[] mono);
+    /** Ends a {@link #playPcm} in progress at its next block (the heat watchdog); nothing when none is playing. */
+    default void abortPlay() { }
 }

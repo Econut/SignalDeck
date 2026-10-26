@@ -125,15 +125,18 @@ public final class TinyServiceAudio implements AudioBackend {
     }
 
     /** Play 8 kHz mono PCM into the TX path (stereo-duplicated, paced to real time); blocks until done. */
+    private volatile boolean abortPlay;
+    @Override public void abortPlay() { abortPlay = true; }
     @Override public String playPcm(short[] mono) {
         Object ok; int fs;
+        abortPlay = false;
         synchronized (this) {
             try { ok = openWrite.invoke(svc); fs = (Integer) frameSize.invoke(svc); } catch (Throwable t) { return "playPcm open: " + t; }
             if (!Boolean.TRUE.equals(ok) || fs <= 0) return "openWritePcm=" + ok + " frameSize=" + fs;
         }
         try {
             byte[] st = new byte[fs]; int per = fs / 4; long t0 = System.nanoTime(); long sent = 0;
-            for (int pos = 0; pos < mono.length; pos += per) {
+            for (int pos = 0; pos < mono.length && !abortPlay; pos += per) {
                 for (int k = 0; k < per; k++) {
                     short v = pos + k < mono.length ? mono[pos + k] : 0;
                     st[4 * k] = (byte) v; st[4 * k + 1] = (byte) (v >> 8); st[4 * k + 2] = (byte) v; st[4 * k + 3] = (byte) (v >> 8);
@@ -144,7 +147,7 @@ public final class TinyServiceAudio implements AudioBackend {
                 if (wait > 0) Thread.sleep(wait / 1_000_000, (int) (wait % 1_000_000));
             }
             Thread.sleep(150);                                                   // let the last frame leave the DSP
-            return "played " + mono.length + " samples";
+            return (abortPlay ? "aborted after part of " : "played ") + mono.length + " samples";
         } catch (Throwable t) { return "playPcm: " + t; }
         finally { try { closeWrite.invoke(svc); } catch (Throwable ignored) { } }
     }

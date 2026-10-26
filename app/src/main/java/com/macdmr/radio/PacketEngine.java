@@ -228,7 +228,7 @@ public final class PacketEngine {
         if (!host.analogRx()) return "SSTV needs an analog channel";
         final int total = SSTVEncoder.durationMs(mode) + TX_LEAD_MS;
         if (total > 118_000) return SSTVEncoder.name(mode) + " runs " + Math.round(total / 1000.0) + " s, past what this radio allows (118 s)";
-        if (total > 30_000) { String wait = host.longTxWait(total); if (wait != null) return wait; }
+        if (total > 30_000) { String wait = host.longTxWait(total); if (wait != null) { host.event("\u23F3 " + SSTVEncoder.name(mode) + " not sent: " + wait); return wait; } }
         new Thread(() -> {
             short[] pcm = SSTVEncoder.encode(bmp, mode);
             int lead = SR * TX_LEAD_MS / 1000;

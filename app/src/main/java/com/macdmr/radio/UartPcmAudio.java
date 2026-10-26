@@ -151,12 +151,14 @@ public final class UartPcmAudio implements AudioBackend {
         return "UART PCM TX stopped";
     }
 
+    private volatile boolean abortPlay;
+    @Override public void abortPlay() { abortPlay = true; }
     @Override public String playPcm(short[] mono) {
         try {
             open();
-            txRunning = true;
+            txRunning = true; abortPlay = false;
             byte[] pkt = new byte[PACKET * 2]; long t0 = System.nanoTime(); long sent = 0;
-            for (int pos = 0; pos < mono.length; pos += PACKET) {
+            for (int pos = 0; pos < mono.length && !abortPlay; pos += PACKET) {
                 for (int k = 0; k < PACKET; k++) { short v = pos + k < mono.length ? mono[pos + k] : 0; pkt[2 * k] = (byte) v; pkt[2 * k + 1] = (byte) (v >> 8); }
                 out.write(pkt); out.flush();
                 sent += PACKET;
@@ -164,7 +166,7 @@ public final class UartPcmAudio implements AudioBackend {
                 if (wait > 0) Thread.sleep(wait / 1_000_000, (int) (wait % 1_000_000));
             }
             Thread.sleep(100);
-            return "played " + mono.length + " samples";
+            return (abortPlay ? "aborted after part of " : "played ") + mono.length + " samples";
         } catch (Throwable t) { return "playPcm: " + t; }
         finally { txRunning = false; }
     }

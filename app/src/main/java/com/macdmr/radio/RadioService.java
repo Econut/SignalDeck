@@ -656,17 +656,19 @@ public class RadioService extends Service implements RadioEngine.Events {
                 int ms = pcm.length / 8;
                 int cap = Math.min(maxMs, TX_MAX_MS);
                 if (ms > cap) { log("TX " + label + " refused: " + ms + " ms over " + cap); history("warn", "\u26D4 Too long to send (" + label + ", " + Math.round(ms / 1000.0) + " s; the radio allows " + (cap / 1000) + " s)"); return; }
+                Thread heatWatch = null;
                 if (ms > ThermalGuard.LONG_MS) {
-                    String wait = thermal.gate(ms);
+                    String wait = thermal.gate(ms, ThermalGuard.batteryC(this));
                     if (wait != null) { log("TX " + label + " held: " + wait); history("warn", "\u23F3 " + wait); return; }
                     thermal.beforeLong();
+                    heatWatch = heatWatchdog(label);
                 }
                 pttDown = true;
                 if (audio != null) audio.stopRx();
                 engine.ptt(true);
                 log("TX " + label + " (" + ms + " ms)");
                 try { Thread.sleep(200); if (audio != null) log(audio.playPcm(pcm)); }
-                finally { engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null) audio.startRx(true); }
+                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null) audio.startRx(true); }
                 if (ms > ThermalGuard.LONG_MS) history("tx", "\uD83D\uDCFB Long transmission " + Math.round(ms / 1000.0) + " s (" + label + "); " + thermal.state());
                 if (onDone != null) onDone.run();
             } catch (Throwable t) { log("TX " + label + ": " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
@@ -2107,6 +2109,33 @@ public class RadioService extends Service implements RadioEngine.Events {
             pttDown = false; thermal.after(ms); refreshControls();
             if (rxAudioOn && audio != null) audio.startRx(true);
         }
+    }
+
+    /**
+     * The in-key heat watchdog for a long transmission: every 5 s the AP zone and the battery; at a stop
+     * ({@link ThermalGuard#stopNow}) the playback is ended at its next block and the history says why. Interrupted
+     * by the sender when the transmission ends.
+     */
+    private Thread heatWatchdog(final String label) {
+        Thread t = new Thread(() -> {
+            double pz = Double.NaN, pb = Double.NaN; int n = 0;
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    Thread.sleep(5000);
+                    double z = thermal.readC(), b = ThermalGuard.batteryC(RadioService.this);
+                    String stop = ThermalGuard.stopNow(z, b, pz, pb);
+                    if (stop != null) {
+                        log("heat stop during " + label + ": " + stop);
+                        history("warn", "\u26D4 " + label + " ended early: " + stop + ". Let the phone cool before the next long transmission.");
+                        if (audio != null) audio.abortPlay();
+                        return;
+                    }
+                    if (++n % 2 == 0) { pz = z; pb = b; }                      // the 10 s comparison
+                }
+            } catch (InterruptedException ignored) { }
+        }, "heat-watch");
+        t.setDaemon(true); t.start();
+        return t;
     }
 
     /** Tone pairs still queued in the module (op 2 with a following byte of 1); 0 when it does not answer. */
