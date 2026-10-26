@@ -51,7 +51,7 @@ public class ChannelEditorView extends LinearLayout {
 
     // ---- field help (what each setting does on this radio) ----
     private static final String H_NOTES = "Anything worth remembering about this channel: who uses it, the repeater's owner or club, linking, hours, how to check in. It can go with the channel when you share it (Share channels \u2192 Channel notes).";
-    private static final String H_NAME = "Shown on the intercom, in the channel list and in voice announcements.";
+    private static final String H_NAME = "Shown on the intercom, in the channel list and in voice announcements. Up to " + ChannelStore.NAME_MAX + " characters; the counter under the field shows how many are left. The radio itself never receives the name. Codeplug tools such as OpenGD77 CPS keep shorter names (16 characters), so a long name may be cut short in a backup opened there.";
     private static final String H_TYPE = "Digital (DMR) channels carry voice and text as data and need a colour code, a time slot and a call target. Analog channels are classic FM. Switching shows the settings that apply.";
     private static final String H_TX = "The frequency you transmit on, in MHz. On a simplex channel it is the same as the receive frequency; on a repeater channel it is the repeater's input (for example +5 MHz on UHF GMRS, or ±0.6 MHz on 2 m). This radio covers 136–174 and 400–480 MHz.";
     private static final String H_RX = "The frequency you listen on, in MHz. On a repeater channel it is the repeater's output. This radio tunes 136–174 and 400–480 MHz; other frequencies (220 MHz, for example) cannot be saved.";
@@ -106,6 +106,7 @@ public class ChannelEditorView extends LinearLayout {
         Context c = getContext(); float d = Theme.dp(c);
         section(form, "Channel");
         name = textInto(form, "Channel name", H_NAME, ch.name, InputType.TYPE_CLASS_TEXT);
+        nameCounter(name);
         choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog" }, ch.type, v -> { ch.type = v; refreshGroups(); });
         tx = textInto(form, "Send frequency (MHz)", H_TX, ch.txFreq > 0 ? String.format(Locale.US, "%.5f", ch.txFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         rx = textInto(form, "Receive frequency (MHz)", H_RX, ch.rxFreq > 0 ? String.format(Locale.US, "%.5f", ch.rxFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -341,6 +342,23 @@ public class ChannelEditorView extends LinearLayout {
         dlg.show();
     }
 
+    /** The name field stops at {@link ChannelStore#NAME_MAX} characters and shows how many are used. */
+    private void nameCounter(EditText e) {
+        Context c = getContext();
+        e.setFilters(new android.text.InputFilter[] { new android.text.InputFilter.LengthFilter(ChannelStore.NAME_MAX) });
+        if (e.length() > ChannelStore.NAME_MAX) e.setText(ChannelStore.fitName(e.getText().toString()));   // an imported longer name
+        TextView count = Neo.text(c, "", Neo.MUTED, 12, Neo.uiSemi(c));
+        count.setGravity(Gravity.END);
+        Runnable show = () -> { int n = e.length(); count.setText(n + " / " + ChannelStore.NAME_MAX); count.setTextColor(n >= ChannelStore.NAME_MAX ? Neo.AMBER : Neo.MUTED); };
+        show.run();
+        e.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int d) { }
+            @Override public void onTextChanged(CharSequence s, int a, int b, int d) { }
+            @Override public void afterTextChanged(android.text.Editable s) { show.run(); }
+        });
+        ((LinearLayout) e.getParent()).addView(count, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+    }
+
     private EditText textInto(LinearLayout target, String label, String help, String value, int inputType) {
         Context c = getContext(); float d = Theme.dp(c);
         LinearLayout row = rowShell(); row.setOrientation(HORIZONTAL); row.setGravity(Gravity.CENTER_VERTICAL);
@@ -387,7 +405,7 @@ public class ChannelEditorView extends LinearLayout {
     /** Validate + copy the text fields into the channel. */
     private boolean apply() {
         try {
-            ch.name = name.getText().toString().trim();
+            ch.name = ChannelStore.fitName(name.getText().toString());
             ch.notes = notes.getText().toString().trim();
             ch.txFreq = (int) Math.round(Double.parseDouble(tx.getText().toString().trim()) * 1e6);
             ch.rxFreq = (int) Math.round(Double.parseDouble(rx.getText().toString().trim()) * 1e6);

@@ -23,6 +23,16 @@ import java.util.List;
  * so a user keeps every channel they already programmed.
  */
 public final class ChannelStore extends SQLiteOpenHelper {
+    /** Longest channel name the editors accept and the repeater planner writes (the stock app's column width). One place to change it. */
+    public static final int NAME_MAX = 32;
+
+    /** A typed or generated channel name, trimmed and cut to {@link #NAME_MAX}. */
+    public static String fitName(String s) {
+        if (s == null) return "";
+        s = s.trim();
+        return s.length() <= NAME_MAX ? s : s.substring(0, NAME_MAX).trim();
+    }
+
     public static final class Channel {
         public long id; public int number; public String name = ""; public int type;          // 0 digital, 1 analog
         public int rxFreq, txFreq, power, band = 1, sq = 2, rxType, rxSubCode, txType, txSubCode, relay = 2, mode;
