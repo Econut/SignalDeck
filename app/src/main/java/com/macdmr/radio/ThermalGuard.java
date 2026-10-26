@@ -20,10 +20,14 @@ public final class ThermalGuard {
     public static final int LONG_MS = 30_000;
     public static final long FALLBACK_MS = 17 * 60_000L;
     public static final double WITHIN_C = 1.0;
-    /** The bench stops (HANDOFF heat rule): a key ends when the AP zone passes 60 C, the battery 45 C, or either climbs 2 C inside 10 s. */
-    public static final double ZONE_STOP_C = 60.0, BATTERY_STOP_C = 45.0, RISE_STOP_C = 2.0;
+    /**
+     * The product's stops (owner, 2026-10-25): a long key ends when the AP zone passes 70 C, the battery 48 C, or either
+     * climbs 2 C inside 10 s. These sit below where the phone itself throttles (AP zones in the 70s to 80s, Android's
+     * battery overheat flag in the mid 50s) and above the bench's own stricter 60 / 45 rules, which stay in the bench runner.
+     */
+    public static final double ZONE_STOP_C = 70.0, BATTERY_STOP_C = 48.0, RISE_STOP_C = 2.0;
     /** A long key adds about 11 C to the AP zone (bench, 120 s high power) and 2 C to the battery: it does not start closer than that to the stops. */
-    public static final double ZONE_START_C = 50.0, BATTERY_START_C = 42.0;
+    public static final double ZONE_START_C = 60.0, BATTERY_START_C = 45.0;
 
     private volatile int zoneIndex = -1;          // the mtktsAP zone, found once; -2 = none on this phone
     private volatile double beforeC = Double.NaN; // the zone before the last long key
@@ -66,8 +70,8 @@ public final class ThermalGuard {
      * over {@link #ZONE_START_C} or the battery at or over {@link #BATTERY_START_C}; null when it may.
      */
     public static String tooHotToStart(double zoneC, double batteryC) {
-        if (!Double.isNaN(zoneC) && zoneC >= ZONE_START_C) return String.format(Locale.US, "The phone's radio zone is at %.1f \u00B0C; a long transmission would take it past the 60 \u00B0C stop. Let it cool below %.0f \u00B0C first; a short mode can go now.", zoneC, ZONE_START_C);
-        if (!Double.isNaN(batteryC) && batteryC >= BATTERY_START_C) return String.format(Locale.US, "The battery is at %.1f \u00B0C; a long transmission would take it near the 45 \u00B0C stop. Let it cool below %.0f \u00B0C first; a short mode can go now.", batteryC, BATTERY_START_C);
+        if (!Double.isNaN(zoneC) && zoneC >= ZONE_START_C) return String.format(Locale.US, "The phone's radio zone is at %.1f \u00B0C; a long transmission would take it past the %.0f \u00B0C stop. Let it cool below %.0f \u00B0C first; a short mode can go now.", zoneC, ZONE_STOP_C, ZONE_START_C);
+        if (!Double.isNaN(batteryC) && batteryC >= BATTERY_START_C) return String.format(Locale.US, "The battery is at %.1f \u00B0C; a long transmission would take it near the %.0f \u00B0C stop. Let it cool below %.0f \u00B0C first; a short mode can go now.", batteryC, BATTERY_STOP_C, BATTERY_START_C);
         return null;
     }
 
