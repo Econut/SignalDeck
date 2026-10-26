@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-26 — Radio firmware files: the Atom XL's folder, and files SignalDeck already knows
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL firmware (owner 2026-10-26) | Device → Device report → Radio firmware files also looks in `/vendor/data/DMR` (upper case). The Atom XL keeps its module image in `/vendor/data/DMR/dmr/`, and the vendor partition is case-sensitive, so the old `/vendor/data/dmr` entry missed it and only its MCU images were listed. Each file whose SHA-256 SignalDeck already has is now marked **already known** in the list and in the report, with what it is: the Armor's factory image or a SignalDeck bench image (built in), or a row of the signed firmware catalogue (a factory image, a released image, or a stock copy kept for research and not offered for loading, such as the Atom XL's DMR006.U4A.V076). The report then says nobody needs a copy of those. Nothing else changes: files are still copied only when ticked, and nothing is sent. Help: Device → Device report. | `FirmwareFinder.java`, `ui/DeviceView.java`, `ui/HelpView.java`, `FirmwareFinderTest.java` | Host: the upper-case folder found two levels down, known-file labels (built-in, catalogue factory / released / research, unknown), the report line and note. **Device test owed** (a root scan on the Armor should mark its factory image already known). |
+
 ## 2026-10-26 — Radio firmware files: the apps' own files are left out
 
 | Backlog | Change | Files | Test |

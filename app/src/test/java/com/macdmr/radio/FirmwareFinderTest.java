@@ -92,5 +92,53 @@ public class FirmwareFinderTest {
         assertFalse(FirmwareFinder.ownOutput("/system/data/dmr/uart_logs/x.bin"));
     }
 
+    @Test public void theAtomXlsUpperCaseFolderIsSearched() throws Exception {
+        assertTrue(java.util.Arrays.asList(FirmwareFinder.FOLDERS).contains("/vendor/data/DMR"));
+        java.io.File root = java.nio.file.Files.createTempDirectory("fwfind-tree").toFile(), tmp = java.nio.file.Files.createTempDirectory("fwfind-tmp").toFile();
+        try {
+            put(root, "/vendor/data/DMR/dmr/DMR006.TEST.V001.bin", 300 * 1024, "DMR006.TEST.V001");   // two levels down, as on the phone
+            java.util.List<FirmwareFinder.Found> out = new java.util.ArrayList<>();
+            FirmwareFinder.scanFolders(new String[] { "/vendor/data/DMR" }, treeAt(root), tmp, s -> { }, out);
+            assertEquals(1, out.size());
+            assertEquals("/vendor/data/DMR/dmr/DMR006.TEST.V001.bin", out.get(0).source);
+            assertEquals("DMR006.TEST.V001", out.get(0).versions);
+        } finally { deleteTree(root); deleteTree(tmp); }
+    }
+
+    private static String x32(String two) { StringBuilder b = new StringBuilder(); for (int i = 0; i < 32; i++) b.append(two); return b.toString(); }
+
+    private static java.util.List<com.macdmr.radio.fw.FirmwareCatalog.Image> catalogue() throws Exception {
+        String json = "{\"format\":1,\"serial\":9,\"images\":["
+                + "{\"tag\":\"DMR009.TEST.V001\",\"sha256\":\"" + x32("ab") + "\",\"size\":1,\"model\":\"Test Phone\",\"status\":\"stock\",\"factory\":false},"
+                + "{\"tag\":\"DMR009.TEST.V002\",\"sha256\":\"" + x32("cd") + "\",\"size\":1,\"model\":\"Test Phone\",\"status\":\"stock\",\"factory\":true},"
+                + "{\"tag\":\"DMR009.FW01.V002\",\"sha256\":\"" + x32("ef") + "\",\"size\":1,\"model\":\"Test Phone\",\"status\":\"released\",\"factory\":false}]}";
+        return com.macdmr.radio.fw.FirmwareCatalog.parse(json.getBytes("UTF-8")).images;
+    }
+
+    @Test public void knownImagesAreNamed() throws Exception {
+        java.util.List<com.macdmr.radio.fw.FirmwareCatalog.Image> cat = catalogue();
+        assertEquals("DMR003.UV4T.V022, the factory image for the Armor 26 Ultra", FirmwareFinder.known(com.macdmr.radio.fw.ImageTable.FACTORY.sha256, cat));
+        assertEquals("DMR003.UV4T.V022, the factory image for the Armor 26 Ultra", FirmwareFinder.known(com.macdmr.radio.fw.ImageTable.FACTORY.sha256, null));
+        assertTrue(FirmwareFinder.known(com.macdmr.radio.fw.ImageTable.FW22.sha256, null).startsWith("DMR003.FW22.V022, a SignalDeck bench image"));
+        assertEquals("DMR009.TEST.V001, a stock copy for the Test Phone kept for research (not offered for loading)", FirmwareFinder.known(x32("AB"), cat));
+        assertEquals("DMR009.TEST.V002, the factory image for the Test Phone", FirmwareFinder.known(x32("cd"), cat));
+        assertEquals("DMR009.FW01.V002, a released image for the Test Phone", FirmwareFinder.known(x32("ef"), cat));
+        assertEquals("", FirmwareFinder.known(x32("01"), cat));
+        assertEquals("", FirmwareFinder.known("(unreadable)", cat));
+    }
+
+    @Test public void theReportMarksKnownFiles() throws Exception {
+        FirmwareFinder.Found a = new FirmwareFinder.Found("/vendor/data/DMR/dmr/x.bin", 10), b = new FirmwareFinder.Found("/vendor/data/mcu/y.bin", 10);
+        a.sha256 = x32("ab"); b.sha256 = x32("01");
+        java.util.List<FirmwareFinder.Found> fs = java.util.Arrays.asList(a, b);
+        FirmwareFinder.markKnown(fs, catalogue());
+        String r = FirmwareFinder.describe(fs);
+        assertTrue(r, r.contains("x.bin  10 bytes  sha256 " + x32("ab") + "  already known: DMR009.TEST.V001, a stock copy"));
+        assertFalse(r, r.contains("y.bin  10 bytes  sha256 " + x32("01") + "  already known"));
+        assertTrue(r, r.contains("nobody needs a copy of those"));
+        b.known = ""; a.known = "";
+        assertFalse(FirmwareFinder.describe(fs).contains("nobody needs a copy"));
+    }
+
     private static void deleteTree(java.io.File f) { java.io.File[] k = f.listFiles(); if (k != null) for (java.io.File c : k) deleteTree(c); f.delete(); }
 }
