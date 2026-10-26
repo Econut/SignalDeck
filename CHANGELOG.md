@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-26 — Firmware the catalogue does not list yet: asked once, noticed on the Device page
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Firmware variants (owner 2026-10-26) | On a phone SignalDeck has a profile for, once it owns the radio and the module has reported its version, SignalDeck checks the phone's stock firmware against the signed firmware catalogue (fetched at most once a day): the version the module first reported, and the stock app's firmware file by its SHA-256 (not read for the Armor's built-in factory version, whose file the firmware page verifies). SignalDeck's own bench tags never count. When the catalogue lists neither, or not both, SignalDeck asks once per variant whether to submit it: **Open GitHub** opens AndroidRadio_Firmware_Project's "Firmware variant seen" issue form with the phone model, module version, stock app and version, the file's fingerprint and what is missing filled in; the user checks it and presses Submit. Nothing is sent by the app, nothing in it identifies the user, and the file itself stays on the phone. An amber line under the Device page's firmware line, **Firmware not in the catalogue yet**, stays until the catalogue lists the variant (tap to submit; after Open GitHub it says it is waiting for the catalogue). Help: Device → Radio firmware. | `FirmwareVariantCheck.java` (new), `MainActivity.java`, `ui/DeviceView.java`, `ui/HelpView.java`, `FirmwareVariantCheckTest.java` (new) | Host: catalogue tags and hashes (images, variants with and without a hash, built-ins), listed / new / bench-tag / no-version cases, the filled-in issue URL, one key per variant. **Device test owed** (the Armor's V022 must show no prompt and no notice; a test catalogue or a renamed stock version shows both). |
+
 ## 2026-10-26 — A long M17 call stays one listing
 
 | Backlog | Change | Files | Test |

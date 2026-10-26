@@ -30,7 +30,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     public interface Host { void openHelp(); void openDiagnostics(); void openFirmware(); void intercomStyleChanged(); void animatedPanelChanged(boolean on); }
 
     private final LinearLayout header, hero;
-    private final TextView linkText, profileText, idText, firmwareText;
+    private final TextView linkText, profileText, idText, firmwareText, variantText;
     private final View linkDot;
     private final ImageView heroIcon;
     private final TextView takeOver, handBack, reportNow;
@@ -69,6 +69,9 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         firmwareText = Neo.text(c, "", 0xFF9FB4C8, 13, Neo.mono(c)); firmwareText.setPadding(0, (int) (3 * d), 0, 0);
         tc.addView(firmwareText);
         firmwareText.setOnClickListener(v -> { if (host != null) host.openFirmware(); });
+        variantText = Neo.text(c, "", Neo.AMBER_LIGHT, 13, Neo.ui(c)); variantText.setPadding(0, (int) (5 * d), 0, 0); variantText.setVisibility(GONE);
+        tc.addView(variantText);
+        variantText.setOnClickListener(v -> { com.macdmr.radio.FirmwareVariantCheck.Finding f = com.macdmr.radio.FirmwareVariantCheck.finding(getContext()); if (f != null) offerVariant(getContext(), f, this::refresh); });
         top.addView(tc, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         hero.addView(top);
         LinearLayout hb = new LinearLayout(c); hb.setBaselineAligned(false);
@@ -927,6 +930,26 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         again.setOnClickListener(v -> { dlg.dismiss(); checkAutoTrust(); });
     }
 
+    /** The Device page re-reads the firmware-variant finding (after the start-up check). */
+    public void refreshVariant() { refresh(); }
+
+    /** Ask whether to submit this phone's firmware variant: GitHub's issue form, filled in, in the browser. */
+    public static void offerVariant(Context c, com.macdmr.radio.FirmwareVariantCheck.Finding f, Runnable after) {
+        new android.app.AlertDialog.Builder(c).setTitle("New firmware variant")
+                .setMessage("This phone's radio firmware is not in the SignalDeck firmware catalogue yet: " + f.why + ".\n\n"
+                        + "Submitting it lets the firmware project catalogue it, so SignalDeck recognises it and firmware work can cover it later. "
+                        + "GitHub opens in your browser with the phone model, the module version, the stock app's version and the firmware file's fingerprint filled in. "
+                        + "Check them and press Submit there (it needs a GitHub account). Nothing is sent unless you submit, nothing in it identifies you, and the firmware file itself stays on this phone.\n\n"
+                        + "The notice stays on the Device page until the catalogue lists this firmware.")
+                .setPositiveButton("Open GitHub", (d, w) -> {
+                    com.macdmr.radio.FirmwareVariantCheck.markOpened(c, f.key);
+                    try { c.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(f.url)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)); }
+                    catch (Throwable t) { android.widget.Toast.makeText(c, "No browser to open GitHub", android.widget.Toast.LENGTH_LONG).show(); }
+                    if (after != null) after.run();
+                })
+                .setNegativeButton("Not now", null).show();
+    }
+
     /** What the firmware line means; when the module runs other firmware, the stock version can be reset to it. */
     private void firmwareSheet() {
         if (svc == null) return;
@@ -965,6 +988,9 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         firmwareText.setText(fwStock.isEmpty() ? "Module firmware" : com.macdmr.radio.Firmware.line(fwStock, fwNow));
         firmwareText.setVisibility(VISIBLE);
         firmwareText.setTextColor(com.macdmr.radio.Firmware.differs(fwStock, fwNow) ? Neo.AMBER_LIGHT : 0xFF9FB4C8);
+        com.macdmr.radio.FirmwareVariantCheck.Finding vf = svc.profile().supported ? com.macdmr.radio.FirmwareVariantCheck.finding(c) : null;
+        variantText.setVisibility(vf == null ? GONE : VISIBLE);
+        if (vf != null) variantText.setText("\u26A0 Firmware not in the catalogue yet \u00B7 " + (vf.opened ? "sent to GitHub, waiting for the catalogue" : "tap to submit it"));
         boolean ready = "ready".equals(l), unsupported = "unsupported".equals(l), bad = "no root".equals(l) || unsupported;
         int accent = ready ? Neo.GREEN : bad ? Neo.AMBER : "stopped".equals(l) ? Neo.CYAN : Neo.AMBER;
         linkText.setText(ready ? "This app owns the radio" : "no root".equals(l) ? "Root not granted (Magisk → Superuser)" : "stopped".equals(l) ? "The stock app owns the radio" : unsupported ? "No profile for this phone yet" : "Starting: " + l);
