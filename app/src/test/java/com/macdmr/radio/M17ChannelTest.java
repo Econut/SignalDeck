@@ -5,10 +5,14 @@
 package com.macdmr.radio;
 
 import com.macdmr.radio.ham.M17;
+import com.macdmr.radio.web.WebHost;
 
+import org.json.JSONObject;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 /** M17 as a channel type: destination, channel access number, and the backup's type cell. */
 public class M17ChannelTest {
@@ -48,5 +52,24 @@ public class M17ChannelTest {
         assertEquals(m.can(), back.can());
         assertEquals(m.m17Dest(), back.m17Dest());
         assertEquals(M17.streamVoice(back.can()), 0x0205);
+    }
+
+    @Test public void web_save_keeps_an_m17_channel() throws Exception {
+        ChannelStore.Channel ch = new ChannelStore.Channel();
+        JSONObject b = new JSONObject();
+        b.put("name", "Bench M17");
+        b.put("type", 2);
+        b.put("txMHz", 467.625);
+        b.put("rxMHz", 467.625);
+        b.put("m17dest", "w9xyz");
+        b.put("cc", 4);
+        assertNull(WebHost.applyChannel(ch, b));
+        assertTrue(ch.isM17());
+        assertEquals("W9XYZ", ch.m17Dest());
+        assertEquals(4, ch.can());
+        assertEquals(1, ch.band);
+        String js = new String(java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("src/main/assets/web/editor.js")), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(js.contains("[2, 'M17']"));
+        assertTrue(js.contains("fM17"));
     }
 }

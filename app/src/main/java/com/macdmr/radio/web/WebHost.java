@@ -260,15 +260,16 @@ public final class WebHost {
         JSONObject o = channelObj(ch);
         o.put("type", ch.type).put("relay", ch.relay).put("mode", ch.mode).put("contactType", ch.contactType).put("encryptSw", ch.encryptSw)
                 .put("hasKey", ch.encryptKey != null && !ch.encryptKey.isEmpty()).put("interrupt", ch.interrupt).put("sq", ch.sq)
-                .put("softSq", ch.softSq).put("softSqLevel", ch.softSqLevel);
+                .put("softSq", ch.softSq).put("softSqLevel", ch.softSqLevel).put("m17dest", ch.m17Dest());
         JSONArray g = new JSONArray(); for (int x : ch.groups) g.put(x); o.put("groups", g);
         return o;
     }
     /** The phone editor's checks (ChannelEditorView.apply), applied to a JSON body; returns null or the problem. */
-    static String applyChannel(ChannelStore.Channel ch, JSONObject b) {
+    public static String applyChannel(ChannelStore.Channel ch, JSONObject b) {
         try {
             ch.name = ChannelStore.fitName(b.optString("name", ch.name));
-            ch.type = b.optInt("type", ch.type) == 0 ? 0 : 1;
+            int asked = b.optInt("type", ch.type);
+            ch.type = asked == ChannelStore.Channel.TYPE_M17 ? ChannelStore.Channel.TYPE_M17 : asked == 0 ? 0 : 1;
             ch.txFreq = (int) Math.round(b.getDouble("txMHz") * 1e6);
             ch.rxFreq = (int) Math.round(b.getDouble("rxMHz") * 1e6);
             if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be 136–174 or 400–480 MHz";
@@ -300,6 +301,12 @@ public final class WebHost {
                 if (b.has("encryptKey")) ch.encryptKey = b.getString("encryptKey");            // absent: keep the stored key
                 if (ch.encryptSw == 1 && (ch.encryptKey == null || ch.encryptKey.length() != 8)) return "Encrypt key must be exactly 8 characters";
                 ch.interrupt = b.optInt("interrupt", ch.interrupt) == 1 ? 1 : 2;
+            } else if (ch.isM17()) {
+                ch.band = 1;
+                ch.cc = Math.max(0, Math.min(15, b.optInt("cc", ch.cc)));
+                if (b.has("m17dest")) ch.m17dest = ChannelStore.Channel.cleanM17Dest(b.optString("m17dest", ""));
+                ch.txType = 0; ch.rxType = 0; ch.txSubCode = 0; ch.rxSubCode = 0;
+                ch.softSq = false;
             } else {
                 ch.band = b.optInt("band", ch.band) == 0 ? 0 : 1;
                 ch.softSq = b.optBoolean("softSq", ch.softSq);

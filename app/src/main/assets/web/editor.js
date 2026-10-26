@@ -30,7 +30,7 @@ async function openEditor(number) {
 }
 
 function renderEditor() {
-  const c = ED.ch, digital = c.type === 0;
+  const c = ED.ch, digital = c.type === 0, m17 = c.type === 2;
   $('edTitle').textContent = ED.vfo ? 'VFO' : ED.isNew ? 'NEW CHANNEL' : 'EDIT CHANNEL';
   $('edSub').textContent = ED.vfo ? (ED.vfoActive ? 'ON' : 'OFF') : ED.isNew ? '' : 'CHANNEL ' + c.number;
   $('edEmpty').classList.add('hidden'); $('edForm').classList.remove('hidden');
@@ -44,7 +44,7 @@ function renderEditor() {
   let h = '';
   h += '<div class="sect">' + (ED.vfo ? 'FREQUENCY' : 'CHANNEL') + '</div>';
   if (!ED.vfo) h += field('name', 'Channel name', txt('fName', (c.name || '').slice(0, ED.nameMax), 'maxlength="' + ED.nameMax + '"') + '<div class="count" id="fNameCount"></div>');
-  h += field('type', 'Channel type', sel('fType', [[0, 'Digital'], [1, 'Analog']], c.type));
+  h += field('type', 'Channel type', sel('fType', [[0, 'Digital'], [1, 'Analog'], [2, 'M17']], c.type));
   h += field('tx', 'Send frequency (MHz)', txt('fTx', mhzIn(c.txFreq), 'inputmode="decimal"'));
   h += field('rx', 'Receive frequency (MHz)', txt('fRx', mhzIn(c.rxFreq), 'inputmode="decimal"'));
   h += field('power', 'Power', sel('fPower', [[0, 'Low power'], [1, 'High power']], c.power));
@@ -61,6 +61,10 @@ function renderEditor() {
     h += field('encrypt', 'Encrypt', sel('fEnc', [[2, 'Disabled'], [1, 'Enabled']], c.encryptSw === 1 ? 1 : 2));
     h += field('key', 'Encrypt key (8 characters)', txt('fKey', '', 'maxlength="8" placeholder="' + (c.hasKey ? 'Set (leave empty to keep)' : 'Not set') + '"'));
     h += field('interrupt', 'Interrupt transmission', sel('fInt', [[2, 'OFF'], [1, 'ON']], c.interrupt === 1 ? 1 : 2));
+  } else if (m17) {
+    h += '<div class="sect">M17</div>';
+    h += field('m17dest', 'Destination (@ALL or a callsign)', txt('fM17', c.m17dest || '@ALL', 'maxlength="9" autocapitalize="characters"'));
+    h += field('can', 'Channel access number', sel('fCan', range(0, 15), c.cc || 0));
   } else {
     h += '<div class="sect">ANALOG (FM)</div>';
     h += field('band', 'Band', sel('fBand', [[0, 'Narrow band'], [1, 'Wide band']], c.band === 0 ? 0 : 1));
@@ -113,6 +117,7 @@ function collect(keepOnly) {
   if ($('fCc')) Object.assign(o, { cc: +v('fCc'), mode: +v('fMode'), slot: +v('fSlot'), contactType: +v('fCtype'), txContact: v('fCall'), groups: v('fGroups'), encryptSw: +v('fEnc'), interrupt: +v('fInt') });
   if ($('fKey') && v('fKey')) o.encryptKey = v('fKey');
   if ($('fBand')) Object.assign(o, { band: +v('fBand'), softSq: v('fSoft') === '1', softSqLevel: +v('fSoftLvl'), sq: +v('fSq'), txType: +v('fTxType'), txSubCode: +v('fTxCode'), rxType: +v('fRxType'), rxSubCode: +v('fRxCode') });
+  if ($('fM17')) Object.assign(o, { m17dest: v('fM17'), cc: +v('fCan') });
   if (keepOnly) {   // map back onto the channel object's own field names
     return { name: o.name, txFreq: Math.round((o.txMHz || 0) * 1e6), rxFreq: Math.round((o.rxMHz || 0) * 1e6), power: o.power, relay: o.relay, rxOnly: o.rxOnly,
       lat: o.lat ? parseFloat(o.lat) : undefined, lon: o.lon ? parseFloat(o.lon) : undefined };
