@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Promiscuous DMR receive: MON on FW26, colour code and slot shown
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Route-list item 10, SignalDeck side (firmware FW26 by Grok Build; bench with the hotspot) | On a digital channel with the bench firmware FW26 or later, MON also sets the module's promiscuous flag (command 0x40 op 15: every call admitted whatever its talkgroup, ID or colour code) and clears it when MON goes off or the channel changes; after a module restart MON is re-sent with it. The 0x2B caller-info body may carry two more bytes, the received colour code and time slot; the caller line, the history line and the DMR event feed show them (CC 1 TS 2). Stock firmware: unchanged (nine-byte body, MON is the radio's own monitor). SignalDeck Web's status carries `promiscuous`. Help: On the intercom → Monitor. | `RadioEngine.java` (`parseCallerInfo`, the event gains cc/slot), `RadioService.java` (`promiscuousCapable/On`, `sendPromiscuous`, caller line), `web/WebHost.java`, `ui/HelpView.java`, `CallerInfoTest.java` | host: `CallerInfoTest` (9- and 11-byte bodies); device: not yet, needs FW26 and the hotspot's A/B rows (phonedmrapp `tools/dmr-replay/capture-matrix.csv`) |
+
 ## 2026-10-25 — Receive calibration from a call
 
 | Backlog | Change | Files | Test |

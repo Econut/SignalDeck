@@ -956,10 +956,11 @@ public class RadioService extends Service implements RadioEngine.Events {
     public boolean rxAudioOn() { return rxAudioOn; }
 
     // ---- DMR call events, for the DMR audio check: reception start/stop and caller reports, with the audio counter ----
-    public static final class DmrEvent { public long ts; public String kind; public int type, caller, target; public long pcmBytes; public boolean digital; }
+    public static final class DmrEvent { public long ts; public String kind; public int type, caller, target; public int cc = -1, slot = -1; public long pcmBytes; public boolean digital; }
     private final java.util.ArrayDeque<DmrEvent> dmrEvents = new java.util.ArrayDeque<>();
-    private void dmrEvent(String kind, int type, int caller, int target) {
-        DmrEvent e = new DmrEvent(); e.ts = System.currentTimeMillis(); e.kind = kind; e.type = type; e.caller = caller; e.target = target; e.pcmBytes = rxAudioBytes();
+    private void dmrEvent(String kind, int type, int caller, int target) { dmrEvent(kind, type, caller, target, -1, -1); }
+    private void dmrEvent(String kind, int type, int caller, int target, int cc, int slot) {
+        DmrEvent e = new DmrEvent(); e.ts = System.currentTimeMillis(); e.kind = kind; e.type = type; e.caller = caller; e.target = target; e.cc = cc; e.slot = slot; e.pcmBytes = rxAudioBytes();
         ChannelStore.Channel c = current; e.digital = c != null && c.isDigital();
         synchronized (dmrEvents) { dmrEvents.addLast(e); while (dmrEvents.size() > 200) dmrEvents.removeFirst(); }
     }
@@ -1114,6 +1115,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     engine.setMonitor(false); engine.setSquelch(hardwareSq(ch));
                     what[0] = "channel (0x23), monitor 2 (0x2F), squelch " + hardwareSq(ch) + " (0x30)";
                 } else { engine.setMonitorRaw(0); what[0] = "monitor 0 (0x2F)"; }
+                if (monitorOn && promiscuousCapable()) sendPromiscuousNow(false);
                 monitorOn = false;
             } catch (Throwable t) { what[0] = "failed: " + t; }
             done.countDown();
@@ -1156,8 +1158,29 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void setMonitor(final boolean on) {
         monitorOn = on; monRetries = 0;
         sendMonitor(on);
+        if (promiscuousCapable()) sendPromiscuous(on);
         pushModes();
     }
+
+    /** The first bench image whose receive handler admits every call while the flag is on (promiscuous receive, phonedmrapp docs/promiscuous-rx-patch-spec-2026-10-24.md). */
+    static final int PROMISCUOUS_FW = 26;
+    /** True when MON on this channel also means "every call": a digital channel and a module running FW26 or later. */
+    public boolean promiscuousCapable() {
+        ChannelStore.Channel ch = current;
+        return ch != null && ch.isDigital() && Firmware.stubTag(moduleVersion) && Firmware.tagNumber(moduleVersion) >= PROMISCUOUS_FW;
+    }
+    /** MON is on and the module is admitting every call (talkgroup, ID and colour code ignored), so the caller line carries CC and slot. */
+    public boolean promiscuousOn() { return monitorOn && promiscuousCapable(); }
+    /** Command 0x40 op 15: body {15, 1} on / {15, 0} off; the reply body echoes the flag. Stock firmware has no 0x40, so this is sent only behind promiscuousCapable(). */
+    private void sendPromiscuous(final boolean on) { worker.execute(() -> sendPromiscuousNow(on)); }
+    private void sendPromiscuousNow(boolean on) {
+        try {
+            Frame f = engine.diag40(new byte[] { 15, (byte) (on ? 1 : 0) }, 1000);
+            log("promiscuous " + (on ? "on" : "off") + (f == null ? ": no answer" : ": sr=" + f.sr + (f.body != null && f.body.length > 0 ? " flag=" + (f.body[0] & 0xFF) : "")));
+            if (f == null || f.sr != 0) history("warn", "WARN The module did not take the promiscuous flag (MON is the radio's own monitor only)".replace("WARN", String.valueOf(WARN_CHAR)));
+        } catch (java.io.IOException e) { log("promiscuous: " + e); }
+    }
+    private static final char WARN_CHAR = (char) 0x26A0;
     /** When the radio last acknowledged MON (0x2F), and when it was last sent: the Xplore 1 sometimes does not answer at all. */
     private volatile long monAckAt, monSentAt;
     public long monAckAt() { return monAckAt; }
@@ -1418,8 +1441,10 @@ public class RadioService extends Service implements RadioEngine.Events {
             ChannelStore.Channel was = current;
             boolean moved = was == null || was.number != ch.number || was.rxFreq != ch.rxFreq || was.type != ch.type;
             if (moved && monitorOn) {                                  // the module leaves monitor mode on a channel change: so does the button
+                boolean promisc = promiscuousCapable();            // judged on the channel being left
                 monitorOn = false;
                 try { engine.setMonitor(false); } catch (IOException e) { log("monitor: " + e); }
+                if (promisc) sendPromiscuousNow(false);
                 log("MON off: the channel changed");
             }
             current = ch; if (fromStore) store.setActive(ch.number);
@@ -2470,7 +2495,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 Thread.sleep(300);
                 boolean ok = versionHandshake(3000);
                 if (current != null) applyChannelNow(current, current.id > 0);
-                if (monitorOn) sendMonitor(true);
+                if (monitorOn) { sendMonitor(true); if (promiscuousCapable()) sendPromiscuous(true); }
                 if (rxAudioOn && audio != null) audio.startRx(true);
                 setLink("ready");
                 history("warn", ok ? "\u2714 The radio module was restarted and answers again" : "\u26A0 The radio module still does not answer after a restart. Restarting the phone usually fixes this; please send a device report");
@@ -2485,19 +2510,20 @@ public class RadioService extends Service implements RadioEngine.Events {
     public RadioEngine engine() { return engine; }
     /** One history line, voice announcement and caller report per call (the caller is asked at the start, a second in, and at the end). */
     private volatile boolean callLogged; private volatile int loggedCaller, loggedTarget;
-    @Override public void callerInfo(int type, int caller, int target) {
+    @Override public void callerInfo(int type, int caller, int target, int cc, int slot) {
         if (caller <= 0) return;
-        dmrEvent("caller", type, caller, target);
+        dmrEvent("caller", type, caller, target, cc, slot);
+        final String ccts = cc >= 0 ? "  CC " + cc + " TS " + (slot + 1) : "";   // appended by the promiscuous firmware while MON is on
         lastCaller = caller; lastCallType = type; lastTarget = target;
         refreshControls();   // the car screens show who is talking
         if (callLogged && caller == loggedCaller && target == loggedTarget) return;
         callLogged = true; loggedCaller = caller; loggedTarget = target;
         String t = (type == 1 ? "TG " + target : type == 2 ? "All call" : "Private") ;
         String who = callerName(caller);
-        history("dmr", "📻 Voice RX " + t + " from " + (who.isEmpty() ? String.valueOf(caller) : who + " (" + caller + ")"));
+        history("dmr", "📻 Voice RX " + t + " from " + (who.isEmpty() ? String.valueOf(caller) : who + " (" + caller + ")") + ccts);
         try { ChannelStore.Contact pc = store.contactByNumber(caller, 0); if (pc != null) store.contactHeard(pc.id, System.currentTimeMillis(), "DMR voice", t + (current != null ? " on " + current.name : ""), Double.NaN, Double.NaN); } catch (Throwable e) { }
         if (logHeard()) { RadioIdStore.Record rr = radioId != null ? radioId.lookup(caller) : null; ChannelStore.Channel lc = current; if (rr != null && rr.callsign != null && !rr.callsign.isEmpty()) try { logbook().heard(rr.callsign, lc != null ? lc.rxFreq : 0, "DMR", rr.first, t + ", DMR ID " + caller); enrichCall(rr.callsign, null); } catch (Throwable x) { log("logbook: " + x); } }
-        ui.post(() -> { for (Listener l : listeners) l.onCaller((who.isEmpty() ? "ID " + caller : who + "  " + caller) + "  " + t); });
+        ui.post(() -> { for (Listener l : listeners) l.onCaller((who.isEmpty() ? "ID " + caller : who + "  " + caller) + "  " + t + ccts); });
         if (voiceOn() && !who.isEmpty()) say(who.split(" ")[0]);
     }
     @Override public void ack(int cmd, boolean ok) {

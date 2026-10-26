@@ -28,7 +28,8 @@ public final class RadioEngine implements UartPort.Listener {
         void status(int code, String name);             // 0x36 push: RECEIVE_START…
         void rssi(int raw, double dbm);
         void version(int version, String text);
-        void callerInfo(int callType, int callerId, int target);
+        /** 0x2B caller info; {@code cc} and {@code slot} are the received colour code and time slot (0 or 1) when the module appended them (FW26 promiscuous receive), else -1. */
+        void callerInfo(int callType, int callerId, int target, int cc, int slot);
         void ack(int cmd, boolean ok);
         void booted(String banner);
         void sms(int type, int fromId, String text);          // 0x2D reply
@@ -210,6 +211,21 @@ public final class RadioEngine implements UartPort.Listener {
     public void queryVersion() throws IOException { send(Frame.request(CMD_VERSION, (byte) 1)); }
     public void queryRssi() throws IOException { send(Frame.request(CMD_RSSI, (byte) 1)); }
     public void queryCallerInfo() throws IOException { send(Frame.request(CMD_CALLER_INFO, (byte) 1)); }
+
+    /**
+     * The 0x2B body: {@code [0]} call type (0 private, 1 group), {@code [1..4]} caller ID LE (24 bits used),
+     * {@code [5..8]} target LE (own ID or talkgroup). A module with the promiscuous-receive firmware (FW26) appends
+     * {@code [9]} the received colour code and {@code [10]} the received time slot while the mode is on; the stock
+     * 9-byte body gives -1 for both. Returns {type, caller, target, cc, slot}, or null when the body is too short.
+     */
+    public static int[] parseCallerInfo(byte[] b) {
+        if (b == null || b.length < 9) return null;
+        ByteBuffer bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
+        int type = bb.get() & 0xFF; int caller = bb.getInt() & 0xFFFFFF; int target = bb.getInt();
+        int cc = -1, slot = -1;
+        if (b.length >= 11) { cc = b[9] & 0x0F; slot = b[10] & 0x01; }
+        return new int[] { type, caller, target, cc, slot };
+    }
     public void setTot(int seconds) throws IOException { send(Frame.request(CMD_TOT, (byte) seconds)); }
     public void setVolume(int v) throws IOException { send(Frame.request(CMD_VOLUME, (byte) v)); }
     public void setMic(int gain) throws IOException { send(Frame.request(CMD_MIC, (byte) gain)); }
@@ -335,13 +351,11 @@ public final class RadioEngine implements UartPort.Listener {
             case CMD_VERSION:
                 if (b.length >= 4) ev.version(ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN).getInt(), new String(b).trim());
                 break;
-            case CMD_CALLER_INFO:
-                if (b.length >= 9) {
-                    ByteBuffer bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
-                    int type = bb.get() & 0xFF; int caller = bb.getInt() & 0xFFFFFF; int target = bb.getInt();
-                    ev.callerInfo(type, caller, target);
-                }
+            case CMD_CALLER_INFO: {
+                int[] ci = parseCallerInfo(b);
+                if (ci != null) ev.callerInfo(ci[0], ci[1], ci[2], ci[3], ci[4]);
                 break;
+            }
             case CMD_FETCH_SMS:
                 if (b.length >= 5) {
                     ByteBuffer bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
