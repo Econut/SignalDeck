@@ -4,6 +4,13 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Device report: no DMR IDs in logged radio frames; the stock app's module answers in the summary
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Queue item 4, privacy row (Armor 3WT report 2026-10-25) | The stock app's log in a device report carried the tester's radio ID: the Agold phones' intercom app logs its channel writes as hex (`7E 96 69 …`, spaced or as one run), and the report's mask only caught decimal numbers. New `AgoldFrames` finds those frames in any log line the report keeps and blanks, as `##`: the own radio ID, the call number and the encryption key of a digital channel write (DMR09 `0x22`, 163-byte body: bytes 8–11, 140–143, 151–158; older set `0x36`, 156 bytes: 9–12, 15–18, 20–27; any other length: everything from the ID on), the whole body of caller info, texts and encryption commands (`0x29`, `0x2B`–`0x2D`, `0x10`, `0x11`), and each such frame's checksum. Frames cut short by the log are handled; the frame hex is no longer chewed up by the long-number mask, so the rest stays readable. | `AgoldFrames.java` (new), `DeviceReport.java` (`mask`), `ui/HelpView.java`, `AgoldFramesTest.java` (new) | Host: synthetic frames for both layouts (spaced, one run, cut short), texts, version replies and the phone-side MCU left alone, the report mask. Run over the two Agold tester reports on the host (not in the repo): 3 lines changed in each, IDs blanked. **Device test owed** (no Agold phone here). |
+| Queue item 4 (Atom XL and 3WT reports) | Run all checks said "radio module answered the version query: no" on both Agold phones although their stock apps' logs show the module answering. The stock-app watch now adds "module replies in its log: …" (count, the version string from `0x34`/`0x25`, which commands were accepted or refused), and when SignalDeck's probe got no answer the summary adds "but the module answered the stock app …: the module works; SignalDeck's probe did not reach the port it is on". | `AgoldFrames.java`, `FirstRunCheck.java` | Host: replies only (route 01, rw 00), MCU frames ignored, the watch line read back. On the two tester reports: 6 answers each, with the module version. |
+
 ## 2026-10-25 — Contacts: callsign, pager RICs, notes, two locations, history; channel history
 
 | Backlog | Change | Files | Test |

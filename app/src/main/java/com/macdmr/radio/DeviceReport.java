@@ -492,6 +492,15 @@ public final class DeviceReport {
 
     /** Long numbers (DMR IDs, phone numbers), e-mail addresses and amateur callsigns. */
     static String mask(String line) {
+        line = AgoldFrames.redact(line);                                       // the radio frames' own private bytes; their hex is left alone below
+        java.util.List<int[]> frames = AgoldFrames.spans(line);
+        if (frames.isEmpty()) return maskText(line);
+        StringBuilder out = new StringBuilder(); int at = 0;
+        for (int[] f : frames) { out.append(maskText(line.substring(at, f[0]))).append(line, f[0], f[1]); at = f[1]; }
+        return out.append(maskText(line.substring(at))).toString();
+    }
+
+    private static String maskText(String line) {
         return line.replaceAll("\\b\\d{6,}\\b", "######").replaceAll("[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}", "***@***")
                 .replaceAll("(?<![\\w.])[A-Z]{1,2}[0-9][A-Z]{1,3}(-[0-9]{1,2})?(?![\\w.])", "CALL");   // not inside a dotted firmware name (DMR003.UV4T.V022)
     }
