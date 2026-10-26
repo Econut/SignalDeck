@@ -51,14 +51,14 @@ public class RamStreamTest {
         assertNull(RamStream.parse(null));
     }
 
-    @Test public void countsSkippedSequencesAndRepeatedHalfIds() {
+    @Test public void countsSkippedSequencesOnly() {
         RamStream.Receiver r = new RamStream.Receiver(null);
-        r.half(RamStream.parse(body(0, 1, ramp(0))));
+        r.half(RamStream.parse(body(0, 0, ramp(0))));
         r.half(RamStream.parse(body(1, 0, ramp(0))));
         r.half(RamStream.parse(body(3, 0, ramp(0))));     // 2 skipped: one miss
-        r.half(RamStream.parse(body(4, 0, ramp(0))));     // same half id twice in a row: one miss
-        r.half(RamStream.parse(body(5, 1, ramp(0))));
-        assertEquals(5, r.halves()); assertEquals(2, r.missed());
+        r.half(RamStream.parse(body(4, 0, ramp(0))));     // the same half id again is not a miss (FW27 reports 0 for every half)
+        r.half(RamStream.parse(body(5, 0, ramp(0))));
+        assertEquals(5, r.halves()); assertEquals(1, r.missed());
         assertEquals(5 * 256 / 8000.0, r.seconds(), 1e-9);
     }
 

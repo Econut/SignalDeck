@@ -13,7 +13,7 @@ import java.util.Locale;
  * module's mode 5 applied and the UART at 230400, command 0x40 op 17 pushes every completed half of the HR-C7000's FM
  * receive RAM as one unsolicited 0x40 frame. FW27 reuses op 5's copy-and-send, so the body is op 5's: 256 big-endian
  * 16-bit samples at 8 kHz in bytes 0..511, then the sequence byte at 512 (op 5 counts 0..5; a free-running 0..255 is
- * taken too) and the half id (0 or 1, alternating) at 513. The older 516-byte form (opcode 17, a 16-bit sequence, the
+ * taken too) and the half id at 513 (informational; FW27 reports 0 for consecutive halves, so misses are counted by the sequence alone). The older 516-byte form (opcode 17, a 16-bit sequence, the
  * half id, then the samples) is still parsed. That baseband is the FM
  * discriminator before the phone's audio path, flat down to 50 Hz, so M17 can be decoded from it without the
  * equaliser the audio path needs. A skipped sequence number, or two frames in a row with the same half id, is a
@@ -75,7 +75,7 @@ public final class RamStream {
             if (started) {
                 int expect = (lastSeq + 1) % seqMod;
                 if (h.seq != expect) missed += ((h.seq - expect) % seqMod + seqMod) % seqMod;
-                else if (h.id == lastId) missed++;              // the sequence said nothing was lost, the half id says one was
+                // The half id is informational only: op 5 on FW27 reported id 0 for consecutive halves (bench 2026-10-26 11:41), so it cannot count misses.
             }
             started = true; lastSeq = h.seq; lastId = h.id; halves++; samples += h.samples.length;
             byte[] le = new byte[2 * h.samples.length];
