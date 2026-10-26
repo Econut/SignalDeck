@@ -49,10 +49,12 @@ public final class FirstRunCheck {
         p.step("Press and release the side PTT key a few times now (10 s)");
         DeviceReport.append("PTT key capture", DeviceReport.captureKeys(c, 10));
 
+        String stockAnswers = null;                                              // module replies found in the stock app's own log
         if (watchPkg != null && !svc.isReady() && RootSetup.haveRoot()) {
             String w = watchStockApp(watchPkg, p);
             DeviceReport.append("The stock app at work (" + watchPkg + ", 15 s, receive only)", w);
             sum.append("watched ").append(watchPkg).append(" start up for 15 s\n");
+            stockAnswers = stockAnswers(w);
         } else sum.append("stock app not watched: ").append(watchPkg == null ? "skipped (no app chosen)" : svc.isReady() ? "SignalDeck owns the radio" : "no root").append('\n');
 
         if (!svc.isReady() && !dp.stockApp.isEmpty() && RootSetup.haveRoot() && !RootSetup.run("pidof " + dp.stockApp + " || true").replaceAll("[^0-9]", "").isEmpty())
@@ -69,6 +71,8 @@ public final class FirstRunCheck {
                 answered = r2.contains("answered");
             }
             sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');
+            if (!answered && stockAnswers != null)
+                sum.append("  but ").append(stockAnswers).append(": the module works; SignalDeck's probe did not reach the port it is on\n");
         }
 
         if (trial && dp.supported && !svc.isReady()) {
@@ -117,6 +121,16 @@ public final class FirstRunCheck {
         return r.toString();
     }
 
+    static final String STOCK_ANSWERS = "module replies in its log: ", NONE_RECOGNISED = "none recognised";
+
+    /** The module-replies line of a stock-app watch, or null when it found none. */
+    static String stockAnswers(String watch) {
+        int a = watch.indexOf(STOCK_ANSWERS); if (a < 0) return null;
+        int from = a + STOCK_ANSWERS.length(), end = watch.indexOf('\n', from);
+        String t = watch.substring(from, end < 0 ? watch.length() : end).trim();
+        return t.isEmpty() || t.equals(NONE_RECOGNISED) ? null : t;
+    }
+
     private static final String KMSG = "dmesg 2>/dev/null | grep -i -E 'intercom|dmr|interphone|walkie|ptt|pwd|pdt|ttyS|ttyMT' | tail -40";
 
     /**
@@ -142,6 +156,10 @@ public final class FirstRunCheck {
                 r.append("  ").append(dev).append(": ").append(RootSetup.run("stty -F " + dev + " -a 2>&1 | head -2").replace('\n', ' ')).append('\n');
         } else r.append("not running after 8 s (pid: ").append(pid).append(")\n");
         Thread.sleep(7000);
+        if (pid.matches("\\d+")) {                                            // again at the end: a daemon-backed app (Armor 3WT) connects only after start-up
+            r.append("at the end of the watch it holds: ").append(RootSetup.run("ls -l /proc/" + pid + "/fd 2>/dev/null | grep -o '/dev/[A-Za-z0-9_/]*' | sort -u").replace('\n', ' ')).append('\n');
+            r.append("its TCP connections: ").append(DeviceReport.tcpOf(RootSetup.run("cat /proc/net/tcp /proc/net/tcp6 2>/dev/null"), RootSetup.run("ls -l /proc/" + pid + "/fd 2>/dev/null"))).append('\n');
+        }
         String log = pid.matches("\\d+") ? RootSetup.run("logcat -d --pid=" + pid + " 2>/dev/null | tail -600") : RootSetup.run("logcat -d 2>/dev/null | tail -400");
         int hexLines = 0; StringBuilder kept = new StringBuilder();
         for (String l : log.split("\n")) {
@@ -149,6 +167,8 @@ public final class FirstRunCheck {
             if (l.matches(".*[0-9A-Fa-f ,]{120,}.*")) { hexLines++; if (hexLines <= 3) kept.append(l, 0, Math.min(l.length(), 260)).append(" …\n"); continue; }   // data dumps: a sample is enough
             kept.append(l.length() > 260 ? l.substring(0, 260) + " …" : l).append('\n');
         }
+        String ans = AgoldFrames.answers(log);
+        r.append(STOCK_ANSWERS).append(ans == null ? NONE_RECOGNISED : ans).append('\n');
         r.append("\nits log (").append(hexLines).append(" data-dump lines shortened to 3 samples; personal details removed):\n").append(DeviceReport.redact(kept.toString()));
         String kAfter = RootSetup.run(KMSG);
         r.append("\nradio driver kernel messages that appeared meanwhile:\n").append(newLines(kBefore, kAfter));

@@ -1,0 +1,157 @@
+/*
+ * SignalDeck - Copyright (C) 2026 IIMacGyverII
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Free software under the GNU General Public License v3 or later, with the additional terms in COPYRIGHT
+ * (keep this notice and the author credit, mark modified versions, no rights to the SignalDeck name or icon).
+ */
+package com.macdmr.radio;
+
+import android.content.Context;
+import android.os.Build;
+import android.os.Environment;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
+/**
+ * Device report, opt-in (root): finds the radio firmware files a phone carries, so a new phone's module and MCU images
+ * can be identified (and, if the owner chooses, handed over privately) without anyone digging through the phone by hand.
+ * Lists name, size, SHA-256 and any module version strings found inside; copies only the files the owner ticks, into
+ * Download/DMR/FoundFirmware/&lt;model&gt;/ (not under Download/DMR/Firmware, which the module loader reads) with a SOURCES.txt. Nothing is sent anywhere and nothing is written to the
+ * phone's own partitions. These files belong to the phone maker: they never go into a public repository.
+ */
+public final class FirmwareFinder {
+    private FirmwareFinder() { }
+
+    /** Folders where the phones seen so far keep radio images (Armor 3WT: /system/data/{mcu,dmr}, /sdcard/intercom/dmr; Atom XL: /vendor/data/mcu). */
+    static final String[] FOLDERS = { "/vendor/data/mcu", "/vendor/data/dmr", "/system/data/mcu", "/system/data/dmr", "/odm/data/mcu",
+            "/sdcard/intercom/dmr", "/sdcard/intercom/mcu", "/sdcard/DMR", "/vendor/firmware", "/odm/firmware", "/system/etc/firmware" };
+    /** In the shared firmware folders only names like these are radio images (the rest is Wi-Fi, camera, touch...). */
+    private static final Pattern RADIO_NAME = Pattern.compile("(?i).*(dmr|mcu|intercom|interphone|walkie|ptt|agold|at1846|hrc|c7000|c5000|bk48|sa8[0-9]{2}|rda18|uv4t|u4a).*");
+    /** Image-like files inside an APK. */
+    private static final Pattern APK_IMAGE = Pattern.compile("(?i)(assets|res/raw)/.*\\.(bin|hex|img|fw|dfu)$");
+    /** Module version strings: Ulefone/Agold "DMR003.UV4T.V022", the Armor 3WT's "ver0.5.4_470M_TONE". */
+    private static final Pattern VERSION = Pattern.compile("DMR\\d{3}\\.[A-Za-z0-9]{2,8}\\.V\\d{2,4}|ver\\d+\\.\\d+\\.\\d+_[A-Za-z0-9_]{2,24}");
+    static final long MAX_BYTES = 32L << 20;
+
+    /** One file found. {@code source} is a path, or "apk-path!entry" for a file inside an APK. */
+    public static final class Found {
+        public final String source; public final long size; public String sha256 = "", versions = "";
+        File cached;                                                       // a copy readable by the app (root-only files), deleted after use
+        Found(String source, long size) { this.source = source; this.size = size; }
+        public String name() { int s = Math.max(source.lastIndexOf('/'), source.lastIndexOf('!')); return source.substring(s + 1); }
+        public String line() { return String.format(Locale.US, "%s  %d bytes  sha256 %s%s", source, size, sha256, versions.isEmpty() ? "" : "  contains " + versions); }
+    }
+
+    /** The radio firmware files on this phone. Off the main thread; needs root for the system folders. */
+    public static List<Found> scan(Context c, List<String> stockApks, Progress p) {
+        List<Found> out = new ArrayList<>();
+        File tmp = new File(c.getCacheDir(), "fwfind"); tmp.mkdirs();
+        boolean root = RootSetup.haveRoot();
+        for (String dir : FOLDERS) {
+            p.step("Looking in " + dir);
+            boolean shared = dir.endsWith("/firmware");
+            String ls = root ? RootSetup.run("find " + dir + " -maxdepth 2 -type f 2>/dev/null | head -200") : "";
+            for (String path : ls.split("\n")) {
+                path = path.trim(); if (path.isEmpty() || (shared && !RADIO_NAME.matcher(path).matches())) continue;
+                long size = parseLong(RootSetup.run("stat -c %s '" + path + "' 2>/dev/null").trim());
+                Found f = new Found(path, size);
+                if (size > 0 && size <= MAX_BYTES) {
+                    File copy = new File(tmp, "f" + out.size());
+                    RootSetup.run("cat '" + path + "' > '" + copy.getAbsolutePath() + "' && chmod 644 '" + copy.getAbsolutePath() + "'");
+                    if (copy.length() == size) { f.cached = copy; digest(f); }
+                }
+                out.add(f);
+            }
+        }
+        for (String apk : stockApks) {
+            p.step("Looking in " + new File(apk).getName());
+            try (ZipFile z = new ZipFile(apk)) {
+                for (Enumeration<? extends ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
+                    ZipEntry ze = e.nextElement();
+                    if (ze.isDirectory() || !APK_IMAGE.matcher(ze.getName()).matches() || ze.getSize() > MAX_BYTES) continue;
+                    Found f = new Found(apk + "!" + ze.getName(), ze.getSize());
+                    File copy = new File(tmp, "f" + out.size());
+                    try (InputStream in = z.getInputStream(ze); OutputStream o = new FileOutputStream(copy)) { pipe(in, o); }
+                    f.cached = copy; digest(f);
+                    out.add(f);
+                }
+            } catch (Throwable t) { out.add(new Found(apk + "! (could not read: " + t.getMessage() + ")", 0)); }
+        }
+        return out;
+    }
+    public interface Progress { void step(String s); }
+
+    /** The report section: one line per file, then what to do with them. */
+    public static String describe(List<Found> fs) {
+        if (fs.isEmpty()) return "no radio firmware files found in " + String.join(", ", FOLDERS) + " or in the stock app\n";
+        StringBuilder s = new StringBuilder();
+        for (Found f : fs) s.append("  ").append(f.line()).append('\n');
+        return s.append("Nothing was copied or sent. Copy files only if the SignalDeck maintainer asks for them, and hand them over privately: they are the phone maker's.\n").toString();
+    }
+
+    /** Copy the ticked files into Download/DMR/FoundFirmware/<model>/ with SOURCES.txt; returns the folder. */
+    public static File copy(List<Found> ticked) throws Exception {
+        File dir = new File(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "DMR/FoundFirmware"), safe(Build.MANUFACTURER + "_" + Build.MODEL));
+        if (!dir.mkdirs() && !dir.isDirectory()) throw new Exception("cannot create " + dir);
+        StringBuilder src = new StringBuilder("Radio firmware files copied by SignalDeck " + BuildConfig.VERSION_NAME + " from " + Build.MANUFACTURER + " " + Build.MODEL + " (" + Build.DISPLAY + ")\n"
+                + "These belong to the phone maker. Share them only privately, never in a public place.\n\n");
+        Set<String> used = new LinkedHashSet<>();
+        for (Found f : ticked) {
+            if (f.cached == null || !f.cached.isFile()) { src.append("not copied (unreadable): ").append(f.source).append('\n'); continue; }
+            String name = uniqueName(used, safe(f.name()));
+            try (InputStream in = new FileInputStream(f.cached); OutputStream o = new FileOutputStream(new File(dir, name))) { pipe(in, o); }
+            src.append(name).append("  <-  ").append(f.line()).append('\n');
+        }
+        try (OutputStream o = new FileOutputStream(new File(dir, "SOURCES.txt"))) { o.write(src.toString().getBytes("UTF-8")); }
+        return dir;
+    }
+
+    /** Delete the app-private copies made by {@link #scan}. */
+    public static void cleanUp(Context c) { File[] fs = new File(c.getCacheDir(), "fwfind").listFiles(); if (fs != null) for (File f : fs) f.delete(); }
+
+    // ---- pure helpers (host-tested) ----
+
+    /** Module version strings in an image, each once, in order. */
+    static String versionsIn(byte[] b) {
+        StringBuilder ascii = new StringBuilder(b.length);
+        for (byte x : b) ascii.append(x >= 0x20 && x < 0x7F ? (char) x : '\n');
+        Set<String> v = new LinkedHashSet<>(); Matcher m = VERSION.matcher(ascii);
+        while (m.find() && v.size() < 6) v.add(m.group());
+        return String.join(", ", v);
+    }
+    static boolean radioName(String path) { return RADIO_NAME.matcher(path).matches(); }
+    static boolean apkImage(String entry) { return APK_IMAGE.matcher(entry).matches(); }
+    static String safe(String s) { String t = s.replaceAll("[^A-Za-z0-9._-]+", "_"); return t.isEmpty() ? "file" : t; }
+    static String uniqueName(Set<String> used, String name) {
+        String n = name; int k = 2;
+        while (!used.add(n)) { int dot = name.lastIndexOf('.'); n = dot > 0 ? name.substring(0, dot) + "_" + k + name.substring(dot) : name + "_" + k; k++; }
+        return n;
+    }
+    static String hex(byte[] d) { StringBuilder s = new StringBuilder(); for (byte x : d) s.append(String.format(Locale.US, "%02x", x & 0xFF)); return s.toString(); }
+
+    private static void digest(Found f) {
+        try (InputStream in = new FileInputStream(f.cached)) {
+            byte[] all = new byte[(int) Math.min(f.cached.length(), MAX_BYTES)]; int n = 0, r;
+            while (n < all.length && (r = in.read(all, n, all.length - n)) > 0) n += r;
+            f.sha256 = hex(MessageDigest.getInstance("SHA-256").digest(java.util.Arrays.copyOf(all, n)));
+            f.versions = versionsIn(all);
+        } catch (Throwable t) { f.sha256 = "(" + t.getMessage() + ")"; }
+    }
+    private static void pipe(InputStream in, OutputStream o) throws java.io.IOException { byte[] b = new byte[65536]; int n; while ((n = in.read(b)) > 0) o.write(b, 0, n); }
+    private static long parseLong(String s) { try { return Long.parseLong(s); } catch (Throwable t) { return -1; } }
+}
