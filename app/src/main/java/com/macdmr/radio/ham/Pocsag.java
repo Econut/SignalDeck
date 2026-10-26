@@ -21,8 +21,12 @@ public final class Pocsag {
     public static final int SYNC = 0x7CD215D8;
     public static final int IDLE = 0x7A89C197;
     private static final int G = 0x769;
-    /** TX-RAM counts for the two levels. FW21 at this amplitude, 1200 baud, measured body p99 4061 Hz. */
-    public static final int LEVEL = 7600;
+    /** TX-RAM counts per baud. A positive count deviates low, so the 0 bit uses the negative value. The 512-baud step is smaller: a long run of one bit at 7600 reached 6281 Hz. */
+    public static int level(int baud) {
+        if (baud == 512) return 4600;    // 5400 still reached 5199 Hz on a half-second slice
+        if (baud == 2400) return 7000;   // worst slice 4417 Hz
+        return 6500;                     // 7000 reached 4814 Hz on the three-address page
+    }
 
     public static final class Page {
         public final int ric, func;
@@ -94,6 +98,7 @@ public final class Pocsag {
             for (int k = 0; k < 16; k++) bits.addAll(wordBits(i + k < words.size() ? words.get(i + k) : IDLE));
             i += 16;
         } while (i < words.size());
+        bits.addAll(wordBits(IDLE));                                 // one idle word after the last batch, so the drop does not clip it
         int[] a = new int[bits.size()];
         for (int n = 0; n < a.length; n++) a[n] = bits.get(n);
         return a;
@@ -121,7 +126,7 @@ public final class Pocsag {
         return o;
     }
 
-    /** Op 8 body: hold shaping, two levels, the baud as a rational advance, amplitudes ±{@link #LEVEL}. */
+    /** Op 8 body: hold shaping, two levels, the baud as a rational advance, amplitudes ±{@link #level(int)}. */
     public static byte[] waveform(int baud) {
         int num, den;
         if (baud == 512) { num = 8; den = 125; }
@@ -131,7 +136,8 @@ public final class Pocsag {
         b[0] = 8; b[1] = 0; b[2] = 2;
         b[3] = (byte) num; b[4] = (byte) (num >> 8);
         b[5] = (byte) den; b[6] = (byte) (den >> 8);
-        put16(b, 7, -LEVEL); put16(b, 9, LEVEL);   // a positive count deviates low on this radio, so a 0 bit is the negative count and comes out positive
+        int level = level(baud);
+        put16(b, 7, -level); put16(b, 9, level);   // a positive count deviates low on this radio, so a 0 bit is the negative count and comes out positive
         return b;
     }
 

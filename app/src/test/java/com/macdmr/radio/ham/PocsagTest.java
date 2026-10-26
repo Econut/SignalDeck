@@ -63,8 +63,16 @@ public class PocsagTest {
         assertEquals(125, Pocsag.waveform(512)[5] & 0xFF);
         assertEquals(3, Pocsag.waveform(2400)[3] & 0xFF);          // 3/10
         assertEquals(10, Pocsag.waveform(2400)[5] & 0xFF);
-        assertEquals((byte) -7600, Pocsag.waveform(1200)[7]);          // 0 bit, low byte
-        assertEquals((byte) (-7600 >> 8), Pocsag.waveform(1200)[8]);  // 0 bit, high byte
+        assertEquals(4600, Pocsag.level(512));
+        assertEquals(6500, Pocsag.level(1200));
+        assertEquals(7000, Pocsag.level(2400));
+        assertEquals((byte) -6500, Pocsag.waveform(1200)[7]);
+        assertEquals((byte) (-6500 >> 8), Pocsag.waveform(1200)[8]);
+        assertEquals((byte) -4600, Pocsag.waveform(512)[7]);
+        int[] one = Pocsag.bits(Arrays.asList(new Pocsag.Page(8, 3, "X")));
+        int tail = 0;
+        for (int i = one.length - 32; i < one.length; i++) tail = (tail << 1) | one[i];
+        assertEquals(Pocsag.IDLE, tail);
         byte[] packed = Pocsag.pack(new int[] { 1, 0, 1, 1 });
         assertEquals(1, packed.length);
         assertEquals((byte) 0x45, packed[0]);                      // 1,0,1,1 in bits 7:6, 5:4, 3:2, 1:0 
