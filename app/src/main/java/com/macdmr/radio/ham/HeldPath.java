@@ -263,15 +263,16 @@ public final class HeldPath {
         if (from < 0) from = 0;
         if (from >= n) return new Live(new ArrayList<List<FrameHit>>(), n, false);
         if (n - from < 800) return new Live(new ArrayList<List<FrameHit>>(), from, false);   // too little new audio to search: keep it for the next pass (a pass that returned n here threw away up to 100 ms per poll)
-        // The saved clips, and a transmission with the 1.6 s lead, have a loud head before the link
-        // setup. Skip it only while the resume point is still in the mute. Once audio is loud, trimming
-        // again would drop the next frames.
+        // Skip a muted stretch in front of the resume point. Do not skip into the audio that follows:
+        // the batch trim drops a quarter-second of squelch burst, and that same jump eats the preamble
+        // of a call that starts right after silence.
         int origin = from;
         boolean mute = true;
         for (int i = from; i < Math.min(n, from + 80); i++) if (Math.abs(pcm[i]) > MUTE_PEAK) { mute = false; break; }
         if (mute) {
-            int loud = loudStart(pcm, n);
-            if (loud > origin) origin = loud;
+            int loud = from;
+            while (loud < n && Math.abs(pcm[loud]) <= MUTE_PEAK) loud++;
+            if (loud > origin && loud < n) origin = loud;
         }
         if (origin >= n) return new Live(new ArrayList<List<FrameHit>>(), n, false);
         // Past context for the matched filter and the equaliser (20 symbols either side): the search itself
@@ -292,7 +293,10 @@ public final class HeldPath {
         while (from48 < limit) {
             int[] at = firstSync(y, part, part.length, from48, limit);
             if (at == null) {
-                resume = chains.isEmpty() ? n : Math.max(origin, origin + from48 / 6 - 2);
+                // A sync in the equaliser's tail scores low, so it is not found yet. Leave the last
+                // frame and the filter's past to be searched again; consuming them drops the link setup.
+                int retry = Math.max(from, n - (PAST + 320));
+                resume = chains.isEmpty() ? retry : Math.max(origin, origin + from48 / 6 - 2);
                 break;
             }
             int pos = at[0]; boolean lsf = at[1] == 0;
@@ -301,6 +305,8 @@ public final class HeldPath {
             boolean abandoned = false, needMore = false, lost = false;
             while (pos + 192 * SPS <= y.length + 8 * SPS) {
                 int start = pos + 8 * SPS;
+                // The equaliser reads L symbols past the frame, plus a little. Wait until that is in the buffer.
+                if (start + (183 + L + 4) * SPS >= y.length) { needMore = true; break; }
                 float[] pay = payload(y, start, lsf ? SYNC_LSF : SYNC_STR);
                 if (pay == null) { needMore = true; break; }
                 double sc = score(y, pos, lsf ? SYNC_LSF : SYNC_STR, lsf ? SS_LSF : SS_STR);
@@ -319,8 +325,25 @@ public final class HeldPath {
                     }
                 }
                 if (best < LOST) {
-                    // The receiver polls while audio is still arriving. A sync within a few frames of the
-                    // end of this slice has not ended the transmission; the rest of the frame is not in yet.
+                    // Coast up to three frame periods. A short dropout is the same call when sync returns.
+                    int hopped = -1; boolean hopLsf = false;
+                    for (int hop = 1; hop <= 3; hop++) {
+                        int base = nxt + hop * 192 * SPS;
+                        if (base >= y.length) break;
+                        double hb = -1; int hp = base; boolean hl = false;
+                        for (int d = -(SPS / 2); d <= SPS / 2; d++) {
+                            int p = base + d;
+                            if (p < 0 || p >= y.length || !loudAt(part, part.length, p)) continue;
+                            for (int kind = 0; kind < 2; kind++) {
+                                boolean useLsf = kind == 1;
+                                double c = score(y, p, useLsf ? SYNC_LSF : SYNC_STR, useLsf ? SS_LSF : SS_STR);
+                                if (c > hb) { hb = c; hp = p; hl = useLsf; }
+                            }
+                        }
+                        if (hb >= LOST) { hopped = hp; hopLsf = hl; break; }
+                    }
+                    if (hopped >= 0) { pos = hopped; lsf = hopLsf; continue; }
+                    // Not enough audio yet to decide the dropout has lasted three frames.
                     if (nxt + 3 * 192 * SPS > y.length) needMore = true;
                     else lost = true;
                     break;

@@ -117,6 +117,21 @@ public class HeldPathReceiverTest {
         assertTrue("wrong payloads " + wrong, wrong <= 3);
     }
 
+    @Test public void oneSecondOfSilenceInTheMiddleStaysOneCall() throws Exception {
+        byte[] lsf = M17.lsf("N0CALL", "@ALL", 0x0005, null);
+        short[] tx = transmission(200, 6, lsf);
+        int hole = 4000 + 320 * 80, holeLen = 8000;            // one second, longer than three frames and shorter than the two-second end
+        short[] audio = concat(silence(4000), tx, silence(20000));
+        for (int i = hole; i < hole + holeLen && i < audio.length; i++) audio[i] = 0;
+        Log log = new Log();
+        HeldPathReceiver rx = new HeldPathReceiver(identity(), log, false);
+        run(rx, audio, 4);
+        for (int w = 0; log.ended.isEmpty() && w < 4; w++) { Thread.sleep(1100); rx.poll(); }
+        assertEquals("one start: " + log.started, 1, log.started.size());
+        assertEquals("one end: " + log.ended, 1, log.ended.size());
+        assertTrue(log.ended.get(0), log.ended.get(0).startsWith("last frame"));
+    }
+
     @Test public void pollingAfterEveryBlockLosesNothing() throws Exception {
         byte[] lsf = M17.lsf("N0CALL", "@ALL", 0x0005, null);
         short[] audio = concat(silence(4000), transmission(100, 5, lsf), silence(12000));

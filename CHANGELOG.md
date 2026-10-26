@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-26 — A long M17 call stays one listing
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| R-I, live receiver | A call longer than 20 seconds is one listing. Audio already given to the listener is dropped, keeping a short margin, so the buffer cap does not cut the call. A frame is decoded only when the equaliser's look-ahead is already in the buffer. Up to three missing frames are coasted, and the call ends on the end of transmission or two seconds of silence, so a one-second gap stays in the same listing. | `ham/HeldPath.java`, `ham/HeldPathReceiver.java`, `ui/HelpView.java` | host: `HeldPathReceiverTest` (30 s payload-exact, a three-frame dropout, a one-second gap, a pass after every block, two calls). The on-air pass follows. |
+
 ## 2026-10-25 — Promiscuous DMR receive: MON on FW26, colour code and slot shown
 
 | Backlog | Change | Files | Test |

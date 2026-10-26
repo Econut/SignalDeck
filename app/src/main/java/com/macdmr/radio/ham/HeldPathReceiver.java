@@ -20,8 +20,8 @@ import java.util.logging.Logger;
  * the listener is dropped from the buffer (keeping {@link #KEEP} samples for the filters' past), so a call is never
  * cut by the buffer cap; a frame whose end sits within {@link #EDGE} samples of the newest audio is left for the
  * next pass while audio is still arriving, because the equaliser and the matched filter would see zeros past it;
- * and a lost sync does not end the call by itself, only the end bit or a second of silence does, so a short dropout
- * is bridged when the sync comes back.
+ * and a lost sync does not end the call by itself, only the end bit or two seconds of silence does, so a
+ * one-second dropout is bridged when the sync comes back.
  */
 public final class HeldPathReceiver {
     public interface Listener {
@@ -37,7 +37,7 @@ public final class HeldPathReceiver {
     private static final int KEEP = 800;
     /** 8 kHz samples a frame must end before the newest audio while it is still arriving: the equaliser's 20 symbols past the frame (200 samples at 48 kHz) and the pulse span, with room. */
     static final int EDGE = 80;
-    private static final long QUIET_MS = 1000;
+    private static final long QUIET_MS = 2000;
 
     private final double[] taps;
     private final Listener listener;
