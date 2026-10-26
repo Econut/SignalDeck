@@ -102,6 +102,42 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 |---|---|---|---|
 | M17 TX | DIAG `m17 --ei mic` holds the microphone path (not the tone extra) for the given time, at most 12 s, and releases it. If `/sdcard/Download/sdvoice.wav` is present it is played on the alarm stream during that hold. Hidden bench extra; the in-app guide is unchanged. | `DiagReceiver.java` | Device, Wi-Fi adb, FW20, 467.625 MHz, low power: a 10 s hold. 247 of 247 frames, end bit set, EOT score 0.978. The host unkey followed the first status byte 4 by 13 ms, and the module sent status byte 4 again at 0.32 s. Codec 2 output is speech. |
 
+## 2026-10-24 — W6 replacement: runbook for dump and root
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Docs only. `docs/w6/REPLACEMENT.md` is the procedure for the replacement phone: identify the display id and the unlocked bootloader, Magisk-patch the dumped `boot_a`, flash it from fastboot, then `dd` `mmcblk0boot0` / `boot1` once `su` exists. `adb reboot autodloader` is marked do-not-run in the older handoff and resume notes (that command erased `splloader` on the bench unit). No phone was plugged in for this edit. | `docs/w6/REPLACEMENT.md`, `docs/w6/UBUNTU_DUMP_RESUME_2026-10-24.md`, `docs/w6/UBUNTU_DUMP_HANDOFF_2026-10-24.md`, `docs/w6/ROOT_ATTEMPT_2026-10-24.md`, `docs/W6_DEVICE_REPORT_PLAN.md` | No code change. Not device-tested. The Armor was not addressed. |
+
+## 2026-10-24 — W6 root: boot images dumped, phone still cannot boot
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Docs only. Read-only `spd_dump` (FDL1 `0x4ee8`, watch FDL2) pulled full `boot_a`, `vendor_boot_a`, `vbmeta_a`, `uboot_a`, `dtbo_a`, `dtb_a`, `misc`, `sml_a`, `teecfg_a`, and `trustos_a` through its signature block. Images are in gitignored `temp/w6-root/dump-20261024/`. `boot_a` is Android 12 header v4 with an lz4 newc cpio ramdisk (the Magisk input). `vbmeta_a` flags are 0 and `boot_a` has a signed AVB hash. `misc` requests one bootloader boot and slot `_a`. `splloader` is still empty, so this unit still cannot boot and cannot take Magisk. Nothing was written. | `docs/w6/ROOT_ATTEMPT_2026-10-24.md`, `docs/w6/UBUNTU_DUMP_RESUME_2026-10-24.md`, `docs/w6/reports/20261024_root/dump/SHA256SUMS` | No code change. **Device: W6**, read-only `spd_dump`. No flash write. The Armor was not addressed. |
+
+## 2026-10-24 — W6 root: cold boot is BootROM, splloader reads empty
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Docs only. After the halted FDL2 upload, a battery pull still comes back as `1782:4d00` with banner `SPRD3`. FDL1 `0x4ee8` runs; its `reset` command times out and wedges USB. Watch FDL2 executes, reports an incompatible partition, and named reads work. `splloader` and `splloader_bak` are 256 KiB of zeros. `boot_a`, `uboot_a`, `vbmeta_a`, `sml_a`, `teecfg_a`, and `trustos_a` still have signed headers. Nothing was written. The watch SPL in the PAC head was not flashed. | `docs/w6/ROOT_ATTEMPT_2026-10-24.md`, `docs/w6/UBUNTU_DUMP_RESUME_2026-10-24.md`, `docs/w6/reports/20261024_root/dump/` | No code change. **Device: W6**, read-only `spd_dump` (FDL1, FDL2, partition reads). No flash write. The Armor was not addressed. |
+
+## 2026-10-24 — W6 root: hand off the read-only dump to an Ubuntu VM
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Docs only. Owner green-lit one read-only spd_dump with a borrowed DW99 `sl8541e_1h10` FDL pair. Download mode was entered (`1782:4d00`); Windows libusb never opened it (no function driver, and UsbDk's `\\.\UsbDk` node is missing). Nothing was written. Next step is the same read on an Ubuntu VM that mounts this tree. Blobs stay in `temp/w6-root/run/`. The handoff has the command, the blob hashes, and the stop rules. | `docs/w6/UBUNTU_DUMP_HANDOFF_2026-10-24.md` (new), `docs/w6/ROOT_ATTEMPT_2026-10-24.md` | No code change. **Device: W6**, one `adb reboot autodloader`. No partition read. The Armor on wifi adb was not addressed. |
+
+## 2026-10-24 — W6 root: phone recovered, boot still unread
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Docs only. After the fastboot USB wedge, the W6 (`W6202601000922`) is back in Android. `boot_a` is `mmcblk0p38`, 64 MiB, mode 0600; a one-sector `dd` from shell is permission denied. `vendor_boot_a` is also 64 MiB, so a later Magisk patch has to inspect both. Chip confirmed `sp9832e` (SL8541E): FDL1 `0x5000`, FDL2 `0x9efffe00`, bypass `exec_addr` `0x4f18` / `0x4ee8`. Download mode not entered. No matching PAC or same-board FDL turned up; a borrowed FDL2 is the remaining risk (pin init on a radio). | `docs/w6/ROOT_ATTEMPT_2026-10-24.md` | No code change. **Device: W6**, read-only adb (`id`, battery, `/proc/partitions`, one `dd` that failed). The Armor on wifi adb was not addressed. |
+
+## 2026-10-24 — W6 bench phone: Phase 0 (facts, baseline report, nine report gaps)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| — | Docs only. The Anysecu W6 UHF bench phone (adb serial W6202601000922, USB; the owner's Armor is the wifi adb entry and is never addressed) was profiled unrooted: Unisoc SL8541E, Android 12, 32-bit, bootloader already unlocked, SELinux permissive, stock app `com.flyscale.analogpoc` on `/dev/ttyS2` at 9600 with SA818-class `AT+DMO…` commands, `flyscale_misc` / gpio / `dmr_state` control nodes, `hook_dmr` PTT input device. Reading `flyscale_misc/af_en` panics the kernel (found the hard way, twice). Baseline report A with beta.19 found the app, port and gpio paths but missed the baud, the protocol family, the misc and kernel nodes, the input devices, init.rc and the last panic: nine gaps listed with where each fact was readable without root. The plan carries the confirmed facts and the amended node-scan rule; the root route needs a vendor boot image (block device is root-only, no firmware package online). | `docs/w6/PHASE0_FINDINGS.md` (new), `docs/w6/reports/20261024_phase0/` (new: getprop, packages, tty nodes, termios, gpio and misc node values, init.rc lines, last kmsg, both stock APKs with dex string dumps, baseline A), `docs/W6_DEVICE_REPORT_PLAN.md` | No code change. **Device: W6 (Unisoc, analog UHF), unrooted**, driven over adb; PTT key not captured (needs a hand on the key, and a synthetic key would reach the stock app and could transmit). |
+
 ## 2026-10-24 — Bench keys for the 120 s ceiling, and an M17 tail
 
 | Backlog | Change | Files | Test |

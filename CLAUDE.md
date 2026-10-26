@@ -23,3 +23,12 @@ before touching radio behaviour; it wins over guesses.
   beta.13 on releases go to this repository only.
 - Device profiles: edit `profiles/profiles.json`, bump `serial`, sign with `scripts/sign_profiles.py`; builds up to
   beta.11 read phonedmrapp's copy, so update both (advisories should reach users still on old builds).
+
+## Mirrored agent notes
+- `CLAUDE.md` and `GROK.md` are mirrors of each other: identical apart from the title. Any change to one must be
+  made in the other in the same edit.
+
+## Transmit testing
+- All development testing that transmits is done inside a Faraday cage by a licensed RF expert. Never ask for, plan
+  or assume an on-air test outside that setup; when a change needs a transmit test, say so and leave it to the owner.
+
