@@ -38,7 +38,6 @@ public final class RepeaterPlanner {
     /** Hardware ceiling on the RX group list (one int[32] per channel). */
     public static final int MAX_GROUPS = 32;
     /** OEM channel-name column width (verified: {@code interphone_channel_name_edit maxLength=32}). */
-    public static final int MAX_NAME = 32;
 
     private RepeaterPlanner() { }
 
@@ -86,7 +85,7 @@ public final class RepeaterPlanner {
     public static Plan plan(Repeater rep, Set<Integer> talkTgIds, Map<Integer, String> names) {
         Plan plan = new Plan();
         if (rep == null) { plan.warnings.add("no repeater"); return plan; }
-        plan.zoneName = trim("»" + nz(rep.callsign) + " " + nz(rep.city), MAX_NAME);
+        plan.zoneName = trim("»" + nz(rep.callsign) + " " + nz(rep.city), com.macdmr.radio.ChannelStore.NAME_MAX);
 
         // FM: exactly one analog channel.
         if (rep.fm && !rep.dmr) {
@@ -99,7 +98,7 @@ public final class RepeaterPlanner {
             fm.toneUp = rep.toneUp;
             fm.toneDown = rep.toneDown;
             fm.role = "fm";
-            fm.name = trim(nz(rep.callsign) + " " + nz(rep.city), MAX_NAME);
+            fm.name = trim(nz(rep.callsign) + " " + nz(rep.city), com.macdmr.radio.ChannelStore.NAME_MAX);
             if (fm.name.isEmpty()) fm.name = nz(rep.callsign);
             plan.channels.add(fm);
             return plan;
@@ -144,7 +143,7 @@ public final class RepeaterPlanner {
             ChannelSpec listen = base(rep, slot, groups, truncated);
             listen.txContact = primary;
             listen.role = "listen";
-            listen.name = trim(nz(rep.callsign) + " S" + slot, MAX_NAME);
+            listen.name = trim(nz(rep.callsign) + " S" + slot, com.macdmr.radio.ChannelStore.NAME_MAX);
             plan.channels.add(listen);
 
             // talk channels for selected TGs on this slot
@@ -155,7 +154,7 @@ public final class RepeaterPlanner {
                 t.txContact = tg;
                 t.role = "talk";
                 String label = nm.get(tg);
-                t.name = trim(nz(rep.callsign) + " " + (label != null ? label : String.valueOf(tg)), MAX_NAME);
+                t.name = trim(nz(rep.callsign) + " " + (label != null ? label : String.valueOf(tg)), com.macdmr.radio.ChannelStore.NAME_MAX);
                 plan.channels.add(t);
             }
         }

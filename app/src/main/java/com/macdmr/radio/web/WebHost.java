@@ -267,7 +267,7 @@ public final class WebHost {
     /** The phone editor's checks (ChannelEditorView.apply), applied to a JSON body; returns null or the problem. */
     static String applyChannel(ChannelStore.Channel ch, JSONObject b) {
         try {
-            ch.name = b.optString("name", ch.name).trim();
+            ch.name = ChannelStore.fitName(b.optString("name", ch.name));
             ch.type = b.optInt("type", ch.type) == 0 ? 0 : 1;
             ch.txFreq = (int) Math.round(b.getDouble("txMHz") * 1e6);
             ch.rxFreq = (int) Math.round(b.getDouble("rxMHz") * 1e6);
@@ -733,7 +733,7 @@ public final class WebHost {
                     if (cur != null) { ch.type = cur.type; ch.rxFreq = cur.rxFreq; ch.txFreq = cur.txFreq; }
                 }
                 JSONObject help = new JSONObject(); for (String[] h : com.macdmr.radio.ui.ChannelEditorView.helpForWeb()) help.put(h[0], h[1]);
-                return ok(new JSONObject().put("channel", channelFull(ch)).put("isNew", n <= 0).put("help", help).put("tones", toneLists()));
+                return ok(new JSONObject().put("channel", channelFull(ch)).put("isNew", n <= 0).put("help", help).put("tones", toneLists()).put("nameMax", ChannelStore.NAME_MAX));
             }
             case "/api/channel/save": if (!post) break; {
                 int n = b.optInt("number", 0);

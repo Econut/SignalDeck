@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Channel names: one 32-character limit in both editors
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Queue item 3 (owner 2026-10-25) | SignalDeck Web's channel editor stopped names at 16 characters and the phone's editor had no limit at all. Both now take up to 32 (`ChannelStore.NAME_MAX`, one constant: the repeater planner's `MAX_NAME` moved there; the web reads it from `/api/channel` as `nameMax`, so changing the constant changes both). Each name field has a counter (used / 32, amber at the limit). Saves from either editor go through `ChannelStore.fitName` (trim, cut to the limit). A longer name from an import is shown cut to the limit and is shortened when the channel is next saved. Help: Channels → Channel names, and the name field's info text (OpenGD77 CPS keeps 16 characters). | `ChannelStore.java`, `repeaters/RepeaterPlanner.java`, `ui/ChannelEditorView.java`, `ui/HelpView.java`, `web/WebHost.java`, `assets/web/editor.js`, `assets/web/app.css`, `ChannelNameTest.java` (new) | Host: the limit, trim and cut, and editor.js reading the limit from the server. **Device and web check owed.** |
+
 ## 2026-10-25 — Contacts: callsign, pager RICs, notes, two locations, history; channel history
 
 | Backlog | Change | Files | Test |

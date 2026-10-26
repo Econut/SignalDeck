@@ -23,7 +23,7 @@ async function openEditor(number) {
   try {
     const j = await api('channel?number=' + (number || 0));
     ED.vfo = false;
-    ED.ch = j.channel; ED.isNew = j.isNew; ED.help = j.help; ED.tones = j.tones;
+    ED.ch = j.channel; ED.isNew = j.isNew; ED.help = j.help; ED.tones = j.tones; ED.nameMax = j.nameMax || 32;
     renderEditor();
     if (window.innerWidth < 900) $('edPanel').scrollIntoView({ behavior: 'smooth' });
   } catch (e) { toast(e.message); }
@@ -43,7 +43,7 @@ function renderEditor() {
   const toneVals = type => type === 1 ? ED.tones.ctcss.map((t, i) => [i, t]) : type === 2 || type === 3 ? ED.tones.dcs.map((t, i) => [i, t + (type === 3 ? 'I' : 'N')]) : [[0, '—']];
   let h = '';
   h += '<div class="sect">' + (ED.vfo ? 'FREQUENCY' : 'CHANNEL') + '</div>';
-  if (!ED.vfo) h += field('name', 'Channel name', txt('fName', c.name, 'maxlength="16"'));
+  if (!ED.vfo) h += field('name', 'Channel name', txt('fName', (c.name || '').slice(0, ED.nameMax), 'maxlength="' + ED.nameMax + '"') + '<div class="count" id="fNameCount"></div>');
   h += field('type', 'Channel type', sel('fType', [[0, 'Digital'], [1, 'Analog']], c.type));
   h += field('tx', 'Send frequency (MHz)', txt('fTx', mhzIn(c.txFreq), 'inputmode="decimal"'));
   h += field('rx', 'Receive frequency (MHz)', txt('fRx', mhzIn(c.rxFreq), 'inputmode="decimal"'));
@@ -87,6 +87,7 @@ function renderEditor() {
     h += '<div class="note">Saving an active channel re-programs the radio at once. VHF channels are always saved as wide band (narrow makes this radio deaf on VHF).</div>';
   }
   $('edForm').innerHTML = h;
+  const nm = $('fName'); if (nm) { const cnt = () => { $('fNameCount').textContent = nm.value.length + ' / ' + ED.nameMax; $('fNameCount').classList.toggle('full', nm.value.length >= ED.nameMax); }; nm.oninput = cnt; cnt(); }
 
   // a change of type redraws the form (keeping what was typed); a tone type change refills its tone list
   $('fType').onchange = () => { Object.assign(ED.ch, collect(true)); ED.ch.type = +$('fType').value; renderEditor(); };
