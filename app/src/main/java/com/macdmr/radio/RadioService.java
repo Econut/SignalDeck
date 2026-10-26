@@ -3233,11 +3233,29 @@ public class RadioService extends Service implements RadioEngine.Events {
             final com.macdmr.radio.ham.RamStream.Receiver r = ramStream; final com.macdmr.radio.ham.HeldPathReceiver rx = ramStreamRx;
             worker.execute(() -> {
                 try {
-                    Frame st = engine.diag40(new byte[] { 17, 0 }, 1000); log("ram stream stop: " + (st == null ? "no answer" : "sr=" + st.sr));
+                    // Each step is proven before the next (the bench's explicit sequence: stop, 0x34 at 230400, rate back,
+                    // 0x34 at 57600, mode 5 off). 16:27 on the bench: a stop with no answer, then no version at 57600 and a
+                    // module restart; the stop is retried, the module is asked for its version at 230400 before the rate
+                    // command, and the switch back gets the module's post-ack settle and three tries.
+                    Frame st = null;
+                    for (int i = 0; i < 3 && (st == null || st.sr != 0); i++) {
+                        st = engine.diag40(new byte[] { 17, 0 }, 1000); log("ram stream stop: " + (st == null ? "no answer" : "sr=" + st.sr));
+                    }
                     engine.setStreamSink(null);
-                    Frame rt = engine.diag40(new byte[] { 16, 0 }, 1000); log("ram stream rate 57600: " + (rt == null ? "no answer" : "sr=" + rt.sr));
-                    engine.reopenAt(0);
-                    if (!versionHandshake(3000)) log("ram stream: no version at 57600 after the switch back");
+                    boolean upAtFast = versionHandshake(1500);
+                    log("ram stream: version at 230400 after the stop " + (upAtFast ? "ok" : "missing"));
+                    boolean back = false;
+                    for (int i = 0; i < 2 && !back; i++) {
+                        Frame rt = engine.diag40(new byte[] { 16, 0 }, 1000); log("ram stream rate 57600: " + (rt == null ? "no answer" : "sr=" + rt.sr));
+                        try { Thread.sleep(60); } catch (InterruptedException ignored) { }   // the module switches after its ack
+                        engine.reopenAt(0);
+                        for (int k = 0; k < 3 && !back; k++) { back = versionHandshake(1500); if (!back) try { Thread.sleep(300); } catch (InterruptedException ignored) { } }
+                        if (!back) {
+                            log("ram stream: no version at 57600 after the switch back" + (i == 0 ? ", asking at 230400 again" : ""));
+                            if (i == 0) { engine.reopenAt(RAM_STREAM_BAUD); if (!versionHandshake(1500)) { engine.reopenAt(0); break; } }
+                        }
+                    }
+                    if (!back) history("warn", "\u26A0 The module did not come back at 57600; use Device \u2192 Restart module");
                     Frame m = engine.diag40(new byte[] { 6, 5, 0 }, 1000); log("ram stream mode 5 off: " + (m == null ? "no answer" : "sr=" + m.sr));
                     if (dataReceive) scheduleDataHold(true);           // the audio-path hold again, as after any register write
                 } catch (Throwable t) { log("ram stream stop: " + t); }
