@@ -34,16 +34,34 @@ public final class ChannelStore extends SQLiteOpenHelper {
     }
 
     public static final class Channel {
-        public long id; public int number; public String name = ""; public int type;          // 0 digital, 1 analog
+        public static final int TYPE_DMR = 0, TYPE_FM = 1, TYPE_M17 = 2;
+        public long id; public int number; public String name = ""; public int type;          // 0 digital, 1 analog, 2 M17
         public int rxFreq, txFreq, power, band = 1, sq = 2, rxType, rxSubCode, txType, txSubCode, relay = 2, mode;
         public int cc = 1, inSlot, outSlot, contactType = 1, txContact, encryptSw = 2, interrupt = 2;
         public String encryptKey = ""; public int[] groups = new int[0]; public boolean active;
         public String location = "";
         public String notes = "";                  // the owner's notes on this channel (shareable as an option)
         public boolean rxOnly;                     // the owner made this channel receive only (never transmits)
+        public String m17dest = "@ALL";            // who an M17 channel calls; @ALL is everyone. The channel-access number is cc (0-15).
         public double lat, lon, elev;              // from the module's location table (0 = none)
         public boolean softSq; public int softSqLevel = 5;   // software squelch (analog)
-        public boolean isDigital() { return type == 0; }
+        public boolean isDigital() { return type == TYPE_DMR; }
+        public boolean isM17() { return type == TYPE_M17; }
+        /** Channel access number, 0 to 15. Stored in {@code cc} so a DMR colour code and an M17 CAN share one column. */
+        public int can() { return cc < 0 ? 0 : Math.min(15, cc); }
+        /** Callsign the air will accept, or @ALL. Blank becomes @ALL. */
+        public String m17Dest() { return cleanM17Dest(m17dest); }
+        public static String cleanM17Dest(String raw) {
+            if (raw == null) return "@ALL";
+            String u = raw.trim().toUpperCase(java.util.Locale.US);
+            if (u.isEmpty() || u.equals("@ALL") || u.equals("ALL")) return "@ALL";
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < u.length() && sb.length() < 9; i++) {
+                char ch = u.charAt(i);
+                if (" ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-/.".indexOf(ch) >= 0 && ch != ' ') sb.append(ch);
+            }
+            return sb.length() == 0 ? "@ALL" : sb.toString();
+        }
         public String freqText(int hz) { return String.format(java.util.Locale.US, "%.3f", hz / 1e6); }
     }
 
@@ -117,6 +135,9 @@ public final class ChannelStore extends SQLiteOpenHelper {
         boolean hasRxOnly = false;
         try (Cursor c = db.rawQuery("PRAGMA table_info(channels)", null)) { while (c.moveToNext()) if ("rxOnly".equals(c.getString(1))) hasRxOnly = true; }
         if (!hasRxOnly) db.execSQL("ALTER TABLE channels ADD COLUMN rxOnly INTEGER DEFAULT 0");
+        boolean hasM17 = false;
+        try (Cursor c = db.rawQuery("PRAGMA table_info(channels)", null)) { while (c.moveToNext()) if ("m17dest".equals(c.getString(1))) hasM17 = true; }
+        if (!hasM17) db.execSQL("ALTER TABLE channels ADD COLUMN m17dest TEXT DEFAULT '@ALL'");
         boolean hasSender = false;                                             // talkgroup texts: the thread is the talkgroup, each message keeps who wrote it
         try (Cursor c = db.rawQuery("PRAGMA table_info(messages)", null)) { while (c.moveToNext()) if ("sender".equals(c.getString(1))) hasSender = true; }
         if (!hasSender) db.execSQL("ALTER TABLE messages ADD COLUMN sender INTEGER DEFAULT 0");
@@ -607,6 +628,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
         v.put("lat", ch.lat); v.put("lon", ch.lon); v.put("elev", ch.elev); v.put("softSq", ch.softSq ? 1 : 0); v.put("softSqLevel", ch.softSqLevel);
         v.put("notes", ch.notes == null ? "" : ch.notes);
         v.put("rxOnly", ch.rxOnly ? 1 : 0);
+        v.put("m17dest", ch.m17Dest());
         return v;
     }
 
@@ -628,6 +650,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
         ch.softSq = c.getInt(c.getColumnIndexOrThrow("softSq")) == 1; ch.softSqLevel = c.getInt(c.getColumnIndexOrThrow("softSqLevel"));
         int ni = c.getColumnIndex("notes"); ch.notes = ni >= 0 && !c.isNull(ni) ? c.getString(ni) : "";
         int ro = c.getColumnIndex("rxOnly"); ch.rxOnly = ro >= 0 && !c.isNull(ro) && c.getInt(ro) != 0;
+        int md = c.getColumnIndex("m17dest"); ch.m17dest = md >= 0 && !c.isNull(md) ? c.getString(md) : "@ALL";
         return ch;
     }
 

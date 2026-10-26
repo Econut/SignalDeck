@@ -399,7 +399,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     private static String channelWords(ChannelStore.Channel ch) {
-        return "Channel " + ch.number + ", " + ch.name.replaceAll("[_]+", " ").replaceAll("\\((UHF|VHF)\\)", "").trim() + (ch.isDigital() ? ", digital" : "");
+        return "Channel " + ch.number + ", " + ch.name.replaceAll("[_]+", " ").replaceAll("\\((UHF|VHF)\\)", "").trim() + (ch.isM17() ? ", M 17" : ch.isDigital() ? ", digital" : "");
     }
 
     public void say(final String text) {
@@ -1094,7 +1094,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public boolean scanning() { return scanner.isScanning(); }
     /** Soft SQ decides what is heard on the current channel (the module then reports a reception all the time). */
     public boolean softSqActive() { return softSq.isEnabled(); }
-    private boolean moved(ChannelStore.Channel ch) { ChannelStore.Channel was = current; return was == null || was.number != ch.number || was.rxFreq != ch.rxFreq || was.isDigital() != ch.isDigital(); }
+    private boolean moved(ChannelStore.Channel ch) { ChannelStore.Channel was = current; return was == null || was.number != ch.number || was.rxFreq != ch.rxFreq || was.type != ch.type; }
     /** The module reports a reception (RECEIVE_START … STOP), whatever Soft SQ decides. */
     public boolean mcuReceiving() { return receiving; }
     /**
@@ -1350,7 +1350,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Soft SQ applies to an analog channel when it is switched on for that channel, or on every analog channel while scanning (setting, default on). */
-    private boolean softSqFor(ChannelStore.Channel ch) { return softSqApplies(ch.isDigital(), ch.softSq, scanner.isScanning(), scanSoftSq()); }
+    private boolean softSqFor(ChannelStore.Channel ch) { return !ch.isM17() && softSqApplies(ch.isDigital(), ch.softSq, scanner.isScanning(), scanSoftSq()); }
     static boolean softSqApplies(boolean digital, boolean channelSoftSq, boolean scanning, boolean scanSoftSq) { return !digital && (channelSoftSq || (scanning && scanSoftSq)); }
     /** The scan priority channel number (0 = none). */
     public int scanPriority() { return getSharedPreferences("radio", MODE_PRIVATE).getInt("scanPriority", 0); }
@@ -1360,7 +1360,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     /** Re-evaluate the squelch for the current channel (Soft SQ key, scan started/stopped): detector config, blackout and the module's squelch byte. */
     private synchronized void refreshSquelch(ChannelStore.Channel ch) {
-        if (ch == null || ch.isDigital() || current != ch) return;
+        if (ch == null || ch.isDigital() || ch.isM17() || current != ch) return;
         boolean soft = softSqFor(ch);
         softSq.configure(soft, ch.softSqLevel, ch.rxType, ch.rxSubCode);
         if (soft) { softSq.onRetune(); squelchOpen = false; } else squelchOpen = true;
@@ -1370,7 +1370,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     /** Soft SQ was switched: re-send the analog channel so the module's squelch follows (single direct write, same path as a channel change). */
     private synchronized void rewriteAnalogSquelch(ChannelStore.Channel ch) {
-        if (ch == null || ch.isDigital() || current != ch) return;
+        if (ch == null || ch.isDigital() || ch.isM17() || current != ch) return;
         try {
             int band = ch.rxFreq < 300_000_000 ? 1 : ch.band;
             synchronized (tunes) { tunes.addLast(new Object[] { ch, false }); }   // answered like any channel write
@@ -1395,6 +1395,14 @@ public class RadioService extends Service implements RadioEngine.Events {
                 int id = !fromStore && ch.mode > 0 ? ch.mode : localId();          // VFO may transmit under another DMR ID
                 engine.setDigital(ch.rxFreq, ch.txFreq, id, ch.groups, ch.txContact, ch.contactType, ch.power, ch.cc, ch.inSlot, ch.outSlot, 8, 4);
                 engine.setInterrupt(ch.interrupt == 1);
+            } else if (ch.isM17()) {
+                engine.setAnalog(ch.rxFreq, ch.txFreq, 1, ch.power, hardwareSq(ch), 0, 0, 0, 0, 8, 2);   // wide FM; M17 is layered on top
+                lastChannelWrite = System.currentTimeMillis();
+                if (profile.globalSquelch) {
+                    final boolean mon = monitorOn && !moved(ch); final int sq = hardwareSq(ch); final long token = ++postWriteToken;
+                    pendingPostWrite = () -> { if (postWriteToken != token) return; postWriteToken++; worker.execute(() -> { try { engine.setMonitor(mon); engine.setSquelch(sq); } catch (IOException e) { log("monitor/squelch: " + e); } }); };
+                    ui.postDelayed(() -> { Runnable r = pendingPostWrite; if (r != null && postWriteToken == token) { log("no channel acknowledgement in 1.5 s: monitor and squelch sent anyway"); r.run(); } }, 1500);
+                }
             } else {
                 int band = ch.rxFreq < 300_000_000 ? 1 : ch.band;      // VHF must be band=1 (band=0 deafens the RX)
                 engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
@@ -1407,7 +1415,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             }
             finishRecording();
             ChannelStore.Channel was = current;
-            boolean moved = was == null || was.number != ch.number || was.rxFreq != ch.rxFreq || was.isDigital() != ch.isDigital();
+            boolean moved = was == null || was.number != ch.number || was.rxFreq != ch.rxFreq || was.type != ch.type;
             if (moved && monitorOn) {                                  // the module leaves monitor mode on a channel change: so does the button
                 monitorOn = false;
                 try { engine.setMonitor(false); } catch (IOException e) { log("monitor: " + e); }
@@ -1423,6 +1431,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             describeLocation(ch);
             updateNotification();
             if (dataReceive) scheduleDataHold(true);
+            followM17Channel(ch);
             return true;
         } catch (IOException e) { log("select: " + e); return false; }
     }
@@ -1604,6 +1613,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!profile.verified || ProfileRegistry.transmitBlocked()) return true;   // an untested profile never transmits; an advisory can switch it off (the Xplore 1 keys through a GPIO line)
         ChannelStore.Channel ch = current;
         if (ch == null) return true;
+        if (ch.isM17() && !m17CanSend()) return true;             // stock firmware: an M17 channel is receive-only
         SatState ss = satState;
         if (ss != null && ss.listenOnly && vfo != null && ss.name.equals(vfo.name)) return true;     // a satellite downlink (ISS SSTV)
         return ChannelStore.receiveOnly(ch);             // NOAA weather, marine and railroad channels, and channels set receive only
@@ -1618,6 +1628,17 @@ public class RadioService extends Service implements RadioEngine.Events {
         worker.execute(() -> {
             try {
                 if (down) {
+                    if (current != null && current.isM17()) {
+                        if (firmwareBusy) { log("PTT blocked: loading firmware"); history("warn", "Radio busy, loading firmware"); return; }
+                        if (!isReady()) { log("PTT ignored: radio not ready"); return; }
+                        if (!m17CanSend()) { log("PTT blocked: M17 receive only"); history("warn", "⚠️ M17 is receive-only until the module firmware has the symbol engine"); return; }
+                        if (txInhibited()) { log("PTT blocked: receive-only channel"); history("warn", "⛔ TX blocked on a receive-only channel"); return; }
+                        if (pttDown) return;
+                        wheelPtt = false; callPtt = false; webFeedNext = null;
+                        pttDown = true; refreshControls();
+                        m17Voice(true);
+                        return;
+                    }
                     if (scope.running()) { scope.stop(); log("band scope stopped for Talk"); }   // back on the channel before keying
                     final boolean fromWheel = wheelPtt, fromCall = callPtt; wheelPtt = false; callPtt = false;      // read once, whatever happens next
                     final AudioBackend.TxFeed webFeed = webFeedNext; webFeedNext = null;
@@ -1644,6 +1665,11 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (audio != null) log(audio.startTx());
                     ui.removeCallbacks(txWatchdog); ui.postDelayed(txWatchdog, 28000);
                 } else {
+                    if (current != null && current.isM17()) {
+                        m17Voice(false);
+                        if (pttDown) { pttDown = false; refreshControls(); }
+                        return;
+                    }
                     if (!pttDown) return;
                     pttDown = false; refreshControls();
                     wheel.stopped(); vox = null; if (audio != null) audio.setTxLevel(null);
@@ -1970,7 +1996,10 @@ public class RadioService extends Service implements RadioEngine.Events {
             Frame rst = sym40(new byte[] { 3 });
             if (rst == null || rst.sr != 0) { log("m17 voice: symbol engine did not answer"); history("warn", "⚠️ This firmware did not accept an M17 symbol reset"); return; }
             String src = com.macdmr.radio.ham.M17.voiceCall(m17Call());
-            byte[] lsf = com.macdmr.radio.ham.M17.lsf(src, "@ALL", 0x0005, null);
+            ChannelStore.Channel mc = current;
+            String dst = mc != null && mc.isM17() ? mc.m17Dest() : "@ALL";
+            int lsfType = mc != null && mc.isM17() ? com.macdmr.radio.ham.M17.streamVoice(mc.can()) : 0x0005;
+            byte[] lsf = com.macdmr.radio.ham.M17.lsf(src, dst, lsfType, null);
             int[] head = new int[192 + 192];
             System.arraycopy(com.macdmr.radio.ham.M17.preamble(), 0, head, 0, 192);
             System.arraycopy(com.macdmr.radio.ham.M17.lsfSymbols(lsf), 0, head, 192, 192);
@@ -3022,7 +3051,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 logHeardStation(call, "M17", "M17");
                 try { ChannelStore.Contact pc = store.contactByCallsign(call); if (pc != null) store.contactHeard(pc.id, System.currentTimeMillis(), "M17", current != null ? "on " + current.name : "", Double.NaN, Double.NaN); } catch (Throwable e) { }
             }
-            @Override public void changed() { ui.post(() -> pushModes()); }
+            @Override public void changed() { ui.post(() -> { pushModes(); publishM17Line(); }); }
             @Override public void voice(short[] pcm) {                       // SignalDeck Web listeners hear the decoded voice (the radio's own audio is held back)
                 com.macdmr.radio.web.WebHost w = web; if (w == null || muted) return;
                 byte[] b = new byte[pcm.length * 2]; for (int i = 0; i < pcm.length; i++) { b[2 * i] = (byte) pcm[i]; b[2 * i + 1] = (byte) (pcm[i] >> 8); }
@@ -3032,6 +3061,28 @@ public class RadioService extends Service implements RadioEngine.Events {
         return m17;
     }
     public boolean m17Running() { M17Station s = m17; return s != null && s.running(); }
+    private boolean m17FromChannel;
+    /** An M17 channel keeps the live receiver on, and the voice-filter hold with it. Leaving the channel stops only a receiver this started. */
+    private void followM17Channel(ChannelStore.Channel ch) {
+        if (ch != null && ch.isM17()) {
+            m17FromChannel = true;
+            String e = setM17(true, true);
+            if (e != null) log("m17 channel: " + e);
+            publishM17Line();
+        } else if (m17FromChannel) {
+            m17FromChannel = false;
+            setM17(false);
+        }
+    }
+    private void publishM17Line() {
+        if (current == null || !current.isM17()) return;
+        M17Station s = m17;
+        M17Station.Heard h = s == null ? null : s.current();
+        String line = h != null
+                ? h.src + " → " + h.dst + "  " + h.frames + " frames"
+                : (m17CanSend() ? "M17 " : "M17 receive only ") + current.m17Dest() + "  CAN " + current.can();
+        for (Listener l : listeners) l.onCaller(line);
+    }
     /** M17 receive on or off (null = done, else why not). A stub-tagged module holds the voice filter open. */
     public synchronized String setM17(boolean on) { return setM17(on, true); }
 

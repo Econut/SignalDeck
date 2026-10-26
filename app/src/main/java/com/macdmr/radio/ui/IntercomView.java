@@ -528,11 +528,14 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         bigNum.setText(isVfo ? "VFO" : String.format(java.util.Locale.US, "%02d", ch.number % 100));
         int numCol = isVfo ? Neo.AMBER : Neo.CYAN; bigNum.setTextColor(numCol); bigNum.setBackground(glow(numCol));
         chipRow.removeAllViews();
-        TextView[] chips = { Neo.chip(c, ch.isDigital() ? "DMR" : "FM", ch.isDigital() ? Neo.VIOLET : Neo.CYAN), Neo.chip(c, ch.rxFreq < 300_000_000 ? "VHF" : "UHF", Neo.CYAN), Neo.chip(c, ch.power == 1 ? "HIGH PWR" : "LOW PWR", Neo.AMBER) };
+        TextView[] chips = { Neo.chip(c, ch.isM17() ? "M17" : ch.isDigital() ? "DMR" : "FM", ch.isM17() || ch.isDigital() ? Neo.VIOLET : Neo.CYAN), Neo.chip(c, ch.rxFreq < 300_000_000 ? "VHF" : "UHF", Neo.CYAN), Neo.chip(c, ch.power == 1 ? "HIGH PWR" : "LOW PWR", Neo.AMBER) };
         for (int i = 0; i < chips.length; i++) { LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); if (i > 0) lp.leftMargin = (int) (6 * d); chipRow.addView(chips[i], lp); }
         readLabel[0].setText("TX"); readLabel[1].setText("RX");
         send.setText(ChannelsView.mhz(ch.txFreq)); receive.setText(ChannelsView.mhz(ch.rxFreq));
-        if (ch.isDigital()) {
+        if (ch.isM17()) {
+            readLabel[2].setText("CAN"); squelch.setText(String.valueOf(ch.can()));
+            readLabel[3].setText("DEST"); power.setText(ch.m17Dest());
+        } else if (ch.isDigital()) {
             readLabel[2].setText("CC · TS"); squelch.setText(ch.cc + " · " + (ch.inSlot + 1));
             readLabel[3].setText("CALL"); power.setText((ch.contactType == 1 ? "TG " : ch.contactType == 2 ? "ALL " : "ID ") + ch.txContact);
         } else {
@@ -548,8 +551,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         boolean isVfo = ch.id < 0;
         if (neo) {
             neoChannel(ch, isVfo); vfo.setOn(isVfo);
-            historyHeader.setText(ch.isDigital() ? "DMR ACTIVITY" : "ANALOG HISTORY");
-            softSq.setVisibility(ch.isDigital() ? INVISIBLE : VISIBLE);
+            historyHeader.setText(ch.isM17() ? "M17" : ch.isDigital() ? "DMR ACTIVITY" : "ANALOG HISTORY");
+            softSq.setVisibility(ch.isDigital() || ch.isM17() ? INVISIBLE : VISIBLE);
             history.clear();
             if (svc != null && !panelClosed) for (String l : svc.store().recentHistory(ch.number, 3)) history.addLast(l);
             renderHistory(); refreshHeadline();
@@ -561,10 +564,10 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         digitOne.setVisibility(isVfo ? GONE : VISIBLE); digitTwo.setVisibility(isVfo ? GONE : VISIBLE); vfoLabel.setVisibility(isVfo ? VISIBLE : GONE);
         vfo.setOn(isVfo);
         power.setText("Power:" + (ch.power == 1 ? "High power" : "Low power"));
-        squelch.setText(ch.isDigital() ? "Color Code:" + ch.cc : "Squelch Level:" + ch.sq);
+        squelch.setText(ch.isM17() ? "CAN:" + ch.can() + "  " + ch.m17Dest() : ch.isDigital() ? "Color Code:" + ch.cc : "Squelch Level:" + ch.sq);
         send.setText("Send:" + ch.freqText(ch.txFreq)); receive.setText("Receive:" + ch.freqText(ch.rxFreq));
-        historyHeader.setText(ch.isDigital() ? "DMR Activity" : "Analog History");
-        softSq.setVisibility(ch.isDigital() ? INVISIBLE : VISIBLE);
+        historyHeader.setText(ch.isM17() ? "M17" : ch.isDigital() ? "DMR Activity" : "Analog History");
+        softSq.setVisibility(ch.isDigital() || ch.isM17() ? INVISIBLE : VISIBLE);
         history.clear();
         if (svc != null && !panelClosed) for (String l : svc.store().recentHistory(ch.number, 3)) history.addLast(l);
         renderHistory();

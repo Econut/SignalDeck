@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — M17 as a channel type
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Route-list item 6, host part | A channel can be M17 (type 2), beside FM and DMR. The editor asks for a destination (@ALL or a callsign, picked from contacts that have one) and a channel access number 0–15. Selecting the channel programs wide FM and starts the M17 receiver with the voice-filter hold. Talk on the intercom sends M17 voice to that destination through the symbol engine when the module firmware has it, and is receive-only on stock firmware. The list marks the card M17. Backup writes the type as M17, the access number in the colour-code column, and the destination in a new M17 Dest column. | `ChannelStore.java`, `Backup.java`, `RadioService.java`, `ham/M17.java`, `ui/ChannelEditorView.java`, `ui/ChannelsView.java`, `ui/IntercomView.java`, `ui/HelpView.java` | host: `M17ChannelTest`. Not installed on the phone (the phone was leased for other checks). The on-air pass waits until the phone is free. |
+
 ## 2026-10-25 — Device report: radio firmware files, listed, copied only when ticked
 
 | Backlog | Change | Files | Test |

@@ -88,7 +88,13 @@ public final class M17 {
         }
         return s;
     }
-    /** The 30-byte LSF: destination, source, type, META (14 bytes), CRC. Type 0x0005 = stream, voice, no encryption. */
+    /** Stream + Codec 2 voice, no encryption. The channel access number (0–15) sits in bits 11:8. CAN 0 is 0x0005. */
+    public static int streamVoice(int can) {
+        int n = can < 0 ? 0 : Math.min(15, can);
+        return 0x0005 | (n << 8);
+    }
+
+    /** The 30-byte LSF: destination, source, type, META (14 bytes), CRC. Type 0x0005 = stream, voice, no encryption, CAN 0. */
     public static byte[] lsf(String src, String dst, int type, byte[] meta) {
         byte[] d = new byte[30];
         System.arraycopy(callsign(dst), 0, d, 0, 6); System.arraycopy(callsign(src), 0, d, 6, 6);

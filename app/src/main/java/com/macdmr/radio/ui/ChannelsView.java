@@ -139,7 +139,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         shown.clear();
         for (ChannelStore.Channel ch : all) {
             if (filter == 1 && !favs.contains(ch.number)) continue;
-            if (filter == 2 && ch.isDigital()) continue;
+            if (filter == 2 && ch.type != com.macdmr.radio.ChannelStore.Channel.TYPE_FM) continue;
             if (filter == 3 && !ch.isDigital()) continue;
             if (!q.isEmpty()) {
                 boolean ok = ch.name != null && ch.name.toLowerCase(Locale.US).contains(q);
@@ -155,6 +155,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
 
     /** The one extra detail worth a badge: colour code + slot on DMR, else repeater shift and/or tone. */
     static String detail(ChannelStore.Channel ch) {
+        if (ch.isM17()) return "CAN " + ch.can() + " · " + ch.m17Dest();
         if (ch.isDigital()) return "CC" + ch.cc + " · TS" + (ch.inSlot + 1);
         List<String> parts = new ArrayList<>();
         int shift = ch.txFreq - ch.rxFreq;
@@ -183,8 +184,8 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         top.addView(col, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         box.addView(top);
         LinearLayout badges = new LinearLayout(c); badges.setPadding(0, (int) (10 * d), 0, 0);
-        badges.addView(Neo.chip(c, ch.isDigital() ? "DMR" : "FM", ch.isDigital() ? Neo.VIOLET : Neo.CYAN));
-        String det = ch.isDigital() ? "CC" + ch.cc + " · TS" + (ch.inSlot + 1) + " · →" + ch.txContact : "SQ " + ch.sq + " · " + (ch.band == 1 ? "WIDE" : "NARROW") + (detail(ch).isEmpty() ? "" : " · " + detail(ch));
+        badges.addView(Neo.chip(c, ch.isM17() ? "M17" : ch.isDigital() ? "DMR" : "FM", ch.isM17() || ch.isDigital() ? Neo.VIOLET : Neo.CYAN));
+        String det = ch.isM17() ? "CAN " + ch.can() + " · " + ch.m17Dest() : ch.isDigital() ? "CC" + ch.cc + " · TS" + (ch.inSlot + 1) + " · →" + ch.txContact : "SQ " + ch.sq + " · " + (ch.band == 1 ? "WIDE" : "NARROW") + (detail(ch).isEmpty() ? "" : " · " + detail(ch));
         TextView dc = Neo.chip(c, det, 0xFF9FB4C8); LayoutParams dl = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); dl.leftMargin = (int) (6 * d);
         badges.addView(dc, dl);
         box.addView(badges);
@@ -225,7 +226,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         dlg.show();
     }
 
-    private static String label(ChannelStore.Channel ch) { return ch.name == null || ch.name.isEmpty() ? (ch.isDigital() ? "Digital " : "Analog ") + ch.number : ch.name; }
+    private static String label(ChannelStore.Channel ch) { return ch.name == null || ch.name.isEmpty() ? (ch.isM17() ? "M17 " : ch.isDigital() ? "Digital " : "Analog ") + ch.number : ch.name; }
 
     private static TextView numberTile(Context c, int number, boolean active) {
         TextView n = Neo.text(c, String.format(Locale.US, "%02d", number % 100), active ? Neo.CYAN : 0xFF6FA9C0, 18, Neo.display(c)); n.setGravity(Gravity.CENTER);
@@ -303,7 +304,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             row.findViewWithTag("air").setVisibility(active ? VISIBLE : GONE);
             ((TextView) row.findViewWithTag("freq")).setText(mhz(ch.rxFreq));
             LinearLayout badges = row.findViewWithTag("badges"); badges.removeAllViews();
-            badges.addView(Neo.chip(c, ch.isDigital() ? "DMR" : "FM", ch.isDigital() ? Neo.VIOLET : Neo.CYAN));
+            badges.addView(Neo.chip(c, ch.isM17() ? "M17" : ch.isDigital() ? "DMR" : "FM", ch.isM17() || ch.isDigital() ? Neo.VIOLET : Neo.CYAN));
             if (svc != null && svc.scanPriority() == ch.number) { TextView pc = Neo.chip(c, "PRIORITY", Neo.VIOLET); LayoutParams pl2 = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); pl2.leftMargin = (int) (6 * d); badges.addView(pc, pl2); }
             Object[] lh = heard.get(ch.number);                                   // when the channel was last heard (owner, 2026-10-25: the colour code and tone chip came off the card; the editor has the detail and the history)
             if (lh != null) { TextView ht = Neo.text(c, "heard " + heardWhen((Long) lh[0]), Neo.DIM, 11.5f, Neo.uiMedium(c)); ht.setSingleLine(true); ht.setEllipsize(android.text.TextUtils.TruncateAt.END); LayoutParams hl = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); hl.leftMargin = (int) (6 * d); badges.addView(ht, hl); }

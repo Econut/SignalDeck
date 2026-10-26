@@ -38,7 +38,8 @@ public class ChannelEditorView extends LinearLayout {
     private EditText name, tx, rx, call, key, groups, notes;
     private EditText lat, lon;
     private TextView txCodeV, rxCodeV;
-    private LinearLayout digitalGroup, analogGroup;
+    private EditText m17Dest;
+    private LinearLayout digitalGroup, analogGroup, m17Group;
 
     private static final String[] TONE_TYPES = { "None", "CTCSS", "DCS", "DCS inverted" };
     /** The field help texts, for SignalDeck Web's channel editor: {key, text}. */
@@ -46,13 +47,15 @@ public class ChannelEditorView extends LinearLayout {
         return new String[][] { { "name", H_NAME }, { "notes", H_NOTES }, { "type", H_TYPE }, { "tx", H_TX }, { "rx", H_RX }, { "pos", H_POS }, { "power", H_POWER }, { "rxOnly", H_RXONLY }, { "band", H_BAND },
                 { "relay", H_RELAY }, { "cc", H_CC }, { "mode", H_MODE }, { "slot", H_SLOT }, { "contactType", H_CTYPE }, { "call", H_CALL }, { "groups", H_GROUPS },
                 { "encrypt", H_ENC }, { "key", H_KEY }, { "interrupt", H_INT }, { "sq", H_SQ }, { "softSq", H_SOFTSQ }, { "softSqLevel", H_SOFTSQ_LVL },
-                { "txType", H_TXT }, { "txTone", H_TXC }, { "rxType", H_RXT }, { "rxTone", H_RXC } };
+                { "txType", H_TXT }, { "txTone", H_TXC }, { "rxType", H_RXT }, { "rxTone", H_RXC }, { "m17dest", H_M17 }, { "can", H_CAN } };
     }
 
     // ---- field help (what each setting does on this radio) ----
     private static final String H_NOTES = "Anything worth remembering about this channel: who uses it, the repeater's owner or club, linking, hours, how to check in. It can go with the channel when you share it (Share channels \u2192 Channel notes).";
     private static final String H_NAME = "Shown on the intercom, in the channel list and in voice announcements. Up to " + ChannelStore.NAME_MAX + " characters; the counter under the field shows how many are left. The radio itself never receives the name. Codeplug tools such as OpenGD77 CPS keep shorter names (16 characters), so a long name may be cut short in a backup opened there.";
-    private static final String H_TYPE = "Digital (DMR) channels carry voice and text as data and need a colour code, a time slot and a call target. Analog channels are classic FM. Switching shows the settings that apply.";
+    private static final String H_TYPE = "Digital (DMR) channels carry voice and text as data and need a colour code, a time slot and a call target. Analog channels are classic FM. M17 channels are wide FM with M17 layered on them: a destination callsign (or everyone) and a channel access number. Switching shows the settings that apply.";
+    private static final String H_M17 = "Who this channel calls. @ALL is everyone. A callsign calls that station. Pick from contacts uses a contact that has a callsign. Your own callsign, the one you transmit from, is the station callsign in APRS settings.";
+    private static final String H_CAN = "Channel access number, 0 to 15. Radios only hear each other when this matches. 0 is the usual choice.";
     private static final String H_TX = "The frequency you transmit on, in MHz. On a simplex channel it is the same as the receive frequency; on a repeater channel it is the repeater's input (for example +5 MHz on UHF GMRS, or ±0.6 MHz on 2 m). This radio covers 136–174 and 400–480 MHz.";
     private static final String H_RX = "The frequency you listen on, in MHz. On a repeater channel it is the repeater's output. This radio tunes 136–174 and 400–480 MHz; other frequencies (220 MHz, for example) cannot be saved.";
     private static final String H_POS = "Optional position of the station or repeater this channel reaches. With it the intercom shows the place name and its distance and bearing from you. Use my position fills in the phone's last known location.";
@@ -107,7 +110,7 @@ public class ChannelEditorView extends LinearLayout {
         section(form, "Channel");
         name = textInto(form, "Channel name", H_NAME, ch.name, InputType.TYPE_CLASS_TEXT);
         nameCounter(name);
-        choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog" }, ch.type, v -> { ch.type = v; refreshGroups(); });
+        choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog", "M17" }, ch.type, v -> { ch.type = v; refreshGroups(); });
         tx = textInto(form, "Send frequency (MHz)", H_TX, ch.txFreq > 0 ? String.format(Locale.US, "%.5f", ch.txFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         rx = textInto(form, "Receive frequency (MHz)", H_RX, ch.rxFreq > 0 ? String.format(Locale.US, "%.5f", ch.rxFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         form.addView(VfoDialog.bandPlanLine(getContext(), rx, tx));
@@ -146,6 +149,15 @@ public class ChannelEditorView extends LinearLayout {
         rxCodeV = choiceInto(analogGroup, "RX tone", H_RXC, null, 0, null);
         rxCodeV.setOnClickListener(v -> pickTone(false)); ((View) rxCodeV.getParent()).setOnClickListener(v -> pickTone(false));
         txCodeV.setText(toneName(ch.txType, ch.txSubCode)); rxCodeV.setText(toneName(ch.rxType, ch.rxSubCode));
+
+        m17Group = new LinearLayout(c); m17Group.setOrientation(VERTICAL); form.addView(m17Group);
+        section(m17Group, "M17");
+        m17Dest = textInto(m17Group, "Destination (@ALL or a callsign)", H_M17, ch.m17Dest(), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);
+        TextView pick = Neo.button(c, "Pick from contacts\u2026", "contacts", Neo.VIOLET); pick.setTextSize(14);
+        LayoutParams mpl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); mpl.bottomMargin = (int) (6 * Theme.dp(c));
+        m17Group.addView(pick, mpl);
+        pick.setOnClickListener(v -> pickM17Dest());
+        choiceInto(m17Group, "Channel access number", H_CAN, names(0, 15), ch.can(), v -> ch.cc = v);
 
         section(form, "Location");
         lat = textInto(form, "Latitude (optional)", H_POS + "\n\n" + H_MAPS, ch.lat != 0 || ch.lon != 0 ? String.format(Locale.US, "%.5f", ch.lat) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
@@ -281,9 +293,24 @@ public class ChannelEditorView extends LinearLayout {
         }).show();
     }
 
+    private void pickM17Dest() {
+        final Context c = getContext();
+        if (!(c instanceof com.macdmr.radio.MainActivity) || ((com.macdmr.radio.MainActivity) c).service() == null) return;
+        final java.util.List<com.macdmr.radio.ChannelStore.Contact> all = ((com.macdmr.radio.MainActivity) c).service().store().contacts();
+        final java.util.List<String> calls = new java.util.ArrayList<>();
+        calls.add("@ALL");
+        for (com.macdmr.radio.ChannelStore.Contact ct : all) {
+            String call = ct.baseCall();
+            if (!call.isEmpty() && !calls.contains(call)) calls.add(call);
+        }
+        String[] items = calls.toArray(new String[0]);
+        new android.app.AlertDialog.Builder(c).setTitle("M17 destination").setItems(items, (d, w) -> m17Dest.setText(items[w])).show();
+    }
+
     private void refreshGroups() {
         digitalGroup.setVisibility(ch.isDigital() ? VISIBLE : GONE);
-        analogGroup.setVisibility(ch.isDigital() ? GONE : VISIBLE);
+        analogGroup.setVisibility(ch.type == com.macdmr.radio.ChannelStore.Channel.TYPE_FM ? VISIBLE : GONE);
+        if (m17Group != null) m17Group.setVisibility(ch.isM17() ? VISIBLE : GONE);
     }
 
     private static String[] names(int from, int to) { String[] s = new String[to - from + 1]; for (int i = from; i <= to; i++) s[i - from] = String.valueOf(i); return s; }
@@ -414,7 +441,11 @@ public class ChannelEditorView extends LinearLayout {
             String la = lat.getText().toString().trim(), lo = lon.getText().toString().trim();
             if (la.isEmpty() && lo.isEmpty()) { ch.lat = 0; ch.lon = 0; }
             else { ch.lat = Double.parseDouble(la); ch.lon = Double.parseDouble(lo); if (Math.abs(ch.lat) > 90 || Math.abs(ch.lon) > 180) throw new IllegalArgumentException("Latitude must be within ±90 and longitude within ±180"); }
-            if (ch.isDigital()) {
+            if (ch.isM17()) {
+                ch.m17dest = com.macdmr.radio.ChannelStore.Channel.cleanM17Dest(m17Dest.getText().toString());
+                ch.band = 1;
+                ch.cc = ch.can();
+            } else if (ch.isDigital()) {
                 ch.txContact = call.getText().toString().trim().isEmpty() ? 0 : Integer.parseInt(call.getText().toString().trim());
                 List<Integer> g = new ArrayList<>();
                 for (String s : groups.getText().toString().split("[,; ]+")) { s = s.trim(); if (!s.isEmpty()) g.add(Integer.parseInt(s)); }

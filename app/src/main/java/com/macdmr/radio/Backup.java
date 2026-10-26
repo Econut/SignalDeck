@@ -39,7 +39,7 @@ public final class Backup {
     public static final String CHANNELS_HEADER = "_id,Channel Number,Channel Name,Channel Type,Rx Frequency,Tx Frequency,Bandwidth (kHz),"
             + "Colour Code,Timeslot,Contact,TG List,DMR ID,TS1_TA_Tx,TS2_TA_Tx ID,RX Tone,TX Tone,"
             + "Squelch,Power,Rx Only,Zone Skip,All Skip,TOT,VOX,No Beep,No Eco,APRS,Latitude,Longitude,Use Location,"
-            + "Encrypt Switch,Encrypt Key,Relay,Interrupt,Active,Outbound Slot,Channel Mode,Contact Type,SoftSQ,SoftSQLevel";
+            + "Encrypt Switch,Encrypt Key,Relay,Interrupt,Active,Outbound Slot,Channel Mode,Contact Type,SoftSQ,SoftSQLevel,M17 Dest";
     private static final String CONTACTS_HEADER = "Contact Name,ID,ID Type,TS Override";
 
     private Backup() { }
@@ -105,10 +105,13 @@ public final class Backup {
             for (ChannelStore.Channel ch : channels) {
                 StringBuilder r = new StringBuilder();
                 boolean dig = ch.isDigital();
-                r.append(ch.id).append(',').append(ch.number).append(',').append(q(ch.name)).append(',').append(dig ? "Digital" : "Analogue").append(',');
+                r.append(ch.id).append(',').append(ch.number).append(',').append(q(ch.name)).append(',').append(typeCell(ch)).append(',');
                 r.append(String.format(Locale.US, "\t%.5f", ch.rxFreq / 1e6)).append(',').append(String.format(Locale.US, "\t%.5f", ch.txFreq / 1e6)).append(',');
-                r.append(dig ? "" : (ch.band == 0 ? "12.5" : "25")).append(',');
-                if (dig) {
+                r.append(dig ? "" : (ch.isM17() || ch.band != 0 ? "25" : "12.5")).append(',');
+                if (ch.isM17()) {
+                    r.append(ch.can()).append(",,,,,,Disabled,Disabled,");
+                    r.append(ch.sq == 0 ? "Disabled" : String.valueOf(ch.sq * 10 - 5)).append(',');
+                } else if (dig) {
                     r.append(ch.cc).append(',').append(ch.inSlot + 1).append(',');
                     String cn = contactName.get(ch.txContact); r.append(q(cn != null ? cn : (ch.txContact > 0 ? "TG " + ch.txContact : "None"))).append(',');
                     String ln = listOf.get(ch.id); r.append(q(ln != null ? ln : "None")).append(',');
@@ -123,6 +126,7 @@ public final class Backup {
                 r.append(',').append(ch.relay == 0 || ch.relay == 1 || ch.relay == 2 ? ch.relay : 2).append(',').append(dig ? (ch.interrupt == 1 ? 1 : 2) : 0).append(',').append(ch.active ? 1 : 0);
                 r.append(',').append(ch.outSlot).append(',').append(ch.mode == 4 ? 3 : ch.mode).append(',').append(ch.contactType);
                 r.append(',').append(ch.softSq ? "On" : "Off").append(',').append(ch.softSqLevel >= 1 ? ch.softSqLevel : 5);
+                r.append(',').append(ch.isM17() ? q(ch.m17Dest()) : "");
                 w.write(r + "\r\n");
             }
         }
@@ -200,6 +204,16 @@ public final class Backup {
         return rows;
     }
 
+    /** Channel Type cell: M17, Digital, or Analogue. */
+    static String typeCell(ChannelStore.Channel ch) { return ch.isM17() ? "M17" : ch.isDigital() ? "Digital" : "Analogue"; }
+    /** 2 M17, 0 digital, 1 analog. Anything else is analog, which is what an OpenGD77 file is. */
+    static int channelKind(String cell) {
+        String k = cell == null ? "" : cell.trim().toLowerCase(Locale.US);
+        if (k.startsWith("m17")) return ChannelStore.Channel.TYPE_M17;
+        if (k.startsWith("dig")) return ChannelStore.Channel.TYPE_DMR;
+        return ChannelStore.Channel.TYPE_FM;
+    }
+
     private static String col(List<String> r, int i) { return i >= 0 && i < r.size() ? r.get(i).trim() : ""; }
     private static int num(String s, int dflt) { try { return Integer.parseInt(s.trim()); } catch (Exception e) { return dflt; } }
 
@@ -224,7 +238,10 @@ public final class Backup {
                 cmp(d, "name", x.name, y.name); cmp(d, "type", x.type, y.type); cmp(d, "rx", x.rxFreq, y.rxFreq); cmp(d, "tx", x.txFreq, y.txFreq);
                 cmp(d, "power", x.power, y.power); cmp(d, "relay", x.relay, y.relay); cmp(d, "lat", Math.round(x.lat * 1e5), Math.round(y.lat * 1e5)); cmp(d, "lon", Math.round(x.lon * 1e5), Math.round(y.lon * 1e5));
                 cmp(d, "softSq", x.softSq, y.softSq); cmp(d, "softSqLevel", x.softSqLevel, y.softSqLevel);
-                if (x.isDigital()) {
+                if (x.isM17()) {
+                    cmp(d, "can", x.can(), y.can()); cmp(d, "m17dest", x.m17Dest(), y.m17Dest());
+                    cmp(d, "band", x.band, y.band); cmp(d, "sq", x.sq, y.sq);
+                } else if (x.isDigital()) {
                     cmp(d, "cc", x.cc, y.cc); cmp(d, "inSlot", x.inSlot, y.inSlot); cmp(d, "outSlot", x.outSlot, y.outSlot); cmp(d, "mode", x.mode, y.mode);
                     cmp(d, "contactType", x.contactType, y.contactType); cmp(d, "txContact", x.txContact, y.txContact); cmp(d, "groups", Arrays.toString(x.groups), Arrays.toString(y.groups));
                     cmp(d, "encrypt", x.encryptSw == 1, y.encryptSw == 1); if (x.encryptSw == 1) cmp(d, "key", x.encryptKey, y.encryptKey); cmp(d, "interrupt", x.interrupt == 1, y.interrupt == 1);
@@ -296,8 +313,8 @@ public final class Backup {
         if (chans.size() < 2) throw new Exception("Channels.csv is empty");
         List<String> head = chans.get(0);
         int off = head.get(0).trim().equalsIgnoreCase("_id") ? 1 : 0;        // Android layout has _id first; OpenGD77 does not
-        int softSqCol = -1, softSqLevelCol = -1;
-        for (int i = 0; i < head.size(); i++) { String h = head.get(i).trim(); if (h.equalsIgnoreCase("SoftSQ")) softSqCol = i; if (h.equalsIgnoreCase("SoftSQLevel")) softSqLevelCol = i; }
+        int softSqCol = -1, softSqLevelCol = -1, m17Col = -1;
+        for (int i = 0; i < head.size(); i++) { String h = head.get(i).trim(); if (h.equalsIgnoreCase("SoftSQ")) softSqCol = i; if (h.equalsIgnoreCase("SoftSQLevel")) softSqLevelCol = i; if (h.equalsIgnoreCase("M17 Dest")) m17Col = i; }
         Map<String, Integer> contactByName = new HashMap<>();
         List<ChannelStore.Contact> cts = new ArrayList<>();
         for (int i = 1; i < contacts.size(); i++) {
@@ -321,7 +338,7 @@ public final class Backup {
             List<String> r = chans.get(i); if (r.size() < off + 17) continue;
             ChannelStore.Channel ch = new ChannelStore.Channel();
             ch.number = num(col(r, off), out.size() + 1); ch.name = col(r, off + 1);
-            ch.type = col(r, off + 2).toLowerCase(Locale.US).startsWith("dig") ? 0 : 1;
+            ch.type = channelKind(col(r, off + 2));
             try { ch.rxFreq = (int) Math.round(Double.parseDouble(col(r, off + 3)) * 1e6); ch.txFreq = (int) Math.round(Double.parseDouble(col(r, off + 4)) * 1e6); } catch (Exception e) { continue; }
             String bw = col(r, off + 5); ch.band = bw.startsWith("12") ? 0 : 1; if (ch.rxFreq < 300_000_000) ch.band = 1;
             if (ch.isDigital()) {
@@ -337,6 +354,11 @@ public final class Backup {
                 try { ch.txType = ToneConverter.parseType(col(r, off + 14)); ch.txSubCode = ToneConverter.parseSubCode(col(r, off + 14)); } catch (Exception ignored) { }
                 String sq = col(r, off + 15).replace("%", "");
                 ch.sq = sq.equalsIgnoreCase("Normal") ? 5 : sq.isEmpty() || sq.equalsIgnoreCase("Disabled") || sq.equalsIgnoreCase("None") ? 0 : Math.max(0, Math.min(9, (num(sq, 0) + 5) / 10));
+                if (ch.isM17()) {
+                    ch.cc = Math.max(0, Math.min(15, num(col(r, off + 6), 0)));
+                    ch.band = 1; ch.rxType = 0; ch.txType = 0; ch.rxSubCode = 0; ch.txSubCode = 0;
+                    ch.m17dest = ChannelStore.Channel.cleanM17Dest(m17Col >= 0 ? col(r, m17Col) : "");
+                }
             }
             String p = col(r, off + 16).toUpperCase(Locale.US);
             ch.power = p.equals("P1") || p.equals("P2") || p.equals("P3") || p.equals("P4") || p.equals("LOW") ? 0 : 1;
