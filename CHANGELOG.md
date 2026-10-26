@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-25 — Device report: radio firmware files, listed, copied only when ticked
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Queue item 5 (owner 2026-10-25) | Device → Device report → **Radio firmware files (root, you choose)**. It looks in the folders where the radio phones seen so far keep radio images (`/vendor/data/mcu`, `/system/data/{mcu,dmr}`, `/sdcard/intercom/dmr` and the like; in the shared `/vendor/firmware` folders, only radio-looking names) and inside the stock walkie-talkie app's APK (`assets`/`res/raw` images). It lists each file's name, size, SHA-256 and the module version strings inside (`DMR00x.….Vnnn`, the 3WT's `ver…_…`). The list goes into the report. Nothing is ticked by default; ticked files are copied to `Download/DMR/FoundFirmware/<model>/` with a SOURCES.txt (source path, size, hash). Nothing is sent anywhere and nothing on the phone's partitions is written; the app-private copies made for hashing are deleted afterwards. The folder is deliberately not under `Download/DMR/Firmware`, which the module loader reads: the handoff asked for `Firmware/found`, and this keeps vendor files out of the loader's folder. Reading the module flash itself is out of scope (stock firmware cannot read it back). Help: Device → Device report. | `FirmwareFinder.java` (new), `ui/DeviceView.java`, `ui/HelpView.java`, `FirmwareFinderTest.java` (new) | Host: version strings, the radio-name filter, APK image entries, safe unique names. **Device test owed** (the root search, the tick list, the copy). |
+
 ## 2026-10-25 — Device report: USB radios, vendor services, safer probe, key layouts
 
 | Backlog | Change | Files | Test |

@@ -368,7 +368,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     private void reportMenu() {
         final Context c = getContext();
         new android.app.AlertDialog.Builder(c).setTitle("Device report")
-                .setItems(new String[] { "Help support this phone (step by step)", "Generate device report", "Share last report", "Capture the PTT key (10 s)", "Radio probe (root)", "Open a GitHub issue with the facts filled in", "What is in it?", "Radio audio check (no sound, DMR or analog)" , "Second radio test (guided)"}, (dd, w) -> {
+                .setItems(new String[] { "Help support this phone (step by step)", "Generate device report", "Share last report", "Capture the PTT key (10 s)", "Radio probe (root)", "Open a GitHub issue with the facts filled in", "What is in it?", "Radio audio check (no sound, DMR or analog)" , "Second radio test (guided)", "Radio firmware files (root, you choose)"}, (dd, w) -> {
+                    if (w == 9) { firmwareFilesIntro(); return; }
                     if (w == 7) { dmrAudioCheckIntro(); return; }
                     if (w == 8) { secondRadioIntro(); return; }
                     if (w == 0) supportMenu();
@@ -809,6 +810,57 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         final Context c = getContext();
         final android.app.AlertDialog pd = new android.app.AlertDialog.Builder(c).setTitle("Press the PTT key now").setMessage("Press and release the phone's side PTT button a few times within the next 10 seconds. Everything the phone reports for it is recorded.").setCancelable(false).create(); pd.show();
         new Thread(() -> { final String r = com.macdmr.radio.DeviceReport.captureKeys(c, 10); final java.io.File dir = com.macdmr.radio.DeviceReport.append("PTT key capture", r); post(() -> { pd.dismiss(); android.widget.Toast.makeText(c, dir == null ? "Captured, but generate a report first so it can be saved" : "Saved to the report", android.widget.Toast.LENGTH_LONG).show(); }); }).start();
+    }
+
+    /** Opt-in: list the phone's radio firmware files (name, size, SHA-256, version strings); copy only the ticked ones. */
+    private void firmwareFilesIntro() {
+        final Context c = getContext();
+        new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files")
+                .setMessage("Needs Magisk root. Looks in the folders where radio phones keep their radio chip images, and in the stock walkie-talkie app, and lists what it finds: name, size, a fingerprint (SHA-256) and the module version written inside. "
+                        + "The list goes into the device report. Nothing is copied unless you tick files, and then only into Download/DMR/FoundFirmware on this phone; nothing is sent anywhere. "
+                        + "These files belong to the phone maker: share them only privately, and only if the SignalDeck maintainer asks.")
+                .setPositiveButton("Look", (dd, w) -> firmwareFilesScan()).setNegativeButton("Cancel", null).show();
+    }
+
+    private void firmwareFilesScan() {
+        final Context c = getContext();
+        final android.app.AlertDialog pd = new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files").setMessage("Starting…").setCancelable(false).create(); pd.show();
+        new Thread(() -> {
+            java.util.List<String> apks = new java.util.ArrayList<>();
+            try {
+                java.util.List<String> pkgs = new java.util.ArrayList<>();
+                if (svc != null && !svc.profile().stockApp.isEmpty()) pkgs.add(svc.profile().stockApp);
+                for (com.macdmr.radio.RadioAppFinder.App a : com.macdmr.radio.RadioAppFinder.rank(c)) if (pkgs.size() < 3 && a.score >= 5 && !pkgs.contains(a.pkg)) pkgs.add(a.pkg);
+                for (String pk : pkgs) try { android.content.pm.ApplicationInfo ai = c.getPackageManager().getApplicationInfo(pk, 0); apks.add(ai.sourceDir); if (ai.splitSourceDirs != null) java.util.Collections.addAll(apks, ai.splitSourceDirs); } catch (Throwable ignored) { }
+            } catch (Throwable ignored) { }
+            final java.util.List<com.macdmr.radio.FirmwareFinder.Found> fs = com.macdmr.radio.FirmwareFinder.scan(c, apks, s -> post(() -> pd.setMessage(s + "…")));
+            final java.io.File dir = com.macdmr.radio.DeviceReport.append("Radio firmware files found (root)", com.macdmr.radio.FirmwareFinder.describe(fs));
+            post(() -> {
+                pd.dismiss();
+                final java.util.List<com.macdmr.radio.FirmwareFinder.Found> readable = new java.util.ArrayList<>();
+                for (com.macdmr.radio.FirmwareFinder.Found f : fs) if (f.size > 0 && !f.sha256.isEmpty() && !f.sha256.startsWith("(")) readable.add(f);
+                if (readable.isEmpty()) {
+                    new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files").setMessage("None found that could be read." + (dir == null ? "" : " The search is in the device report.")).setPositiveButton("OK", null).show();
+                    com.macdmr.radio.FirmwareFinder.cleanUp(c); return;
+                }
+                String[] items = new String[readable.size()]; final boolean[] on = new boolean[items.length];
+                for (int i = 0; i < items.length; i++) { com.macdmr.radio.FirmwareFinder.Found f = readable.get(i); items[i] = f.name() + "\n" + (f.size / 1024) + " kB" + (f.versions.isEmpty() ? "" : " · " + f.versions) + "\n" + f.source; }
+                new android.app.AlertDialog.Builder(c).setTitle(readable.size() + " found (listed in the report)").setMultiChoiceItems(items, on, (d2, w2, ch) -> on[w2] = ch)
+                        .setPositiveButton("Copy ticked", (d2, w2) -> {
+                            java.util.List<com.macdmr.radio.FirmwareFinder.Found> ticked = new java.util.ArrayList<>();
+                            for (int i = 0; i < on.length; i++) if (on[i]) ticked.add(readable.get(i));
+                            if (ticked.isEmpty()) { com.macdmr.radio.FirmwareFinder.cleanUp(c); return; }
+                            new Thread(() -> {
+                                String msg;
+                                try { java.io.File out = com.macdmr.radio.FirmwareFinder.copy(ticked); msg = "Copied " + ticked.size() + " file" + (ticked.size() == 1 ? "" : "s") + " to Download/DMR/FoundFirmware/" + out.getName() + " with a SOURCES.txt. Nothing was sent anywhere; share the folder privately if asked."; com.macdmr.radio.DeviceReport.append("Radio firmware files copied", msg + "\n"); }
+                                catch (Throwable t) { msg = "Copy failed: " + t.getMessage(); }
+                                com.macdmr.radio.FirmwareFinder.cleanUp(c);
+                                final String m = msg; post(() -> new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files").setMessage(m).setPositiveButton("OK", null).show());
+                            }).start();
+                        })
+                        .setNegativeButton("Copy nothing", (d2, w2) -> com.macdmr.radio.FirmwareFinder.cleanUp(c)).setCancelable(false).show();
+            });
+        }).start();
     }
 
     private void probe() {
