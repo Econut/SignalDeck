@@ -23,14 +23,14 @@ public final class RadioProbe {
     private RadioProbe() { }
 
     /** Open the port as this app (the live rules allow it), send the version query, collect 3 s of reply bytes as hex. */
-    private static String javaQuery(String port) {
+    private static String javaQuery(String port, byte[] query) {
         StringBuilder hex = new StringBuilder();
         try (java.io.FileInputStream in = new java.io.FileInputStream(port); java.io.FileOutputStream out = new java.io.FileOutputStream(port)) {
             final byte[] buf = new byte[512]; final int[] got = { 0 };
             Thread t = new Thread(() -> { try { int n; while (got[0] < buf.length && (n = in.read(buf, got[0], buf.length - got[0])) > 0) got[0] += n; } catch (Throwable ignored) { } });
             t.setDaemon(true); t.start();
             Thread.sleep(300);
-            out.write(new byte[] { 0x68, 0x34, 0x01, 0x01, (byte) 0x95, (byte) 0xB9, 0x00, 0x01, 0x01, 0x10 }); out.flush();
+            out.write(query); out.flush();
             Thread.sleep(3000);
             for (int i = 0; i < got[0]; i++) hex.append(String.format(Locale.US, "%02x ", buf[i] & 0xFF));
         } catch (Throwable e) { return "(open failed: " + e.getMessage() + ")"; }
@@ -39,13 +39,12 @@ public final class RadioProbe {
 
     /** Labels of ports that belong to another subsystem (the Armor's ttyS1 is the modem mux, mt6825muxd_device): never written to, never opened up. */
     private static final java.util.regex.Pattern OTHER_USE = java.util.regex.Pattern.compile("(?i)mux|modem|ccci|radio|gps|gnss|bt_|bluetooth|nfc|console|wifi|wlan|fm_");
-    private static final String QUERY = "printf '\\x68\\x34\\x01\\x01\\x95\\xb9\\x00\\x01\\x01\\x10' > ";
 
     public static String run(android.content.Context ctx, Progress p, boolean pulsePower) {
         StringBuilder r = new StringBuilder();
         if (!RootSetup.haveRoot()) return "Root is not granted: the probe needs Magisk root (Superuser → allow SignalDeck).";
         p.step("Labels");
-        String ls = RootSetup.run("ls -Z /dev/ttyS* /dev/ttyMT* /dev/ttyHS* 2>/dev/null; true");
+        String ls = RootSetup.run("ls -Z /dev/ttyS* /dev/ttyMT* /dev/ttyHS* /dev/ttyACM* /dev/ttyUSB* 2>/dev/null; true");   // USB serial: the Agold phones' module sits behind a USB MCU on ttyACM0
         r.append("Serial ports and labels:\n").append(ls).append('\n');
         String holders = portHolders();
         r.append("Processes holding a serial port:\n").append(holders.isEmpty() ? "  (none)" : "  " + holders).append('\n');
@@ -99,12 +98,15 @@ public final class RadioProbe {
         } else r.append("No power-looking node found under /sys/devices/platform/*{dmr,intercom,walkie,ptt}*\n");
 
         p.step("Serial probe");
+        String stty = stty();
+        r.append("\nline settings tool: ").append(stty).append('\n');
+        List<String> notBack = new ArrayList<>();
         for (String port : ports) {
             r.append("\n--- ").append(port).append(" ---\n");
-            r.append("before: ").append(RootSetup.run("stty -F " + port + " -a 2>&1 | head -1")).append('\n');
-            String saved = RootSetup.run("stty -F " + port + " -g 2>/dev/null").trim();     // put the line back exactly as it was
-            try { probePort(r, port); }
-            finally { r.append("  line settings put back: ").append(restore(port, saved)).append('\n'); }
+            r.append("before: ").append(RootSetup.run(stty + " -F " + port + " -a 2>&1 | head -1")).append('\n');
+            Saved saved = save(stty, port);                                    // put the line back exactly as it was
+            try { probePort(r, stty, port, saved); }
+            finally { String back = restore(stty, port, saved); r.append("  line settings put back: ").append(back).append('\n'); if (!back.startsWith("yes")) notBack.add(port); }
         }
 
         p.step("Vendor serial library");
@@ -112,19 +114,54 @@ public final class RadioProbe {
 
         p.step("PCM sniff");
         for (String port : ports) {
-            String saved = RootSetup.run("stty -F " + port + " -g 2>/dev/null").trim();
-            String out = RootSetup.run("stty -F " + port + " 230400 raw -echo 2>&1; timeout 2 cat " + port + " | head -c 4000 | wc -c").trim();
-            restore(port, saved);
+            Saved saved = save(stty, port);
+            if (!saved.canChange) { r.append(port).append(": not sniffed at 230400 (its speed ").append(saved.speed).append(" could not be put back if changed)\n"); continue; }
+            String out = RootSetup.run(stty + " -F " + port + " 230400 raw -echo 2>&1; timeout 2 cat " + port + " | head -c 4000 | wc -c").trim();
+            String back = restore(stty, port, saved);
+            if (!back.startsWith("yes") && !notBack.contains(port)) notBack.add(port);
             r.append(String.format(Locale.US, "%s @230400: %s bytes in 2 s%s\n", port, out, out.matches("[1-9]\\d*") && Integer.parseInt(out) > 1000 ? "  (continuous stream — a PCM audio port?)" : ""));
         }
+        r.append(notBack.isEmpty() ? "\nline settings: every probed port is back as it was\n" : "\nline settings NOT back on " + String.join(", ", notBack) + " (a reboot puts them back)\n");
         r.append("\nSELinux denials during the probe:\n").append(RootSetup.run("logcat -d -b all 2>/dev/null | grep -i 'avc: denied' | tail -30")).append('\n');
         return r.toString();
     }
 
-    private static String restore(String port, String saved) {
-        if (!saved.matches("[0-9a-fA-F:]+")) return "(could not read them beforehand)";
-        RootSetup.run("stty -F " + port + " " + saved);
-        return RootSetup.run("stty -F " + port + " -g 2>/dev/null").trim().equals(saved) ? "yes" : "NO: " + RootSetup.run("stty -F " + port + " -a 2>&1 | head -1");
+    /** Magisk's busybox stty when present (it sets every speed the kernel knows), else the system's. */
+    private static String stty() {
+        String bb = RootSetup.run("for b in /data/adb/magisk/busybox /data/adb/ksu/bin/busybox; do [ -x $b ] && $b stty --help >/dev/null 2>&1 && { echo $b; break; }; done; true").trim();
+        return bb.isEmpty() ? "stty" : bb + " stty";
+    }
+
+    /** A port's line settings before the probe: the full state, its speed, and whether that speed can be set again. */
+    static final class Saved { String g = "", speed = ""; boolean canChange; }
+
+    private static Saved save(String stty, String port) {
+        Saved s = new Saved();
+        s.g = RootSetup.run(stty + " -F " + port + " -g 2>/dev/null").trim();
+        s.speed = speedOf(RootSetup.run(stty + " -F " + port + " 2>&1 | head -1"));
+        // only change a port whose own speed the tool accepts: setting the speed it already has must work and read back
+        // (the Atom XL's ttyS0 at 921600 was left at 230400 once: the speed was changed and could not be put back)
+        s.canChange = !s.speed.isEmpty() && RootSetup.run(stty + " -F " + port + " " + s.speed + " >/dev/null 2>&1 && echo ok").trim().equals("ok")
+                && speedOf(RootSetup.run(stty + " -F " + port + " 2>&1 | head -1")).equals(s.speed);
+        return s;
+    }
+
+    /** "speed 57600 baud; ..." (stty's first line) -> "57600"; "" if not found. */
+    static String speedOf(String sttyLine) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("speed (\\d+) baud").matcher(sttyLine == null ? "" : sttyLine);
+        return m.find() ? m.group(1) : "";
+    }
+
+    private static String restore(String stty, String port, Saved saved) {
+        if (!saved.g.matches("[0-9a-fA-F:]+") && saved.speed.isEmpty()) return "(could not read them beforehand)";
+        if (saved.g.matches("[0-9a-fA-F:]+")) RootSetup.run(stty + " -F " + port + " " + saved.g + " 2>/dev/null");
+        if (RootSetup.run(stty + " -F " + port + " -g 2>/dev/null").trim().equals(saved.g)) return "yes";
+        String now = speedOf(RootSetup.run(stty + " -F " + port + " 2>&1 | head -1"));
+        if (!saved.speed.isEmpty() && !now.equals(saved.speed)) {               // the full state did not take: the speed at least
+            RootSetup.run(stty + " -F " + port + " " + saved.speed + " 2>/dev/null");
+            now = speedOf(RootSetup.run(stty + " -F " + port + " 2>&1 | head -1"));
+        }
+        return now.equals(saved.speed) ? "yes (speed " + now + "; other flags may differ)" : "NO: speed " + now + " instead of " + saved.speed;
     }
 
     /** One line per process with a tty open: "  cmdline (pid): /dev/ttyX …". */
@@ -136,16 +173,28 @@ public final class RadioProbe {
         return null;
     }
 
-    private static void probePort(StringBuilder r, String port) {
+    /** The module's version queries: the Ulefone/Blackview frame, and the Agold envelope's 0x34 (DMR09 set) and 0x25 (older set). */
+    static final byte[] QUERY_ULEFONE = { 0x68, 0x34, 0x01, 0x01, (byte) 0x95, (byte) 0xB9, 0x00, 0x01, 0x01, 0x10 };
+    static final byte[] QUERY_AGOLD_34 = { 0x7E, (byte) 0x96, 0x69, 0x01, 0x34, 0x01, 0x00, 0x00, (byte) 0xFD, (byte) 0xCB, (byte) 0x81 };
+    static final byte[] QUERY_AGOLD_25 = { 0x7E, (byte) 0x96, 0x69, 0x01, 0x25, 0x01, 0x00, 0x00, (byte) 0xFD, (byte) 0xDA, (byte) 0x81 };
+    private static String printf(byte[] q) { StringBuilder s = new StringBuilder("printf '"); for (byte b : q) s.append(String.format(Locale.US, "\\x%02x", b & 0xFF)); return s.append("' > ").toString(); }
+    /** Bytes that only a radio module's answer starts with. */
+    static boolean looksLikeModule(String hex) { String h = hex.toLowerCase(Locale.US); return h.contains("68 34") || h.contains("bf aa") || h.contains("7e 96 69"); }
+
+    private static void probePort(StringBuilder r, String stty, String port, Saved saved) {
+        boolean usb = port.matches("/dev/tty(ACM|USB)\\d+");
         // first as the app itself, with the line as it is (toybox stty cannot set some MTK UARTs)
-        String direct = javaQuery(port);
+        String direct = javaQuery(port, QUERY_ULEFONE);
+        if (usb) direct = (direct + " " + javaQuery(port, QUERY_AGOLD_34) + " " + javaQuery(port, QUERY_AGOLD_25)).trim();   // a USB MCU ignores the line speed
         r.append("  as-is (opened by the app, no stty): ").append(direct.isEmpty() ? "(nothing received)" : direct).append('\n');
-        if (direct.contains("68 34") || direct.contains("bf aa")) { r.append("  ^ the DMR module answered on this port at its current line speed\n"); return; }
+        if (looksLikeModule(direct)) { r.append("  ^ the DMR module answered on this port at its current line speed\n"); return; }
+        if (usb) { r.append("  (USB serial: the line speed does not matter, no other speeds tried)\n"); return; }
+        if (!saved.canChange) { r.append("  other speeds not tried: its speed ").append(saved.speed.isEmpty() ? "(unreadable)" : saved.speed).append(" could not be put back if changed\n"); return; }
         for (int baud : new int[] { 57600, 115200, 9600, 230400 }) {
-            String out = RootSetup.run("stty -F " + port + " " + baud + " raw -echo 2>&1; " + "(timeout 3 cat " + port + " | head -c 400 | od -An -tx1 | tr -d '\\n' | cut -c1-600) & sleep 0.3; " + QUERY + port + "; sleep 3.2; echo");
+            String out = RootSetup.run(stty + " -F " + port + " " + baud + " raw -echo 2>&1; " + "(timeout 3 cat " + port + " | head -c 400 | od -An -tx1 | tr -d '\\n' | cut -c1-600) & sleep 0.3; " + printf(QUERY_ULEFONE) + port + "; sleep 3.2; echo");
             String hex = out.replaceAll("\\s+", " ").trim();
-            r.append(String.format(Locale.US, "  %6d baud (readback %s), after 0x34 query: %s\n", baud, RootSetup.run("stty -F " + port + " -a 2>&1 | head -1").replaceAll("(?s).*speed (\\d+) baud.*", "$1").trim(), hex.isEmpty() ? "(nothing received)" : hex));
-            if (hex.contains("68 34") || hex.contains("bf aa")) { r.append("  ^ looks like the DMR module answered at ").append(baud).append(" baud\n"); return; }
+            r.append(String.format(Locale.US, "  %6d baud (readback %s), after 0x34 query: %s\n", baud, speedOf(RootSetup.run(stty + " -F " + port + " 2>&1 | head -1")), hex.isEmpty() ? "(nothing received)" : hex));
+            if (looksLikeModule(hex)) { r.append("  ^ looks like the DMR module answered at ").append(baud).append(" baud\n"); return; }
         }
     }
 
@@ -163,8 +212,10 @@ public final class RadioProbe {
             if (!VendorSerial.haveWrapper(syms)) { r.append("  no wrapper class for this JNI class yet: add one named exactly as above (see VendorSerial.java) and the app can open the port the vendor way\n"); continue; }
             r.append("  known wrapper class (").append(VendorSerial.wrapperFor(syms)).append(") available: trying it on each port at 57600\n");
             if (!VendorSerial.load(ctx, lib.getAbsolutePath())) { r.append("  could not load it (another serial library is already loaded until SignalDeck restarts, or the load failed)\n"); continue; }
+            String stty = stty();
             for (String port : ports) {
-                String saved = RootSetup.run("stty -F " + port + " -g 2>/dev/null").trim();
+                Saved saved = save(stty, port);
+                if (!saved.canChange) { r.append("  ").append(port).append(": not opened at 57600 (its speed ").append(saved.speed).append(" could not be put back)\n"); continue; }
                 try {
                     VendorSerial.Port sp = VendorSerial.openPort(port, 57600);
                     if (sp == null) { r.append("  ").append(port).append(": native open failed\n"); continue; }
@@ -173,10 +224,10 @@ public final class RadioProbe {
                     Thread t = new Thread(() -> { try { int n; while (got[0] < buf.length && (n = in.read(buf, got[0], buf.length - got[0])) > 0) got[0] += n; } catch (Throwable ignored) { } }); t.setDaemon(true); t.start();
                     Thread.sleep(300); out.write(new byte[] { 0x68, 0x34, 0x01, 0x01, (byte) 0x95, (byte) 0xB9, 0x00, 0x01, 0x01, 0x10 }); out.flush(); Thread.sleep(3000);
                     StringBuilder hex = new StringBuilder(); for (int i = 0; i < got[0]; i++) hex.append(String.format(Locale.US, "%02x ", buf[i] & 0xFF));
-                    r.append("  ").append(port).append(" via vendor library @57600: ").append(hex.length() == 0 ? "(nothing received)" : hex.toString().trim()).append(hex.toString().contains("68 34") ? "  <- module answered" : "").append('\n');
+                    r.append("  ").append(port).append(" via vendor library @57600: ").append(hex.length() == 0 ? "(nothing received)" : hex.toString().trim()).append(looksLikeModule(hex.toString()) ? "  <- module answered" : "").append('\n');
                     try { in.close(); out.close(); } catch (Throwable ignored) { } sp.release();
                 } catch (Throwable t) { r.append("  ").append(port).append(": ").append(t).append('\n'); }
-                finally { restore(port, saved); }
+                finally { restore(stty, port, saved); }
             }
         }
     }

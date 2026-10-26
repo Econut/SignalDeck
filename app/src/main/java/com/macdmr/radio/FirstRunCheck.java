@@ -156,6 +156,10 @@ public final class FirstRunCheck {
                 r.append("  ").append(dev).append(": ").append(RootSetup.run("stty -F " + dev + " -a 2>&1 | head -2").replace('\n', ' ')).append('\n');
         } else r.append("not running after 8 s (pid: ").append(pid).append(")\n");
         Thread.sleep(7000);
+        if (pid.matches("\\d+")) {                                            // again at the end: a daemon-backed app (Armor 3WT) connects only after start-up
+            r.append("at the end of the watch it holds: ").append(RootSetup.run("ls -l /proc/" + pid + "/fd 2>/dev/null | grep -o '/dev/[A-Za-z0-9_/]*' | sort -u").replace('\n', ' ')).append('\n');
+            r.append("its TCP connections: ").append(DeviceReport.tcpOf(RootSetup.run("cat /proc/net/tcp /proc/net/tcp6 2>/dev/null"), RootSetup.run("ls -l /proc/" + pid + "/fd 2>/dev/null"))).append('\n');
+        }
         String log = pid.matches("\\d+") ? RootSetup.run("logcat -d --pid=" + pid + " 2>/dev/null | tail -600") : RootSetup.run("logcat -d 2>/dev/null | tail -400");
         int hexLines = 0; StringBuilder kept = new StringBuilder();
         for (String l : log.split("\n")) {

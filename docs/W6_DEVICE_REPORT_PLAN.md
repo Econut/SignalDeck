@@ -153,6 +153,34 @@ Each item is a backlog row in `CHANGELOG.md` with "Device: W6" in its test colum
     Android 10 (`timeout`, `stat -c`, `cmd package resolve-activity`), the 200-line `cat` limit, generation time on a
     slow quad A53.
 
+#### Phase 2 additions from the Agold reports (Atom XL, Armor 3WT; added 2026-10-25, branch `claude/report-gaps`)
+
+Both Agold phones put the module behind a USB STM32 (`ttyACM0` for commands, a USB Audio Class card for audio), with a
+vendor HAL (Atom XL) or a daemon on local TCP ports (3WT) holding the port. Their reports missed that. Done on the
+branch, host-tested only (no Agold phone here):
+
+13. **Privacy: no radio ID in logged frames.** `AgoldFrames` blanks the own ID, call number and key of logged
+    `7E 96 69` channel writes, the bodies of texts and caller info, and their checksums.
+14. **The module's answers in the stock app's log** (`AgoldFrames.answers`): when SignalDeck's probe got no answer,
+    the summary says so.
+15. **Probe: USB serial ports** (`ttyACM*`, `ttyUSB*`, with the Agold `0x34`/`0x25` queries); ports held by a
+    vendor service are skipped and named. Part of item 6.
+16. **Probe: line speed safety.** Magisk's busybox `stty` is used when present. A port's speed is changed only if its
+    own speed can be set again, the restore is checked by speed, and any port not back is named.
+17. **USB devices with interface classes, USB sound cards marked.**
+18. **Radio-related properties** (`agold|agui|extmodule|intercom|interphone|dmr|walkie|ptt|smartkey|prize|pdt`).
+19. **Vendor services:** `lshal` lines and the vendor HAL and daemon names with their sizes.
+20. **Programs listening on local TCP ports, and radio-looking unix sockets**, with their owners. This is parsed in
+    Java, because `awk` is missing on older toybox.
+21. **Programs holding USB serial, sound or radio devices**, with their full command line.
+22. **Magisk modules:** id, name, version, state and file names, never contents.
+23. **The phone's name from the vendor partition on a GSI**, in the report and in the summary.
+24. **The stock app's devices and TCP connections again at the end of the 15 s watch.** Part of item 1, until strace
+    lands.
+25. **PTT: the key layout lookup for raw scancodes** (via `dumpsys input`'s `KeyLayoutFile`). Part of item 7.
+26. **SignalDeck's own `/data/local/tests` denials** are counted, not listed; its other denials are marked
+    `[SignalDeck]`.
+
 ### Phase 3: Receive side on the W6
 
 - With the protocol known, decide what "compatible" means for the W6:

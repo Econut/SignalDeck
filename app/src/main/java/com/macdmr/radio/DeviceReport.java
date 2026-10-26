@@ -73,6 +73,9 @@ public final class DeviceReport {
         kv(r, "su present", String.valueOf(suPresent())); kv(r, "root granted to this app", String.valueOf(root));
         kv(r, "magisk", root ? RootSetup.run("magisk -v 2>/dev/null; magisk -V 2>/dev/null").replace('\n', ' ') : "n/a");
         for (String prop : new String[] { "ro.product.model", "ro.board.platform", "ro.hardware", "ro.build.version.sdk", "ro.vendor.build.fingerprint", "persist.sys.usb.config", "ro.boot.verifiedbootstate" }) kv(r, prop, getprop(prop));
+        for (String prop : VENDOR_PROPS) kv(r, prop, getprop(prop));
+        String vn = vendorName();
+        if (vn != null) kv(r, "phone (vendor partition)", vn);
         DeviceProfile dp = DeviceProfile.detect();
         kv(r, "profile detected", dp.supported ? dp.name + (dp.verified ? "" : " (untested on hardware)") : "none (this is an unsupported phone)");
 
@@ -154,14 +157,22 @@ public final class DeviceReport {
         if (root) r.append(RootSetup.run("grep -il -E 'pdt|intercom|interphone|dmr|walkie' /vendor/etc/*.xml /vendor/etc/audio/* /odm/etc/*.xml /system/etc/audio* 2>/dev/null | head; "
                 + "for f in $(grep -il -E 'pdt|intercom|interphone|dmr|walkie' /vendor/etc/*.xml /vendor/etc/audio/* /odm/etc/*.xml 2>/dev/null | head -5); do echo \"--- $f\"; grep -i -E 'pdt|intercom|interphone|dmr|walkie' \"$f\" | head -20; done; "
                 + "dumpsys media.audio_flinger 2>/dev/null | grep -i -E 'pdt|intercom|interphone|dmr|walkie' | grep -v macdmr | head -20; true")).append('\n');
-        h(r, "Audio devices"); r.append(cat("/proc/asound/cards")).append(ls("/dev/snd", null)).append('\n');
+        h(r, "Audio devices"); r.append(soundCards()).append(ls("/dev/snd", null)).append('\n');
+        p.step("USB devices");
+        h(r, "USB devices (a radio behind a USB MCU shows here: serial = CDC, sound = audio class)"); r.append(usbDevices()).append('\n');
+        h(r, "Radio-related system properties"); r.append(mask(exec("getprop | grep -iE '" + PROP_WORDS + "' | grep -v -E 'known_codenames|macdmr' | head -80"))).append('\n');
 
         if (root) {
             p.step("Root extras");
             h(r, "Processes with a radio-looking name (root)"); r.append(RootSetup.run("ps -AZ | grep -iE 'intercom|interphone|walkie|dmr|ptt|quickchat|tiny|serial|uart' | grep -v grep")).append('\n');
             h(r, "Who holds the serial ports (root)"); r.append(RootSetup.run("for p in /proc/[0-9]*; do ls -l $p/fd 2>/dev/null | grep -q '/dev/tty' && echo \"$(cat $p/comm) ($(basename $p)): $(ls -l $p/fd 2>/dev/null | grep -o '/dev/tty[A-Za-z0-9]*' | sort -u | tr '\\n' ' ')\"; done")).append('\n');
             h(r, "Recent logcat lines mentioning the radio (root, redacted)"); r.append(redact(RootSetup.run("logcat -d -t 3000 2>/dev/null | grep -iE 'ptt|intercom|interphone|walkie|dmr|serial|tty|tiny' | grep -vE 'BufferQueue|SurfaceFlinger|MTK_APPList|WindowManager|InputManager|ImeTracker|InputMethod|ApkAssets|PackageConfig|ViewRootImpl' | tail -120"))).append('\n');
-            h(r, "SELinux denials seen so far (root)"); r.append(RootSetup.run("logcat -d -b all 2>/dev/null | grep -i 'avc: denied' | tail -40; dmesg 2>/dev/null | grep -i 'avc: denied' | tail -40")).append('\n');
+            h(r, "SELinux denials seen so far (root)"); r.append(labelDenials(RootSetup.run("logcat -d -b all 2>/dev/null | grep -i 'avc: denied' | tail -120; dmesg 2>/dev/null | grep -i 'avc: denied' | tail -60"), c.getPackageName())).append('\n');
+            p.step("Vendor services");
+            h(r, "Vendor radio services and programs (root: HIDL list, vendor HAL and daemon names and sizes)"); r.append(vendorServices()).append('\n');
+            h(r, "Programs listening on local sockets (root)"); r.append(listeningSockets()).append('\n');
+            h(r, "Programs holding USB serial, sound or radio devices (root, full command line)"); r.append(deviceHolders()).append('\n');
+            h(r, "Magisk modules (root: id, name, version, file names)"); r.append(magiskModules()).append('\n');
             p.step("Sound card");
             h(r, "Sound card streams and mixer (root)"); r.append(soundCard(c)).append('\n');
         } else {
@@ -337,6 +348,7 @@ public final class DeviceReport {
     static String summary(RadioService svc, File reportTxt) {
         StringBuilder b = new StringBuilder("SIGNALDECK DEVICE REPORT \u2014 SUMMARY\n\n");
         b.append("phone: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append(" \u00B7 Android ").append(Build.VERSION.RELEASE).append(" \u00B7 ").append(Build.DISPLAY).append('\n');
+        String vn = vendorName(); if (vn != null) b.append("phone per its vendor partition: ").append(vn).append('\n');   // a GSI names itself, not the phone
         b.append("SignalDeck: ").append(BuildConfig.VERSION_NAME).append(" \u00B7 up ").append(android.os.SystemClock.elapsedRealtime() / 60_000).append(" min since the phone booted\n");
         if (svc != null) {
             DeviceProfile dp = svc.profile();
@@ -424,7 +436,10 @@ public final class DeviceReport {
         } catch (Throwable ignored) { }
         keyCapture = null;
         try { c.unregisterReceiver(br); } catch (Throwable ignored) { }
-        return "Activity key events and known PTT broadcasts:\n" + (keys.length() == 0 ? "  (none reached the app)\n" : keys) + "\nInput events (root getevent):\n" + (events.isEmpty() ? "  (n/a)\n" : events + "\n") + "\nLog lines during the capture (root):\n" + (logs.isEmpty() ? "  (n/a)\n" : logs + "\n");
+        String layouts = root ? keyLayouts(rawKeys(events)) : "";
+        return "Activity key events and known PTT broadcasts:\n" + (keys.length() == 0 ? "  (none reached the app)\n" : keys) + "\nInput events (root getevent):\n" + (events.isEmpty() ? "  (n/a)\n" : events + "\n")
+                + (layouts.isEmpty() ? "" : "\nWhat the key layouts make of those keys (root):\n" + layouts)
+                + "\nLog lines during the capture (root):\n" + (logs.isEmpty() ? "  (n/a)\n" : logs + "\n");
     }
 
     /** JNI entry points of a native library, by scanning for "Java_" symbol names: tells us the Java class the vendor's serial opener binds to. */
@@ -521,6 +536,209 @@ public final class DeviceReport {
             out.append(mask(l).replaceAll("-?\\b\\d{1,3}\\.\\d{4,}\\b", "#.####")).append('\n');
         }
         return out.length() == 0 ? "(empty)\n" : out.toString();
+    }
+
+    // ---- phones the Agold/Atom XL/Armor 3WT reports taught us about ----
+
+    private static final String[] VENDOR_PROPS = { "ro.product.vendor.brand", "ro.product.vendor.manufacturer", "ro.product.vendor.model", "ro.product.vendor.device", "ro.product.odm.model", "ro.product.board", "ro.board.platform" };
+    private static final String PROP_WORDS = "agold|agui|extmodule|intercom|interphone|dmr|walkie|ptt|smartkey|prize|pdt";
+
+    /** "Ulefone Armor 3WT (board s62v71c2k_gq_3wt)" from the vendor partition when Build says something generic (a GSI), else null. */
+    static String vendorName() { return vendorName(Build.MODEL, getprop("ro.product.vendor.brand"), getprop("ro.product.vendor.model"), getprop("ro.product.board").isEmpty() ? Build.BOARD : getprop("ro.product.board")); }
+    static String vendorName(String model, String vBrand, String vModel, String board) {
+        boolean generic = model == null || model.matches("(?i).*(treble|gsi|phh|lineage|generic|aosp|sdk_|^unknown$).*");
+        String v = ((vBrand == null ? "" : vBrand.trim()) + " " + (vModel == null ? "" : vModel.trim())).trim();
+        if (v.isEmpty() || v.matches("(?i).*(treble|gsi|phh|generic).*")) v = "";
+        if (!generic) return null;                                             // a stock ROM's own name is right
+        String b = board == null || board.trim().isEmpty() || board.equalsIgnoreCase("unknown") ? "" : board.trim();
+        if (v.isEmpty() && b.isEmpty()) return null;
+        return (v.isEmpty() ? "unknown" : v) + (b.isEmpty() ? "" : " (board " + b + ")");
+    }
+
+    /** /proc/asound/cards with each USB sound card marked (the Agold phones' radio audio is the MCU's USB audio class card). */
+    static String soundCards() {
+        String cards = cat("/proc/asound/cards");
+        StringBuilder out = new StringBuilder();
+        for (String l : cards.split("\n")) out.append(l).append(l.matches("\\s*\\d+ \\[.*") && l.matches("(?i).*usb.*") ? "   <- USB sound card" : "").append('\n');
+        return out.toString();
+    }
+
+    /** A USB interface class byte in words. */
+    static String usbClass(String hex) {
+        switch (hex == null ? "" : hex.trim().toLowerCase(Locale.US)) {
+            case "01": return "audio"; case "02": return "serial (CDC)"; case "03": return "HID"; case "08": return "storage"; case "09": return "hub";
+            case "0a": return "CDC data"; case "0e": return "video"; case "e0": return "wireless"; case "fe": return "DFU/app"; case "ff": return "vendor";
+            default: return hex == null || hex.trim().isEmpty() ? "?" : "class " + hex.trim();
+        }
+    }
+
+    /** Every USB device: vendor:product, maker and product names, and what each interface is. No serial numbers. */
+    static String usbDevices() {
+        File[] ds = new File("/sys/bus/usb/devices").listFiles();
+        if (ds == null) return "  (not readable)\n";
+        java.util.Arrays.sort(ds);
+        StringBuilder out = new StringBuilder();
+        for (File d : ds) {
+            String vid = cat(d + "/idVendor").trim(); if (vid.isEmpty() || d.getName().startsWith("usb")) continue;   // root hubs
+            out.append(String.format(Locale.US, "  %-8s %s:%s  %s %s\n", d.getName(), vid, cat(d + "/idProduct").trim(), cat(d + "/manufacturer").trim(), cat(d + "/product").trim()));
+            File[] is = d.listFiles((x, n) -> n.startsWith(d.getName() + ":"));
+            if (is != null) { java.util.Arrays.sort(is); for (File i : is) out.append("           ").append(i.getName()).append(": ").append(usbClass(cat(i + "/bInterfaceClass"))).append(ttyOf(i)).append('\n'); }
+        }
+        return out.length() == 0 ? "  (none besides the root hubs)\n" : out.toString();
+    }
+    /** The tty an interface made: CDC ACM puts it under tty/ttyACMn, USB serial converters as ttyUSBn directly. */
+    private static String ttyOf(File iface) {
+        File[] sub = new File(iface, "tty").listFiles();
+        if (sub != null && sub.length > 0) return " -> /dev/" + sub[0].getName();
+        File[] t = iface.listFiles((x, n) -> n.matches("tty[A-Z]+\\d+"));
+        return t != null && t.length > 0 ? " -> /dev/" + t[0].getName() : "";
+    }
+
+    private static String vendorServices() {
+        StringBuilder out = new StringBuilder("HIDL services (lshal):\n");
+        String hal = RootSetup.run("lshal --neat 2>/dev/null | grep -iE '" + PROP_WORDS + "|serial|tty|mcu' | head -20; true").trim();
+        out.append(hal.isEmpty() ? "  (none matching)" : hal).append("\nprograms (size, path):\n");
+        int n = 0;
+        for (String d : new String[] { "/vendor/bin/hw", "/vendor/bin", "/system/bin", "/system_ext/bin", "/odm/bin" }) {
+            for (String l : RootSetup.run("ls -l " + d + " 2>/dev/null").split("\n")) {
+                String[] w = l.trim().split("\\s+");
+                if (w.length < 8 || !w[w.length - 1].matches("(?i).*(" + PROP_WORDS + "|mcu|tinyserver|dfu).*") || w[0].startsWith("l")) continue;
+                out.append(String.format(Locale.US, "  %9s  %s/%s\n", w[4], d, w[w.length - 1]));
+                if (++n >= 30) break;
+            }
+        }
+        if (n == 0) out.append("  (none matching)\n");
+        return out.toString();
+    }
+
+    /** TCP and unix sockets in LISTEN state with the program behind each (the Armor 3WT's radio daemon serves 127.0.0.1:9980/9985). */
+    private static String listeningSockets() {
+        java.util.Map<String, String> owner = socketOwners(RootSetup.run("ls -l /proc/[0-9]*/fd 2>/dev/null | grep -E '^/proc/|socket:'"));
+        StringBuilder out = new StringBuilder();
+        for (String[] t : tcpTable(RootSetup.run("cat /proc/net/tcp /proc/net/tcp6 2>/dev/null"))) {
+            if (!t[3].equals("0A")) continue;
+            String pid = owner.get(t[4]);
+            out.append(String.format(Locale.US, "  tcp %s:%d  %s\n", t[0], Integer.parseInt(t[1], 16), pid == null ? "(owner not found)" : "pid " + pid + "  " + RootSetup.run("tr '\\0' ' ' < /proc/" + pid + "/cmdline 2>/dev/null | cut -c1-120").trim()));
+        }
+        if (out.length() == 0) out.append("  (no TCP port is listening)\n");
+        out.append("unix sockets with a radio-looking name:\n");
+        int n = 0;
+        for (String l : RootSetup.run("cat /proc/net/unix 2>/dev/null").split("\n")) {
+            String[] w = l.trim().split("\\s+");
+            if (w.length < 8 || !w[7].matches("(?i).*(" + PROP_WORDS + "|radio|mcu|serial).*")) continue;
+            String pid = owner.get(w[6]);
+            out.append("  ").append(w[7]).append(pid == null ? "" : "  pid " + pid + "  " + RootSetup.run("tr '\\0' ' ' < /proc/" + pid + "/cmdline 2>/dev/null | cut -c1-120").trim()).append('\n');
+            if (++n >= 20) break;
+        }
+        if (n == 0) out.append("  (none)\n");
+        return out.toString();
+    }
+
+    /** /proc/net/tcp(6) rows as {local address hex, local port hex, remote port hex, state hex, inode}. */
+    static List<String[]> tcpTable(String procNetTcp) {
+        List<String[]> out = new ArrayList<>();
+        for (String l : (procNetTcp == null ? "" : procNetTcp).split("\n")) {
+            String[] w = l.trim().split("\\s+");
+            if (w.length < 10 || !w[1].contains(":") || !w[0].endsWith(":")) continue;
+            String[] loc = w[1].split(":"), rem = w[2].split(":");
+            out.add(new String[] { addr(loc[0]), loc[1], rem.length > 1 ? rem[1] : "0", w[3].toUpperCase(Locale.US), w[9] });
+        }
+        return out;
+    }
+    /** 0100007F -> 127.0.0.1; an IPv6 hex address is shortened to "[v6]" unless it is all zeros or the v4-mapped loopback. */
+    static String addr(String hex) {
+        if (hex.length() == 8) { long v = Long.parseLong(hex, 16); return (v & 0xFF) + "." + ((v >> 8) & 0xFF) + "." + ((v >> 16) & 0xFF) + "." + ((v >> 24) & 0xFF); }
+        if (hex.matches("0+")) return "[::]";
+        if (hex.toUpperCase(Locale.US).startsWith("0000000000000000FFFF0000")) return addr(hex.substring(24));
+        return "[v6]";
+    }
+    /** "ls -l /proc/[0-9]*\/fd" output -> socket inode -> pid. */
+    static java.util.Map<String, String> socketOwners(String ls) {
+        java.util.Map<String, String> m = new java.util.HashMap<>(); String pid = null;
+        for (String l : (ls == null ? "" : ls).split("\n")) {
+            java.util.regex.Matcher d = Pattern.compile("^/proc/(\\d+)/fd:?").matcher(l.trim());
+            if (d.find()) { pid = d.group(1); continue; }
+            java.util.regex.Matcher s = Pattern.compile("socket:\\[(\\d+)\\]").matcher(l);
+            if (s.find() && pid != null && !m.containsKey(s.group(1))) m.put(s.group(1), pid);
+        }
+        return m;
+    }
+    /** One process's TCP sockets ("ls -l /proc/PID/fd" output against /proc/net/tcp): "local port -> remote port (state); ...". */
+    static String tcpOf(String procNetTcp, String lsFd) {
+        java.util.Set<String> mine = new java.util.HashSet<>(socketOwners("/proc/0/fd:\n" + lsFd).keySet());
+        StringBuilder out = new StringBuilder();
+        for (String[] t : tcpTable(procNetTcp)) if (mine.contains(t[4]))
+            out.append(String.format(Locale.US, "%d -> %d (%s); ", Integer.parseInt(t[1], 16), Integer.parseInt(t[2], 16), t[3].equals("01") ? "connected" : t[3].equals("0A") ? "listening" : "state " + t[3]));
+        return out.length() == 0 ? "(none)" : out.toString().trim();
+    }
+
+    /** Every process with a USB serial port, a sound device or a known radio device open, with its full command line. */
+    private static String deviceHolders() {
+        return RootSetup.run("for p in /proc/[0-9]*; do d=$(ls -l $p/fd 2>/dev/null | grep -oE '/dev/(tty(ACM|USB|GS)[0-9]*|snd/[A-Za-z0-9]+|stmcu|ttyTTCMD|dmr[A-Za-z0-9_]*)' | sort -u | tr '\\n' ' '); "
+                + "[ -n \"$d\" ] && echo \"  $(tr '\\0' ' ' < $p/cmdline 2>/dev/null | cut -c1-160) (pid ${p#/proc/}): $d\"; done; true");
+    }
+
+    /** Installed Magisk modules: id, name, version, state and their file names (never their contents). */
+    private static String magiskModules() {
+        String out = RootSetup.run("for d in /data/adb/modules/*/; do [ -d \"$d\" ] || continue; id=$(basename $d); "
+                + "echo \"  $id: $(grep -m1 '^name=' $d/module.prop 2>/dev/null | cut -d= -f2-) $(grep -m1 '^version=' $d/module.prop 2>/dev/null | cut -d= -f2-)$([ -f $d/disable ] && echo ' (disabled)')$([ -f $d/remove ] && echo ' (to be removed)')\"; "
+                + "(cd $d && find . -type f ! -name module.prop | sed 's|^\\./|      |' | head -40); done; true");
+        return out.trim().isEmpty() ? "  (none)\n" : out;
+    }
+
+    /** getevent -lt key lines that carry a raw scancode (no name): {event device, hex code}, each once. */
+    static List<String[]> rawKeys(String getevent) {
+        List<String[]> out = new ArrayList<>(); java.util.Set<String> seen = new java.util.HashSet<>();
+        java.util.regex.Matcher m = Pattern.compile("(/dev/input/event\\d+):\\s+EV_KEY\\s+([0-9a-fA-F]{4})\\s").matcher(getevent == null ? "" : getevent);
+        while (m.find()) if (seen.add(m.group(1) + m.group(2))) out.add(new String[] { m.group(1), m.group(2).toLowerCase(Locale.US) });
+        return out;
+    }
+
+    /** For each raw scancode: the input device's name, the key layout file Android uses for it, and that file's line for the code. */
+    private static String keyLayouts(List<String[]> keys) {
+        StringBuilder out = new StringBuilder();
+        String input = keys.isEmpty() ? "" : RootSetup.run("dumpsys input 2>/dev/null");
+        for (String[] k : keys) {
+            int code = Integer.parseInt(k[1], 16);
+            String[] dev = inputDevice(input, k[0]); String name = dev[0], kl = dev[1];
+            String line = kl.isEmpty() ? "" : RootSetup.run("grep -E '^key +" + code + " ' " + kl + " 2>/dev/null | head -1").trim();
+            out.append(String.format(Locale.US, "  scancode 0x%s (%d) on %s%s: ", k[1], code, k[0], name.isEmpty() ? "" : " (" + name + ")"));
+            if (kl.isEmpty()) out.append("no key layout file listed for this device\n");
+            else if (line.isEmpty()) out.append(kl).append(" has no line for it, so it never becomes an Android key; only getevent sees it\n");
+            else { String[] w = line.split("\\s+"); int kc = w.length > 2 ? KeyEvent.keyCodeFromString("KEYCODE_" + w[2]) : 0; out.append(kl).append(" maps it to ").append(w.length > 2 ? w[2] : line).append(kc > 0 ? " (Android keycode " + kc + ")" : "").append('\n'); }
+        }
+        return out.toString();
+    }
+
+    /** {device name, key layout file} of an input device in dumpsys input's Event Hub list ("  3: mtk-kpd ... Path: /dev/input/event1 ... KeyLayoutFile: ..."). */
+    static String[] inputDevice(String dumpsysInput, String path) {
+        String in = dumpsysInput == null ? "" : dumpsysInput;
+        java.util.regex.Matcher p = Pattern.compile("Path: " + Pattern.quote(path) + "\\s").matcher(in);
+        if (!p.find()) return new String[] { "", "" };
+        int at = p.start();
+        String name = "";
+        java.util.regex.Matcher n = Pattern.compile("\\n\\s*-?\\d+: ([^\\n]+)").matcher(in.substring(Math.max(0, at - 2000), at));
+        while (n.find()) name = n.group(1).trim();
+        java.util.regex.Matcher next = Pattern.compile("\\n\\s*-?\\d+: ").matcher(in);
+        int end = next.find(at) ? next.start() : in.length();
+        java.util.regex.Matcher f = Pattern.compile("KeyLayoutFile: (\\S*)").matcher(in.substring(at, end));
+        return new String[] { name, f.find() ? f.group(1) : "" };
+    }
+
+    /** SELinux denial lines with SignalDeck's own harmless ones counted instead of listed (Magisk's su looks into /data/local/tests on every call). */
+    static String labelDenials(String raw, String pkg) {
+        StringBuilder out = new StringBuilder(); int ownTests = 0, own = 0;
+        for (String l : (raw == null ? "" : raw).split("\n")) {
+            if (l.trim().isEmpty()) continue;
+            boolean mine = l.contains("app=" + pkg);
+            if (mine && l.contains("name=\"tests\"") && l.contains("shell_test_data_file")) { ownTests++; continue; }
+            if (mine) own++;
+            out.append(mine ? "  [SignalDeck] " : "  ").append(l.trim()).append('\n');
+        }
+        if (out.length() == 0 && ownTests == 0) return "  (none)\n";
+        if (ownTests > 0) out.append(String.format(Locale.US, "  (+%d of SignalDeck's own root calls looking into /data/local/tests, left out: harmless, Magisk's su checks that folder)\n", ownTests));
+        if (own > 0) out.append(String.format(Locale.US, "  (%d line%s marked [SignalDeck] come from this app itself, mostly the report reading what an app may not)\n", own, own == 1 ? "" : "s"));
+        return out.toString();
     }
 
     // ---- helpers ----
