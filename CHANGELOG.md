@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-26 — Intercom: room above the Soft SQ slider, and the slider only while Soft SQ is on
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner suggestion 2026-10-26 (mockup approved by the owner) | A thumb aimed at the Soft SQ slider often hit SCAN. The slider row now sits 14 dp under SCAN / ZONE (was 2 dp); the buttons and the slider keep their sizes. The slider row shows only while Soft SQ is on for an FM channel; with Soft SQ off, and on DMR and M17 channels, it is hidden and the activity panel uses the space. Only the activity panel resizes (46 dp when the slider appears or goes); the talk key and its six buttons do not move. The classic look is unchanged. Help: Soft SQ → The slider. | `ui/IntercomView.java`, `ui/HelpView.java` | Host: build and host suite (layout only). **Device test owed:** the gap on the Armor, the slider appearing and going with SOFT SQ, hidden on a DMR channel, the talk key in the same place. |
+
 ## 2026-10-26 — A long M17 call stays one listing
 
 | Backlog | Change | Files | Test |
