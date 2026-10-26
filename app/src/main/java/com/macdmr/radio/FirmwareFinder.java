@@ -37,8 +37,9 @@ import java.util.zip.ZipFile;
 public final class FirmwareFinder {
     private FirmwareFinder() { }
 
-    /** Folders where the phones seen so far keep radio images (Armor 3WT: /system/data/{mcu,dmr}, /sdcard/intercom/dmr; Atom XL: /vendor/data/mcu and
-     *  /vendor/data/DMR/dmr, upper case: the vendor partition is case-sensitive, so /vendor/data/dmr does not find it). */
+    /** Folders where the phones seen so far keep radio images (Armor 3WT: /system/data/{mcu,dmr}, /sdcard/intercom/dmr; Atom XL: /vendor/data/mcu, and
+     *  /vendor/data/dmr, which its stock app reads; a copy of an Atom XL's files came as DMR/dmr, so the upper-case folder is searched too: the vendor
+     *  partition is case-sensitive, and an unneeded entry costs nothing). */
     static final String[] FOLDERS = { "/vendor/data/mcu", "/vendor/data/dmr", "/vendor/data/DMR", "/system/data/mcu", "/system/data/dmr", "/odm/data/mcu",
             "/sdcard/intercom/dmr", "/sdcard/intercom/mcu", "/sdcard/DMR", "/vendor/firmware", "/odm/firmware", "/system/etc/firmware" };
     /** In the shared firmware folders only names like these are radio images (the rest is Wi-Fi, camera, touch...). */
@@ -83,6 +84,12 @@ public final class FirmwareFinder {
         markKnown(out, cat == null ? null : cat.images);
         return out;
     }
+
+    /** The stock apps of the Atom XL and the Armor 3WT flash a .bin from this folder into the module by themselves, when its name sorts after
+     *  the module's version + ".bin" (read from their code). */
+    static final String AUTO_FLASH_DIR = "/sdcard/intercom/dmr/";
+
+    static boolean autoFlash(String source) { return source.startsWith(AUTO_FLASH_DIR) || source.startsWith("/storage/self/primary/intercom/dmr/"); }
 
     /** Name every file whose SHA-256 SignalDeck already has: the built-in images first, then the signed catalogue's rows. */
     static void markKnown(List<Found> fs, List<com.macdmr.radio.fw.FirmwareCatalog.Image> catalogue) {
@@ -159,9 +166,11 @@ public final class FirmwareFinder {
     public static String describe(List<Found> fs) {
         if (fs.isEmpty()) return "no radio firmware files found in " + String.join(", ", FOLDERS) + " or in the stock app\n";
         StringBuilder s = new StringBuilder();
-        boolean anyKnown = false;
-        for (Found f : fs) { s.append("  ").append(f.line()).append('\n'); anyKnown |= !f.known.isEmpty(); }
+        boolean anyKnown = false, anyAuto = false;
+        for (Found f : fs) { s.append("  ").append(f.line()).append('\n'); anyKnown |= !f.known.isEmpty(); anyAuto |= autoFlash(f.source); }
         if (anyKnown) s.append("Files marked already known are in SignalDeck or its firmware catalogue: nobody needs a copy of those.\n");
+        if (anyAuto) s.append("Note: on some phones (Unihertz Atom XL, Ulefone Armor 3WT) the stock walkie-talkie app loads a .bin from " + AUTO_FLASH_DIR
+                + " into the radio module by itself when its name sorts after the module's version. Leave nothing there you do not mean to load.\n");
         return s.append("Nothing was copied or sent. Copy files only if the SignalDeck maintainer asks for them, and hand them over privately: they are the phone maker's.\n").toString();
     }
 

@@ -96,7 +96,7 @@ public class FirmwareFinderTest {
         assertTrue(java.util.Arrays.asList(FirmwareFinder.FOLDERS).contains("/vendor/data/DMR"));
         java.io.File root = java.nio.file.Files.createTempDirectory("fwfind-tree").toFile(), tmp = java.nio.file.Files.createTempDirectory("fwfind-tmp").toFile();
         try {
-            put(root, "/vendor/data/DMR/dmr/DMR006.TEST.V001.bin", 300 * 1024, "DMR006.TEST.V001");   // two levels down, as on the phone
+            put(root, "/vendor/data/DMR/dmr/DMR006.TEST.V001.bin", 300 * 1024, "DMR006.TEST.V001");   // two levels down, as in the copy we were sent
             java.util.List<FirmwareFinder.Found> out = new java.util.ArrayList<>();
             FirmwareFinder.scanFolders(new String[] { "/vendor/data/DMR" }, treeAt(root), tmp, s -> { }, out);
             assertEquals(1, out.size());
@@ -138,6 +138,17 @@ public class FirmwareFinderTest {
         assertTrue(r, r.contains("nobody needs a copy of those"));
         b.known = ""; a.known = "";
         assertFalse(FirmwareFinder.describe(fs).contains("nobody needs a copy"));
+        assertFalse(FirmwareFinder.describe(fs).contains("by itself"));
+    }
+
+    @Test public void filesTheStockAppWouldLoadAreFlagged() {
+        FirmwareFinder.Found a = new FirmwareFinder.Found("/sdcard/intercom/dmr/DMR006.U4A.V099.bin", 10);
+        a.sha256 = x32("01");
+        String r = FirmwareFinder.describe(java.util.Collections.singletonList(a));
+        assertTrue(r, r.contains("loads a .bin from /sdcard/intercom/dmr/ into the radio module by itself"));
+        assertTrue(FirmwareFinder.autoFlash("/storage/self/primary/intercom/dmr/x.bin"));
+        assertFalse(FirmwareFinder.autoFlash("/sdcard/intercom/mcu/x.bin"));
+        assertFalse(FirmwareFinder.autoFlash("/vendor/data/dmr/x.bin"));
     }
 
     private static void deleteTree(java.io.File f) { java.io.File[] k = f.listFiles(); if (k != null) for (java.io.File c : k) deleteTree(c); f.delete(); }
