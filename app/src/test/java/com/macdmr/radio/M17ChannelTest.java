@@ -52,6 +52,17 @@ public class M17ChannelTest {
         assertEquals(m.can(), back.can());
         assertEquals(m.m17Dest(), back.m17Dest());
         assertEquals(0x0105, M17.streamVoice(back.can()));
+        // Colour code through power is 11 header columns. A short row shifts the destination off "M17 Dest".
+        m.sq = 0;
+        String cells = Backup.m17ToneCells(m) + "P1";
+        String[] f = cells.split(",", -1);
+        assertEquals(11, f.length);
+        assertEquals("2", f[0]);
+        assertEquals("", f[6]);
+        assertEquals("Disabled", f[7]);
+        assertEquals("Disabled", f[8]);
+        assertEquals("Disabled", f[9]);
+        assertEquals("P1", f[10]);
     }
 
     @Test public void web_save_keeps_an_m17_channel() throws Exception {

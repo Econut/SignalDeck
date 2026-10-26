@@ -109,8 +109,7 @@ public final class Backup {
                 r.append(String.format(Locale.US, "\t%.5f", ch.rxFreq / 1e6)).append(',').append(String.format(Locale.US, "\t%.5f", ch.txFreq / 1e6)).append(',');
                 r.append(dig ? "" : (ch.isM17() || ch.band != 0 ? "25" : "12.5")).append(',');
                 if (ch.isM17()) {
-                    r.append(ch.can()).append(",,,,,,Disabled,Disabled,");
-                    r.append(ch.sq == 0 ? "Disabled" : String.valueOf(ch.sq * 10 - 5)).append(',');
+                    r.append(m17ToneCells(ch));
                 } else if (dig) {
                     r.append(ch.cc).append(',').append(ch.inSlot + 1).append(',');
                     String cn = contactName.get(ch.txContact); r.append(q(cn != null ? cn : (ch.txContact > 0 ? "TG " + ch.txContact : "None"))).append(',');
@@ -202,6 +201,15 @@ public final class Backup {
             }
         }
         return rows;
+    }
+
+    /**
+     * Colour code through squelch for an M17 row. Six empty columns (timeslot, contact, list, DMR ID, the two
+     * talk-alias cells), then RX tone, TX tone and squelch. One comma short shifts every later column, including
+     * the destination, off the header.
+     */
+    static String m17ToneCells(ChannelStore.Channel ch) {
+        return ch.can() + ",,,,,,,Disabled,Disabled," + (ch.sq == 0 ? "Disabled" : String.valueOf(ch.sq * 10 - 5)) + ",";
     }
 
     /** Channel Type cell: M17, Digital, or Analogue. */
