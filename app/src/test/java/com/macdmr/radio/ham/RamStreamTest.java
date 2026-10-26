@@ -12,8 +12,17 @@ import org.junit.Test;
 
 /** The FW27 receive-RAM stream: frame parsing, the miss count, and the sample order into the receiver. */
 public class RamStreamTest {
+    /** Op 5's reply as FW27 streams it: the samples, then the sequence byte and the half id. */
     private static byte[] body(int seq, int id, short[] samples) {
         byte[] b = new byte[RamStream.BODY];
+        for (int i = 0; i < RamStream.SAMPLES; i++) { b[2 * i] = (byte) (samples[i] >> 8); b[2 * i + 1] = (byte) samples[i]; }
+        b[512] = (byte) seq; b[513] = (byte) id;
+        return b;
+    }
+
+    /** The first design's frame: opcode 17, a 16-bit sequence, the half id, then the samples. */
+    private static byte[] body17(int seq, int id, short[] samples) {
+        byte[] b = new byte[RamStream.BODY_OP17];
         b[0] = RamStream.OP; b[1] = (byte) seq; b[2] = (byte) (seq >> 8); b[3] = (byte) id;
         for (int i = 0; i < RamStream.SAMPLES; i++) { b[4 + 2 * i] = (byte) (samples[i] >> 8); b[5 + 2 * i] = (byte) samples[i]; }
         return b;
@@ -23,17 +32,22 @@ public class RamStreamTest {
 
     @Test public void parsesBigEndianSamplesAndHeader() {
         short[] s = ramp(-300);
-        RamStream.Half h = RamStream.parse(body(0x1234, 1, s));
+        RamStream.Half h = RamStream.parse(body(5, 1, s));
         assertNotNull(h);
-        assertEquals(0x1234, h.seq); assertEquals(1, h.id);
+        assertEquals(5, h.seq); assertEquals(1, h.id);
         assertArrayEquals(s, h.samples);
+        RamStream.Half o = RamStream.parse(body17(0x1234, 1, s));
+        assertNotNull(o);
+        assertEquals(0x1234, o.seq); assertEquals(1, o.id);
+        assertArrayEquals(s, o.samples);
     }
 
     @Test public void otherBodiesAreNotHalves() {
         assertNull(RamStream.parse(new byte[] { 17, 1 }));                 // the op 17 ack
         assertNull(RamStream.parse(new byte[] { 15, 1 }));
-        byte[] b = body(1, 0, ramp(0)); b[0] = 16;
+        byte[] b = body17(1, 0, ramp(0)); b[0] = 16;
         assertNull(RamStream.parse(b));
+        assertNull(RamStream.parse(new byte[513]));
         assertNull(RamStream.parse(null));
     }
 
@@ -48,11 +62,27 @@ public class RamStreamTest {
         assertEquals(5 * 256 / 8000.0, r.seconds(), 1e-9);
     }
 
-    @Test public void wrapsAtSixteenBits() {
+    @Test public void opFiveSequenceWrapsAtSix() {
         RamStream.Receiver r = new RamStream.Receiver(null);
-        r.half(RamStream.parse(body(0xFFFF, 1, ramp(0))));
-        r.half(RamStream.parse(body(0, 0, ramp(0))));
+        int id = 1;
+        for (int seq = 0; seq < 6; seq++) { r.half(RamStream.parse(body(seq, id, ramp(0)))); id ^= 1; }
+        r.half(RamStream.parse(body(0, id, ramp(0))));          // 5 then 0: no miss
         assertEquals(0, r.missed());
+        id ^= 1;
+        r.half(RamStream.parse(body(2, id, ramp(0))));          // 0 then 2: one missed
+        assertEquals(1, r.missed());
+    }
+
+    @Test public void widerSequenceWrapsAtItsWidth() {
+        RamStream.Receiver r = new RamStream.Receiver(null);
+        r.half(RamStream.parse(body(254, 1, ramp(0))));
+        r.half(RamStream.parse(body(255, 0, ramp(0))));
+        r.half(RamStream.parse(body(0, 1, ramp(0))));
+        assertEquals(0, r.missed());
+        RamStream.Receiver w = new RamStream.Receiver(null);
+        w.half(RamStream.parse(body17(0xFFFF, 1, ramp(0))));
+        w.half(RamStream.parse(body17(0, 0, ramp(0))));
+        assertEquals(0, w.missed());
     }
 
     @Test public void identityTapsLeaveTheStreamAlone() {
