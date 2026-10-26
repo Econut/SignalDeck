@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-26 — Morse decoding pauses while packet audio is received
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Queue item 8 (Morse false text from APRS tones, seen on air 2026-10-20) | The Morse decoder no longer gets the audio while packet audio is received. A small streaming detector, `AfskPresence`, finds HDLC flags (four flags whole bytes apart within six bytes; a lead-in has dozens) block by block on the 8 kHz receive audio, about 33 ms into a lead-in, where the packet decoder only reports a frame after its 2-second window. Morse is held off while flags were heard in the last 2 s of audio or a frame was decoded in the last 2 s, and what the Morse decoder had gathered when the hold starts is dropped unreported. A closed squelch ends the audio part of the hold. A Morse ID sent within 2 s of a packet is not decoded. Help: Packet radio → Morse. | `pkt/AfskPresence.java` (new), `pkt/CwGate.java` (new), `ham/CwDecoder.java` (`discard()`), `PacketEngine.java` (`feed`, `deliverFrames`), `ui/HelpView.java`, `CwGateTest.java` (new) | Host, on direwolf's APRS benchmark files in the repository (flat, de-emphasised, pre-emphasised): every 2-second window in which the packet decoder finds a frame has the hold on; in the first 20 s at most 100 ms of audio reaches the Morse decoder, and it reports nothing even in its non-strict mode; it turns on within 50 ms of the first flags (5, 50 and 240 flags, clean and noisy); no hold in 15 minutes of noise at three levels, 5 minutes of voice-like audio or 10 repeated Morse IDs at 600/800/1000 Hz; a Morse ID before and after packets is still decoded; a decoded frame holds it for 2 s; a closed squelch ends the hold. **Not reproduced with the radio:** the radio-recorded APRS clips that show the false text come from a phone window later. **Device test owed:** APRS heard on the Armor writes no Morse line, and a repeater's Morse ID is still decoded. |
+
 ## 2026-10-26 — A long M17 call stays one listing
 
 | Backlog | Change | Files | Test |
