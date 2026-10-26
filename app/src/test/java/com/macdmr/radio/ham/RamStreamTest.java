@@ -52,7 +52,7 @@ public class RamStreamTest {
     }
 
     @Test public void countsSkippedSequencesOnly() {
-        RamStream.Receiver r = new RamStream.Receiver(null);
+        RamStream.Receiver r = new RamStream.Receiver(null, 8000);
         r.half(RamStream.parse(body(0, 0, ramp(0))));
         r.half(RamStream.parse(body(1, 0, ramp(0))));
         r.half(RamStream.parse(body(3, 0, ramp(0))));     // 2 skipped: one miss
@@ -62,8 +62,31 @@ public class RamStreamTest {
         assertEquals(5 * 256 / 8000.0, r.seconds(), 1e-9);
     }
 
+    /** A real 1 kHz tone sampled at the module's 8103 Hz clock (987.25 Hz if played at 8 kHz) reads 1000 Hz after resampling, with 8000/8103 of the samples. */
+    @Test public void resamplesTheModuleClockToEightKilohertz() {
+        final java.io.ByteArrayOutputStream got = new java.io.ByteArrayOutputStream();
+        RamStream.Receiver r = new RamStream.Receiver((mono, n) -> got.write(mono, 0, n));
+        int halves = 400, total = halves * RamStream.SAMPLES;                      // 12.6 s at 8103 Hz
+        double f = 1000.0;                                                         // a real 1 kHz tone, sampled on the module's clock (reads 987.25 Hz if played at 8 kHz)
+        int seq = 0;
+        for (int h = 0; h < halves; h++) {
+            short[] s = new short[RamStream.SAMPLES];
+            for (int i = 0; i < s.length; i++) s[i] = (short) Math.round(10000 * Math.sin(2 * Math.PI * f * (h * RamStream.SAMPLES + i) / RamStream.STREAM_HZ));
+            r.half(RamStream.parse(body(seq, h & 1, s))); seq = (seq + 1) % 6;
+        }
+        byte[] b = got.toByteArray(); int n = b.length / 2;
+        assertEquals(total * (double) RamStream.OUT_HZ / RamStream.STREAM_HZ, n, 3);
+        double[] y = new double[n]; for (int i = 0; i < n; i++) y[i] = (short) ((b[2 * i] & 0xFF) | (b[2 * i + 1] << 8));
+        int zc = 0; for (int i = 1; i < n; i++) if ((y[i - 1] < 0) != (y[i] < 0)) zc++;   // the tone from its zero crossings, at 8 kHz
+        double hz = zc / 2.0 * RamStream.OUT_HZ / n;
+        assertEquals(1000.0, hz, 1.0);
+        double maxStep = 10000 * 2 * Math.PI * 1000 / RamStream.OUT_HZ * 1.05 + 2;       // a clean sine across the half seams
+        for (int i = 1; i < n; i++) assertTrue("jump at " + i, Math.abs(y[i] - y[i - 1]) <= maxStep);
+        assertEquals(total / (double) RamStream.STREAM_HZ, r.seconds(), 1e-6);
+    }
+
     @Test public void opFiveSequenceWrapsAtSix() {
-        RamStream.Receiver r = new RamStream.Receiver(null);
+        RamStream.Receiver r = new RamStream.Receiver(null, 8000);
         int id = 1;
         for (int seq = 0; seq < 6; seq++) { r.half(RamStream.parse(body(seq, id, ramp(0)))); id ^= 1; }
         r.half(RamStream.parse(body(0, id, ramp(0))));          // 5 then 0: no miss
@@ -74,12 +97,12 @@ public class RamStreamTest {
     }
 
     @Test public void widerSequenceWrapsAtItsWidth() {
-        RamStream.Receiver r = new RamStream.Receiver(null);
+        RamStream.Receiver r = new RamStream.Receiver(null, 8000);
         r.half(RamStream.parse(body(254, 1, ramp(0))));
         r.half(RamStream.parse(body(255, 0, ramp(0))));
         r.half(RamStream.parse(body(0, 1, ramp(0))));
         assertEquals(0, r.missed());
-        RamStream.Receiver w = new RamStream.Receiver(null);
+        RamStream.Receiver w = new RamStream.Receiver(null, 8000);
         w.half(RamStream.parse(body17(0xFFFF, 1, ramp(0))));
         w.half(RamStream.parse(body17(0, 0, ramp(0))));
         assertEquals(0, w.missed());
@@ -96,7 +119,7 @@ public class RamStreamTest {
     @Test public void feedsTheReceiverLittleEndian() {
         final byte[][] got = new byte[1][];
         RamStream.Sink sink = (mono, n) -> got[0] = java.util.Arrays.copyOf(mono, n);
-        RamStream.Receiver r = new RamStream.Receiver(sink);
+        RamStream.Receiver r = new RamStream.Receiver(sink, 8000);
         short[] s = ramp(1000); s[0] = (short) 0xBEEF;
         r.half(RamStream.parse(body(0, 0, s)));
         assertEquals(512, got[0].length);

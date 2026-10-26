@@ -3275,7 +3275,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 final com.macdmr.radio.ham.RamStream.Receiver r = new com.macdmr.radio.ham.RamStream.Receiver(rx::feed);
                 ramStreamRx = rx; ramStream = r;
                 engine.setStreamSink(r::half);
-                Frame go = engine.diag40(new byte[] { 17, 1 }, 1000);
+                Frame go = engine.diag40(new byte[] { 17, 1, (byte) com.macdmr.radio.ham.RamStream.PERIOD }, 1000);   // start, with the re-arm period
                 if (go == null || go.sr != 0) {
                     engine.setStreamSink(null); rx.stop(); ramStream = null; ramStreamRx = null; ramStreamOn = false;
                     engine.diag40(new byte[] { 16, 0 }, 1000); engine.reopenAt(0); versionHandshake(3000); engine.diag40(new byte[] { 6, 5, 0 }, 1000);

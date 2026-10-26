@@ -23,6 +23,15 @@ public final class RamStream {
     private RamStream() { }
 
     public static final int OP = 17;
+    /** The re-arm period the stream is started with: a {@code WORK_MODE} store every this many halves (bench 2026-10-26: 8 keeps every half). */
+    public static final int PERIOD = 8;
+    /**
+     * The module's capture clock: a 1 kHz tone reads 987.25 Hz when the halves are taken as 8 kHz (bench 2026-10-26 15:23),
+     * so the stream runs at about 8103 samples a second, 31.65 halves a second. The receiver resamples to 8000 before the
+     * decoder, which would otherwise drift two and a half symbols across one 40 ms frame.
+     */
+    public static final int STREAM_HZ = 8103;
+    public static final int OUT_HZ = 8000;
     public static final int SAMPLES = 256;
     public static final int BODY = 2 * SAMPLES + 2;   // op 5's reply: 512 sample bytes, sequence, half id
     public static final int BODY_OP17 = 4 + 2 * SAMPLES;   // the first design: opcode, seq lo, seq hi, half id, samples
@@ -54,20 +63,27 @@ public final class RamStream {
     }
 
     /**
-     * Reassembles the halves into the 8 kHz 16-bit little-endian stream the held-path receiver already takes, and keeps
-     * the count of halves and misses. The receiver it feeds decides what the samples mean; this class only moves bytes.
+     * Reassembles the halves into the 8 kHz 16-bit little-endian stream the held-path receiver already takes (resampled
+     * from the module's clock by linear interpolation, the phase carried across halves), and keeps the count of halves
+     * and misses. The receiver it feeds decides what the samples mean; this class only moves bytes.
      */
     /** Where the reassembled 8 kHz little-endian stream goes: the held-path receiver's {@code feed}. */
     public interface Sink { void feed(byte[] mono, int n); }
 
     public static final class Receiver {
         private final Sink sink;
+        private final double step;                       // input samples per output sample
+        private double phase;                            // position of the next output sample, in input samples, relative to the previous half's last sample
+        private short prev;                              // the last input sample of the previous half, for interpolation across the seam
+        private boolean havePrev;
         private int lastSeq = -1, lastId = -1;
         private int seqMod = 6;                          // op 5's sequence counts 0..5; a value of 6 or more means a wider counter
         private long halves, missed, samples;
         private boolean started;
 
-        public Receiver(Sink sink) { this.sink = sink; }
+        public Receiver(Sink sink) { this(sink, STREAM_HZ); }
+        /** @param rateHz the module's clock the halves arrive at; 8000 passes the samples through unchanged. */
+        public Receiver(Sink sink, int rateHz) { this.sink = sink; this.step = rateHz / (double) OUT_HZ; }
 
         public synchronized void half(Half h) {
             if (h == null) return;
@@ -78,15 +94,34 @@ public final class RamStream {
                 // The half id is informational only: op 5 on FW27 reported id 0 for consecutive halves (bench 2026-10-26 11:41), so it cannot count misses.
             }
             started = true; lastSeq = h.seq; lastId = h.id; halves++; samples += h.samples.length;
-            byte[] le = new byte[2 * h.samples.length];
-            for (int i = 0; i < h.samples.length; i++) { le[2 * i] = (byte) h.samples[i]; le[2 * i + 1] = (byte) (h.samples[i] >> 8); }
-            if (sink != null) sink.feed(le, le.length);
+            short[] out = resample(h.samples);
+            byte[] le = new byte[2 * out.length];
+            for (int i = 0; i < out.length; i++) { le[2 * i] = (byte) out[i]; le[2 * i + 1] = (byte) (out[i] >> 8); }
+            if (sink != null && le.length > 0) sink.feed(le, le.length);
+        }
+
+        /** Linear interpolation from the module's clock to 8 kHz; index 0 of the virtual input is the previous half's last sample. */
+        private short[] resample(short[] in) {
+            if (step == 1.0) return in;
+            if (!havePrev) { prev = in[0]; havePrev = true; phase = 1.0; }
+            int n = in.length;                           // virtual input: prev at 0, in[0..n-1] at 1..n
+            short[] out = new short[(int) Math.ceil((n + 1 - phase) / step) + 1];
+            int k = 0;
+            while (phase < n) {                          // outputs whose position is inside [0, n)
+                int i = (int) phase; double f = phase - i;
+                double a = i == 0 ? prev : in[i - 1];
+                double b = in[i];
+                out[k++] = (short) Math.round(a + (b - a) * f);
+                phase += step;
+            }
+            prev = in[n - 1]; phase -= n;                // the new half starts at virtual index 1 again
+            return k == out.length ? out : java.util.Arrays.copyOf(out, k);
         }
 
         public synchronized long halves() { return halves; }
         public synchronized long missed() { return missed; }
-        /** Seconds of audio the halves carried. */
-        public synchronized double seconds() { return samples / 8000.0; }
+        /** Seconds of audio the halves carried, at the module's clock. */
+        public synchronized double seconds() { return samples / (OUT_HZ * step); }
         public synchronized String stats() {
             return String.format(Locale.US, "%d halves (%.1f s), %d missed", halves, seconds(), missed);
         }
