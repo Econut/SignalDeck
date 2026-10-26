@@ -111,8 +111,9 @@ public class ChannelEditorView extends LinearLayout {
         name = textInto(form, "Channel name", H_NAME, ch.name, InputType.TYPE_CLASS_TEXT);
         nameCounter(name);
         choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog", "M17" }, ch.type, v -> { ch.type = v; refreshGroups(); });
-        tx = textInto(form, "Send frequency (MHz)", H_TX, ch.txFreq > 0 ? String.format(Locale.US, "%.5f", ch.txFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        // receive first: repeater lists give the output (what you hear) and the offset
         rx = textInto(form, "Receive frequency (MHz)", H_RX, ch.rxFreq > 0 ? String.format(Locale.US, "%.5f", ch.rxFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        tx = textInto(form, "Send frequency (MHz)", H_TX, ch.txFreq > 0 ? String.format(Locale.US, "%.5f", ch.txFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         form.addView(VfoDialog.bandPlanLine(getContext(), rx, tx));
 
         section(form, "Radio");
