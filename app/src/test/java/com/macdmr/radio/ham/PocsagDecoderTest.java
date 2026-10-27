@@ -74,11 +74,49 @@ public class PocsagDecoderTest {
         }
     }
 
+    @Test public void wordErrorsClimbTowardTheEnd() throws Exception {
+        String b = errors("rx_restore_b.wav", "RESTORE B");
+        assertTrue(b, b.contains("sync576 0 0 0 0 0 0"));
+    }
+
+    private static String errors(String name, String text) throws Exception {
+        java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/" + name);
+        short[] raw = wav(f);
+        short[] y = PocsagDecoder.restore(raw, 0.0016);
+        java.util.List<Integer> expect = Pocsag.words(java.util.Collections.singletonList(new Pocsag.Page(1001, 3, text)));
+        StringBuilder sb = new StringBuilder(name);
+        PocsagDecoder.Clock clock = PocsagDecoder.preamble(y);
+        if (clock == null) clock = PocsagDecoder.preamble(raw);
+        if (clock == null) return name + " no preamble";
+        for (int pol : new int[] { 1, -1 }) {
+            int[] bits = PocsagDecoder.follow(y, clock.spb, clock.phase, pol);
+            int sync = -1;
+            for (int i = 0; i + 32 <= bits.length; i++) {
+                int w = 0;
+                for (int k = 0; k < 32; k++) w = (w << 1) | (bits[i + k] & 1);
+                if (w == Pocsag.SYNC) { sync = i; break; }
+            }
+            sb.append(" pol").append(pol).append(" sync").append(sync);
+            if (sync < 0) continue;
+            int n = Math.min(expect.size(), 16);
+            for (int w = 0; w < n; w++) {
+                int at = sync + 32 + 32 * w;
+                if (at + 32 > bits.length) break;
+                int got = 0;
+                for (int k = 0; k < 32; k++) got = (got << 1) | (bits[at + k] & 1);
+                int err = Long.bitCount((got ^ expect.get(w)) & 0xFFFFFFFFL);
+                sb.append(" ").append(err);
+                if (w == n - 1) sb.append(" xor").append(Integer.toHexString(got ^ expect.get(w)));
+            }
+        }
+        return sb.toString();
+    }
+
     @Test public void leakyRestoreShowsTheWholeRestoreB() throws Exception {
         java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/rx_restore_b.wav");
         assertTrue(f.isFile());
         short[] raw = wav(f);
-        PocsagDecoder.Hit hit = PocsagDecoder.best(PocsagDecoder.restore(raw, 0.0016));
+        PocsagDecoder.Hit hit = PocsagDecoder.best(raw, 0.0016);
         assertFalse(hit.pages.isEmpty());
         assertEquals(1001, hit.pages.get(0).ric);
         assertTrue(hit.pages.get(0).text, hit.pages.get(0).text.startsWith("RESTORE"));

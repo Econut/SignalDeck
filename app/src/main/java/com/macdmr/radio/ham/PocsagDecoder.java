@@ -25,30 +25,20 @@ public final class PocsagDecoder {
         public Hit(int baud, List<Pocsag.Page> pages) { this.baud = baud; this.pages = pages; }
     }
 
-    /** Slow leak on the inverse, so a residual offset does not ramp across a batch. */
-    static final double TAU_LONG_SEC = 0.25;
-
-    /** Undo a one-pole high-pass of time constant {@code tauSec}. A non-positive tau leaves the audio unchanged. */
-    public static short[] restore(short[] x, double tauSec) { return restore(x, tauSec, TAU_LONG_SEC); }
-
-    static short[] restore(short[] x, double tauSec, double tauLongSec) {
-        return restore(x, tauSec, tauLongSec, true);
-    }
-
-    static short[] restore(short[] x, double tauSec, double tauLongSec, boolean removeMean) {
+    /** Undo a one-pole high-pass of time constant {@code tauSec}, then remove the mean. A non-positive tau leaves the audio unchanged. */
+    public static short[] restore(short[] x, double tauSec) {
         if (x == null || tauSec <= 0) return x;
         double b = Math.exp(-1.0 / (RATE * tauSec));
-        double c = tauLongSec <= 0 ? 1.0 : Math.exp(-1.0 / (RATE * tauLongSec));
         double[] acc = new double[x.length];
         double state = 0, prev = 0, sum = 0;
         for (int i = 0; i < x.length; i++) {
             double s = x[i];
-            state = s - b * prev + c * state;
+            state = s - b * prev + state;
             prev = s;
             acc[i] = state;
             sum += state;
         }
-        double mean = removeMean ? sum / Math.max(1, x.length) : 0;
+        double mean = sum / Math.max(1, x.length);
         short[] y = new short[x.length];
         for (int i = 0; i < x.length; i++) {
             double v = acc[i] - mean;
@@ -172,27 +162,73 @@ public final class PocsagDecoder {
         int cap = (int) (audio.length / Math.max(1.0, spb)) + 2;
         int[] bits = new int[Math.max(1, cap)];
         int n = 0; double pos = phase; int guard = 0;
+        int prevBit = -1; double prevPos = phase - spb;
+        double spbNow = spb;
+        double lastSync = -1, nextSync = -1;
         Level level = new Level();
         while (pos >= 0 && pos < audio.length && n < bits.length) {
             if (runningMean) level.push(sampleAt(audio, pos));
-            bits[n++] = decide(audio, pos, pol, level);
-            pos += spb;
+            double here = pos;
+            int bit = decide(audio, here, pol, level);
+            bits[n++] = bit;
+            if (!runningMean && guard == 0 && prevBit >= 0 && bit != prevBit) {
+                double sa = sampleAt(audio, prevPos) - level.mean;
+                double sb = sampleAt(audio, here) - level.mean;
+                if (sa * sb < 0 && Math.min(Math.abs(sa), Math.abs(sb)) > 1000) {
+                    double zc = zeroCrossing(audio, prevPos, here, level.mean);
+                    if (!Double.isNaN(zc)) {
+                        double err = zc - (prevPos + here) / 2.0;
+                        if (Math.abs(err) < spbNow / 2.0) pos += err / 8.0;
+                    }
+                }
+            }
+            prevBit = bit; prevPos = here;
+            pos += spbNow;
+            if (nextSync >= 0 && here > nextSync + 40 * spbNow) nextSync = -1;
             if (guard > 0) { guard--; continue; }
-            if (n >= 32 && hamming(bits, n - 32) <= 2 && heardPreamble(audio, pos - 32 * spb, spb)) {
-                double start = pos - 32 * spb;
-                double shift = relock(audio, start, spb, pol);
+            double start = here - 31 * spbNow;
+            boolean expected = nextSync >= 0 && Math.abs(start - nextSync) < 2 * spbNow;
+            if (n >= 32 && hamming(bits, n - 32) <= 2 && (expected || heardPreamble(audio, start, spbNow))) {
+                double shift = relock(audio, start, spbNow, pol);
+                double syncPos = start + shift;
+                if (lastSync >= 0) {
+                    double refined = (syncPos - lastSync) / 544.0;
+                    if (refined > spb * 0.97 && refined < spb * 1.03) spbNow = refined;
+                }
+                lastSync = syncPos;
+                nextSync = syncPos + 544 * spbNow;
                 if (!runningMean) {
                     double sum = 0;
-                    for (int i = 0; i < 32; i++) sum += sampleAt(audio, start + shift + i * spb);
+                    for (int i = 0; i < 32; i++) sum += sampleAt(audio, syncPos + i * spbNow);
                     level.mean = sum / 32.0;
                     level.freeze = true;
                 }
-                for (int i = 0; i < 32; i++) bits[n - 32 + i] = decide(audio, start + shift + i * spb, pol, level);
-                pos = start + shift + 32 * spb;
+                for (int i = 0; i < 32; i++) bits[n - 32 + i] = decide(audio, syncPos + i * spbNow, pol, level);
+                pos = syncPos + 32 * spbNow;
                 guard = 32;
+                prevBit = bits[n - 1];
+                prevPos = syncPos + 31 * spbNow;
             }
         }
         return java.util.Arrays.copyOf(bits, n);
+    }
+
+    /** Linear zero crossing of {@code sample − mean} between two bit centres. */
+    private static double zeroCrossing(short[] audio, double a, double b, double mean) {
+        if (b < a) { double t = a; a = b; b = t; }
+        int i = Math.max(1, (int) Math.floor(a));
+        int end = Math.min(audio.length - 1, (int) Math.ceil(b));
+        double prev = sampleAt(audio, i - 1) - mean;
+        for (int k = i; k <= end; k++) {
+            double s = audio[k] - mean;
+            if ((s < 0) != (prev < 0)) {
+                double den = prev - s;
+                if (den == 0) return k;
+                return (k - 1) + prev / den;
+            }
+            prev = s;
+        }
+        return Double.NaN;
     }
 
     /** Alternation at this baud in the half second before the sync word. */
