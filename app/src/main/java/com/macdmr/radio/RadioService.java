@@ -50,6 +50,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         void onSmsResult(boolean ok);
         void onModes(boolean softSq, int softSqLevel, boolean squelchOpen, boolean monitor, boolean recording, boolean scanning, boolean holding, String zoneName);
         void onCaption(boolean enabled, String live, String sentence);   // live = current partial ("" to clear); sentence = a finished line (null if none)       // the intercom's location block ("City, State\n(↓S 25.5mi (41.0km))\n959ft (292m) 📍")
+        /** A page or an M17 text was filed under {@code threadKey}. */
+        default void onPage(String threadKey, String line) { }
     }
 
     public class LocalBinder extends Binder { public RadioService get() { return RadioService.this; } }
@@ -359,6 +361,14 @@ public class RadioService extends Service implements RadioEngine.Events {
     public java.util.List<ChannelStore.Conversation> conversations() {
         java.util.List<ChannelStore.Conversation> l = store.conversations();
         for (ChannelStore.Conversation cv : l) if (cv.name == null || cv.name.isEmpty()) cv.name = cv.type == 1 ? talkgroupName(cv.peer) : cv.type == 0 ? callerName(cv.peer) : "";
+        for (ChannelStore.Conversation cv : store.pageConversations()) {
+            if (cv.threadKey != null && cv.threadKey.startsWith("c:")) {
+                try { ChannelStore.Contact ct = store.contactById(Long.parseLong(cv.threadKey.substring(2))); if (ct != null && ct.name != null && !ct.name.isEmpty()) cv.name = ct.name; } catch (Exception ignored) { }
+            } else if ("everyone".equals(cv.threadKey)) cv.name = "M17 everyone";
+            else if (cv.threadKey != null && cv.threadKey.startsWith("call:")) cv.name = cv.threadKey.substring(5);
+            l.add(cv);
+        }
+        l.sort((a, b) -> Long.compare(b.lastTs, a.lastTs));
         return l;
     }
 
@@ -1029,6 +1039,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (packet != null) packet.feed(mono, n, open, packet.monitoring() || packet.sstvRx());   // APRS / SSTV decode below any squelch (noise fails the CRC / VIS); Morse and DTMF wait for a signal
         M17Station m7 = m17;
         if (m7 != null && m7.running() && current != null && !current.isDigital()) m7.feed(mono, n);   // finds the preamble itself, squelch or not
+        PagerStation pg = pager;
+        if (pg != null && pg.running() && current != null && !current.isDigital()) pg.feed(mono, n);   // pages, below the squelch
         com.macdmr.radio.ham.Ft8Station f8 = ft8;
         if (f8 != null && f8.running() && current != null && !current.isDigital()) f8.feed(mono, n);   // every slot, squelch or not: noise fails FT8's CRC
         if (parrot.enabled()) {
@@ -1803,6 +1815,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         Thread t = new Thread(() -> streamPage(rate, hz, packedBits, rics.length), "pocsag");
         symThread = t;
         t.start();
+        for (int ric : rics) rememberSentPage(ric, func, rate, hz, body);
         return null;
     }
 
@@ -3185,6 +3198,9 @@ public class RadioService extends Service implements RadioEngine.Events {
     private com.macdmr.radio.ham.FormStore forms;
     // ---- M17 receive ----
     private volatile M17Station m17;
+    private volatile PagerStation pager;
+    private volatile boolean pagerHold;
+    private String openThread = "";
     /** An M17 (or later raw-discriminator) decoder wants the module's voice filter held open. */
     private volatile boolean dataReceive;
     private final java.util.concurrent.atomic.AtomicInteger dataHoldGen = new java.util.concurrent.atomic.AtomicInteger();
@@ -3192,6 +3208,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (m17 == null) m17 = new M17Station(this, profile != null ? profile.id : "unknown", new M17Station.Host() {
             @Override public void event(String line) { history("pkt", line); }
             @Override public void text(String line) { history("m17", line); }
+            @Override public void sms(String src, String dst, String body, boolean sent) { fileM17(src, dst, body, sent); }
             @Override public void heard(String call) {
                 if (call == null || call.isEmpty() || call.startsWith("@") || call.startsWith("#")) return;
                 logHeardStation(call, "M17", "M17");
@@ -3208,6 +3225,83 @@ public class RadioService extends Service implements RadioEngine.Events {
         return m17;
     }
     public boolean m17Running() { M17Station s = m17; return s != null && s.running(); }
+
+    public PagerStation pager() {
+        if (pager == null) pager = new PagerStation(new PagerStation.Host() {
+            @Override public void page(ChannelStore.PageRow row) { filePage(row); }
+            @Override public void tune(int hz) {
+                ChannelStore.Channel v = new ChannelStore.Channel();
+                v.type = 1; v.rxFreq = v.txFreq = hz; v.band = 1; v.power = 0; v.sq = 2; v.name = "Pager";
+                applyVfo(v, false);
+            }
+            @Override public int currentHz() { ChannelStore.Channel c = current; return c == null ? 0 : c.rxFreq; }
+            @Override public double[] taps() { M17Station s = m17; return s == null ? null : s.taps(); }
+            @Override public boolean held() { return dataReceive; }
+            @Override public com.macdmr.radio.ham.MessageThreads.Contacts contacts() { return threadContacts(); }
+        });
+        return pager;
+    }
+    public boolean pagerRunning() { PagerStation p = pager; return p != null && p.running(); }
+    /** Hear pages on the current analog channel. A stub-tagged module holds the voice filter open. */
+    public synchronized String setPager(boolean on) { return setPager(on, true); }
+    public synchronized String setPager(boolean on, boolean hold) {
+        PagerStation p = pager();
+        if (!on) { p.stop(); if (pagerHold) { pagerHold = false; setM17(false); } return null; }
+        if (current == null || current.isDigital()) return "Pages need an analog channel";
+        boolean stub = com.macdmr.radio.Firmware.stubTag(moduleVersion);
+        if (hold && stub && !m17Running()) { String e = setM17(true, true); if (e != null) return e; pagerHold = true; }
+        else if (hold && stub) m17().setHeldPath(true);
+        p.start(hold && stub);
+        return null;
+    }
+    public String setPagerMonitor(boolean on, int[] hz, int baud) {
+        String e = setPager(true, true); if (e != null) return e;
+        pager().setScan(hz, baud);
+        return pager().monitor(on);
+    }
+    public void watchingThread(String key) { openThread = key == null ? "" : key; if (key != null && !key.isEmpty()) store.markThreadRead(key); }
+    private com.macdmr.radio.ham.MessageThreads.Contacts threadContacts() {
+        return new com.macdmr.radio.ham.MessageThreads.Contacts() {
+            public long byCallsign(String call) { ChannelStore.Contact c = store.contactByCallsign(call); return c == null ? 0 : c.id; }
+            public long byRic(int ric) { ChannelStore.Contact c = store.contactByRic(ric); return c == null ? 0 : c.id; }
+            public String name(long id) { ChannelStore.Contact c = store.contactById(id); return c == null ? "" : c.name; }
+        };
+    }
+    private void fileM17(String src, String dst, String body, boolean sent) {
+        com.macdmr.radio.ham.MessageThreads.Key key = com.macdmr.radio.ham.MessageThreads.m17(src, dst, threadContacts());
+        ChannelStore.PageRow row = new ChannelStore.PageRow();
+        row.ts = System.currentTimeMillis(); row.text = body == null ? "" : body; row.signer = src == null ? "" : src;
+        row.transport = "m17"; row.outgoing = sent; row.threadKey = PagerStation.threadKey(key); row.hz = current == null ? 0 : current.rxFreq;
+        filePage(row);
+    }
+    private void rememberSentPage(int ric, int func, int baud, int hz, String text) {
+        com.macdmr.radio.ham.MessageThreads.Key key = com.macdmr.radio.ham.MessageThreads.page(ric, text, threadContacts());
+        ChannelStore.PageRow row = new ChannelStore.PageRow();
+        row.ts = System.currentTimeMillis(); row.ric = ric; row.func = func; row.baud = baud; row.hz = hz; row.text = text;
+        row.signer = com.macdmr.radio.ham.Pocsag.sender(text) == null ? "" : com.macdmr.radio.ham.Pocsag.sender(text);
+        row.transport = "page"; row.outgoing = true; row.threadKey = PagerStation.threadKey(key);
+        filePage(row);
+    }
+    private void filePage(ChannelStore.PageRow row) {
+        if (row.threadKey == null || row.threadKey.isEmpty()) return;
+        store.addPage(row);
+        String line = ("m17".equals(row.transport) ? "✉ " : "📟 ") + (row.signer == null || row.signer.isEmpty() ? ("RIC " + row.ric) : row.signer) + ": " + row.text;
+        if ("page".equals(row.transport)) { history("page", line); log("page ric " + row.ric + " baud " + row.baud + " corrected " + row.corrected + " " + row.text); }
+        if ("page".equals(row.transport) && !row.outgoing && com.macdmr.radio.Station.isMyRic(this, row.ric) && !mutedRic(row.ric))
+            notifyUser("Page for you", row.text, false);
+        final String key = row.threadKey, shown = line;
+        ui.post(() -> { for (Listener l : listeners) l.onPage(key, shown); });
+    }
+    private boolean mutedRic(int ric) {
+        for (String s : getSharedPreferences("pager", MODE_PRIVATE).getString("muted", "").split(",")) if (s.trim().equals(String.valueOf(ric))) return true;
+        return false;
+    }
+    public void muteRic(int ric, boolean on) {
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        for (String s : getSharedPreferences("pager", MODE_PRIVATE).getString("muted", "").split(",")) if (!s.trim().isEmpty()) set.add(s.trim());
+        if (on) set.add(String.valueOf(ric)); else set.remove(String.valueOf(ric));
+        getSharedPreferences("pager", MODE_PRIVATE).edit().putString("muted", String.join(",", set)).apply();
+    }
     private boolean m17FromChannel;
     /** An M17 channel keeps the live receiver on, and the voice-filter hold with it. Leaving the channel stops only a receiver this started. */
     private void followM17Channel(ChannelStore.Channel ch) {

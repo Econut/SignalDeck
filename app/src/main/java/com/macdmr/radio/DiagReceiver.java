@@ -124,6 +124,11 @@ public final class DiagReceiver extends BroadcastReceiver {
                 Log.i("DiagReceiver", err == null ? "page started " + rics.length + " at " + i.getIntExtra("baud", 1200) : "page: " + err);
                 break;
             }
+            case "pager": {
+                boolean hold = !i.hasExtra("hold") || i.getBooleanExtra("hold", true);
+                if (i.hasExtra("on")) Log.i("DiagReceiver", "pager: " + s.setPager(i.getBooleanExtra("on", false), hold));
+                break;
+            }
             case "m17": {                                                       // bench: M17 receive on/off (--ez on); --ei tx ms: a short Codec 2 tone through the symbol engine; --ei mic ms: hold the microphone path (not the tone) for that long, at most 12 s; --es enc NAME: Codec 2 3200 encode cache/NAME.wav to cache/NAME.c2; --es dec NAME: decode cache/NAME.c2 back to cache/NAME.wav
                 if (i.hasExtra("mic")) {
                     int ms = Math.max(1000, Math.min(12000, i.getIntExtra("mic", 10000)));

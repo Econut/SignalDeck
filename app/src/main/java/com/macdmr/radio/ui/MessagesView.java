@@ -56,6 +56,10 @@ public class MessagesView extends LinearLayout implements RadioService.Listener 
         content = new FrameLayout(c);
         listPage = new LinearLayout(c); listPage.setOrientation(VERTICAL);
         header = Neo.header(c, "Messages", "DMR text");
+        ImageView mon = Neo.iconButton(c, "scan", Neo.VIOLET, "Pager monitor");
+        mon.setOnClickListener(v -> toggleMonitor());
+        mon.setOnLongClickListener(v -> { editScan(); return true; });
+        Neo.addAction(header, mon);
         ImageView add = Neo.iconButton(c, "plus", Neo.GREEN, "New message");
         add.setOnClickListener(v -> newMessage());
         Neo.addAction(header, add);
@@ -63,7 +67,7 @@ public class MessagesView extends LinearLayout implements RadioService.Listener 
         list = new ListView(c); list.setAdapter(convAdapter); list.setDivider(null); list.setDividerHeight(0);
         list.setSelector(new android.graphics.drawable.ColorDrawable(0)); list.setClipToPadding(false);
         list.setPadding((int) (12 * d), (int) (8 * d), (int) (12 * d), (int) (12 * d));
-        list.setOnItemClickListener((p, v, pos, id) -> { ChannelStore.Conversation cv = convs.get(pos); ChannelStore.Contact ct = new ChannelStore.Contact(); ct.name = cv.name; ct.number = cv.peer; ct.type = cv.type; openThread(ct); });
+        list.setOnItemClickListener((p, v, pos, id) -> { ChannelStore.Conversation cv = convs.get(pos); if (!"dmr".equals(cv.transport)) openDataThread(cv); else { ChannelStore.Contact ct = new ChannelStore.Contact(); ct.name = cv.name; ct.number = cv.peer; ct.type = cv.type; openThread(ct); } });
 
         // empty state: glowing icon, title, how-to, button
         empty = new LinearLayout(c); empty.setOrientation(VERTICAL); empty.setGravity(Gravity.CENTER_HORIZONTAL); empty.setPadding((int) (32 * d), (int) (70 * d), (int) (32 * d), 0);
@@ -91,7 +95,118 @@ public class MessagesView extends LinearLayout implements RadioService.Listener 
         Neo.headerSubtitle(header).setText(convs.isEmpty() ? "DMR TEXT" : (convs.size() + (convs.size() == 1 ? " conversation" : " conversations")).toUpperCase(java.util.Locale.US));
     }
 
-    public boolean back() { if (threadPage != null) { content.removeView(threadPage); threadPage = null; peer = null; reload(); return true; } return false; }
+    public boolean back() { if (threadPage != null) { content.removeView(threadPage); threadPage = null; peer = null; dataThread = null; if (svc != null) svc.watchingThread(""); reload(); return true; } return false; }
+
+    private String dataThread;
+    private TextView pageBanner;
+
+    @Override public void onPage(String threadKey, String line) {
+        if (dataThread != null && threadKey != null && !threadKey.equals(dataThread) && pageBanner != null) { pageBanner.setText("Also heard: " + line); pageBanner.setVisibility(View.VISIBLE); }
+        reload();
+        if (dataThread != null && threadKey != null && threadKey.equals(dataThread)) loadData();
+    }
+
+    private void toggleMonitor() {
+        if (svc == null) return;
+        boolean on = svc.pager() != null && svc.pager().monitoring();
+        if (on) { svc.pager().monitor(false); android.widget.Toast.makeText(getContext(), "Pager monitor off", android.widget.Toast.LENGTH_SHORT).show(); reload(); return; }
+        int[] hz = scanHz();
+        String e = svc.setPagerMonitor(true, hz, 1200);
+        android.widget.Toast.makeText(getContext(), e == null ? "Listening for pages" : e, android.widget.Toast.LENGTH_LONG).show();
+        reload();
+    }
+
+    private int[] scanHz() {
+        String raw = getContext().getSharedPreferences("pager", android.content.Context.MODE_PRIVATE).getString("scan", "467625000,467650000");
+        java.util.List<Integer> hz = new java.util.ArrayList<>();
+        for (String s : raw.split("[,\\s]+")) { try { int n = Integer.parseInt(s.trim()); if (ChannelStore.inBand(n)) hz.add(n); } catch (Exception ignored) { } }
+        int[] a = new int[hz.size()]; for (int i = 0; i < a.length; i++) a[i] = hz.get(i); return a;
+    }
+
+    private void editScan() {
+        final android.widget.EditText et = new android.widget.EditText(getContext());
+        et.setText(getContext().getSharedPreferences("pager", android.content.Context.MODE_PRIVATE).getString("scan", "467625000,467650000"));
+        et.setTextColor(Neo.TEXT);
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Pager frequencies").setMessage("Hertz, separated by commas. Monitor waits a full batch on each, and stays while a preamble is heard.").setView(et)
+                .setPositiveButton("Save", (d, w) -> getContext().getSharedPreferences("pager", android.content.Context.MODE_PRIVATE).edit().putString("scan", et.getText().toString().trim()).apply())
+                .setNegativeButton("Cancel", null).show();
+    }
+
+    private void openDataThread(ChannelStore.Conversation cv) {
+        final android.content.Context c = getContext(); float d = Theme.dp(c);
+        dataThread = cv.threadKey;
+        if (svc != null) svc.watchingThread(cv.threadKey);
+        if (threadPage != null) content.removeView(threadPage);
+        threadPage = new LinearLayout(c); threadPage.setOrientation(VERTICAL); threadPage.setBackground(Neo.page(c));
+        String kind = "page".equals(cv.transport) ? "Pager" : "M17";
+        LinearLayout bar = Neo.header(c, cv.name == null || cv.name.isEmpty() ? kind : cv.name, kind);
+        ImageView back = Neo.iconButton(c, "left", Neo.CYAN, "Back"); back.setOnClickListener(v -> back());
+        LayoutParams bl = new LayoutParams((int) (44 * d), (int) (44 * d)); bl.rightMargin = (int) (12 * d);
+        bar.addView(back, 0, bl);
+        threadPage.addView(bar);
+        pageBanner = Neo.text(c, "", Neo.AMBER_LIGHT, 13.5f, Neo.uiSemi(c));
+        pageBanner.setPadding((int) (12 * d), (int) (8 * d), (int) (12 * d), (int) (8 * d));
+        pageBanner.setVisibility(View.GONE);
+        threadPage.addView(pageBanner);
+        threadList = new ListView(c); threadAdapter = new ThreadAdapter(); threadList.setAdapter(threadAdapter); threadList.setDivider(null); threadList.setDividerHeight(0);
+        threadList.setSelector(new android.graphics.drawable.ColorDrawable(0));
+        threadList.setTranscriptMode(ListView.TRANSCRIPT_MODE_ALWAYS_SCROLL); threadList.setStackFromBottom(true);
+        threadPage.addView(threadList, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+        if (svc == null || svc.pager() == null || !svc.pager().monitoring()) {
+            LinearLayout compose = new LinearLayout(c); compose.setGravity(Gravity.CENTER_VERTICAL); compose.setPadding((int) (12 * d), (int) (8 * d), (int) (12 * d), (int) (10 * d));
+            compose.setBackgroundColor(Neo.BAR);
+            final android.widget.EditText input = new android.widget.EditText(c); input.setHint("page".equals(cv.transport) ? "Page" : "M17 text"); input.setTextColor(Neo.TEXT); input.setHintTextColor(Neo.DIM);
+            input.setBackground(Neo.card(c, Neo.alpha(Neo.CYAN, 0x33), 14)); input.setPadding((int) (14 * d), (int) (8 * d), (int) (14 * d), (int) (8 * d));
+            compose.addView(input, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+            ImageView send = new ImageView(c); send.setImageDrawable(new Neo.IconDrawable("send", 0xFF04121A)); send.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            int sp = (int) (12 * d); send.setPadding(sp, sp, sp, sp); send.setContentDescription("Send");
+            android.graphics.drawable.GradientDrawable sg = new android.graphics.drawable.GradientDrawable(); sg.setShape(android.graphics.drawable.GradientDrawable.OVAL); sg.setColor(Neo.GREEN); send.setBackground(sg);
+            LayoutParams sl = new LayoutParams((int) (46 * d), (int) (46 * d)); sl.leftMargin = (int) (8 * d);
+            compose.addView(send, sl);
+            send.setOnClickListener(v -> sendData(cv, input));
+            threadPage.addView(compose);
+            if ("page".equals(cv.transport) && cv.threadKey != null && cv.threadKey.startsWith("ric:")) {
+                TextView save = Neo.button(c, "Save as contact", "plus", Neo.CYAN);
+                save.setOnClickListener(v -> saveRic(cv));
+                threadPage.addView(save);
+            }
+        }
+        content.addView(threadPage);
+        loadData();
+    }
+
+    private void loadData() {
+        if (dataThread == null || svc == null) return;
+        msgs.clear();
+        for (ChannelStore.PageRow p : svc.store().pagesIn(dataThread)) {
+            ChannelStore.Message m = new ChannelStore.Message();
+            m.id = p.id; m.ts = p.ts; m.outgoing = p.outgoing; m.text = p.text; m.status = p.corrected > 0 ? 3 : 1;
+            msgs.add(m);
+        }
+        if (threadAdapter != null) threadAdapter.notifyDataSetChanged();
+    }
+
+    private void sendData(ChannelStore.Conversation cv, android.widget.EditText input) {
+        String t = input.getText().toString().trim();
+        if (t.isEmpty() || svc == null) return;
+        String err;
+        if ("m17".equals(cv.transport)) err = svc.sendM17Sms("everyone".equals(cv.threadKey) ? "@ALL" : cv.address, t);
+        else {
+            int ric = 0; try { ric = Integer.parseInt(cv.address); } catch (Exception ignored) { }
+            err = svc.sendPage(1200, svc.current() == null ? 467625000 : svc.current().rxFreq, new int[] { ric }, 3, t, true);
+        }
+        if (err != null) android.widget.Toast.makeText(getContext(), err, android.widget.Toast.LENGTH_LONG).show();
+        else input.setText("");
+        loadData();
+    }
+
+    private void saveRic(ChannelStore.Conversation cv) {
+        final android.widget.EditText name = new android.widget.EditText(getContext()); name.setHint("Name"); name.setTextColor(Neo.TEXT);
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Save RIC " + cv.address).setView(name).setPositiveButton("Save", (d, w) -> {
+            ChannelStore.Contact ct = new ChannelStore.Contact(); ct.name = name.getText().toString().trim(); ct.rics = cv.address; ct.type = 0;
+            if (!ct.name.isEmpty()) svc.store().insertContact(ct);
+        }).setNeutralButton("Mute", (d, w) -> { try { svc.muteRic(Integer.parseInt(cv.address), true); } catch (Exception ignored) { } }).setNegativeButton("Cancel", null).show();
+    }
 
     private void newMessage() {
         final Context c = getContext();
@@ -203,7 +318,9 @@ public class MessagesView extends LinearLayout implements RadioService.Listener 
             LinearLayout av = row.findViewWithTag("av"); av.removeAllViews();
             av.addView(ContactsView.avatar(c, cv.type, cv.name, 46), new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
             ChannelStore.Contact tmp = new ChannelStore.Contact(); tmp.type = cv.type; tmp.number = cv.peer;
-            ((TextView) row.findViewWithTag("name")).setText(cv.name == null || cv.name.isEmpty() ? peerLabel(tmp) : cv.name);
+            String chip = "page".equals(cv.transport) ? "PAGE  " : "m17".equals(cv.transport) ? "M17  " : "";
+            String unread = cv.unread > 0 ? "  (" + cv.unread + ")" : "";
+            ((TextView) row.findViewWithTag("name")).setText(chip + (cv.name == null || cv.name.isEmpty() ? peerLabel(tmp) : cv.name) + unread);
             ((TextView) row.findViewWithTag("time")).setText(df.format(new Date(cv.lastTs)));
             ((TextView) row.findViewWithTag("last")).setText((cv.outgoing ? "You: " : "") + cv.lastText);
             return v;

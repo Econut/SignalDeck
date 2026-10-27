@@ -28,7 +28,7 @@ import java.util.Locale;
  * Receive only: this radio's transmit path cannot produce M17 that M17 radios decode.
  */
 public final class M17Station {
-    public interface Host { void event(String line); void heard(String call); void changed(); default void voice(short[] pcm) { } default int meter() { return -999; } default void text(String line) { event(line); } }
+    public interface Host { void event(String line); void heard(String call); void changed(); default void voice(short[] pcm) { } default int meter() { return -999; } default void text(String line) { event(line); } default void sms(String src, String dst, String body, boolean sent) { } }
 
     /** One M17 text, sent or received. */
     public static final class Text {
@@ -67,7 +67,7 @@ public final class M17Station {
     public Heard current() { return current; }
     public synchronized List<Heard> heard() { return new ArrayList<>(heard); }
     public synchronized List<Text> texts() { return new ArrayList<>(texts); }
-    public synchronized void noteSent(String src, String dst, String body) { remember(new Text(System.currentTimeMillis(), true, src, dst, body)); host.changed(); }
+    public synchronized void noteSent(String src, String dst, String body) { remember(new Text(System.currentTimeMillis(), true, src, dst, body)); host.sms(src, dst, body, true); host.changed(); }
     public float quality() { return quality; }
     public String calibration() { return calibration; }
     public void resetCalibration() { if (cal != null) cal.reset(); stopHeld(); setHeldPath(true); host.changed(); }
@@ -121,6 +121,14 @@ public final class M17Station {
         host.changed();
     }
 
+    /** The fixed taps this station uses for the held path: the phone's own fit, else the shipped table. */
+    public double[] taps() {
+        if (heldTaps != null) return heldTaps;
+        double[] t = cal != null ? cal.accepted() : null;
+        if (t == null) t = loadTaps("m17/held_" + profileId + ".txt");
+        return t;
+    }
+
     public synchronized void stop() {
         running = false; current = null;
         stopHeld();
@@ -170,6 +178,7 @@ public final class M17Station {
         remember(new Text(System.currentTimeMillis(), false, src, dst, shown));
         Log.i("M17Station", "sms " + src + " -> " + dst + " " + shown);
         host.text((sms != null ? "✉ " : "") + src + " → " + dst + ": " + shown);
+        if (sms != null) host.sms(src, dst, sms, false);
         host.heard(src); host.changed();
     }
     private void noteLost() { host.text("✉ M17: frames lost"); host.changed(); }

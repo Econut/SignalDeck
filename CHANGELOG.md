@@ -1,5 +1,13 @@
 # SignalDeck changelog
 
+## 2026-10-27 — POCSAG receive
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Plan A | Pages are decoded on an analog channel and filed in Messages: by the contact that owns the RIC, else a signed callsign, else the RIC. M17 texts file by the source callsign, and @ALL shares one thread. PKT → Hear pages listens; the Messages scan icon steps a frequency list and waits out a preamble. A page for your own RIC notifies. | `PagerStation.java`, `ham/Pocsag.java`, `ham/PocsagDecoder.java`, `ChannelStore.java`, `RadioService.java`, `ui/MessagesView.java`, `ui/PktDialog.java`, `ui/HelpView.java`, `DiagReceiver.java` | Host: clean pages at 512/1200/2400, a 30 ppm stretch, one and two bit repairs, thread keys. Bench, held path, 2.5 kHz, channel 2: 1200 baud 3/3 and 2400 baud 3/3 payload-exact. 512 baud listed one text with the wrong RIC and missed the next. With the voice-filter hold off, a 1200 baud page kept the text and changed the RIC. |
+
+
+
 Newest first. Each entry: what changed, the files, and how it was tested (host tests, device, bench). Entries before
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).

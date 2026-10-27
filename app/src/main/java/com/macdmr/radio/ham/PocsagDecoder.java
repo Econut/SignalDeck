@@ -54,6 +54,23 @@ public final class PocsagDecoder {
     /** A run of alternating bits: the baud from the gap, and the middle of the first bit. */
     static final class Clock { final int baud; final double spb, phase; Clock(int baud, double spb, double phase) { this.baud = baud; this.spb = spb; this.phase = phase; } }
 
+    /** True when the latest audio still looks like a preamble, so a scan should not step. */
+    public static boolean hearingPreamble(short[] audio) { return audio != null && preamble(audio) != null; }
+
+    /** The held-path taps, then the same slicer. Null taps leaves the audio alone. */
+    public static Hit bestHeld(short[] audio, double[] taps) {
+        if (taps == null || audio == null || audio.length < 800) return best(audio);
+        double[] x = HeldPath.signed(audio, audio.length);
+        double[] y = HeldPath.equalise(HeldPath.matched(HeldPath.resample6(x)), taps);
+        short[] back = new short[y.length / 6];
+        for (int i = 0; i < back.length; i++) {
+            double v = y[i * 6];
+            if (v > 32767) v = 32767; else if (v < -32767) v = -32767;
+            back[i] = (short) v;
+        }
+        return best(back);
+    }
+
     static Clock preamble(short[] audio) {
         int last = -1, crosses = 0, start = -1;
         double sum = 0;

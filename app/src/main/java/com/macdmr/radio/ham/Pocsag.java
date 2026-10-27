@@ -34,6 +34,8 @@ public final class Pocsag {
         public Page(int ric, int func, String text) {
             this.ric = ric; this.func = func & 3; this.text = text == null ? "" : text;
         }
+        /** Bits repaired by BCH while this page was decoded. Zero for a page this app built to send. */
+        public int corrected;
     }
 
     public static int bch(int data21) {
@@ -204,22 +206,27 @@ public final class Pocsag {
             for (int k = 0; k < 16; k++) {
                 int at = i + 32 + 32 * k;
                 if (at + 32 > bits.length) break;
-                int cw = correct(wordAt(bits, at));
+                int raw = wordAt(bits, at);
+                int cw = correct(raw);
                 if (!check(cw) || cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
+                if (cur != null) cur.corrected += Integer.bitCount(raw ^ cw);
                 int data = (int) ((cw & 0xFFFFFFFFL) >>> 11);
                 if ((data & (1 << 20)) == 0) {
                     finish(out, cur, text, leftover);
                     int frame = k / 2;
                     int ric = ((data >> 2) & 0x3FFFF) << 3 | frame;
                     cur = new Page(ric, data & 3, "");
+                    cur.corrected = Integer.bitCount(raw ^ cw);
                     text.setLength(0); leftover.clear();
                 } else if (cur != null) {
                     int payload = data & 0xFFFFF;
+                    int width = cur.func == 0 ? 4 : 7;
                     for (int b = 19; b >= 0; b--) leftover.add((payload >> b) & 1);
-                    while (leftover.size() >= 7) {
+                    while (leftover.size() >= width) {
                         int v = 0;
-                        for (int b = 0; b < 7; b++) v |= leftover.remove(0) << b;
-                        if (v != 0) text.append((char) v);
+                        for (int b = 0; b < width; b++) v |= leftover.remove(0) << b;
+                        if (cur.func == 0) { if (v < 16 && "0123456789*U -)(".charAt(v) != ' ') text.append("0123456789*U -)(".charAt(v)); }
+                        else if (v != 0) text.append((char) v);
                     }
                 }
             }
