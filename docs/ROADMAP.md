@@ -18,6 +18,7 @@ entry and a device test.
 
 - **Range test with two SignalDeck radios** (owner, 2026-10-27): a base that stays put and a rover that beacons by distance; packets both ways carry the level heard and the base's noise floor; uplink, downlink and misses go into the coverage store with a fitted range band per sector on the map. Plan: phonedmrapp `docs/plan-range-test.md`. After the new phones are compatible and the hotspot session.
 - **Restricted mode** (owner, 2026-10-27): a voluntary PIN lock that hides and refuses chosen zones, transmit, modes and admin items, enforced in the engine so every transmit path meets the same rule; presets are starting points, no regulation text; no back door (clearing app data removes it). Plan: phonedmrapp `docs/plan-restricted-mode.md`. After the POCSAG/web work and the range test.
+- **ATAK (CivTAK) integration** (owner, 2026-10-27): tier 1 a local Cursor-on-Target bridge (positions, stations heard, alerts and texts into ATAK; ATAK positions, markers, chat and 911 back; KMZ exports), tier 2 the radio as a TAK transport between SignalDeck phones (compact CoT over AFSK, DMR texts or M17 packets), tier 3 an optional ATAK plugin. Plan: phonedmrapp `docs/plan-atak-integration.md`. After the current work, Restricted mode, the range test and the new phones.
 
 - **Winlink gateway list, automatic**: ask Winlink for an API access key so SignalDeck can refresh the gateway list itself (today: the user downloads the CSV in the browser and imports it; winlink.org is behind a Cloudflare bot check, which SignalDeck never works around).
 
