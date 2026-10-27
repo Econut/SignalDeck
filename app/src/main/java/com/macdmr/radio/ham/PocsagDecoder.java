@@ -25,20 +25,30 @@ public final class PocsagDecoder {
         public Hit(int baud, List<Pocsag.Page> pages) { this.baud = baud; this.pages = pages; }
     }
 
+    /** Slow leak on the inverse, so a residual offset does not ramp across a batch. */
+    static final double TAU_LONG_SEC = 0.25;
+
     /** Undo a one-pole high-pass of time constant {@code tauSec}. A non-positive tau leaves the audio unchanged. */
-    public static short[] restore(short[] x, double tauSec) {
+    public static short[] restore(short[] x, double tauSec) { return restore(x, tauSec, TAU_LONG_SEC); }
+
+    static short[] restore(short[] x, double tauSec, double tauLongSec) {
+        return restore(x, tauSec, tauLongSec, true);
+    }
+
+    static short[] restore(short[] x, double tauSec, double tauLongSec, boolean removeMean) {
         if (x == null || tauSec <= 0) return x;
         double b = Math.exp(-1.0 / (RATE * tauSec));
+        double c = tauLongSec <= 0 ? 1.0 : Math.exp(-1.0 / (RATE * tauLongSec));
         double[] acc = new double[x.length];
         double state = 0, prev = 0, sum = 0;
         for (int i = 0; i < x.length; i++) {
             double s = x[i];
-            state = s - b * prev + state;
+            state = s - b * prev + c * state;
             prev = s;
             acc[i] = state;
             sum += state;
         }
-        double mean = sum / Math.max(1, x.length);
+        double mean = removeMean ? sum / Math.max(1, x.length) : 0;
         short[] y = new short[x.length];
         for (int i = 0; i < x.length; i++) {
             double v = acc[i] - mean;

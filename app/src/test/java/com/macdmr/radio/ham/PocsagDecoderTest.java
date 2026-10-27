@@ -74,6 +74,16 @@ public class PocsagDecoderTest {
         }
     }
 
+    @Test public void leakyRestoreShowsTheWholeRestoreB() throws Exception {
+        java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/rx_restore_b.wav");
+        assertTrue(f.isFile());
+        short[] raw = wav(f);
+        PocsagDecoder.Hit hit = PocsagDecoder.best(PocsagDecoder.restore(raw, 0.0016));
+        assertFalse(hit.pages.isEmpty());
+        assertEquals(1001, hit.pages.get(0).ric);
+        assertTrue(hit.pages.get(0).text, hit.pages.get(0).text.startsWith("RESTORE"));
+    }
+
     @Test public void minuteOfNoiseOpensNoPage() {
         java.util.Random r = new java.util.Random(1718);
         short[] audio = new short[8000 * 60];

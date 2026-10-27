@@ -232,10 +232,16 @@ public final class Pocsag {
         StringBuilder text = new StringBuilder();
         List<Integer> leftover = new ArrayList<>();
         int i = 0;
+        int expect = -1;   // bit index of the next sync, one batch after the last one accepted
         while (i + 32 <= bits.length) {
             int w = wordAt(bits, i);
-            // The first sync of a transmission follows the preamble. The next batch's sync does not.
-            if (w != SYNC || (cur == null && !preambleBefore(bits, i))) { i++; continue; }
+            boolean continued = expect == i && syncErrors(w) <= 2;
+            boolean opening = !continued && w == SYNC && preambleBefore(bits, i);
+            if (!continued && !opening) {
+                if (expect == i) expect = -1;   // the transmission ended; look for a new preamble
+                i++;
+                continue;
+            }
             for (int k = 0; k < 16; k++) {
                 int at = i + 32 + 32 * k;
                 if (at + 32 > bits.length) break;
@@ -255,7 +261,6 @@ public final class Pocsag {
                     cur = new Page(ric, data & 3, "");
                     cur.corrected = flips;
                 } else if (cur != null) {
-                    if (flips > 1) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
                     int payload = data & 0xFFFFF;
                     int width = cur.func == 0 ? 4 : 7;
                     for (int b = 19; b >= 0; b--) leftover.add((payload >> b) & 1);
@@ -267,7 +272,8 @@ public final class Pocsag {
                     }
                 }
             }
-            i += 32 * 17;   // a message may continue in the next batch
+            expect = i + 32 * 17;   // the next sync is one batch later, page open or not
+            i = expect;
         }
         finish(out, cur, text, leftover);
         return out;
@@ -279,6 +285,10 @@ public final class Pocsag {
         p.corrected = cur.corrected;
         p.ricUnreadable = cur.ricUnreadable;
         out.add(p);
+    }
+
+    private static int syncErrors(int w) {
+        return Long.bitCount((w ^ SYNC) & 0xFFFFFFFFL);
     }
 
     /** The 256 bits before a sync word are the tail of the preamble: mostly alternating. */
