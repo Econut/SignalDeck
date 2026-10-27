@@ -54,6 +54,15 @@ public final class DeviceReport {
     /** Packages the last report took for the stock walkie-talkie app (the first-run check watches the first one). */
     public static volatile List<String> lastCandidates = new ArrayList<>();
 
+    static boolean serialPortName(String name) {
+        return name != null && name.matches("tty(S|sWK|MT|HS|USB|GS|ACM)\\d+");
+    }
+
+    static String profileDescription(DeviceProfile p) {
+        if ("uniwa-p8".equals(p.id)) return p.name + " (recognised; hardware access disabled)";
+        return p.supported ? p.name + (p.verified ? "" : " (untested on hardware)") : "none (this is an unsupported phone)";
+    }
+
     public static File generate(Context c, Progress p) throws Exception {
         String tag = (Build.MANUFACTURER + "_" + Build.MODEL).replaceAll("[^A-Za-z0-9._-]+", "_");
         File dir = new File(reportRoot(), tag + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()));
@@ -70,19 +79,27 @@ public final class DeviceReport {
         String se = cat("/sys/fs/selinux/enforce").trim();
         if (!se.equals("0") && !se.equals("1") && root) se = RootSetup.run("cat /sys/fs/selinux/enforce 2>/dev/null; true").trim();   // apps cannot read it on newer Android
         kv(r, "selinux", se.equals("1") ? "enforcing" : se.equals("0") ? "permissive" : "unknown");
-        kv(r, "su present", String.valueOf(suPresent())); kv(r, "root granted to this app", String.valueOf(root));
+        kv(r, "su present", String.valueOf(suPresent())); kv(r, "root granted to this app", DeviceProfile.detectBuiltIn().offlineOnly() ? "not tested (offline mode disables root commands)" : String.valueOf(root));
         kv(r, "magisk", root ? RootSetup.run("magisk -v 2>/dev/null; magisk -V 2>/dev/null").replace('\n', ' ') : "n/a");
         for (String prop : new String[] { "ro.product.model", "ro.board.platform", "ro.hardware", "ro.build.version.sdk", "ro.vendor.build.fingerprint", "persist.sys.usb.config", "ro.boot.verifiedbootstate" }) kv(r, prop, getprop(prop));
         for (String prop : VENDOR_PROPS) kv(r, prop, getprop(prop));
         String vn = vendorName();
         if (vn != null) kv(r, "phone (vendor partition)", vn);
         DeviceProfile dp = DeviceProfile.detect();
-        kv(r, "profile detected", dp.supported ? dp.name + (dp.verified ? "" : " (untested on hardware)") : "none (this is an unsupported phone)");
+        kv(r, "profile detected", profileDescription(dp));
 
         p.step("Serial ports");
         h(r, "Serial ports (File API)");
         File[] dev = new File("/dev").listFiles();
-        if (dev != null) for (File f : dev) if (f.getName().matches("tty(S|MT|HS|USB|GS|ACM)\\d*")) r.append(String.format(Locale.US, "  %-14s read=%s write=%s\n", f.getName(), f.canRead(), f.canWrite()));
+        if (dev != null) for (File f : dev) if (serialPortName(f.getName())) r.append(String.format(Locale.US, "  %-14s read=%s write=%s\n", f.getName(), f.canRead(), f.canWrite()));
+        if (dp.offlineOnly()) {
+            h(r, "P8 expected paths (permission metadata only; no port opened or GPIO written)");
+            for (String path : new String[] { dp.controlPort, dp.pcmPort, dp.powerNode, dp.pttNode, P8Protocol.AUDIO_CONTROL_NODE }) {
+                if (path == null) continue;
+                File f = new File(path);
+                r.append("  ").append(path).append(" exists=").append(f.exists()).append(" read=").append(f.canRead()).append(" write=").append(f.canWrite()).append('\n');
+            }
+        }
         r.append(cat("/proc/tty/drivers"));
         if (root) { h(r, "Serial ports (root: labels, drivers)"); r.append(RootSetup.run("ls -lZ /dev/ttyS* /dev/ttyMT* /dev/ttyHS* /dev/ttyUSB* /dev/ttyGS* 2>/dev/null; echo; cat /proc/tty/drivers; echo; for t in /dev/ttyS*; do echo \"$t: $(stty -F $t -a 2>&1 | head -1)\"; done")).append('\n'); }
 
@@ -176,7 +193,7 @@ public final class DeviceReport {
             p.step("Sound card");
             h(r, "Sound card streams and mixer (root)"); r.append(soundCard(c)).append('\n');
         } else {
-            h(r, "Root"); r.append("  not available — with Magisk root the report also lists SELinux labels, which process holds the serial ports, and the stock app's receivers (the PTT key broadcasts).\n");
+            h(r, "Root"); r.append(dp.offlineOnly() ? "  not tested: root commands are intentionally disabled in offline mode; this is not a root-capability test.\n" : "  not available — with Magisk root the report also lists SELinux labels, which process holds the serial ports, and the stock app's receivers (the PTT key broadcasts).\n");
         }
 
         File txt = new File(dir, "report.txt");

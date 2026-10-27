@@ -36,6 +36,12 @@ public final class FirstRunCheck {
         }
 
         DeviceReport.generate(c, s -> p.step("Report: " + s));
+        if (dp.offlineOnly()) {
+            // Never inherit the upstream PTT prompt: the stock app may still own the transmitter.
+            DeviceReport.append("Summary", "Offline report only: root test, PTT key capture, stock-app launch/stop, version query and radio takeover were not performed. No command was sent to the module.\n");
+            p.step("Zipping offline report");
+            return DeviceReport.zipNewest(c, true);
+        }
         if (watchPkg != null && !DeviceReport.lastCandidates.contains(watchPkg)) {      // the owner picked an app the ranking did not examine
             try {
                 File src = new File(c.getPackageManager().getApplicationInfo(watchPkg, 0).sourceDir), dir = DeviceReport.newestDir();

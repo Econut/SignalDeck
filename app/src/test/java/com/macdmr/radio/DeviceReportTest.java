@@ -15,6 +15,17 @@ import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 
 public class DeviceReportTest {
+    @Test public void p8CaseSensitiveSerialNamesAreNotOmitted() {
+        for (String name : new String[] {"ttysWK0", "ttysWK3", "ttyS0", "ttyUSB12", "ttyACM0"})
+            assertTrue(name, DeviceReport.serialPortName(name));
+        for (String name : new String[] {"ttySWK0", "tty", "ttysWK", "ttyS0/other", "console"})
+            assertFalse(name, DeviceReport.serialPortName(name));
+    }
+    @Test public void recognisedOfflineP8IsNotReportedAsUnknown() {
+        String label = DeviceReport.profileDescription(DeviceProfile.UNIWA_P8);
+        assertTrue(label.contains("recognised")); assertTrue(label.contains("hardware access disabled"));
+        assertFalse(label.contains("unsupported"));
+    }
     private static File lib(String strings) throws Exception {
         File f = File.createTempFile("lib", ".so"); f.deleteOnExit();
         try (FileOutputStream o = new FileOutputStream(f)) { o.write(("\u007fELF\u0000" + strings).getBytes(StandardCharsets.ISO_8859_1)); }
