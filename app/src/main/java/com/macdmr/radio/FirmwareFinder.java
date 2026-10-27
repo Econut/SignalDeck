@@ -72,6 +72,7 @@ public final class FirmwareFinder {
         try {
             for (RadioAppFinder.App a : RadioAppFinder.rank(c)) if (pkgs.size() < 3 && a.score >= 5 && !pkgs.contains(a.pkg)) pkgs.add(a.pkg);
         } catch (Throwable t) { android.util.Log.w("FirmwareFinder", "radio app ranking failed: " + t); }
+        android.util.Log.i("FirmwareFinder", "stock packages: " + pkgs);
         List<String> apks = new ArrayList<>();
         for (String pk : pkgs) {
             try {

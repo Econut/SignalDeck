@@ -826,7 +826,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         final Context c = getContext();
         final android.app.AlertDialog pd = new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files").setMessage("Starting…").setCancelable(false).create(); pd.show();
         new Thread(() -> {
-            final String stockApp = svc != null ? svc.profile().stockApp : "";
+            final com.macdmr.radio.RadioService rs = svc != null ? svc : com.macdmr.radio.RadioService.running;   // the page may not be attached yet
+            final String stockApp = rs != null ? rs.profile().stockApp : "";
             java.util.List<String> apks = com.macdmr.radio.FirmwareFinder.stockApks(c, stockApp);   // each step guarded and logged; root pm path when the stock app is not visible
             final java.util.List<com.macdmr.radio.FirmwareFinder.Found> fs = com.macdmr.radio.FirmwareFinder.scan(c, apks, s -> post(() -> pd.setMessage(s + "…")));
             if (apks.isEmpty()) fs.add(com.macdmr.radio.FirmwareFinder.noStockApk(stockApp));
