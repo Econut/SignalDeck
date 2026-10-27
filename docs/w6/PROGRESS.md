@@ -2,6 +2,19 @@
 
 Newest first. Phone: ANYSECU W6+ replacement unit, adb `-s W6202601000904` (USB). Plan: `docs/W6_DEVICE_REPORT_PLAN.md`.
 
+## 2026-10-27 16:55 CDT — Probe: the stock app's port and the AT probe (B1, B2, B5)
+
+- Branch `w6/probe-at`, stacked on `w6/bench-driver`.
+- The probe takes the ports the stock app or the profile name (W6: `/dev/ttyS2`) and skips the rest (`ttySE0`); the
+  sepolicy line is now `console_device`. AT probe added (`AT+DMOCONNECT`, `AT+DMOVERQ`).
+- **W6 facts from it:** the module answers at 9600 on `/dev/ttyS2` with version **`PB202EU05`** (`+DMOVERQ:PB202EU05`).
+  The handshake came back three times as an error echo with one byte lost (`T+DMOCONNECT:1`, `AT+DMOCONNEC:1`), while
+  the shorter version query answered cleanly: the engine design has to check how the stock app writes (pacing, one
+  write per command) before it relies on long commands. The module also echoes unknown binary input wrapped in `:1`,
+  which the old probe took for a DMR answer (fixed).
+- Report kept in `reports/20261027_probe_at/`.
+- Next: serial sniff of the stock app plus a real start-up watch (B3, B4; plan item 1).
+
 ## 2026-10-27 16:35 CDT — Bench driver (plan item 10, gap 7)
 
 - Branch `w6/bench-driver`, stacked on `w6/phase1-baseline`.

@@ -50,8 +50,9 @@ public final class FirstRunCheck {
         DeviceReport.append("PTT key capture", DeviceReport.captureKeys(c, 10));
 
         String stockAnswers = null;                                              // module replies found in the stock app's own log
+        String watchText = "";
         if (watchPkg != null && !svc.isReady() && RootSetup.haveRoot()) {
-            String w = watchStockApp(watchPkg, p);
+            String w = watchStockApp(watchPkg, p); watchText = w;
             DeviceReport.append("The stock app at work (" + watchPkg + ", 15 s, receive only)", w);
             sum.append("watched ").append(watchPkg).append(" start up for 15 s\n");
             stockAnswers = stockAnswers(w);
@@ -62,15 +63,20 @@ public final class FirstRunCheck {
         if (svc.isReady()) {
             sum.append("radio probe skipped: SignalDeck owns the radio (Hand back first to probe the ports)\n");
         } else {
-            String r = RadioProbe.run(c, s -> p.step("Probe: " + s), false);
+            File dir = DeviceReport.newestDir();
+            java.util.Set<String> named = RadioProbe.namedPorts(dir == null ? "" : DeviceReport.cat(new File(dir, "report.txt").getAbsolutePath()), watchText, dp.supported ? dp.controlPort : null);
+            String r = RadioProbe.run(c, s -> p.step("Probe: " + s), false, named);
             DeviceReport.append("Radio probe", r);
             boolean answered = r.contains("answered");
             if (!answered && dp.supported && dp.powerNode != null) {             // the stock app switches the module off when it closes
-                String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true);
+                String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true, named);
                 DeviceReport.append("Radio probe (module power switched on first)", r2);
-                answered = r2.contains("answered");
+                answered = r2.contains("answered"); r = r2;
             }
-            sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');
+            if (r.contains(RadioProbe.AT_MARK))
+                sum.append("radio module answered: yes, with AT commands (SA818 class)").append(atWhere(r)).append(": SignalDeck has no engine for this module family yet\n");
+            else sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');
+            if (!named.isEmpty()) sum.append("ports probed: only those the stock app or the profile name (").append(String.join(" ", named)).append(")\n");
             if (!answered && stockAnswers != null)
                 sum.append("  but ").append(stockAnswers).append(": the module works; SignalDeck's probe did not reach the port it is on\n");
         }
@@ -155,6 +161,12 @@ public final class FirstRunCheck {
             } catch (Throwable t) { android.util.Log.w("BenchChecks", "failed " + t); }
             finally { benchBusy.set(false); }
         }, "bench-checks").start();
+    }
+
+    /** " on /dev/ttyS2 at 9600 baud" from the probe's AT line, or "". */
+    static String atWhere(String probe) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(RadioProbe.AT_MARK) + "( on \\S+ at \\d+ baud)").matcher(probe);
+        return m.find() ? m.group(1) : "";
     }
 
     static final String STOCK_ANSWERS = "module replies in its log: ", NONE_RECOGNISED = "none recognised";

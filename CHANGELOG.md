@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Radio probe: the stock app's own port, and SA818-class AT modules
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 report gaps B1, B2, B5 (plan item 6) | **The probe now probes the port the walkie-talkie app uses.** Before, it skipped the W6's module port `/dev/ttyS2` because its SELinux label is `console_device`, and wrote DMR queries at four speeds to `/dev/ttySE0`, a Unisoc engineering port that answered `FAIL: Invalid command`. Now, when the stock app's code (the clue `paths:`), the ports it held during the watch or the profile name ports, only those are probed, whatever their label; with no such evidence the probe works as before. The derived sepolicy lines follow (`console_device` on the W6, not `device`). **New AT probe:** after the DMR query gets nothing, `AT+DMOCONNECT` and `AT+DMOVERQ` (identity reads only, nothing that tunes or keys) at the port's own speed and 9600; the summary says `radio module answered: yes, with AT commands (SA818 class) on /dev/ttyS2 at 9600 baud: SignalDeck has no engine for this module family yet`. **An echo is no answer:** the W6's module sends back what it got wrapped in an error (`…68 34 01 01 95 b9 00 01 01 10…:1`), which the old check read as "the DMR module answered"; echoes of our own queries (DMR, Agold, AT) are now taken out before deciding. Help and the Run all checks dialog say what the probe sends. | `RadioProbe.java` (`namedPorts`, `probeAt`, `looksLikeAt`, `asText`, `looksLikeModule`), `FirstRunCheck.java` (named ports, summary, `atWhere`), `ui/HelpView.java`, `ui/DeviceView.java`, `RadioProbeAtTest.java` | Host: `RadioProbeAtTest` (port choice, AT answer, the W6's echo bytes, loopback), all 388 host tests pass. **Device: W6 (Unisoc, analog UHF), rooted**, through `scripts/w6/run_checks.sh`: `ttySE0` skipped as unnamed, `ttyS2` probed, `+DMOVERQ:PB202EU05`, summary as above, line settings put back. Not run on a phone with a profile (the change keeps its probe to the profile's port plus the stock app's). |
+
 ## 2026-10-27 — Run all checks from adb, with the host's clock
 
 | Backlog | Change | Files | Test |
