@@ -153,9 +153,7 @@ public final class FirmwareVariantCheck {
         if (!f.fileToAttach() || f.pkg.isEmpty()) return f.url;
         File tmp = new File(c.getCacheDir(), "fwvariant.apk");
         try {
-            android.content.pm.ApplicationInfo ai = c.getPackageManager().getApplicationInfo(f.pkg, 0);
-            List<String> apks = new ArrayList<>(); apks.add(ai.sourceDir); if (ai.splitSourceDirs != null) java.util.Collections.addAll(apks, ai.splitSourceDirs);
-            for (String apk : apks) {
+            for (String apk : StockApk.paths(c, f.pkg)) {   // root pm path when the package manager cannot see the stock app
                 File a = new File(apk);
                 byte[] img = assetFrom(a); String name = img == null ? null : assetName(a);
                 if (img == null && RootSetup.haveRoot()) {
@@ -171,6 +169,21 @@ public final class FirmwareVariantCheck {
         } catch (Throwable ignored) {
         } finally { tmp.delete(); }
         return f.url;
+    }
+
+    /** The stock app's version name; through root (dumpsys) when the package manager cannot see it (Android 11+ package visibility). */
+    static String stockAppVersion(Context c, String pkg) {
+        String v = com.macdmr.radio.fw.FirmwareVault.stockVersion(c, pkg);
+        if (!v.isEmpty() || pkg.isEmpty() || !pkg.matches("[A-Za-z0-9_.]+") || !RootSetup.haveRoot()) return v;
+        return versionFromDumpsys(RootSetup.run("dumpsys package " + pkg + " 2>/dev/null | grep -m 1 versionName="));
+    }
+    static String versionFromDumpsys(String s) {
+        if (s == null) return "";
+        int i = s.indexOf("versionName=");
+        if (i < 0) return "";
+        String v = s.substring(i + 12).trim();
+        int sp = v.indexOf(' '); if (sp >= 0) v = v.substring(0, sp);
+        return v.length() > 40 ? v.substring(0, 40) : v;
     }
 
     static String enc(String s) {
@@ -222,7 +235,7 @@ public final class FirmwareVariantCheck {
         boolean builtIn = com.macdmr.radio.fw.ImageTable.FACTORY.tag.equals(svc.stockFirmware().trim());
         try { if (!builtIn && !dp.stockApp.isEmpty() && RootSetup.haveRoot()) sha = com.macdmr.radio.fw.FirmwareVault.factory(c).sha256; } catch (Throwable ignored) { }
         Facts f = new Facts(android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL, svc.stockFirmware(), dp.stockApp,
-                com.macdmr.radio.fw.FirmwareVault.stockVersion(c, dp.stockApp), sha);
+                stockAppVersion(c, dp.stockApp), sha);
         Known k = known(body);
         String why = missing(f, k);
         if (why == null) { p.edit().remove("fwVariantKey").remove("fwVariantUrl").remove("fwVariantWhy").remove("fwVariantPkg").remove("fwVariantSha").remove("fwVariantFileNew").apply(); return null; }

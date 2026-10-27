@@ -13,6 +13,12 @@ import org.junit.Test;
 import java.nio.charset.StandardCharsets;
 
 public class FirmwareVariantCheckTest {
+    @Test public void stockVersionFromDumpsys() {
+        assertEquals("1.0.13", FirmwareVariantCheck.versionFromDumpsys("    versionName=1.0.13\n"));
+        assertEquals("", FirmwareVariantCheck.versionFromDumpsys(""));
+        assertEquals("", FirmwareVariantCheck.versionFromDumpsys(null));
+    }
+
     private static String x32(String two) { StringBuilder b = new StringBuilder(); for (int i = 0; i < 32; i++) b.append(two); return b.toString(); }
 
     /** A catalogue like serial 5: one image row, one device block with a variant without a hash and one with. */
