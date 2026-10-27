@@ -11,6 +11,8 @@ def signingValue = { String key, String env -> signingProps.getProperty(key) ?: 
 def releaseStore = signingValue('signaldeck.storeFile', 'SIGNALDECK_STORE_FILE')
 
 def sdalsaAssets = layout.buildDirectory.dir('generated/sdalsa-assets').get().asFile
+// Local, separately installed development edition; never updates an official installation.
+def p8OfflineBuild = project.findProperty('p8Offline') == 'true'
 
 android {
     testOptions { unitTests.returnDefaultValues = true }   // host tests: android.util.Log calls in shared DSP code are no-ops
@@ -18,11 +20,14 @@ android {
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.macdmr.radio"
+        applicationId p8OfflineBuild ? "com.macdmr.radio.p8lab" : "com.macdmr.radio"
+        buildConfigField 'boolean', 'P8_OFFLINE', p8OfflineBuild.toString()
+        manifestPlaceholders = [appLabel: p8OfflineBuild ? 'P8 Radio Lab (modified)' : 'SignalDeck',
+                                appIcon: p8OfflineBuild ? '@drawable/ic_p8_lab' : '@mipmap/ic_launcher']
         minSdk 29
         targetSdk 34
         versionCode 119
-        versionName "1.0.0-beta.20"
+        versionName p8OfflineBuild ? "1.0.0-beta.20-p8-offline.1" : "1.0.0-beta.20"
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }   // the phones this radio family ships in are ARM; keeps the Vosk natives to two ABIs
     }
 

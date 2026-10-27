@@ -1,0 +1,125 @@
+# UNIWA P8 compatibility — offline milestone 1
+
+Modified development branch: `uniwa-p8-support`, based on upstream tag `v1.0.0-beta.20`.
+Upstream author/copyright: IIMacGyverII; GPL-3.0-or-later and COPYRIGHT retained.
+
+## Testable now
+
+- A recognised P8 profile with the stock command UART, PCM UART, stock package, PTT broadcasts and identified GPIO paths.
+- `P8Protocol`, a pure Java wire-data adapter: P8 analogue channel packet construction, version/volume previews, strict checksummed saved-frame decoding and P8 text-version/status interpretation.
+- Device → **P8 offline workbench**: edit analogue preview values and decode a saved reply. No hardware access. Channels can be edited in the app's existing Channels page/database independently of the radio.
+- Host tool to convert a consistent saved stock Channel database into receive-only CHIRP CSV for the existing channel importer. Preserves original wire fields in comments; deliberately does not translate tone-index filters yet.
+- Host tool to reconstruct 8 kHz mono WAV from saved framed PCM, report source peak/RMS and test bounded gain on a new WAV, including clipping counts. It cannot repair missing bandwidth or clipping in the source.
+- Pure-data/host tests, plus engine/profile gates that reject UART/power/PTT/raw commands before transport access.
+
+**Not live P8 radio support yet.** No packet has been sent, no UART/GPIO has been opened, no stock app disabled, and no P8 root/flash/unlock/RF operation was performed for this software milestone. The phone remains blocked at its earlier physical unlock confirmation; this work does not revisit or change that state.
+
+## Build and run
+
+Requires JDK17, Android SDK34/build-tools34.0.0, NDK26.3.11579264 and CMake3.22.1. Use a separate host SDK/cache; no device drivers need changing.
+
+```powershell
+./gradlew.bat --no-daemon -Pp8Offline=true assembleRelease testReleaseUnitTest
+python -m unittest discover -s tools -p 'test_p8_*.py' -v
+```
+
+Offline APK application ID: `com.macdmr.radio.p8lab`; label **P8 Radio Lab (modified)**; version `1.0.0-beta.20-p8-offline.1`. Uses a separate launcher icon, skips the upstream wordmark splash and keeps upstream attribution. Without upstream signing credentials it is signed with the local Android development key, not the official release key. It installs separately and does not replace official SignalDeck or Intercom. Do not use `adb uninstall` on the official app. This milestone has not installed anything on the P8.
+
+With `-Pp8Offline=true`, the app forces the P8 development profile on any test device. The profile remains `supported=false`, `verified=false`. Root commands, active probes, DIAG commands and control/PCM opens are blocked. `RadioEngine` rejects sends/raw writes/power operations, even if its caller holds a promoted copy of the profile. Signed profile-list updates cannot promote built-in `uniwa-p8`. Do not remove these gates to test UI.
+
+Suggested device test once the owner has returned to normal Android (no bootloader operation included here):
+
+1. Install the separately packaged lab APK with `adb install -r PATH_TO_LAB_APK`.
+2. Open it and select Device → P8 offline workbench. No Magisk grant is needed.
+3. Tap Decode saved reply: the built-in APK fixture should show **Status: SMS received**.
+4. Change RX frequency/bandwidth/volume/monitor and preview. This produces hex only. Confirm narrow0/wide1 and repeated final monitor byte.
+5. Create/edit a channel locally on Channels; close/reopen and check persistence. This does not tune the module. A generated receive-only CSV can be imported through the existing import flow after reviewing its preview.
+6. Confirm Take over opens the workbench and no serial/root access occurs. Do not use an official app/profile override to defeat the offline mode.
+
+Host utility, with `JAVA_HOME` pointing at JDK17:
+
+```powershell
+./tools/p8-offline.ps1 decode 6836020090B800010510
+./tools/p8-offline.ps1 analog 145500000
+./tools/p8-offline.ps1 pcm-wav SAVED_CAPTURE.bin NEW_RX.wav
+./tools/p8-offline.ps1 pcm-wav SAVED_CAPTURE.bin NEW_RX_GAIN6.wav 6
+python tools/p8_channels.py CONSISTENT_SAVED_STOCK.db NEW_RECEIVE_ONLY.csv
+```
+
+Utilities open only supplied regular host files. Outputs refuse overwrite. Do not point them at device paths or live databases. WAV inputs are capped at64MiB. Channel converter uses SQLite read-only/immutable mode, refuses WAL sidecars, hashes the source before/after, selects only known channel columns and excludes DMR contacts/IDs/encryption keys. CSV tone fields are empty by design; original wire-tone values are recorded as comments and all channels have Duplex=off. Do not treat that as full channel migration.
+
+## Evidence and provenance
+
+Stock APK extracted read-only from the verified reconstructed `super` backup, `system_a:/system/app/WW_DMR/WW_DMR.apk`.
+
+- 5,480,701 bytes, SHA-256 `9ab1a2da53e5a7d92418bf39f28d9e3eb299605a97a805b83b2caccdea081c43`.
+- Package `com.wtwd.ucee.dmr`; module version previously recorded as `DMR003BN.UV.V026`.
+- Local JADX1.5.6 produced source with11 decompilation errors; claims below use the specific readable methods listed. Unreadable methods are not assumed correct. Decompiled proprietary source and binary APKs are kept outside this repository; this branch implements protocol facts, not copied stock application code.
+- Prior Notion discovery evidence was consulted. The original laptop `_nostation.zip` was not located in the searched PC backup/download locations; no claim of fresh inspection of that raw report. APK extraction independently confirmed the key UART/protocol facts.
+- Original factory firmware and C:/F: preservation backups were opened read-only and remain unchanged. Analysis/decompiler/build output is separate.
+
+### Stock source anchors (local decompilation, names vary by decompiler)
+
+| Evidence | Stock source anchor | Consequence |
+|---|---|---|
+| Command UART | `x2.c` constructor | `/dev/ttysWK0`,57600; do not use generic ttyS0 for commands |
+| Audio UART | `x2.d` constructor | `/dev/ttyS0`,230400 — corrects earlier notes suggesting the alternate baud used the command port |
+| Packet frame/checksum | `androidx.appcompat.widget.e4` constructors and `a()` | Existing `Frame` encoding is compatible: `68 cmd rw sr checksumBE lengthBE body 10`, one's-complement16 sum |
+| Incoming SMS fixture | `x2.c.c()` | Literal `6836020090B800010510`, reused as an independent checksum/parser fixture |
+| Version | `w2.b.N()`, `s2.d.a()`, `t2.d.x()` | query34/body01; response body decoded bytewise as text, not a version integer |
+| Analogue channel | `y2.c(Channel)`, `r2.i.e()` | command23;19-byte body; last byte repeats monitor |
+| Digital channel | `y2.d(Channel)`, `w2.b.Q()` | command22;163-byte body,32 groups, LE frequencies/IDs; field schema appears shared, not yet implemented as a live P8 path |
+| Module volume/mic | `s2.g.b()` | volume2E, mic2A; volumes0..255 accepted as preview bytes only, safe hardware range not established |
+| Power/audio enable | `MainActivity.onCreate()` | stock writes dmr_pwr=1 then auctusctl=1; shutdown `t2.d.h()` writes auctusctl4 then power0; no generic inverse GPIO assumptions |
+| Physical PTT | `t2.d.M(int)` | `/sys/devices/platform/dmr_gpio/dmrptt`: argument1 -> GPIO0 (TX), other ->1; no basis to substitute serial26 |
+| Hardware broadcasts | `androidx.appcompat.app.h` filter, `d0.onReceive()` | `dmr.play.SEND_START/END`; receiver also uses `dmr.play.DMR_REVC_START/END` |
+| Knob | `d0.onReceive()` | `dmr.knob.TIMER`, signed integer extra `timer`; stock steps channel list modulo count |
+| RX PCM | `MainActivity.p()`, `x2.d`, `t2.c` | 167-byte envelope,160-byte payload offset6, tail44;8kHz mono PCM16; fits existing `PcmFramer` |
+| Speaker | `d0.onReceive()` | stock sets speakerphone true/false on RX broadcasts; actual routing/stream volume still needs device validation |
+| Channel schema | `database.Channel_Table` | stock format0=analogue vs SignalDeck type1=FM; importer must translate rather than copy the type byte |
+| Bandwidth UI | resources `analog_broadband_array/value` |0 narrow,1 wide; generic engine's VHF band=1 rule cannot be assumed for this P8 |
+
+### Analogue payload comparison
+
+| Offset | P8 meaning | Generic engine difference |
+|---|---|---|
+|0..3 /4..7|RX/TX frequency int32LE|Same field shape|
+|8|Stock `broadbandSettings`0 narrow/1 wide|Generic engine also calls this band, with a VHF-specific1 rule; do not apply automatically|
+|9|Global power bool ->0/1|Shape matches, hardware power interpretation untested|
+|10|Squelch level|Preserve stock value|
+|11..14|RX type/index,TX type/index|Do not assume tone-index tables are interchangeable|
+|15|Power-save wire enum|Generic hard-codes2; stock derives preference|
+|16|Receive volume preference|Separate from Android media stream volume|
+|17|Monitor|Preserve raw stock value|
+|18|Monitor repeated by stock code|Generic uses relay=2; whether the P8 stock repetition is intended or a vendor bug is unresolved|
+
+P8Protocol reproduces the stock layout, not a claim that every stock field is correct. Helpers only return data; no experimental command dispatcher exists for this profile. Frequency sanity bounds100..1000MHz prevent mistaken MHz units in previews, not a claim that the module supports that tuning range.
+
+Status map01/02 receive start/end,03/04 transmit start/end,05 SMS,06 repeater timeout,07 busy/deny,08/09 SMS success/failure,0A/0B mixed digital receive,0C/0D mixed analogue. Stock labels0C/0D are duplicated/ambiguous; do not silently relabel0D as proven receive-end. The stock app ACKs status36. Future live scanner integration needs to account for that, actual event timing, retune acknowledgements and audio settling; no scan dwell is claimed measured on the P8.
+
+### DMR MCU assets — not a recovery guarantee
+
+| APK asset | Bytes | Embedded tag | SHA-256 |
+|---|---:|---|---|
+|`assets/dmr_003.bin`|303832|`DMR003N.UV4P.V011`|`d2a8d07e280980e0c2f6dfdd75cd92674312e81d56eda340effdf9b366a3e2cb`|
+|`assets/image/dmr_003.bin`|379964|`DMR003N.UV4P.V002`|`d404d7ecf3bb978acc3dfbd8a4125747b53c46000480aeb48465f41e6e495d5b`|
+
+Neither matches recorded `DMR003BN.UV.V026`. No extraction to an auto-update folder, no load and no calibration changes. Bundled firmware bytes do not back up unique MCU calibration or prove compatibility. Do not use them as automatic rollback candidates.
+
+## Remaining implementation work / factory questions
+
+1. Validate JNI symbols/ABI for `com.hebs.dmrserial.jni.SerialPort` and the stock `libserial_port.so`; SignalDeck's current JNI wrappers use different classes. Avoid relying on an unverified stty fallback. UART device labels/ownership still need validation before any approved hardware access.
+2. Obtain engineering confirmation of dmr_pwr/auctusctl/dmrptt modes, safe RX-first sequencing and shutdown behaviour. In particular, what does auctusctl4 mean, and must PTT be released before enabling power?
+3. Confirm analogue byte18 repetition, bandwidth mapping on VHF/UHF, CTCSS/DCS index tables, documented receive-volume range, and whether RX PCM gain is module-side or Android-side. Preserve drivers; start with saved-PCM analysis before live mixer changes.
+4. Implement the stock DB channel adapter inside the app after validating a consistent exported schema/sample. Current converter handles analogue receive-only migration; DMR groups, slots and encrypted fields are not silently guessed.
+5. Wire receive status into the existing scanner with a fake clock/transport test before a separately approved receive-only session. Measure command acknowledgements, dwell and channel-switch audio settling on the actual P8 later.
+6. Map programmable buttons using passive Android key/broadcast capture once Android is available; keep SOS/PTT excluded from remapping until actual behaviour is known. Knob `timer` signed step semantics can reuse channel navigation, but are not enabled in this milestone.
+7. Ask UNIWA for exact DMR003BN.UV.V026 protocol/firmware and separate calibration preservation instructions; the APK's older DMR003N assets are not a match.
+
+Next hardware milestone is an explicitly approved **receive-only** transport/routing test once normal Android and access prerequisites are available. Offline tests do not prove electrical sequencing, RF behaviour, USB recovery or root access. No bootloader investigation is part of this task.
+
+## Validation record
+
+Initial normal release build: PASS;97 Java suites /391 tests /0 failures /0 errors. Host utility tests:4 PASS (saved-frame checksum rejection; exact WAV payload/rate/frame count; no overwrite; source preservation; clipping report; stock analogue type/bandwidth conversion; DMR exclusion; WAL refusal).
+
+Separately packaged offline release: PASS; full suite97 suites /392 tests /0 failures /0 errors. After the final direct GPIO/native-port guards, release rebuild and all14 affected Java tests passed (5 profile tests,7 protocol/PCM tests,2 hardware-gate tests). Host utility tests:4 PASS. APK v2 signature, separate application ID, label, launcher class and ARM ABIs verified with Android SDK tools. No device/UI runtime test has occurred. APK SHA-256: `43ea12f7d6b580f6e88467f9be617badac3bf09e700a12a100f8f5817900ed12`, 31678423 bytes. Local build receipt and TEST-FIRST instructions accompany the APK.

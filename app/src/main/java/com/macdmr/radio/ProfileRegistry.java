@@ -69,6 +69,7 @@ public final class ProfileRegistry {
 
     public static Selection select(DeviceProfile builtIn, JSONObject list, Env env, boolean useBuiltIn, Set<String> overrides, String today) {
         Selection s = new Selection(); s.profile = builtIn;
+        if ("uniwa-p8".equals(builtIn.id)) return s; // downloaded profiles/advisory overrides cannot enable P8 hardware
         JSONArray profiles = list == null ? null : list.optJSONArray("profiles");
         if (!useBuiltIn && profiles != null) {
             for (int i = 0; i < profiles.length(); i++) {
@@ -231,6 +232,7 @@ public final class ProfileRegistry {
 
     /** At most every 12 hours, in the background. */
     public static void maybeFetch() {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) return;
         if (System.currentTimeMillis() - lastCheck() < 12 * 3600_000L) return;
         new Thread(() -> android.util.Log.i("ProfileRegistry", fetch()), "profile-check").start();
     }

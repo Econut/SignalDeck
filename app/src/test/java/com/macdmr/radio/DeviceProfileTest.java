@@ -11,6 +11,25 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 
 public class DeviceProfileTest {
+    @Test public void p8RecognitionNeverEnablesHardwareOrMatchesOtherP8Models() {
+        DeviceProfile p = DeviceProfile.detectBuiltIn("uniwa p8 mt6765", false, false);
+        assertSame(DeviceProfile.UNIWA_P8, p);
+        assertEquals("/dev/ttysWK0", p.controlPort);
+        assertEquals("/dev/ttyS0", p.pcmPort);
+        assertEquals(230400, p.pcmBaud);
+        assertFalse(p.supported); assertFalse(p.verified); assertTrue(p.offlineOnly());
+        assertTrue(p.copy(true, true).offlineOnly());
+        assertSame(DeviceProfile.UNKNOWN, DeviceProfile.detectBuiltIn("huawei p8", false, false));
+        assertSame(DeviceProfile.UNKNOWN, DeviceProfile.detectBuiltIn("uniwa p80", false, false));
+        assertSame(DeviceProfile.UNIWA_P8, DeviceProfile.detectBuiltIn("uniwa p8 mt6765", true, true));
+    }
+
+    @Test public void remoteProfilesCannotTurnP8HardwareOn() throws Exception {
+        org.json.JSONObject list = new org.json.JSONObject("{\"profiles\":[{\"id\":\"uniwa-p8\",\"revision\":999,\"match\":{\"model\":[\"uniwa p8\"]},\"name\":\"unsafe replacement\",\"controlPort\":\"/dev/ttysWK0\",\"baud\":57600,\"audio\":\"UART_PCM\",\"supported\":true,\"verified\":true}]}");
+        ProfileRegistry.Selection s = ProfileRegistry.select(DeviceProfile.UNIWA_P8, list, null, false, null, "2026-10-27");
+        assertSame(DeviceProfile.UNIWA_P8, s.profile);
+        assertFalse(s.profile.supported); assertTrue(s.profile.offlineOnly());
+    }
     @Test public void armor20wtIsNotTakenForTheArmor26() {
         // Armor 20WT report (beta.18, 2026-10-24): same dmr009 node as the Armor 26 Ultra, detected as one before
         DeviceProfile p = DeviceProfile.detectBuiltIn("ulefone armor 20wt armor_20wt", true, false);

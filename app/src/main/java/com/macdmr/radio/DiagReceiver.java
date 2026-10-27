@@ -31,6 +31,7 @@ public final class DiagReceiver extends BroadcastReceiver {
         String cmd = i.getStringExtra("cmd");
         Log.i("DiagReceiver", "cmd " + cmd);
         if (s == null || cmd == null) return;
+        if (s.profile().offlineOnly()) { Log.w("DiagReceiver", "P8 offline profile: bench commands disabled"); return; }
         switch (cmd) {
             case "inject": s.injectWav(new java.io.File(i.getStringExtra("path"))); break;
             case "isline": if (s.packet() != null) s.packet().diagServerLine(i.getStringExtra("line")); break;

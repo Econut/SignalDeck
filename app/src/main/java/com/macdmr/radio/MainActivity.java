@@ -97,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
         root.addView(modeBar, 1);                                  // under the page, over the tab bar: a running mode, tap to open its page
         root.addView(nav);
         setContentView(root);
-        if (b == null) {                                          // only when the screen is created fresh (first start, or after it was closed); returning to the open app never replays it
+        if (b == null && !BuildConfig.P8_OFFLINE) {                 // modified P8 edition has its own launcher identity, no upstream wordmark splash
             String ver; try { ver = "v" + getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Throwable t) { ver = ""; }
             final com.macdmr.radio.ui.SplashView[] sp = new com.macdmr.radio.ui.SplashView[1];
             sp[0] = new com.macdmr.radio.ui.SplashView(this, ver, () -> { if (sp[0].getParent() != null) ((android.view.ViewGroup) sp[0].getParent()).removeView(sp[0]); });

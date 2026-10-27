@@ -154,6 +154,18 @@ public final class DeviceProfile {
                 { "/sys/devices/platform/intercom/intercom_power_control", "1" } };
     }
 
+    /** Recognised P8 wiring, deliberately offline until transport/GPIO ownership is verified on hardware. */
+    public static final DeviceProfile UNIWA_P8 = new DeviceProfile(
+            "UNIWA P8 (offline development)", P8Protocol.CONTROL_PORT, P8Protocol.CONTROL_BAUD,
+            Audio.UART_PCM, P8Protocol.PCM_PORT, P8Protocol.PCM_BAUD,
+            P8Protocol.POWER_NODE, P8Protocol.PTT_NODE, "1",
+            new String[] { "dmr.play.SEND_START", "dmr.play.SEND_END" },
+            "com.wtwd.ucee.dmr", new String[0], null, false, false);
+    static { UNIWA_P8.id = "uniwa-p8"; UNIWA_P8.revision = 1; }
+
+    /** Hardware integration is intentionally unavailable in the P8 development milestone. */
+    public boolean offlineOnly() { return BuildConfig.P8_OFFLINE || "uniwa-p8".equals(id); }
+
     /** Any other phone: nothing is touched until a device report has been made and a profile written. */
     public static final DeviceProfile UNKNOWN = new DeviceProfile(
             Build.MANUFACTURER + " " + Build.MODEL + " (not supported yet)", "/dev/ttyS0", 57600, Audio.TINY_SERVICE, null, 0,
@@ -164,12 +176,14 @@ public final class DeviceProfile {
 
     /** The profile built into this release for this phone (no profile list, no advisories). */
     public static DeviceProfile detectBuiltIn() {
+        if (BuildConfig.P8_OFFLINE) return UNIWA_P8;
         String m = (Build.MANUFACTURER + " " + Build.MODEL + " " + Build.DEVICE).toLowerCase();
         return detectBuiltIn(m, new File("/sys/devices/platform/dmr009").exists(), new File("/sys/devices/platform/intercom").exists());
     }
 
     /** Model text first (the Armor 20WT has the same dmr009 node as the Armor 26 Ultra, on another port), then the nodes. */
     static DeviceProfile detectBuiltIn(String m, boolean dmr009, boolean intercom) {
+        if (m.matches(".*\\buniwa\\b.*") && m.matches(".*\\bp8\\b.*")) return UNIWA_P8;
         if (m.contains("armor 20wt") || m.contains("armor_20wt")) return ARMOR_20WT;
         if (dmr009 || m.contains("armor 26")) return ARMOR_26_ULTRA;
         if (intercom || m.contains("xplore")) return XPLORE_1;

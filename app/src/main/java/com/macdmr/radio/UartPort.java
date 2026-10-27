@@ -44,6 +44,7 @@ public final class UartPort {
 
     /** @param baud 0 = plain file open (line already configured); else configure it through the stock serial JNI. */
     public synchronized void open(int baud) throws IOException {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) throw new IOException("P8 offline development: serial access disabled");
         if (in != null) return;
         if (baud > 0 && VendorSerial.isLoaded()) {
             native_ = VendorSerial.openPort(path, baud);

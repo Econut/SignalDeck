@@ -33,6 +33,7 @@ public final class SysfsGpio {
 
     /** Write a value to a sysfs line, through root when the app may not open it. */
     public static void write(String node, String value) throws IOException {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) throw new IOException("P8 offline development: GPIO writes disabled");
         try (FileOutputStream f = new FileOutputStream(node)) { f.write(value.getBytes()); }
         catch (IOException e) {
             if (!RootSetup.haveRoot()) throw e;

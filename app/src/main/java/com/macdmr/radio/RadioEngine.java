@@ -128,6 +128,7 @@ public final class RadioEngine implements UartPort.Listener {
     public boolean rawSession() { return rawHold; }
 
     private void send(Frame fr) throws IOException {
+        requireHardwareAccess();
         if (rawHold) return;
         if (fr.rw == 1 && watched(fr.cmd) && firstUnansweredAt == 0) firstUnansweredAt = System.currentTimeMillis();
         if (fr.rw == 1 && fr.cmd != CMD_STATUS) synchronized (stats) { CommandStats c = stats.computeIfAbsent(fr.cmd, k -> new CommandStats()); c.sent++; c.pending.addLast(System.currentTimeMillis()); while (c.pending.size() > 20) c.pending.removeFirst(); }
@@ -163,13 +164,16 @@ public final class RadioEngine implements UartPort.Listener {
     public DeviceProfile profile() { return profile; }
     public boolean isOpen() { return port.isOpen(); }
 
-    public void open() throws IOException { port.open(profile.serialLib != null && VendorSerial.isLoaded() ? profile.baud : 0); }
+    private void requireHardwareAccess() throws IOException {
+        if (profile.offlineOnly()) throw new IOException("UNIWA P8 is offline-only: UART/GPIO access is disabled");
+    }
+    public void open() throws IOException { requireHardwareAccess(); port.open(profile.serialLib != null && VendorSerial.isLoaded() ? profile.baud : 0); }
     public void close() { port.close(); }
 
     /** Pause framing so a firmware load can use the same port. Ordinary commands are held until {@link #stopDivert}. */
     public void startDivert() { rawHold = true; firstUnansweredAt = 0; port.startDivert(); }
     public void stopDivert() { port.stopDivert(); rawHold = false; }
-    public void writeRaw(byte[] b) throws IOException { port.writeRaw(b); }
+    public void writeRaw(byte[] b) throws IOException { requireHardwareAccess(); port.writeRaw(b); }
     public int readRaw(int timeoutMs) throws IOException { return port.readRaw(timeoutMs); }
     public String powerNode() { return profile.powerNode; }
     public String pttNode() { return profile.pttNode; }
@@ -179,13 +183,14 @@ public final class RadioEngine implements UartPort.Listener {
     /** pwd 0→1; the module then prints its banner ("…BF AA <GBK text>\r\n") within ~1 s and accepts commands. */
     /** @return true if the module was off and has just been switched on (caller must {@link #waitBooted}). */
     public boolean powerOn() throws IOException {
+        requireHardwareAccess();
         if (profile.lineSetup != null) for (String[] l : profile.lineSetup) { SysfsGpio.write(l[0], l[1]); ev.log("line " + l[0].substring(l[0].lastIndexOf('/') + 1) + " -> " + l[1]); }
         if (!power.isOn()) { bootLatch = new java.util.concurrent.CountDownLatch(1); power.set(true); ev.log("module power -> on (" + power.read() + ")"); return true; }
         ev.log("module already powered (" + power.read() + ")");
         return false;
     }
 
-    public void powerOff() throws IOException { power.set(false); ev.log("module power -> off (" + power.read() + ")"); }
+    public void powerOff() throws IOException { requireHardwareAccess(); power.set(false); ev.log("module power -> off (" + power.read() + ")"); }
 
     /**
      * A real restart of the module: the power line off, and the profile's other supply lines too (the Xplore 1's stock app
@@ -193,6 +198,7 @@ public final class RadioEngine implements UartPort.Listener {
      * line cannot be read back, so a module that is already on is never restarted by {@link #powerOn}.
      */
     public void powerCycle() throws IOException {
+        requireHardwareAccess();
         power.set(false);
         if (profile.lineSetup != null) for (int i = profile.lineSetup.length - 1; i >= 0; i--) { String[] l = profile.lineSetup[i]; SysfsGpio.write(l[0], "0"); }
         try { Thread.sleep(1000); } catch (InterruptedException ignored) { }

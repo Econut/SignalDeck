@@ -43,6 +43,7 @@ public final class UartPcmAudio implements AudioBackend {
     @Override public void setGate(Gate g) { gate = g; }
 
     private synchronized void open() throws Exception {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) throw new java.io.IOException("P8 offline development: PCM port access disabled");
         if (in != null) return;
         if (VendorSerial.isLoaded()) {
             nativePort = VendorSerial.openPort(path, baud);

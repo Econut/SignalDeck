@@ -41,6 +41,7 @@ public final class RadioProbe {
     private static final java.util.regex.Pattern OTHER_USE = java.util.regex.Pattern.compile("(?i)mux|modem|ccci|radio|gps|gnss|bt_|bluetooth|nfc|console|wifi|wlan|fm_");
 
     public static String run(android.content.Context ctx, Progress p, boolean pulsePower) {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) return "UNIWA P8 offline development: active radio probes are disabled. Use the offline workbench.";
         StringBuilder r = new StringBuilder();
         if (!RootSetup.haveRoot()) return "Root is not granted: the probe needs Magisk root (Superuser → allow SignalDeck).";
         p.step("Labels");

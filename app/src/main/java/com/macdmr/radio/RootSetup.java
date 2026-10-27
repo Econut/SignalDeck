@@ -34,6 +34,7 @@ public final class RootSetup {
      * spawns) only sees its own /data/data entry, so the stock app's databases are simply absent without it.
      */
     private static String run(String cmd, boolean magiskContext) {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) return "UNIWA P8 offline build: root commands disabled";
         StringBuilder sb = new StringBuilder();
         try {
             Process p = (magiskContext ? new ProcessBuilder("su", "--mount-master", "--context", "u:r:magisk:s0", "-c", cmd) : new ProcessBuilder("su", "-c", cmd)).redirectErrorStream(true).start();

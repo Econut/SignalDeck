@@ -29,13 +29,14 @@
         <package android:name="com.pri.prizeinterphone" />
         <package android:name="com.agold.intercom" />
         <package android:name="com.interphone" />
+        <package android:name="com.wtwd.ucee.dmr" />
         <intent><action android:name="android.intent.action.APPLICATION_PREFERENCES" /></intent>
     </queries>
 
     <application
         android:name=".RadioApp"
-        android:label="SignalDeck"
-        android:icon="@mipmap/ic_launcher"
+        android:label="${appLabel}"
+        android:icon="${appIcon}"
         android:fullBackupContent="@xml/backup_rules"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:theme="@style/AppTheme">

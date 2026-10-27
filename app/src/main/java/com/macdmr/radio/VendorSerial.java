@@ -45,6 +45,7 @@ public final class VendorSerial {
 
     /** Copy the system library into our own files dir (the app linker namespace cannot load it from /system) and load it. */
     public static synchronized boolean load(Context ctx, String systemLib) {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) return false;
         if (bound != null) return true;
         if (systemLib == null) return false;
         try {
@@ -80,6 +81,7 @@ public final class VendorSerial {
 
     /** Open and configure the line through the loaded library; null if none is loaded or the native open failed. */
     public static Port openPort(String path, int baud) {
+        if (DeviceProfile.detectBuiltIn().offlineOnly()) return null;
         String cls = bound;
         if (cls == null) return null;
         try { return open(cls, path, baud); }

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — UNIWA P8 offline compatibility milestone (modified branch)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| P8 support | Recognise UNIWA P8 with stock control/PCM UARTs, GPIO/PTT facts and stock package. Keep hardware access disabled, including active probes, root helpers, engine commands and serial opens. A fetched profile cannot promote the P8. Add an offline workbench for analogue packet previews and checksummed saved replies; preserve P8 bandwidth and repeated monitor byte, and decode textual module versions. `-Pp8Offline=true` builds a separately installed, visibly modified P8 Radio Lab edition with its own icon and no upstream splash. Add host saved-PCM-to-WAV/level/gain utility and read-only stock-channel-to-receive-only CSV conversion. | `P8Protocol.java`, `DeviceProfile.java`, transport/helper guards, `ui/P8Workbench.java`, Device/Help views, optional build edition, `tools/p8_*`, `docs/uniwa-p8.md` | Initial full release build and 391 host tests passed; new host tools passed 4 tests. Final build verification is recorded in `docs/uniwa-p8.md`. No hardware test, UART write, radio takeover, RF, root or firmware modification. |
+
 ## 2026-10-26 — Firmware the catalogue does not list yet: asked once, noticed on the Device page
 
 | Backlog | Change | Files | Test |

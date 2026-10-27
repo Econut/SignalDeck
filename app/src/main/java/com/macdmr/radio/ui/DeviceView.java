@@ -82,6 +82,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         hero.addView(hb);
         takeOver.setOnClickListener(v -> {
             if (svc == null) return;
+            if (svc.profile().offlineOnly()) { P8Workbench.show(c); return; }
             if (svc.profile().verified || svc.isReady()) { svc.bringUp(); return; }
             new android.app.AlertDialog.Builder(getContext()).setTitle("Untested profile")
                     .setMessage("SignalDeck has a profile for the " + svc.profile().name + ", written from its stock app and the owner's reports, but it has never run on this phone. Taking over pauses " + svc.profile().stockApp + " and opens the radio's serial ports. If it fails, the stock app is switched back on; Hand back or a reboot also gives it back.\n\nFirst run Device report → Generate device report and Radio probe (root) and share them: that is what turns this into a tested profile.")
@@ -102,10 +103,17 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         reportNow = Neo.button(c, "Help support this phone", "report", Neo.VIOLET);
         hero.addView(reportNow, new LayoutParams(bl)); reportNow.setVisibility(GONE);
         reportNow.setOnClickListener(v -> supportMenu());
-        TextView note = Neo.text(c, "Needs root (Magisk). While this app owns the radio the stock walkie-talkie app is paused and its icon hidden; Hand back restores it. The Magisk module keeps the SELinux rules across reboots so the radio can be owned straight from boot.", Neo.MUTED, 13, Neo.uiMedium(c));
+        TextView note = Neo.text(c, com.macdmr.radio.DeviceProfile.detectBuiltIn().offlineOnly()
+                ? "P8 offline development: no root needed. The stock Intercom keeps the radio. Use the workbench for packet previews and saved replies; channel edits stay in this app. Hardware access is disabled."
+                : "Needs root (Magisk). While this app owns the radio the stock walkie-talkie app is paused and its icon hidden; Hand back restores it. The Magisk module keeps the SELinux rules across reboots so the radio can be owned straight from boot.", Neo.MUTED, 13, Neo.uiMedium(c));
         note.setLineSpacing(0, 1.1f); note.setPadding(0, (int) (10 * d), 0, 0);
         hero.addView(note);
         body.addView(hero, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        if (com.macdmr.radio.DeviceProfile.detectBuiltIn().offlineOnly()) {
+            TextView lab = Neo.button(c, "P8 offline workbench", "report", Neo.CYAN);
+            body.addView(lab, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+            lab.setOnClickListener(v -> P8Workbench.show(c));
+        }
 
         // ---- radio settings ----
         LinearLayout set = card(body, "Radio settings");

@@ -15,3 +15,4 @@ app/.cxx/
 
 # User reports and files shared for support (never commit)
 temp/
+__pycache__/
