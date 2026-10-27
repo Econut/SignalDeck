@@ -2,6 +2,14 @@
 
 Newest first. Phone: ANYSECU W6+ replacement unit, adb `-s W6202601000904` (USB). Plan: `docs/W6_DEVICE_REPORT_PLAN.md`.
 
+## 2026-10-27 20:10 CDT: Compact intercom (layout B)
+
+- Branch `w6/compact-intercom`, stacked on `w6/engine-design`. Owner picked layout B with today's button columns, and
+  asked that changes to the Armor's page reach the compact page by themselves: one build path, one size table, the
+  regular sizes locked by a host test to the previous numbers.
+- W6: everything fits; `screenHeightDp` is 545 (status bar excluded), the rule is < 700.
+- Next: the HackRF is mine after this (owner): receive-audio test (ENGINE_DESIGN test 1) first.
+
 ## 2026-10-27 18:50 CDT: Engine design written (docs/w6/ENGINE_DESIGN.md)
 
 - Branch `w6/engine-design`, stacked on `w6/clues-32bit`. Docs only.

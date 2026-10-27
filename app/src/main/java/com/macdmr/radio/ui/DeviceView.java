@@ -123,6 +123,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         addRow(set, Neo.switchRow(c, "voice", Neo.VIOLET, "Voice announcements", "Channel changes, caller names, keyword alerts", voiceSw));
         addRow(set, rogerRow(c));
         addRow(set, Neo.switchRow(c, "intercom", Neo.CYAN, "New intercom look", "Off: the classic intercom page", styleSw));
+        addRow(set, layoutRow(c));
         addRow(set, Neo.switchRow(c, "diag", Neo.CYAN, "Animated panel when quiet", "Falling lines on an idle channel (uses a little battery)", animSw));
         addRow(set, Neo.switchRow(c, "signal", Neo.VIOLET, "Coverage logging", "Records signal and key-ups with GPS for the coverage maps (Map → Coverage)", covSw));
         roamSw = sw();
@@ -690,6 +691,24 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
             try { com.macdmr.radio.DeviceReport.generate(c, s -> post(() -> pd.setMessage(s + "…"))); post(() -> { pd.dismiss(); new android.app.AlertDialog.Builder(c).setTitle("Report ready").setMessage("Saved under Download/DMR/DeviceReport. If the phone has a side PTT key, run \"Capture the PTT key\" and, with root, the radio probe, then use Share last report, which explains what it contains.").setPositiveButton("OK", null).show(); }); }
             catch (Throwable t) { post(() -> { pd.dismiss(); android.widget.Toast.makeText(c, "Report failed: " + t.getMessage(), android.widget.Toast.LENGTH_LONG).show(); }); }
         }).start();
+    }
+
+    /** Intercom layout: Automatic (compact below 700 dp of screen height), Regular, or Compact. The page and the tab bar follow it. */
+    private LinearLayout layoutRow(final Context c) {
+        final String[] keys = { "auto", "regular", "compact" };
+        final int hdp = c.getResources().getConfiguration().screenHeightDp;
+        final String[] names = { "Automatic (" + (IntercomView.compactFor(hdp, "auto") ? "compact" : "regular") + " on this phone, " + hdp + " dp tall)", "Regular", "Compact" };
+        String cur = IntercomView.layoutPref(c); int sel = 0; for (int i = 0; i < keys.length; i++) if (keys[i].equals(cur)) sel = i;
+        final LinearLayout row = Neo.switchRow(c, "intercom", Neo.CYAN, "Intercom layout", names[sel], null);
+        final int pick = sel;
+        row.setOnClickListener(v -> new android.app.AlertDialog.Builder(c).setTitle("Intercom layout")
+                .setSingleChoiceItems(names, pick, (dd, w) -> {
+                    dd.dismiss();
+                    if (keys[w].equals(IntercomView.layoutPref(c))) return;
+                    IntercomView.setLayoutPref(c, keys[w]);
+                    if (c instanceof android.app.Activity) ((android.app.Activity) c).recreate();   // the tab bar is sized when the screen is built
+                }).setNegativeButton("Cancel", null).show());
+        return row;
     }
 
     private void checks(boolean firstLaunch) {
