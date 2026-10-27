@@ -48,6 +48,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     private SMeterView smeter;
     private String zoneName = "ALL";
     private LinearLayout scanZoneRow;
+    private LinearLayout sqRow;                       // new look's Soft SQ slider row: shown only while Soft SQ is on an FM channel
+    private boolean sqShown = true, chanFm = true;
     private String lastZoneText = "";
 
     /**
@@ -446,8 +448,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         sq.addView(seek, new LayoutParams(0, (int) (32 * d), 1f));
         sqValue = Neo.text(c, "5", Neo.CYAN, 20, Neo.mono(c)); sqValue.setGravity(Gravity.END);
         sq.addView(sqValue, new LayoutParams((int) (24 * d), LayoutParams.WRAP_CONTENT));
-        LayoutParams sql = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); sql.setMargins(m + (int) (2 * d), (int) (2 * d), m, 0);
-        addView(sq, sql);
+        LayoutParams sql = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); sql.setMargins(m + (int) (2 * d), (int) (14 * d), m, 0);   // 14 dp under SCAN / ZONE: room for a thumb (was 2 dp)
+        addView(sq, sql); sqRow = sq;
     }
 
     private static FrameLayout.LayoutParams sat(float d, int wDp, int side, int sideMarginDp, int topDp) {
@@ -584,6 +586,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             neoChannel(ch, isVfo); vfo.setOn(isVfo);
             historyHeader.setText(ch.isM17() ? "M17" : ch.isDigital() ? "DMR ACTIVITY" : "ANALOG HISTORY");
             softSq.setVisibility(ch.isDigital() || ch.isM17() ? INVISIBLE : VISIBLE);
+            chanFm = !ch.isDigital() && !ch.isM17(); showSqRow(softSq.isOn());
             history.clear();
             if (svc != null && !panelClosed) for (String l : svc.store().recentHistory(ch.number, 3)) history.addLast(l);
             renderHistory(); refreshHeadline();
@@ -644,6 +647,13 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         captionLive.setText(live == null ? "" : live); captionLive.setVisibility(live == null || live.isEmpty() ? GONE : VISIBLE);
         captionScroll.post(() -> captionScroll.fullScroll(android.view.View.FOCUS_DOWN));
     }
+    /** The slider only while Soft SQ is on and the channel is FM; the activity panel takes the room otherwise (the talk key does not move). */
+    private void showSqRow(boolean sqOn) {
+        if (sqRow == null) return;
+        boolean show = sqOn && chanFm;
+        if (show == sqShown) return;
+        sqShown = show; sqRow.setVisibility(show ? VISIBLE : GONE);
+    }
     private boolean gateWasOpen;
     private int lastScanState = -1;
     @Override public void onModes(boolean sq, int level, boolean open, boolean monitor, boolean recording, boolean scanning, boolean holding, String zoneName) {
@@ -651,6 +661,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         boolean was = gateWasOpen; gateWasOpen = sq && open;   // Soft SQ channels: the gate opening is the reception
         if (was != gateWasOpen) { updateMeter(); refreshHeadline(); }   // headline and talk key follow what is actually heard
         softSq.setOn(sq); mon.setOn(monitor); rec.setOn(recording); pkt.setOn(svc != null && svc.packetActive());
+        showSqRow(sq);
         if (!sqFromUser) { sqSeek.setProgress(level); sqValue.setText(String.valueOf(level)); }
         sqValue.setTextColor(sq ? (open ? Theme.GREEN : Theme.AMBER) : Theme.CYAN);
         zoneBtn.setText("ZONE: " + zoneName.toUpperCase(java.util.Locale.US));
