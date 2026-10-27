@@ -49,7 +49,11 @@ public final class PocsagDecoder {
     }
 
     private static Hit take(int baud, int[] bits) { return new Hit(baud, Pocsag.decode(bits)); }
-    private static int score(Hit h) { int n = 0; for (Pocsag.Page p : h.pages) n += p.text.length(); return n; }
+    private static int score(Hit h) {
+        int n = 0;
+        for (Pocsag.Page p : h.pages) n += p.ricUnreadable ? 1 : p.text.length() * 10;
+        return n;
+    }
 
     /** A run of alternating bits: the baud from the gap, and the middle of the first bit. */
     static final class Clock { final int baud; final double spb, phase; Clock(int baud, double spb, double phase) { this.baud = baud; this.spb = spb; this.phase = phase; } }
@@ -98,14 +102,18 @@ public final class PocsagDecoder {
         int cap = (int) (audio.length / Math.max(1.0, spb)) + 2;
         int[] bits = new int[Math.max(1, cap)];
         int n = 0; double pos = phase; int guard = 0;
+        Level level = new Level();
         while (pos >= 0 && pos < audio.length && n < bits.length) {
-            bits[n++] = bitAt(audio, pos, pol);
+            bits[n++] = decide(audio, pos, pol, level);
             pos += spb;
             if (guard > 0) { guard--; continue; }
             if (n >= 32 && hamming(bits, n - 32) <= 2) {
                 double start = pos - 32 * spb;
                 double shift = relock(audio, start, spb, pol);
-                for (int i = 0; i < 32; i++) bits[n - 32 + i] = bitAt(audio, start + shift + i * spb, pol);
+                double sum = 0;
+                for (int i = 0; i < 32; i++) sum += sampleAt(audio, start + shift + i * spb);
+                level.mean = sum / 32.0;
+                for (int i = 0; i < 32; i++) bits[n - 32 + i] = decide(audio, start + shift + i * spb, pol, level);
                 pos = start + shift + 32 * spb;
                 guard = 32;
             }
@@ -113,25 +121,25 @@ public final class PocsagDecoder {
         return java.util.Arrays.copyOf(bits, n);
     }
 
-    private static int bitAt(short[] audio, double pos, int pol) {
-        int k = (int) pos;
-        if (k < 0 || k >= audio.length) return 0;
-        return (pol * audio[k] < 0) ? 1 : 0;
-    }
-
     private static double relock(short[] audio, double start, double spb, int pol) {
         double best = 0; int bestErr = 99;
+        Level zero = new Level();
         for (int step = -8; step <= 8; step++) {
             double d = step * spb / 20.0;
             int err = 0;
             for (int i = 0; i < 32; i++) {
-                int got = bitAt(audio, start + d + i * spb, pol);
+                int got = decide(audio, start + d + i * spb, pol, zero);
                 int want = (Pocsag.SYNC >>> (31 - i)) & 1;
                 if (got != want) err++;
             }
             if (err < bestErr) { bestErr = err; best = d; }
         }
         return best;
+    }
+
+    private static double sampleAt(short[] audio, double pos) {
+        int k = (int) pos;
+        return k >= 0 && k < audio.length ? audio[k] : 0;
     }
 
     private static int hamming(int[] bits, int at) {
@@ -145,12 +153,19 @@ public final class PocsagDecoder {
         int n = 0;
         for (double t = phase + spb / 2; t < audio.length; t += spb) n++;
         int[] bits = new int[n];
+        Level level = new Level();
         int i = 0;
-        for (double t = phase + spb / 2; t < audio.length; t += spb) {
-            int k = (int) t;
-            int sample = k >= 0 && k < audio.length ? audio[k] : 0;
-            bits[i++] = (pol * sample < 0) ? 1 : 0;
-        }
+        for (double t = phase + spb / 2; t < audio.length; t += spb) bits[i++] = decide(audio, t, pol, level);
         return bits;
+    }
+
+    /** A slow baseline, about the last 32 bits. Re-centred when a sync word is found. */
+    static final class Level {
+        double mean;
+        void clear() { mean = 0; }
+    }
+
+    private static int decide(short[] audio, double pos, int pol, Level level) {
+        return (pol * (sampleAt(audio, pos) - level.mean) < 0) ? 1 : 0;
     }
 }

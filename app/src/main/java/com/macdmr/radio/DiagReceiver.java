@@ -126,6 +126,14 @@ public final class DiagReceiver extends BroadcastReceiver {
             }
             case "pager": {
                 boolean hold = !i.hasExtra("hold") || i.getBooleanExtra("hold", true);
+                if (i.hasExtra("monitor")) {
+                    String raw = i.getStringExtra("freqs");
+                    java.util.List<Integer> list = new java.util.ArrayList<>();
+                    if (raw != null) for (String part : raw.split("[, ]+")) { try { list.add(Integer.parseInt(part.trim())); } catch (Exception ignored) { } }
+                    int[] hz = new int[list.size()]; for (int k = 0; k < list.size(); k++) hz[k] = list.get(k);
+                    Log.i("DiagReceiver", "pager monitor: " + s.setPagerMonitor(i.getBooleanExtra("monitor", false), hz, i.getIntExtra("baud", 1200)));
+                    break;
+                }
                 if (i.hasExtra("on")) Log.i("DiagReceiver", "pager: " + s.setPager(i.getBooleanExtra("on", false), hold));
                 break;
             }

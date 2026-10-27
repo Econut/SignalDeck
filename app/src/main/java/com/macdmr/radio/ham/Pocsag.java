@@ -36,6 +36,8 @@ public final class Pocsag {
         }
         /** Bits repaired by BCH while this page was decoded. Zero for a page this app built to send. */
         public int corrected;
+        /** The address word did not check. The text is kept and the number is not guessed. */
+        public boolean ricUnreadable;
     }
 
     public static int bch(int data21) {
@@ -57,14 +59,44 @@ public final class Pocsag {
     }
 
     /**
-     * The codeword, or the same word with one or two bits repaired. Unrepairable words come back unchanged,
-     * so {@link #check} still fails.
+     * The codeword, or the same word with one or two bits of the BCH word repaired. The even-parity bit is checked
+     * after that repair; if it does not match, the word is uncorrectable and comes back unchanged.
      */
     public static int correct(int cw) {
         if (check(cw)) return cw;
-        for (int i = 0; i < 32; i++) { int t = cw ^ (1 << i); if (check(t)) return t; }
-        for (int i = 0; i < 32; i++) for (int j = i + 1; j < 32; j++) { int t = cw ^ (1 << i) ^ (1 << j); if (check(t)) return t; }
-        return cw;
+        int body = (int) ((cw & 0xFFFFFFFFL) >>> 1);
+        int parity = cw & 1;
+        int fixed = correctBody(body);
+        if (fixed < 0 || parity != (Integer.bitCount(fixed) & 1)) return cw;
+        return (fixed << 1) | parity;
+    }
+
+    /** One unique 31-bit word within two flips whose BCH syndrome is zero, or -1. */
+    private static int correctBody(int body) {
+        if (syndrome(body) == 0) return body & 0x7FFFFFFF;
+        int one = searchFlips(body, 1, 0, 0, -1);
+        if (one == -2) return -1;
+        if (one >= 0) return one;
+        int two = searchFlips(body, 2, 0, 0, -1);
+        return two < 0 ? -1 : two;
+    }
+
+    private static int searchFlips(int body, int left, int from, int flipped, int found) {
+        if (left == 0) return (syndrome(body ^ flipped) == 0) ? oneOf(found, body ^ flipped) : found;
+        for (int i = from; i < 31 && found != -2; i++) found = searchFlips(body, left - 1, i + 1, flipped ^ (1 << i), found);
+        return found;
+    }
+
+    private static int oneOf(int found, int word) {
+        word &= 0x7FFFFFFF;
+        if (found < 0) return word;
+        return found == word ? found : -2;
+    }
+
+    private static int syndrome(int body) {
+        long r = body & 0x7FFFFFFFL;
+        for (int i = 30; i >= 10; i--) if ((r & (1L << i)) != 0) r ^= (long) G << (i - 10);
+        return (int) (r & 0x3FF);
     }
 
     public static int addressWord(int ric, int func) {
@@ -208,7 +240,12 @@ public final class Pocsag {
                 if (at + 32 > bits.length) break;
                 int raw = wordAt(bits, at);
                 int cw = correct(raw);
-                if (!check(cw) || cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
+                if (cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
+                if (!check(cw)) {
+                    if (cur == null) { cur = new Page(-1, 3, ""); cur.ricUnreadable = true; text.setLength(0); leftover.clear(); }
+                    else { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); }
+                    continue;
+                }
                 if (cur != null) cur.corrected += Integer.bitCount(raw ^ cw);
                 int data = (int) ((cw & 0xFFFFFFFFL) >>> 11);
                 if ((data & (1 << 20)) == 0) {
@@ -237,8 +274,11 @@ public final class Pocsag {
     }
 
     private static void finish(List<Page> out, Page cur, StringBuilder text, List<Integer> leftover) {
-        if (cur == null) return;
-        out.add(new Page(cur.ric, cur.func, text.toString()));
+        if (cur == null || text.length() == 0) return;
+        Page p = new Page(cur.ricUnreadable ? -1 : cur.ric, cur.func, text.toString());
+        p.corrected = cur.corrected;
+        p.ricUnreadable = cur.ricUnreadable;
+        out.add(p);
     }
 
     private static int wordAt(int[] bits, int at) {

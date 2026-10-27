@@ -4,7 +4,7 @@
 
 | Backlog | Change | Files | Test |
 |---|---|---|---|
-| Plan A | Pages are decoded on an analog channel and filed in Messages: by the contact that owns the RIC, else a signed callsign, else the RIC. M17 texts file by the source callsign, and @ALL shares one thread. PKT → Hear pages listens; the Messages scan icon steps a frequency list and waits out a preamble. A page for your own RIC notifies. | `PagerStation.java`, `ham/Pocsag.java`, `ham/PocsagDecoder.java`, `ChannelStore.java`, `RadioService.java`, `ui/MessagesView.java`, `ui/PktDialog.java`, `ui/HelpView.java`, `DiagReceiver.java` | Host: clean pages at 512/1200/2400, a 30 ppm stretch, one and two bit repairs, thread keys. Bench, held path, 2.5 kHz, channel 2: 1200 baud 3/3 and 2400 baud 3/3 payload-exact. 512 baud listed one text with the wrong RIC and missed the next. With the voice-filter hold off, a 1200 baud page kept the text and changed the RIC. |
+| Plan A review | An address word that fails its parity check after BCH is not given a guessed RIC: the page is listed as RIC unreadable and the text is kept. Hear pages does not start on the firmware the phone shipped with. At 512 baud the slicer re-centres its threshold on each sync word. | `ham/Pocsag.java`, `ham/PocsagDecoder.java`, `RadioService.java`, `PagerStation.java`, `ui/HelpView.java`, `DiagReceiver.java` | Host: a three-error address stays unreadable with the text kept; one and two bit repairs still restore the word; a drooping 512 baud baseline still decodes; clean pages at 512/1200/2400. Bench, held path, 2.5 kHz: 512 baud still reported RIC 123617 for one text and missed another. A signed 1200 baud page filed under the callsign; a bare page under its RIC. Monitor stepped 467.625 and 467.650. |
 
 
 

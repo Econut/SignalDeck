@@ -654,7 +654,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
                 Conversation cv = new Conversation();
                 cv.threadKey = c.getString(0); cv.transport = c.getString(1); cv.lastText = c.getString(2); cv.lastTs = c.getLong(3); cv.outgoing = c.getInt(4) == 1;
                 String signer = c.getString(5); int ric = c.getInt(6); cv.unread = c.getInt(7);
-                cv.name = "m17".equals(cv.transport) ? (signer == null || signer.isEmpty() ? "M17" : signer) : (ric == 0 ? cv.threadKey : ("RIC " + ric));
+                cv.name = "m17".equals(cv.transport) ? (signer == null || signer.isEmpty() ? "M17" : signer) : (ric < 0 ? "RIC unreadable" : ric == 0 ? cv.threadKey : ("RIC " + ric));
                 cv.address = "m17".equals(cv.transport) ? signer : String.valueOf(ric);
                 out.add(cv);
             }

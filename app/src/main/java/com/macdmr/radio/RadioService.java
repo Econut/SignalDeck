@@ -3230,6 +3230,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (pager == null) pager = new PagerStation(new PagerStation.Host() {
             @Override public void page(ChannelStore.PageRow row) { filePage(row); }
             @Override public void tune(int hz) {
+                log("pager tune " + hz);
                 ChannelStore.Channel v = new ChannelStore.Channel();
                 v.type = 1; v.rxFreq = v.txFreq = hz; v.band = 1; v.power = 0; v.sq = 2; v.name = "Pager";
                 applyVfo(v, false);
@@ -3249,6 +3250,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!on) { p.stop(); if (pagerHold) { pagerHold = false; setM17(false); } return null; }
         if (current == null || current.isDigital()) return "Pages need an analog channel";
         boolean stub = com.macdmr.radio.Firmware.stubTag(moduleVersion);
+        if (!stub) return "Page receive needs the bench firmware";
         if (hold && stub && !m17Running()) { String e = setM17(true, true); if (e != null) return e; pagerHold = true; }
         else if (hold && stub) m17().setHeldPath(true);
         p.start(hold && stub);
@@ -3285,8 +3287,9 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void filePage(ChannelStore.PageRow row) {
         if (row.threadKey == null || row.threadKey.isEmpty()) return;
         store.addPage(row);
-        String line = ("m17".equals(row.transport) ? "✉ " : "📟 ") + (row.signer == null || row.signer.isEmpty() ? ("RIC " + row.ric) : row.signer) + ": " + row.text;
-        if ("page".equals(row.transport)) { history("page", line); log("page ric " + row.ric + " baud " + row.baud + " corrected " + row.corrected + " " + row.text); }
+        String who = row.ric < 0 ? "RIC unreadable" : (row.signer == null || row.signer.isEmpty() ? ("RIC " + row.ric) : row.signer);
+        String line = ("m17".equals(row.transport) ? "✉ " : "📟 ") + who + ": " + row.text;
+        if ("page".equals(row.transport)) { history("page", line); log("page ric " + (row.ric < 0 ? "unreadable" : row.ric) + " thread " + row.threadKey + " baud " + row.baud + " corrected " + row.corrected + " " + row.text); }
         if ("page".equals(row.transport) && !row.outgoing && com.macdmr.radio.Station.isMyRic(this, row.ric) && !mutedRic(row.ric))
             notifyUser("Page for you", row.text, false);
         final String key = row.threadKey, shown = line;

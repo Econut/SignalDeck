@@ -115,14 +115,15 @@ public final class PagerStation {
         if (hit == null || hit.pages == null) return;
         for (Pocsag.Page p : hit.pages) {
             if (p.text == null || p.text.isEmpty()) continue;
-            String mark = p.ric + "\n" + p.text;
+            String mark = (p.ricUnreadable ? "bad" : p.ric) + "\n" + p.text;
             synchronized (seen) {
                 if (seen.contains(mark)) continue;
                 seen.add(mark); while (seen.size() > 40) seen.remove(0);
             }
-            MessageThreads.Key key = MessageThreads.page(p.ric, p.text, host.contacts());
+            MessageThreads.Key key = p.ricUnreadable ? new MessageThreads.Key(MessageThreads.Kind.RIC, 0, "RIC unreadable", "unreadable")
+                    : MessageThreads.page(p.ric, p.text, host.contacts());
             ChannelStore.PageRow row = new ChannelStore.PageRow();
-            row.ts = System.currentTimeMillis(); row.hz = host.currentHz(); row.ric = p.ric; row.func = p.func; row.baud = hit.baud;
+            row.ts = System.currentTimeMillis(); row.hz = host.currentHz(); row.ric = p.ricUnreadable ? -1 : p.ric; row.func = p.func; row.baud = hit.baud;
             row.text = p.text; row.corrected = p.corrected; row.signer = Pocsag.sender(p.text) == null ? "" : Pocsag.sender(p.text);
             row.transport = "page"; row.threadKey = threadKey(key); row.outgoing = false;
             try { host.page(row); } catch (Throwable t) { Log.i("PagerStation", "page: " + t); }
