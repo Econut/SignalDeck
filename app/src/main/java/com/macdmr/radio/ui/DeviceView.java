@@ -816,7 +816,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     private void firmwareFilesIntro() {
         final Context c = getContext();
         new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files")
-                .setMessage("Needs Magisk root. Looks in the folders where radio phones keep their radio chip images, and in the stock walkie-talkie app, and lists what it finds: name, size, a fingerprint (SHA-256) and the module version written inside. "
+                .setMessage("Needs Magisk root. Looks in the folders where radio phones keep their radio chip images, and in the stock walkie-talkie app, and lists what it finds: name, size, a fingerprint (SHA-256) and the module version written inside. SignalDeck's own files (serial captures, recordings, reports) are left out; in /sdcard/DMR only a module image counts. A file SignalDeck or its firmware catalogue already has is marked already known, so nobody needs a copy of it. "
                         + "The list goes into the device report. Nothing is copied unless you tick files, and then only into Download/DMR/FoundFirmware on this phone; nothing is sent anywhere. "
                         + "These files belong to the phone maker: share them only privately, and only if the SignalDeck maintainer asks.")
                 .setPositiveButton("Look", (dd, w) -> firmwareFilesScan()).setNegativeButton("Cancel", null).show();
@@ -826,14 +826,11 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         final Context c = getContext();
         final android.app.AlertDialog pd = new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files").setMessage("Starting…").setCancelable(false).create(); pd.show();
         new Thread(() -> {
-            java.util.List<String> apks = new java.util.ArrayList<>();
-            try {
-                java.util.List<String> pkgs = new java.util.ArrayList<>();
-                if (svc != null && !svc.profile().stockApp.isEmpty()) pkgs.add(svc.profile().stockApp);
-                for (com.macdmr.radio.RadioAppFinder.App a : com.macdmr.radio.RadioAppFinder.rank(c)) if (pkgs.size() < 3 && a.score >= 5 && !pkgs.contains(a.pkg)) pkgs.add(a.pkg);
-                for (String pk : pkgs) try { android.content.pm.ApplicationInfo ai = c.getPackageManager().getApplicationInfo(pk, 0); apks.add(ai.sourceDir); if (ai.splitSourceDirs != null) java.util.Collections.addAll(apks, ai.splitSourceDirs); } catch (Throwable ignored) { }
-            } catch (Throwable ignored) { }
+            final com.macdmr.radio.RadioService rs = svc != null ? svc : com.macdmr.radio.RadioService.running;   // the page may not be attached yet
+            final String stockApp = rs != null ? rs.profile().stockApp : "";
+            java.util.List<String> apks = com.macdmr.radio.FirmwareFinder.stockApks(c, stockApp);   // each step guarded and logged; root pm path when the stock app is not visible
             final java.util.List<com.macdmr.radio.FirmwareFinder.Found> fs = com.macdmr.radio.FirmwareFinder.scan(c, apks, s -> post(() -> pd.setMessage(s + "…")));
+            if (apks.isEmpty()) fs.add(com.macdmr.radio.FirmwareFinder.noStockApk(stockApp));
             final java.io.File dir = com.macdmr.radio.DeviceReport.append("Radio firmware files found (root)", com.macdmr.radio.FirmwareFinder.describe(fs));
             post(() -> {
                 pd.dismiss();
@@ -844,7 +841,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                     com.macdmr.radio.FirmwareFinder.cleanUp(c); return;
                 }
                 String[] items = new String[readable.size()]; final boolean[] on = new boolean[items.length];
-                for (int i = 0; i < items.length; i++) { com.macdmr.radio.FirmwareFinder.Found f = readable.get(i); items[i] = f.name() + "\n" + (f.size / 1024) + " kB" + (f.versions.isEmpty() ? "" : " · " + f.versions) + "\n" + f.source; }
+                for (int i = 0; i < items.length; i++) { com.macdmr.radio.FirmwareFinder.Found f = readable.get(i); items[i] = f.name() + "\n" + (f.size / 1024) + " kB" + (f.versions.isEmpty() ? "" : " · " + f.versions) + (f.known.isEmpty() ? "" : "\nAlready known: " + f.known) + "\n" + f.source; }
                 new android.app.AlertDialog.Builder(c).setTitle(readable.size() + " found (listed in the report)").setMultiChoiceItems(items, on, (d2, w2, ch) -> on[w2] = ch)
                         .setPositiveButton("Copy ticked", (d2, w2) -> {
                             java.util.List<com.macdmr.radio.FirmwareFinder.Found> ticked = new java.util.ArrayList<>();

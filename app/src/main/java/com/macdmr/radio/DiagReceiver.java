@@ -62,6 +62,17 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "raw40": s.diagRaw40(new java.io.File(i.getStringExtra("path"))); break;  // bench: one 0x40 body from a file, reply in cache/raw40.bin, does not key
             case "fwload": s.diagFwLoad(new java.io.File(i.getStringExtra("file")), i.getBooleanExtra("abort50", false), i.hasExtra("pause") ? i.getIntExtra("pause", 300) : -1); break;  // bench: YModem-1K into the module. abort50 closes the port halfway. --ei pause sets the gap before each data block.
             case "fwcatalog": new Thread(() -> android.util.Log.i("DiagReceiver", "fwcatalog " + com.macdmr.radio.fw.FirmwareCatalog.fetch(c)), "fwcatalog").start(); break;
+            case "fwfind": new Thread(() -> {                                   // bench: the Radio firmware files scan headless; every entry to the log, nothing copied
+                try {
+                    String stock = s.profile().stockApp;
+                    java.util.List<String> apks = FirmwareFinder.stockApks(c, stock);
+                    java.util.List<FirmwareFinder.Found> fs = FirmwareFinder.scan(c, apks, m -> Log.i("DiagReceiver", "fwfind: " + m));
+                    if (apks.isEmpty()) fs.add(FirmwareFinder.noStockApk(stock));
+                    Log.i("DiagReceiver", "fwfind: " + fs.size() + " entries, stock apks " + apks);
+                    for (FirmwareFinder.Found f : fs) Log.i("DiagReceiver", "fwfind: " + f.line());
+                } catch (Throwable t) { Log.w("DiagReceiver", "fwfind: " + t); }
+                finally { FirmwareFinder.cleanUp(c); }
+            }, "fwfind").start(); break;
             case "fwunlistedbad": {                                                                 // bench: load the first unlisted file, then treat the tag as wrong
                 java.util.List<com.macdmr.radio.fw.ImageTable.Row> files = com.macdmr.radio.fw.Unlisted.files(c);
                 if (files.isEmpty()) { android.util.Log.w("DiagReceiver", "fwunlistedbad: no unlisted file"); break; }

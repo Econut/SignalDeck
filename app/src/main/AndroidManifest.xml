@@ -25,6 +25,10 @@
     <!-- Android Auto: to tell whether it will show this app in the car (car/AutoTrust) and open its settings -->
     <queries>
         <package android:name="com.google.android.projection.gearhead" />
+        <!-- The stock radio apps, so their APK and version are visible to the package manager (Android 11+ package visibility) -->
+        <package android:name="com.pri.prizeinterphone" />
+        <package android:name="com.agold.intercom" />
+        <package android:name="com.interphone" />
         <intent><action android:name="android.intent.action.APPLICATION_PREFERENCES" /></intent>
     </queries>
 

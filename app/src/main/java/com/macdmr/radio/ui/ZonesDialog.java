@@ -82,14 +82,7 @@ public final class ZonesDialog {
         body.addView(Neo.sheetHint(c, "A standard list adds its channels and a zone holding them. Channels you already have on the same frequency are reused, not doubled. Check the licence line: listening is always fine, transmitting is not on every list."));
         final AlertDialog[] self = new AlertDialog[1];
         Runnable finished = () -> { if (self[0] != null) self[0].dismiss(); done.run(); };
-        body.addView(Neo.sheetSection(c, "Standard lists"));
-        Set<String> have = new HashSet<>(); for (ChannelStore.Zone z : svc.store().zones()) have.add(z.name);
-        for (ChannelPresets.Preset p : ChannelPresets.all()) {
-            LinearLayout r = card(c, p.zone + "  ·  " + p.channels.size() + " channels", p.region + "  ·  " + p.licence + (have.contains(p.zone) ? "\nYou have a zone called " + p.zone + ": adds the missing channels to it" : ""), p.receiveOnly() ? Neo.AMBER : Neo.CYAN);
-            r.setOnClickListener(v -> presetSheet(c, svc, p, finished));
-            body.addView(r, rowLp(d));
-        }
-        body.addView(Neo.sheetSection(c, "Your own"));
+        body.addView(Neo.sheetSection(c, "Your own"));                          // first: the one most people use
         LinearLayout own = card(c, "New zone from your channels", "Name it, then tick the channels it holds", Neo.GREEN);
         own.setOnClickListener(v -> askName(c, "New zone", "", name -> {
             for (ChannelStore.Zone z : svc.store().zones()) if (z.name.equalsIgnoreCase(name)) { Toast.makeText(c, "There is already a zone called " + z.name, Toast.LENGTH_LONG).show(); return; }
@@ -97,6 +90,13 @@ public final class ZonesDialog {
             pickChannels(c, svc, z, () -> { svc.setZone(z.id); finished.run(); });
         }));
         body.addView(own, rowLp(d));
+        body.addView(Neo.sheetSection(c, "Standard lists"));
+        Set<String> have = new HashSet<>(); for (ChannelStore.Zone z : svc.store().zones()) have.add(z.name);
+        for (ChannelPresets.Preset p : ChannelPresets.all()) {
+            LinearLayout r = card(c, p.zone + "  ·  " + p.channels.size() + " channels", p.region + "  ·  " + p.licence + (have.contains(p.zone) ? "\nYou have a zone called " + p.zone + ": adds the missing channels to it" : ""), p.receiveOnly() ? Neo.AMBER : Neo.CYAN);
+            r.setOnClickListener(v -> presetSheet(c, svc, p, finished));
+            body.addView(r, rowLp(d));
+        }
         self[0] = Neo.showSheet(c, body);
     }
 
