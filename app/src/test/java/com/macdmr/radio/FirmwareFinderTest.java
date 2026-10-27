@@ -152,4 +152,12 @@ public class FirmwareFinderTest {
     }
 
     private static void deleteTree(java.io.File f) { java.io.File[] k = f.listFiles(); if (k != null) for (java.io.File c : k) deleteTree(c); f.delete(); }
+
+    @Test public void noStockApkEntryNamesThePackageAndReadsAsUnreadable() {
+        FirmwareFinder.Found f = FirmwareFinder.noStockApk("com.pri.prizeinterphone");
+        assertEquals(0, f.size);
+        assertTrue(f.source.startsWith("com.pri.prizeinterphone!"));
+        assertTrue(f.line().contains("APK not found"));
+        assertTrue(FirmwareFinder.noStockApk("").source.startsWith("stock app!"));
+    }
 }

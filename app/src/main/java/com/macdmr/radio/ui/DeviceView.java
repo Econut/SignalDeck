@@ -826,14 +826,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         final Context c = getContext();
         final android.app.AlertDialog pd = new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files").setMessage("Starting…").setCancelable(false).create(); pd.show();
         new Thread(() -> {
-            java.util.List<String> apks = new java.util.ArrayList<>();
-            try {
-                java.util.List<String> pkgs = new java.util.ArrayList<>();
-                if (svc != null && !svc.profile().stockApp.isEmpty()) pkgs.add(svc.profile().stockApp);
-                for (com.macdmr.radio.RadioAppFinder.App a : com.macdmr.radio.RadioAppFinder.rank(c)) if (pkgs.size() < 3 && a.score >= 5 && !pkgs.contains(a.pkg)) pkgs.add(a.pkg);
-                for (String pk : pkgs) for (String a : com.macdmr.radio.StockApk.paths(c, pk)) if (!apks.contains(a)) apks.add(a);   // root pm path when the stock app is not visible
-            } catch (Throwable ignored) { }
+            final String stockApp = svc != null ? svc.profile().stockApp : "";
+            java.util.List<String> apks = com.macdmr.radio.FirmwareFinder.stockApks(c, stockApp);   // each step guarded and logged; root pm path when the stock app is not visible
             final java.util.List<com.macdmr.radio.FirmwareFinder.Found> fs = com.macdmr.radio.FirmwareFinder.scan(c, apks, s -> post(() -> pd.setMessage(s + "…")));
+            if (apks.isEmpty()) fs.add(com.macdmr.radio.FirmwareFinder.noStockApk(stockApp));
             final java.io.File dir = com.macdmr.radio.DeviceReport.append("Radio firmware files found (root)", com.macdmr.radio.FirmwareFinder.describe(fs));
             post(() -> {
                 pd.dismiss();

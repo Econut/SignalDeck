@@ -61,6 +61,33 @@ public final class FirmwareFinder {
         public String line() { return String.format(Locale.US, "%s  %d bytes  sha256 %s%s%s", source, size, sha256, versions.isEmpty() ? "" : "  contains " + versions, known.isEmpty() ? "" : "  already known: " + known); }
     }
 
+    /**
+     * The stock radio apps' APK paths: the profile's stock app first, then the ranked radio apps, each step on its own
+     * so one failure (package visibility, a root shell that answers nothing) cannot empty the list silently. Every step
+     * is logged under the FirmwareFinder tag.
+     */
+    public static List<String> stockApks(Context c, String profileStockApp) {
+        List<String> pkgs = new ArrayList<>();
+        if (profileStockApp != null && !profileStockApp.isEmpty()) pkgs.add(profileStockApp);
+        try {
+            for (RadioAppFinder.App a : RadioAppFinder.rank(c)) if (pkgs.size() < 3 && a.score >= 5 && !pkgs.contains(a.pkg)) pkgs.add(a.pkg);
+        } catch (Throwable t) { android.util.Log.w("FirmwareFinder", "radio app ranking failed: " + t); }
+        List<String> apks = new ArrayList<>();
+        for (String pk : pkgs) {
+            try {
+                List<String> paths = StockApk.paths(c, pk);
+                android.util.Log.i("FirmwareFinder", "stock app " + pk + ": " + (paths.isEmpty() ? "no APK path" : paths));
+                for (String a : paths) if (!apks.contains(a)) apks.add(a);
+            } catch (Throwable t) { android.util.Log.w("FirmwareFinder", "stock app " + pk + ": " + t); }
+        }
+        return apks;
+    }
+
+    /** The entry that stands in for the stock app's APK when none was found, so the report says so instead of saying nothing. */
+    public static Found noStockApk(String profileStockApp) {
+        return new Found((profileStockApp == null || profileStockApp.isEmpty() ? "stock app" : profileStockApp) + "! (APK not found: not installed, or the package manager hides it and root gave no path)", 0);
+    }
+
     /** The radio firmware files on this phone. Off the main thread; needs root for the system folders. */
     public static List<Found> scan(Context c, List<String> stockApks, Progress p) {
         List<Found> out = new ArrayList<>();
@@ -69,6 +96,7 @@ public final class FirmwareFinder {
         for (String apk : stockApks) {
             p.step("Looking in " + new File(apk).getName());
             File readable = StockApk.readable(c, apk, "fwfind.apk");
+            android.util.Log.i("FirmwareFinder", "apk " + apk + ": " + (readable == null ? "not readable" : "readable as " + readable.getPath()));
             if (readable == null) { out.add(new Found(apk + "! (could not read)", 0)); continue; }
             try (ZipFile z = new ZipFile(readable)) {
                 for (Enumeration<? extends ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
