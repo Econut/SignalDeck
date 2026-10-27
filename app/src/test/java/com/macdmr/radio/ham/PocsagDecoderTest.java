@@ -109,6 +109,62 @@ public class PocsagDecoderTest {
         return o;
     }
 
+    @Test public void heldClipRestoresRic1001() throws Exception {
+        java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/rx_p512_held.wav");
+        if (!f.isFile()) return;
+        short[] raw = wav(f);
+        PocsagDecoder.Clock clock = PocsagDecoder.preamble(raw);
+        short[] audio = PocsagDecoder.restore(raw, 0.0016);
+        PocsagDecoder.Hit hit = PocsagDecoder.best(audio);
+        PocsagDecoder.Hit gated = PocsagDecoder.best(raw, 0.0016);
+        boolean ok = false;
+        for (Pocsag.Page p : hit.pages) if (p.ric == 1001 && p.text.startsWith("ALPHA")) ok = true;
+        assertTrue("baud " + hit.baud + " pages " + hit.pages.size(), ok);
+        boolean gatedOk = false;
+        for (Pocsag.Page p : gated.pages) if (p.ric == 1001 && p.text.startsWith("ALPHA")) gatedOk = true;
+        assertTrue("gate spb " + (clock == null ? "none" : clock.spb) + " baud " + gated.baud, gatedOk);
+    }
+
+    @Test public void heldTapsKeepTheFasterRatesExact() throws Exception {
+        double[] taps = armorTaps();
+        assertClip("rx_g1200.wav", taps, 1200, 1002, "STILL 1200");
+        assertClip("rx_g2400.wav", taps, 2400, 1003, "STILL 2400");
+        java.io.File slow = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/rx_p512_held.wav");
+        if (!slow.isFile()) return;
+        PocsagDecoder.Hit hit = PocsagDecoder.best(wav(slow), 0.0016, taps);
+        boolean ok = false;
+        for (Pocsag.Page p : hit.pages) if (p.ric == 1001 && p.text.startsWith("ALPHA")) ok = true;
+        assertTrue("512 baud must not take the tap path " + hit.baud, ok);
+    }
+
+    private static void assertClip(String name, double[] taps, int baud, int ric, String text) throws Exception {
+        java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/" + name);
+        if (!f.isFile()) return;
+        PocsagDecoder.Hit hit = PocsagDecoder.best(wav(f), 0.0016, taps);
+        assertEquals(baud, hit.baud);
+        assertFalse(hit.pages.isEmpty());
+        assertEquals(ric, hit.pages.get(0).ric);
+        assertEquals(text, hit.pages.get(0).text);
+    }
+
+    private static double[] armorTaps() throws Exception {
+        java.util.List<String> lines = java.nio.file.Files.readAllLines(java.nio.file.Paths.get(
+                "D:/Documents/code/personal/SignalDeck/app/src/main/assets/m17/held_ulefone-armor26ultra.txt"));
+        double[] t = new double[lines.size()];
+        for (int i = 0; i < t.length; i++) t[i] = Double.parseDouble(lines.get(i).trim());
+        return t;
+    }
+
+    @Test public void restorationLeaves1200Alone() {
+        Pocsag.Page page = new Pocsag.Page(1002, 3, "STILL 1200");
+        short[] audio = audio(Pocsag.bits(Collections.singletonList(page)), 1200);
+        PocsagDecoder.Hit hit = PocsagDecoder.best(audio, 0.0016);
+        assertEquals(1200, hit.baud);
+        assertEquals(1, hit.pages.size());
+        assertEquals(1002, hit.pages.get(0).ric);
+        assertEquals("STILL 1200", hit.pages.get(0).text);
+    }
+
     @Test public void armorPageRecordingDecodes() throws Exception {
         java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/rx_p2500.wav");
         if (!f.isFile()) return;

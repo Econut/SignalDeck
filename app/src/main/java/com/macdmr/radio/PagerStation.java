@@ -26,6 +26,8 @@ public final class PagerStation {
         int currentHz();
         double[] taps();
         boolean held();
+        /** High-pass time constant for this phone, seconds. 0 skips DC restoration. */
+        double tau();
         MessageThreads.Contacts contacts();
     }
 
@@ -38,16 +40,18 @@ public final class PagerStation {
     private int baud = 1200;
     private Thread scan;
     private volatile boolean preamble;
+    private int sincePreamble;
+    private long holdUntil;
 
     public PagerStation(Host host) { this.host = host; }
     public boolean running() { return running; }
     public boolean monitoring() { return monitor; }
     public boolean preamble() { return preamble; }
-    /** How long to sit on a frequency: one preamble plus one batch. */
-    public static long dwellMs(int baud) { return baud <= 512 ? 2300 : baud >= 2400 ? 700 : 1100; }
+    /** About a second on each frequency. A preamble, then one batch, holds the step. */
+    public static long dwellMs(int baud) { return 1000; }
 
     public synchronized void start(boolean heldPath) {
-        running = true; held = heldPath; fresh = 0;
+        running = true; held = heldPath; fresh = 0; sincePreamble = 0; holdUntil = 0;
     }
     public synchronized void stop() {
         running = false; monitor = false;
@@ -87,13 +91,23 @@ public final class PagerStation {
     /** 8 kHz mono, little-endian, squelch or not. */
     public void feed(byte[] mono, int n) {
         if (!running || mono == null || n < 2) return;
+        int added = 0;
         synchronized (ring) {
             for (int i = 0; i + 1 < n; i += 2) {
                 ring[at] = (short) ((mono[i] & 0xFF) | (mono[i + 1] << 8));
                 at = (at + 1) % ring.length;
                 if (filled < ring.length) filled++;
                 fresh++;
+                added++;
             }
+        }
+        sincePreamble += added;
+        if (sincePreamble >= 1200) {   // 150 ms: alternation at baud/2, then one batch after it stops
+            sincePreamble = 0;
+            short[] tail = copyTail(1200);
+            boolean hearing = tail != null && PocsagDecoder.hearingPreamble(tail);
+            if (hearing) holdUntil = System.currentTimeMillis() + 1200;
+            preamble = hearing || System.currentTimeMillis() < holdUntil;
         }
         if (fresh < 8000) return;
         fresh = 0;
@@ -103,15 +117,25 @@ public final class PagerStation {
             int start = (at - len + ring.length) % ring.length;
             for (int i = 0; i < len; i++) snap[i] = ring[(start + i) % ring.length];
         }
-        short[] tail = len > 8000 ? java.util.Arrays.copyOfRange(snap, len - 8000, len) : snap;
-        preamble = PocsagDecoder.hearingPreamble(tail);
         final boolean useHeld = held;
         final double[] taps = useHeld ? host.taps() : null;
-        new Thread(() -> decode(snap, taps), "pager-decode").start();
+        final double tau = host.tau();
+        new Thread(() -> decode(snap, taps, tau), "pager-decode").start();
     }
 
-    private void decode(short[] snap, double[] taps) {
-        PocsagDecoder.Hit hit = taps != null ? PocsagDecoder.bestHeld(snap, taps) : PocsagDecoder.best(snap);
+    private short[] copyTail(int n) {
+        synchronized (ring) {
+            if (filled < 200) return null;
+            int len = Math.min(filled, n);
+            short[] tail = new short[len];
+            int start = (at - len + ring.length) % ring.length;
+            for (int i = 0; i < len; i++) tail[i] = ring[(start + i) % ring.length];
+            return tail;
+        }
+    }
+
+    private void decode(short[] snap, double[] taps, double tau) {
+        PocsagDecoder.Hit hit = PocsagDecoder.best(snap, tau, taps);
         if (hit == null || hit.pages == null) return;
         for (Pocsag.Page p : hit.pages) {
             if (p.text == null || p.text.isEmpty()) continue;

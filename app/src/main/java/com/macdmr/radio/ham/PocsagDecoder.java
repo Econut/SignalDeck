@@ -25,6 +25,56 @@ public final class PocsagDecoder {
         public Hit(int baud, List<Pocsag.Page> pages) { this.baud = baud; this.pages = pages; }
     }
 
+    /** Undo a one-pole high-pass of time constant {@code tauSec}. A non-positive tau leaves the audio unchanged. */
+    public static short[] restore(short[] x, double tauSec) {
+        if (x == null || tauSec <= 0) return x;
+        double b = Math.exp(-1.0 / (RATE * tauSec));
+        double[] acc = new double[x.length];
+        double state = 0, prev = 0, sum = 0;
+        for (int i = 0; i < x.length; i++) {
+            double s = x[i];
+            state = s - b * prev + state;
+            prev = s;
+            acc[i] = state;
+            sum += state;
+        }
+        double mean = sum / Math.max(1, x.length);
+        short[] y = new short[x.length];
+        for (int i = 0; i < x.length; i++) {
+            double v = acc[i] - mean;
+            if (v > 32767) v = 32767;
+            else if (v < -32767) v = -32767;
+            y[i] = (short) v;
+        }
+        return y;
+    }
+
+    /**
+     * Restore only a measured 512 baud preamble. Nearest-rate classification calls a stretched
+     * 1200 baud gap "512" (13 samples is closer to 15.6 than to 6.7) and restoration then wipes it.
+     */
+    public static Hit best(short[] audio, double tauSec) { return best(audio, tauSec, null); }
+
+    /**
+     * A measured 512 baud preamble is restored and sliced without the held-path taps
+     * (those taps turn the long zero run into another valid address). 1200 and 2400
+     * use the taps and are not restored.
+     */
+    public static Hit best(short[] audio, double tauSec, double[] taps) {
+        if (audio == null) return best(audio);
+        Clock clock = preamble(audio);
+        double expect = (double) RATE / 512.0;
+        if (tauSec > 0 && clock != null && Math.abs(clock.spb - expect) < 1.5) {
+            Hit fixed = best(restore(audio, tauSec));
+            if (fixed.baud == 512 && !fixed.pages.isEmpty()) return fixed;
+        }
+        if (taps != null && taps.length > 0) {
+            Hit held = bestHeld(audio, taps);
+            if (held != null && held.pages != null && !held.pages.isEmpty()) return held;
+        }
+        return best(audio);
+    }
+
     public static Hit best(short[] audio) {
         Hit best = new Hit(1200, java.util.Collections.<Pocsag.Page>emptyList());
         int score = -1;

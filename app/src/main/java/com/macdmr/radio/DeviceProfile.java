@@ -40,6 +40,8 @@ public final class DeviceProfile {
     public boolean globalSquelch;        // the module follows its global squelch (0x30) rather than the channel's sq byte: send it with every analog channel
     /** How long the scanner listens on each channel before moving on (the module's "receiving" report must arrive in time). */
     public long scanDwellMs = 1500;
+    /** High-pass time constant of this phone's pager audio, seconds. 0 means no DC restoration. The Armor 26 Ultra's is from a 512 baud clip. */
+    public double pocsagTauSec;
     /** Least time between two channel writes (0 = none); quicker channel changes collapse into the last one. */
     public long minWriteGapMs;
     public String[][] lineSetup;         // {node, value} written in this order before the power line, every bring-up (null = none)
@@ -135,6 +137,7 @@ public final class DeviceProfile {
         // ptt_control 0 is its transmit state (setPttLaunch). So the PTT line goes to receive first, before the module is
         // powered, or a module left by QuickChat's power-off would come up with its PTT line asserted.
         ARMOR_26_ULTRA.id = "ulefone-armor26ultra"; ARMOR_26_ULTRA.revision = 1;
+        ARMOR_26_ULTRA.pocsagTauSec = 0.0016;
         // Measured on the owner's Armor 2026-10-24 (stock ROM, mixer read while tinyserver received and while it sent a
         // low-power test tone): receive is capture device 11 (8 kHz stereo) with I2S2 routed to UL2; transmit is playback
         // device 8 with DL8 routed to I2S1, the ES8311's DAC turned up and its ADC muted. Used only when the ROM has no

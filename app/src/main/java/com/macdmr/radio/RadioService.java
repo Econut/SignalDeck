@@ -3238,6 +3238,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             @Override public int currentHz() { ChannelStore.Channel c = current; return c == null ? 0 : c.rxFreq; }
             @Override public double[] taps() { M17Station s = m17; return s == null ? null : s.taps(); }
             @Override public boolean held() { return dataReceive; }
+            @Override public double tau() { return profile == null ? 0 : profile.pocsagTauSec; }
             @Override public com.macdmr.radio.ham.MessageThreads.Contacts contacts() { return threadContacts(); }
         });
         return pager;

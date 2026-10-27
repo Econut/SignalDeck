@@ -124,6 +124,18 @@ public final class DiagReceiver extends BroadcastReceiver {
                 Log.i("DiagReceiver", err == null ? "page started " + rics.length + " at " + i.getIntExtra("baud", 1200) : "page: " + err);
                 break;
             }
+            case "contact": {                                              // bench: save a contact the way the editor does
+                com.macdmr.radio.ChannelStore.Contact ct = new com.macdmr.radio.ChannelStore.Contact();
+                ct.name = i.getStringExtra("name");
+                if (ct.name == null || ct.name.isEmpty()) ct.name = "Contact";
+                ct.callsign = ct.name;
+                ct.type = 0;
+                int ric = i.getIntExtra("ric", -1);
+                if (ric >= 0) ct.rics = String.valueOf(ric);
+                s.store().insertContact(ct);
+                Log.i("DiagReceiver", "contact saved id " + ct.id + " ric " + ct.rics);
+                break;
+            }
             case "pager": {
                 boolean hold = !i.hasExtra("hold") || i.getBooleanExtra("hold", true);
                 if (i.hasExtra("monitor")) {
