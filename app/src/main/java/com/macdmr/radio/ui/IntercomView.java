@@ -657,6 +657,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     private boolean gateWasOpen;
     private int lastScanState = -1;
     @Override public void onModes(boolean sq, int level, boolean open, boolean monitor, boolean recording, boolean scanning, boolean holding, String zoneName) {
+        applyRestriction();                                                    // Restricted mode: satellites follow the policy on every update (unlock, lock, edit)
         if (sq && open && !gateWasOpen) reopenPanel("soft squelch opened");
         boolean was = gateWasOpen; gateWasOpen = sq && open;   // Soft SQ channels: the gate opening is the reception
         if (was != gateWasOpen) { updateMeter(); refreshHeadline(); }   // headline and talk key follow what is actually heard
@@ -673,7 +674,6 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             if (scanState == lastScanState) return;   // pushModes runs on every Soft SQ gate change: rebuild the SCAN key only when it changes
             lastScanState = scanState;
             Context c = getContext(); int col = scanning ? Neo.AMBER : Neo.CYAN;
-            applyRestriction();
             scanBtn.setText(scanning ? (holding ? "HOLD" : "SCANNING") : "SCAN"); scanBtn.setTextColor(scanning ? Neo.AMBER_LIGHT : Neo.CYAN_LIGHT);
             Neo.IconDrawable ic = new Neo.IconDrawable(scanning ? "stop" : "scan", scanBtn.getCurrentTextColor()); int sz = Theme.dp(c, 18); ic.setBounds(0, 0, sz, sz); scanBtn.setCompoundDrawables(ic, null, null, null);
             android.graphics.drawable.StateListDrawable st = new android.graphics.drawable.StateListDrawable();

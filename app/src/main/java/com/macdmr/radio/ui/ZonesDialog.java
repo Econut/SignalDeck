@@ -41,7 +41,7 @@ public final class ZonesDialog {
         final AlertDialog[] self = new AlertDialog[1];
         Runnable done = () -> { if (self[0] != null) self[0].dismiss(); if (changed != null) changed.run(); };
 
-        body.addView(zoneRow(c, svc, null, svc.zoneId() <= 0, svc.store().count(), done, self), rowLp(d));
+        body.addView(zoneRow(c, svc, null, svc.zoneId() <= 0, svc.visibleChannels().size(), done, self), rowLp(d));
         for (ChannelStore.Zone z : svc.visibleZones()) body.addView(zoneRow(c, svc, z, svc.zoneId() == z.id, z.numbers.length, done, self), rowLp(d));
 
         TextView add = Neo.button(c, "Add a zone", "plus", Neo.GREEN);

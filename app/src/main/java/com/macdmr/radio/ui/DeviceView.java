@@ -92,7 +92,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         LayoutParams el = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); el.topMargin = (int) (8 * d);
         hero.addView(exit, el);
         exit.setOnClickListener(v -> exitSheet());
-        if (svc != null && !svc.adminAllowed("exit")) exit.setVisibility(GONE);
+        exitBtn = exit;
         TextView boot = Neo.button(c, "Keep access after reboot", "shield", Neo.CYAN);
         LayoutParams bl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); bl.topMargin = (int) (8 * d);
         hero.addView(boot, bl);
@@ -170,7 +170,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         restrictedRow.setOnClickListener(v -> { if (svc != null) RestrictedDialog.show(c, svc, this::refresh); });
         addRow(restricted, restrictedRow);
         LinearLayout web = card(body, "SignalDeck Web");
-        if (svc != null && !svc.adminAllowed("web")) web.setVisibility(GONE);
+        webCard = web;
         webSw = sw(); webTxSw = sw();
         LinearLayout webRow = Neo.switchRow(c, WEB_ICON, Neo.CYAN, "Web access", "Use SignalDeck from a browser on the same Wi-Fi", webSw);
         webSub = (TextView) ((LinearLayout) webRow.getChildAt(1)).getChildAt(1);
@@ -216,12 +216,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         LinearLayout diag = Neo.tile(c, "diag", Neo.AMBER, "Diagnostics", "Live protocol log");
         LinearLayout widget = Neo.tile(c, "widget", Neo.VIOLET, "Home widget", "Channel, scan and Talk");
         LinearLayout sos = Neo.tile(c, "alert", Neo.RED, "Emergency", "Send your position");
-        if (svc != null) {                                                     // Restricted mode: hidden admin items are not offered
-            com.macdmr.radio.Restriction rr = svc.restriction();
-            if (!rr.adminAllowed("backup")) { backup = null; restore = null; reimport = null; }
-            if (!rr.adminAllowed("report")) { report = null; diag = null; }
-            if (!rr.modeAllowed("aprs")) sos = null;
-        }
+        restrictTiles = new LinearLayout[] { backup, restore, reimport, report, diag, sos };   // hidden by the policy on refresh (see updateRestricted)
         LinearLayout[] tiles = tilesOf(backup, restore, reimport, radioIdTile, report, upd, help, diag, widget, sos);
         for (int i = 0; i < tiles.length; i += 2) {
             LinearLayout r = new LinearLayout(c); r.setBaselineAligned(false);
@@ -315,11 +310,19 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         if (out.size() % 2 == 1) out.add(null);
         return out.toArray(new LinearLayout[0]);
     }
-    private LinearLayout restrictedRow;
+    private LinearLayout restrictedRow, webCard;
+    private TextView exitBtn;
+    private LinearLayout[] restrictTiles;
+    private static final String[] RESTRICT_TILE_IDS = { "backup", "backup", "backup", "report", "report", "aprs" };
     /** The Restricted mode row's second line: off, on (locked), or unlocked for a while. */
     void updateRestricted() {
         if (restrictedRow == null || svc == null) return;
         TextView sub = (TextView) ((LinearLayout) restrictedRow.getChildAt(1)).getChildAt(1);
+        com.macdmr.radio.Restriction r = svc.restriction();                     // Restricted mode: hidden tools and cards go, and come back when unlocked
+        if (restrictTiles != null) for (int i = 0; i < restrictTiles.length; i++) if (restrictTiles[i] != null)
+            restrictTiles[i].setVisibility(("aprs".equals(RESTRICT_TILE_IDS[i]) ? r.modeAllowed("aprs") : r.adminAllowed(RESTRICT_TILE_IDS[i])) ? VISIBLE : GONE);
+        if (webCard != null) webCard.setVisibility(r.adminAllowed("web") ? VISIBLE : GONE);
+        if (exitBtn != null) exitBtn.setVisibility(r.adminAllowed("exit") ? VISIBLE : GONE);
         boolean on = svc.restrictedOn();
         sub.setText(!on ? "Off. A PIN lock on zones, transmit, modes and tools, set by you for you" : com.macdmr.radio.Restricted.unlocked(getContext()) ? "On, unlocked for a while" : "On and locked. Tap for the PIN");
     }
