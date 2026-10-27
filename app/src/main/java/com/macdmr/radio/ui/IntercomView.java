@@ -393,6 +393,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             val[i] = Neo.text(c, "", Neo.TEXT, 15.5f, Neo.mono(c)); val[i].setSingleLine(true); val[i].setPadding(0, (int) (4 * d), 0, 0);
             cell.addView(val[i], new LayoutParams(LayoutParams.MATCH_PARENT, (int) (22 * d)));
             ro.addView(cell, new LayoutParams(0, LayoutParams.WRAP_CONTENT, wts[i]));
+            if (i == 3) cell.setOnLongClickListener(v -> { pickTalkgroup(); return true; });   // long-press only: no accidental change
         }
         send = val[0]; receive = val[1]; squelch = val[2]; power = val[3];
         rcard.addView(ro);
@@ -535,17 +536,47 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         readLabel[0].setText("TX"); readLabel[1].setText("RX");
         send.setText(ChannelsView.mhz(ch.txFreq)); receive.setText(ChannelsView.mhz(ch.rxFreq));
         if (ch.isM17()) {
-            readLabel[2].setText("CAN"); squelch.setText(String.valueOf(ch.can()));
+            readLabel[2].setText("CAN"); squelch.setText(String.valueOf(ch.can())); power.setTextColor(Neo.TEXT);
             readLabel[3].setText("DEST"); power.setText(ch.m17Dest());
         } else if (ch.isDigital()) {
             readLabel[2].setText("CC · TS"); squelch.setText(ch.cc + " · " + (ch.inSlot + 1));
-            readLabel[3].setText("CALL"); power.setText((ch.contactType == 1 ? "TG " : ch.contactType == 2 ? "ALL " : "ID ") + ch.txContact);
+            int picked = svc != null && !isVfo ? svc.talkgroupOverride() : 0;          // a talkgroup picked here (long-press) shows in amber
+            readLabel[3].setText(picked > 0 ? "CALL · PICKED" : "CALL");
+            power.setText(picked > 0 ? "TG " + picked : (ch.contactType == 1 ? "TG " : ch.contactType == 2 ? "ALL " : "ID ") + ch.txContact);
+            power.setTextColor(picked > 0 ? Neo.AMBER : Neo.TEXT);
         } else {
-            readLabel[2].setText("SQ"); squelch.setText(String.valueOf(ch.sq));
+            readLabel[2].setText("SQ"); squelch.setText(String.valueOf(ch.sq)); power.setTextColor(Neo.TEXT);
             readLabel[3].setText("TONE");
             String tone = ch.rxType == 1 && com.macdmr.radio.dsp.ToneTable.ctcssHz(ch.rxSubCode) > 0 ? String.format(java.util.Locale.US, "%.1f", com.macdmr.radio.dsp.ToneTable.ctcssHz(ch.rxSubCode)) : ch.rxType == 2 || ch.rxType == 3 ? com.macdmr.radio.dsp.ToneTable.toneLabel(ch.rxType, ch.rxSubCode) : "NONE";
             power.setText(tone);
         }
+    }
+
+    /** Long-press on CALL (DMR): transmit to another talkgroup without editing the channel, until the channel changes. */
+    private void pickTalkgroup() {
+        final ChannelStore.Channel ch = svc != null ? svc.current() : null;
+        if (ch == null || !ch.isDigital()) return;
+        final java.util.List<com.macdmr.radio.TalkgroupOverride.Option> opts = svc.talkgroupOptions();
+        int picked = svc.talkgroupOverride();
+        String[] items = new String[opts.size()];
+        for (int i = 0; i < items.length; i++) {
+            com.macdmr.radio.TalkgroupOverride.Option o = opts.get(i);
+            boolean on = picked > 0 ? !o.programmed && o.number == picked : o.programmed;
+            items[i] = (on ? "✓  " : "     ") + o.label;
+        }
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(getContext()).setTitle("Talkgroup on " + ch.name)
+                .setItems(items, (d, w) -> {
+                    com.macdmr.radio.TalkgroupOverride.Option o = opts.get(w);
+                    String err = svc.pickTalkgroup(o.programmed ? 0 : o.number);
+                    if (err != null) android.widget.Toast.makeText(getContext(), err, android.widget.Toast.LENGTH_SHORT).show();
+                });
+        if (opts.size() == 1) {                                                 // a message would hide the list: say what to do instead
+            new android.app.AlertDialog.Builder(getContext()).setTitle("Talkgroup on " + ch.name)
+                    .setMessage("No group contacts yet. Add talkgroups on the Contacts page (type Group) to pick them here.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        b.show();
     }
 
     // RadioService.Listener

@@ -45,8 +45,8 @@ function renderEditor() {
   h += '<div class="sect">' + (ED.vfo ? 'FREQUENCY' : 'CHANNEL') + '</div>';
   if (!ED.vfo) h += field('name', 'Channel name', txt('fName', (c.name || '').slice(0, ED.nameMax), 'maxlength="' + ED.nameMax + '"') + '<div class="count" id="fNameCount"></div>');
   h += field('type', 'Channel type', sel('fType', [[0, 'Digital'], [1, 'Analog'], [2, 'M17']], c.type));
-  h += field('tx', 'Send frequency (MHz)', txt('fTx', mhzIn(c.txFreq), 'inputmode="decimal"'));
   h += field('rx', 'Receive frequency (MHz)', txt('fRx', mhzIn(c.rxFreq), 'inputmode="decimal"'));
+  h += field('tx', 'Send frequency (MHz)', txt('fTx', mhzIn(c.txFreq), 'inputmode="decimal"'));
   h += field('power', 'Power', sel('fPower', [[0, 'Low power'], [1, 'High power']], c.power));
   h += field('rxOnly', 'Transmit', sel('fRxOnly', [[0, 'Allowed'], [1, 'Receive only']], c.rxOnly ? 1 : 0));
   h += field('relay', 'Relay (repeater)', sel('fRelay', [[1, 'Disconnect'], [2, 'Normal']], c.relay === 1 ? 1 : 2));
