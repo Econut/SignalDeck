@@ -2094,6 +2094,32 @@ public class RadioService extends Service implements RadioEngine.Events {
         t.start();
     }
 
+    /**
+     * Send an M17 text through the symbol engine, the same path voice uses. Null when it has started.
+     * Stock firmware and a digital channel get the same refusal voice does. The text is protocol 0x05.
+     */
+    public String sendM17Sms(String dest, String text) {
+        if (!m17CanSend()) return "M17 transmit needs the module firmware with the symbol engine";
+        if (current != null && current.isDigital()) return "M17 transmit needs an analog channel";
+        String body = text == null ? "" : text.trim();
+        if (body.isEmpty()) return "Write the message";
+        if (symThread != null && symThread.isAlive()) return "M17 is already sending";
+        String src = com.macdmr.radio.ham.M17.voiceCall(m17Call());
+        ChannelStore.Channel mc = current;
+        String raw = dest != null && dest.trim().length() > 0 ? dest.trim() : (mc != null && mc.isM17() ? mc.m17Dest() : "@ALL");
+        String dst = raw.equalsIgnoreCase("@ALL") ? "@ALL" : com.macdmr.radio.ham.M17.voiceCall(raw);
+        int can = mc != null && mc.isM17() ? mc.can() : 0;
+        int[] syms = com.macdmr.radio.ham.M17.packetTransmission(src, dst, can, com.macdmr.radio.ham.M17.smsPayload(body));
+        try {
+            java.io.File f = new java.io.File(getCacheDir(), "m17-sms.sym");
+            java.nio.file.Files.write(f.toPath(), com.macdmr.radio.ham.M17.packSymbols(syms));
+            diagSym(f, true);
+            M17Station st = m17; if (st != null) st.noteSent(src, dst, body);
+            history("m17", "✉ " + src + " → " + dst + ": " + body);
+            return null;
+        } catch (java.io.IOException e) { return "Could not send the text"; }
+    }
+
     /** Bench: one short Codec 2 tone through the symbol engine. Not a long key. */
     public void m17BenchTone(int ms) {
         ms = Math.max(800, Math.min(4000, ms));
@@ -3165,6 +3191,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public synchronized M17Station m17() {
         if (m17 == null) m17 = new M17Station(this, profile != null ? profile.id : "unknown", new M17Station.Host() {
             @Override public void event(String line) { history("pkt", line); }
+            @Override public void text(String line) { history("m17", line); }
             @Override public void heard(String call) {
                 if (call == null || call.isEmpty() || call.startsWith("@") || call.startsWith("#")) return;
                 logHeardStation(call, "M17", "M17");

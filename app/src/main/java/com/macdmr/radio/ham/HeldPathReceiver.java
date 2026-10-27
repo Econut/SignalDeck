@@ -30,6 +30,8 @@ public final class HeldPathReceiver {
         void link(M17.Lsf lsf);
         void frame(M17.Stream s, float quality);
         void ended(int frames, int good, String why);
+        /** A packet whose CRC checked. The body is the type byte and the payload, without the CRC. */
+        default void packet(M17.Lsf lsf, byte[] body) { }
     }
 
     private static final Logger LOG = Logger.getLogger("HeldPath");
@@ -44,6 +46,8 @@ public final class HeldPathReceiver {
     private final short[] buf = new short[CAP];
     private int len, ignore, lastN;
     private boolean open, stop, lsfSent;
+    private M17.Lsf packetLsf;
+    private final java.util.List<M17.Packet> packetFrames = new java.util.ArrayList<>();
     private int frames, good, emitted;
     private long lastEmit;
     private final java.util.ArrayList<HeldFit.Frame> kept = new java.util.ArrayList<HeldFit.Frame>();
@@ -144,21 +148,32 @@ public final class HeldPathReceiver {
             if (!open) {
                 if (id == null) continue;
                 open = true; frames = 0; good = 0; emitted = 0; lsfSent = true; lastEmit = now; kept.clear();
+                packetFrames.clear(); packetLsf = id != null && !id.stream() ? id : null;
                 callMark = (ringAt - 8000 + ring.length) % ring.length;
                 callWritten = 0; callGap = 8000;
                 listener.started(id); added++;
             } else if (id != null && !lsfSent) { lsfSent = true; listener.link(id); }
             for (HeldPath.FrameHit h : chain) {
-                if (h.stream == null) continue;
+                if (h.stream == null && h.packet == null) continue;
                 int end8 = live.origin8 + (h.syncAt + 192 * HeldPath.SPS) / 6;
                 if (index >= emitted) {
                     if (growing && end8 + EDGE > n) { heldBack = true; break outer; }   // its filters would see zeros past the newest audio: next pass
                     frames++;
-                    if (h.stream.lich != null && h.stream.lichErrors <= 2) good++;
-                    keep(snap, live, h);
-                    listener.frame(h.stream, Math.max(0f, Math.min(1f, h.score)));
+                    if (h.stream != null) {
+                        if (h.stream.lich != null && h.stream.lichErrors <= 2) good++;
+                        keep(snap, live, h);
+                        listener.frame(h.stream, Math.max(0f, Math.min(1f, h.score)));
+                        endBit = h.stream.last();
+                    } else {
+                        packetFrames.add(h.packet);
+                        if (h.packet.eof) {
+                            M17.Lsf who = packetLsf != null ? packetLsf : id;
+                            byte[] body = M17.assemble(packetFrames);
+                            if (body != null && who != null) listener.packet(who, body);
+                            endBit = true;
+                        }
+                    }
                     added++; lastEmit = now;
-                    endBit = h.stream.last();
                     lastEnd8 = end8;
                 }
                 index++;
@@ -233,6 +248,7 @@ public final class HeldPathReceiver {
         synchronized (buf) {
             if (!open) { len = 0; ignore = 0; lastN = 0; return; }
             open = false; f = frames; g = good; frames = 0; good = 0; emitted = 0; lsfSent = false;
+            packetFrames.clear(); packetLsf = null;
             len = 0; ignore = 0; lastN = 0;
         }
         listener.ended(f, g, why);

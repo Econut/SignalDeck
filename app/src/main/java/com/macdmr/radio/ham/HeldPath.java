@@ -24,8 +24,8 @@ public final class HeldPath {
     static final int PAST = 400;
     static final double THRESH = 0.95, LOST = 0.6;
     private static final double[] RRC = rrc(0.5, 8, SPS);
-    private static final double[] SYNC_LSF = sync(M17.SYNC_LSF), SYNC_STR = sync(M17.SYNC_STR);
-    private static final double SS_LSF = energy(SYNC_LSF), SS_STR = energy(SYNC_STR);
+    private static final double[] SYNC_LSF = sync(M17.SYNC_LSF), SYNC_STR = sync(M17.SYNC_STR), SYNC_PKT = sync(M17.SYNC_PKT);
+    private static final double SS_LSF = energy(SYNC_LSF), SS_STR = energy(SYNC_STR), SS_PKT = energy(SYNC_PKT);
 
     private HeldPath() { }
 
@@ -35,8 +35,11 @@ public final class HeldPath {
         public final float score;
         public final M17.Lsf link;
         public final M17.Stream stream;
-        FrameHit(int at, float score, M17.Lsf link, M17.Stream stream) {
-            syncAt = at; this.score = score; this.link = link; this.stream = stream;
+        public final M17.Packet packet;
+        FrameHit(int at, float score, M17.Lsf link, M17.Stream stream) { this(at, score, link, stream, null); }
+        FrameHit(int at, float score, M17.Packet packet) { this(at, score, null, null, packet); }
+        private FrameHit(int at, float score, M17.Lsf link, M17.Stream stream, M17.Packet packet) {
+            syncAt = at; this.score = score; this.link = link; this.stream = stream; this.packet = packet;
         }
         public boolean lsf() { return link != null; }
     }
@@ -129,38 +132,37 @@ public final class HeldPath {
         List<FrameHit> out = new ArrayList<>();
         int limit = y.length - 8 * SPS;
         if (limit <= 0) return out;
-        int bestB = -1; boolean bestLsf = true;
-        for (int kind = 0; kind < 2; kind++) {
-            double[] s = kind == 0 ? SYNC_LSF : SYNC_STR; double ss = kind == 0 ? SS_LSF : SS_STR;
+        int bestB = -1; int bestKind = 0;
+        for (int kind = 0; kind < 3; kind++) {
+            double[] s = syncOf(kind); double ss = energyOf(kind);
             int a = -1;
             for (int i = 0; i < limit; i++) if (score(y, i, s, ss) > THRESH) { a = i; break; }
             if (a < 0) continue;
             int b = a; double sb = -1;
             int hi = Math.min(limit, a + SPS);
             for (int i = a; i < hi; i++) { double sc = score(y, i, s, ss); if (sc > sb) { sb = sc; b = i; } }
-            if (bestB < 0 || b < bestB) { bestB = b; bestLsf = kind == 0; }
+            if (bestB < 0 || b < bestB) { bestB = b; bestKind = kind; }
         }
         if (bestB < 0) return out;
-        int pos = bestB; boolean lsf = bestLsf;
+        int pos = bestB; int kind = bestKind;
         while (pos + 192 * SPS <= y.length + 8 * SPS) {
-            double sc = score(y, pos, lsf ? SYNC_LSF : SYNC_STR, lsf ? SS_LSF : SS_STR);
+            double sc = score(y, pos, syncOf(kind), energyOf(kind));
             int start = pos + 8 * SPS;
-            float[] pay = payload(y, start, lsf ? SYNC_LSF : SYNC_STR);
+            float[] pay = payload(y, start, syncOf(kind));
             if (pay == null) break;
-            if (lsf) out.add(new FrameHit(pos, (float) sc, M17.decodeLsf(pay, 0), null));
-            else out.add(new FrameHit(pos, (float) sc, null, M17.decodeStream(pay, 0)));
+            if (kind == 0) out.add(new FrameHit(pos, (float) sc, M17.decodeLsf(pay, 0), null));
+            else if (kind == 1) out.add(new FrameHit(pos, (float) sc, null, M17.decodeStream(pay, 0)));
+            else out.add(new FrameHit(pos, (float) sc, M17.decodePacket(pay, 0)));
             int nxt = pos + 192 * SPS;
-            double best = -1; int bp = nxt; boolean bl = false;
+            double best = -1; int bp = nxt; int bk = kind;
             for (int d = -(SPS / 2); d <= SPS / 2; d++) {
-                for (int kind = 0; kind < 2; kind++) {
-                    boolean useLsf = kind == 1;
-                    double[] s = useLsf ? SYNC_LSF : SYNC_STR; double ss = useLsf ? SS_LSF : SS_STR;
-                    double c = score(y, nxt + d, s, ss);
-                    if (c > best) { best = c; bp = nxt + d; bl = useLsf; }
+                for (int k = 0; k < 3; k++) {
+                    double c = score(y, nxt + d, syncOf(k), energyOf(k));
+                    if (c > best) { best = c; bp = nxt + d; bk = k; }
                 }
             }
             if (best < LOST) break;
-            pos = bp; lsf = bl;
+            pos = bp; kind = bk;
         }
         return out;
     }
@@ -299,7 +301,7 @@ public final class HeldPath {
                 resume = chains.isEmpty() ? retry : Math.max(origin, origin + from48 / 6 - 2);
                 break;
             }
-            int pos = at[0]; boolean lsf = at[1] == 0;
+            int pos = at[0]; int kind = at[1];
             List<FrameHit> chain = new ArrayList<FrameHit>();
             int end48 = pos;
             boolean abandoned = false, needMore = false, lost = false;
@@ -307,48 +309,48 @@ public final class HeldPath {
                 int start = pos + 8 * SPS;
                 // The equaliser reads L symbols past the frame, plus a little. Wait until that is in the buffer.
                 if (start + (183 + L + 4) * SPS >= y.length) { needMore = true; break; }
-                float[] pay = payload(y, start, lsf ? SYNC_LSF : SYNC_STR);
+                double[] sync = syncOf(kind); double ss = energyOf(kind);
+                float[] pay = payload(y, start, sync);
                 if (pay == null) { needMore = true; break; }
-                double sc = score(y, pos, lsf ? SYNC_LSF : SYNC_STR, lsf ? SS_LSF : SS_STR);
-                if (lsf) chain.add(new FrameHit(pos, (float) sc, M17.decodeLsf(pay, 0), null));
-                else chain.add(new FrameHit(pos, (float) sc, null, M17.decodeStream(pay, 0)));
+                double sc = score(y, pos, sync, ss);
+                if (kind == 0) chain.add(new FrameHit(pos, (float) sc, M17.decodeLsf(pay, 0), null));
+                else if (kind == 1) chain.add(new FrameHit(pos, (float) sc, null, M17.decodeStream(pay, 0)));
+                else chain.add(new FrameHit(pos, (float) sc, M17.decodePacket(pay, 0)));
                 if (chain.size() >= 8 && !inCall && !identified(chain)) { abandoned = true; chain.clear(); break; }
                 end48 = pos + 192 * SPS;
                 int nxt = end48;
-                double best = -1; int bp = nxt; boolean bl = false;
+                double best = -1; int bp = nxt; int bk = kind;
                 for (int d = -(SPS / 2); d <= SPS / 2; d++) {
                     if (!loudAt(part, part.length, nxt + d)) continue;
-                    for (int kind = 0; kind < 2; kind++) {
-                        boolean useLsf = kind == 1;
-                        double c = score(y, nxt + d, useLsf ? SYNC_LSF : SYNC_STR, useLsf ? SS_LSF : SS_STR);
-                        if (c > best) { best = c; bp = nxt + d; bl = useLsf; }
+                    for (int k = 0; k < 3; k++) {
+                        double c = score(y, nxt + d, syncOf(k), energyOf(k));
+                        if (c > best) { best = c; bp = nxt + d; bk = k; }
                     }
                 }
                 if (best < LOST) {
                     // Coast up to three frame periods. A short dropout is the same call when sync returns.
-                    int hopped = -1; boolean hopLsf = false;
+                    int hopped = -1; int hopKind = kind;
                     for (int hop = 1; hop <= 3; hop++) {
                         int base = nxt + hop * 192 * SPS;
                         if (base >= y.length) break;
-                        double hb = -1; int hp = base; boolean hl = false;
+                        double hb = -1; int hp = base; int hk = kind;
                         for (int d = -(SPS / 2); d <= SPS / 2; d++) {
                             int p = base + d;
                             if (p < 0 || p >= y.length || !loudAt(part, part.length, p)) continue;
-                            for (int kind = 0; kind < 2; kind++) {
-                                boolean useLsf = kind == 1;
-                                double c = score(y, p, useLsf ? SYNC_LSF : SYNC_STR, useLsf ? SS_LSF : SS_STR);
-                                if (c > hb) { hb = c; hp = p; hl = useLsf; }
+                            for (int k = 0; k < 3; k++) {
+                                double c = score(y, p, syncOf(k), energyOf(k));
+                                if (c > hb) { hb = c; hp = p; hk = k; }
                             }
                         }
-                        if (hb >= LOST) { hopped = hp; hopLsf = hl; break; }
+                        if (hb >= LOST) { hopped = hp; hopKind = hk; break; }
                     }
-                    if (hopped >= 0) { pos = hopped; lsf = hopLsf; continue; }
+                    if (hopped >= 0) { pos = hopped; kind = hopKind; continue; }
                     // Not enough audio yet to decide the dropout has lasted three frames.
                     if (nxt + 3 * 192 * SPS > y.length) needMore = true;
                     else lost = true;
                     break;
                 }
-                pos = bp; lsf = bl;
+                pos = bp; kind = bk;
             }
             if (!chain.isEmpty()) chains.add(chain);
             closed = lost && !abandoned && !needMore;
@@ -367,11 +369,11 @@ public final class HeldPath {
         return new Live(chains, resume, closed, origin);
     }
 
-    /** First sync at or after {@code from48}. Returns {index, 0 lsf / 1 stream}, or null. */
+    /** First sync at or after {@code from48}. Returns {index, 0 lsf / 1 stream / 2 packet}, or null. */
     private static int[] firstSync(double[] y, short[] pcm, int n, int from48, int limit) {
         int bestB = -1; int bestKind = 0;
-        for (int kind = 0; kind < 2; kind++) {
-            double[] s = kind == 0 ? SYNC_LSF : SYNC_STR; double ss = kind == 0 ? SS_LSF : SS_STR;
+        for (int kind = 0; kind < 3; kind++) {
+            double[] s = syncOf(kind); double ss = energyOf(kind);
             int a = -1;
             for (int i = Math.max(0, from48); i < limit; i++) {
                 if (!loudAt(pcm, n, i)) continue;
@@ -389,6 +391,9 @@ public final class HeldPath {
         }
         return bestB < 0 ? null : new int[] { bestB, bestKind };
     }
+
+    private static double[] syncOf(int kind) { return kind == 0 ? SYNC_LSF : kind == 1 ? SYNC_STR : SYNC_PKT; }
+    private static double energyOf(int kind) { return kind == 0 ? SS_LSF : kind == 1 ? SS_STR : SS_PKT; }
 
     /** A real transmission shows a link-setup CRC, or six LICH chunks, within the first frames. */
     private static boolean identified(List<FrameHit> chain) {

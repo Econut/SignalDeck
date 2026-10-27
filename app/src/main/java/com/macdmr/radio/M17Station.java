@@ -28,7 +28,13 @@ import java.util.Locale;
  * Receive only: this radio's transmit path cannot produce M17 that M17 radios decode.
  */
 public final class M17Station {
-    public interface Host { void event(String line); void heard(String call); void changed(); default void voice(short[] pcm) { } default int meter() { return -999; } }
+    public interface Host { void event(String line); void heard(String call); void changed(); default void voice(short[] pcm) { } default int meter() { return -999; } default void text(String line) { event(line); } }
+
+    /** One M17 text, sent or received. */
+    public static final class Text {
+        public final long ts; public final boolean sent; public final String src, dst, body;
+        Text(long ts, boolean sent, String src, String dst, String body) { this.ts = ts; this.sent = sent; this.src = src; this.dst = dst; this.body = body; }
+    }
 
     /** One transmission heard. */
     public static final class Heard {
@@ -44,6 +50,7 @@ public final class M17Station {
     private volatile boolean running;
     private volatile Heard current;
     private final List<Heard> heard = new ArrayList<>();
+    private final List<Text> texts = new ArrayList<>();
     private volatile float quality;
     /** Bench: also append the decoded voice to cache/m17_out.raw (8 kHz 16-bit mono). */
     public static volatile boolean benchDump;
@@ -59,6 +66,8 @@ public final class M17Station {
     public boolean receiving() { return running && current != null; }
     public Heard current() { return current; }
     public synchronized List<Heard> heard() { return new ArrayList<>(heard); }
+    public synchronized List<Text> texts() { return new ArrayList<>(texts); }
+    public synchronized void noteSent(String src, String dst, String body) { remember(new Text(System.currentTimeMillis(), true, src, dst, body)); host.changed(); }
     public float quality() { return quality; }
     public String calibration() { return calibration; }
     public void resetCalibration() { if (cal != null) cal.reset(); stopHeld(); setHeldPath(true); host.changed(); }
@@ -78,12 +87,14 @@ public final class M17Station {
             @Override public void frame(M17.Stream s, float q) { onFrame(s, q); }
             @Override public void lsfFromLich(M17.Lsf l) { onLink(l); }
             @Override public void ended(int frames, int good, String why) { finish(frames, good, why); }
+            @Override public void packet(M17.Lsf l, byte[] body) { onPacket(l, body); }
         };
         heldEar = new HeldPathReceiver.Listener() {
             @Override public void started(M17.Lsf l) { begin(l); }
             @Override public void link(M17.Lsf l) { onLink(l); }
             @Override public void frame(M17.Stream s, float q) { onFrame(s, q); }
             @Override public void ended(int frames, int good, String why) { finish(frames, good, why); }
+            @Override public void packet(M17.Lsf l, byte[] body) { onPacket(l, body); }
         };
         rx = new M17Receiver(coef, dfeEar);
         running = true; host.changed();
@@ -148,6 +159,16 @@ public final class M17Station {
         fill(h, l);
         host.event("📻 M17: " + h.src + " → " + h.dst + (h.meta != null ? "  “" + h.meta + "”" : ""));
         host.heard(h.src); host.changed();
+    }
+    private void remember(Text t) { synchronized (this) { texts.add(t); while (texts.size() > 100) texts.remove(0); } }
+    private void onPacket(M17.Lsf l, byte[] body) {
+        String src = l == null ? "" : l.src(), dst = l == null ? "" : l.dst();
+        String sms = M17.smsText(body);
+        String shown = sms != null ? sms : M17.protocolName(body.length == 0 ? -1 : body[0] & 0xFF) + ", " + Math.max(0, body.length - 1) + " bytes";
+        remember(new Text(System.currentTimeMillis(), false, src, dst, shown));
+        Log.i("M17Station", "sms " + src + " -> " + dst + " " + shown);
+        host.text((sms != null ? "✉ " : "") + src + " → " + dst + ": " + shown);
+        host.heard(src); host.changed();
     }
     private void begin(M17.Lsf l) {
         Heard h = new Heard(System.currentTimeMillis());
