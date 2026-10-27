@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Device report: 32-bit native code, module commands in the code, the whole report read back
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 report gaps 2, 8, B12, plan item 3; a 200-line read limit found on the W6 | **Clues from every ABI:** the stock app's native libraries are read whatever their ABI (it was `lib/arm64` only; the W6 is a 32-bit phone), and the report lists them. **Module commands in the code:** `AT+…` command names in the app's code are listed, and two or more `AT+DMO…` names give a protocol hint (SA818 class), which reaches the summary and needs no root. **Quieter log texts:** PTT/PCM/DMR must start a word or a camelCase part (`isPttButton`), so `FPTt\@n` and `onInterceptTouchEvent` no longer show up. **The whole report read back:** the summary in the Checks done dialog, the probe's port evidence and the new code hint read report.txt through `DeviceReport.cat`, which stops after 200 lines; every one of them sits further down, so the dialog never showed the summary and the probe saw only the watch's ports. They now read the whole file (`readReport`). | `DeviceReport.java` (`apkClues`, `commandFamily`, `readReport`), `FirstRunCheck.java` (`codeHint`), `ui/DeviceView.java`, `DeviceReportTest.java`, `RadioProbeAtTest.java` | Host: a W6-shaped APK (dex with AT commands, `lib/armeabi-v7a` library) and the summary hint; all 393 host tests pass. **Device: W6**, through `scripts/w6/run_checks.sh`: `native libraries: lib/arm64-v8a/… lib/armeabi-v7a/… lib/x86/… lib/x86_64/libserial_port.so`, `module commands: AT+DMOAUTOPOWCONTR= AT+DMOCONNECT AT+DMOSETGROUP= AT+DMOSETMIC= AT+DMOSETVOLUME= AT+DMOSETVOX= AT+DMOVERQ`, the summary's first line `the stock app's code names SA818-class AT commands (7 AT+DMO… names)`. Not run on a phone with a profile. |
+
 ## 2026-10-27 — Device report: every byte the stock app sends to the radio module
 
 | Backlog | Change | Files | Test |

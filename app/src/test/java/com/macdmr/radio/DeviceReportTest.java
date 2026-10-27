@@ -72,6 +72,28 @@ public class DeviceReportTest {
         assertFalse(r, r.contains("/sys/not/code") || r.contains("unrelated") || r.contains("DmrManager"));
     }
 
+    @Test public void apkCluesOnA32BitAppWithAtCommands() throws Exception {
+        // the W6's stock app: one dex with SA818-class commands, its serial library only for armeabi-v7a
+        File apk = File.createTempFile("w6stock", ".apk"); apk.deleteOnExit();
+        try (java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(new FileOutputStream(apk))) {
+            z.putNextEntry(new java.util.zip.ZipEntry("classes.dex"));
+            z.write(("dex\n035\u0000\u0001AT+DMOCONNECT\u0000\u0001AT+DMOSETGROUP=\u0000\u0001AT+DMOSETVOLUME=\u0000\u0001AT+DMOVERQ\u0000"
+                    + "\u0001, isPttButton ==\u0000\u0001FPTt\\@n\u0000\u0001in onInterceptTouchEvent\u0000").getBytes(StandardCharsets.ISO_8859_1));
+            z.closeEntry();
+            z.putNextEntry(new java.util.zip.ZipEntry("lib/armeabi-v7a/libserial_port.so"));
+            z.write("\u007fELF....Opening serial port /dev/ttyS2 with flags\u0000".getBytes(StandardCharsets.ISO_8859_1));
+            z.closeEntry();
+        }
+        String r = DeviceReport.apkClues(apk);
+        assertTrue(r, r.contains("  paths: /dev/ttyS2\n"));                                     // from the 32-bit library
+        assertTrue(r, r.contains("  native libraries: lib/armeabi-v7a/libserial_port.so\n"));
+        assertTrue(r, r.contains("  module commands: AT+DMOCONNECT  AT+DMOSETGROUP=  AT+DMOSETVOLUME=  AT+DMOVERQ\n"));
+        assertTrue(r, r.contains("  protocol hint from its code: SA818-class AT commands (4 AT+DMO… names)\n"));
+        assertTrue(r, r.contains("isPttButton"));
+        assertFalse(r, r.contains("FPTt") || r.contains("onInterceptTouchEvent"));            // noise the 2026-10-27 report listed
+        assertNull(DeviceReport.commandFamily(java.util.List.of("AT+CGMI")));
+    }
+
     @Test public void deviceTreeValuesAsTextOrCells() {
         assertEquals("\"coosea,dmr009\"", DeviceReport.dtValue("63 6f 6f 73 65 61 2c 64 6d 72 30 30 39 00"));
         assertEquals("\"default|sleep\"", DeviceReport.dtValue("64 65 66 61 75 6c 74 00 73 6c 65 65 70 00"));
