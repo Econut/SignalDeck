@@ -685,7 +685,7 @@ public final class PacketEngine {
         host.transmitPcm(pcm, "Morse ID", () -> host.event("\uD83D\uDD24 Sent Morse ID " + callsign()));
         return null;
     }
-    private com.macdmr.radio.ham.CwDecoder cw;
+    private volatile com.macdmr.radio.pkt.CwGate cw;                          // the Morse decoder, paused while packet audio is heard
     private boolean wasOpen;
     public SharedPreferences prefs() { return prefs; }
 
@@ -813,14 +813,14 @@ public final class PacketEngine {
             if (open && textMode == 1 && rtty != null) rtty.process(mono, n);
             else if (open && textMode == 2 && psk != null) psk.process(mono, n);
             if (open && cwEnabled() && !weatherBand) {
-                if (cw == null) cw = new com.macdmr.radio.ham.CwDecoder((text, hz, wpm) -> {
+                if (cw == null) cw = new com.macdmr.radio.pkt.CwGate(new com.macdmr.radio.ham.CwDecoder((text, hz, wpm) -> {
                     String id = null;                                                      // the channel's own callsign (repeater channels are named after it)
                     for (String w : host.channelName().toUpperCase(Locale.US).replace(",", " ").split(" ")) { String b = com.macdmr.radio.ham.Logbook.baseCall(w.startsWith("\u00BB") ? w.substring(1) : w); if (b != null && text.contains(b)) id = b; }
                     host.event(id != null ? "\uD83D\uDD24 Repeater ID " + id + " in Morse (matches this channel): " + text + String.format(Locale.US, "  (%.0f Hz, %d WPM)", hz, wpm)
                                           : "\uD83D\uDD24 Morse: " + text + String.format(Locale.US, "  (%.0f Hz, %d WPM)", hz, wpm));
                     for (String w : text.split(" ")) if (com.macdmr.radio.ham.Logbook.baseCall(w) != null) host.logHeard(w, "CW", "Morse ID");
-                });
-                cw.process(mono, n);
+                }));
+                cw.process(mono, n, System.currentTimeMillis());
             }
             if (open && wxEnabled() && f >= 162_400_000 && f <= 162_550_000) {
                 if (same == null) same = new SAMEDecoder(SR, false, sameListener);
@@ -882,6 +882,7 @@ public final class PacketEngine {
     }
     private void deliverFrames(List<byte[]> frames) {
         try {
+            if (!frames.isEmpty()) { com.macdmr.radio.pkt.CwGate g = cw; if (g != null) g.packetHeard(System.currentTimeMillis()); }
             for (byte[] frame : frames) {
                 java.util.function.Consumer<byte[]> ft = finderTap; if (ft != null) try { ft.accept(frame); } catch (Throwable x) { Log.w(TAG, "finder: " + x); }
                 com.macdmr.radio.pkt.Ax25Session ts = terminal;

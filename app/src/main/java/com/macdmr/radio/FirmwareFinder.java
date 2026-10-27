@@ -37,8 +37,10 @@ import java.util.zip.ZipFile;
 public final class FirmwareFinder {
     private FirmwareFinder() { }
 
-    /** Folders where the phones seen so far keep radio images (Armor 3WT: /system/data/{mcu,dmr}, /sdcard/intercom/dmr; Atom XL: /vendor/data/mcu). */
-    static final String[] FOLDERS = { "/vendor/data/mcu", "/vendor/data/dmr", "/system/data/mcu", "/system/data/dmr", "/odm/data/mcu",
+    /** Folders where the phones seen so far keep radio images (Armor 3WT: /system/data/{mcu,dmr}, /sdcard/intercom/dmr; Atom XL: /vendor/data/mcu, and
+     *  /vendor/data/dmr, which its stock app reads; a copy of an Atom XL's files came as DMR/dmr, so the upper-case folder is searched too: the vendor
+     *  partition is case-sensitive, and an unneeded entry costs nothing). */
+    static final String[] FOLDERS = { "/vendor/data/mcu", "/vendor/data/dmr", "/vendor/data/DMR", "/system/data/mcu", "/system/data/dmr", "/odm/data/mcu",
             "/sdcard/intercom/dmr", "/sdcard/intercom/mcu", "/sdcard/DMR", "/vendor/firmware", "/odm/firmware", "/system/etc/firmware" };
     /** In the shared firmware folders only names like these are radio images (the rest is Wi-Fi, camera, touch...). */
     private static final Pattern RADIO_NAME = Pattern.compile("(?i).*(dmr|mcu|intercom|interphone|walkie|ptt|agold|at1846|hrc|c7000|c5000|bk48|sa8[0-9]{2}|rda18|uv4t|u4a).*");
@@ -51,10 +53,40 @@ public final class FirmwareFinder {
     /** One file found. {@code source} is a path, or "apk-path!entry" for a file inside an APK. */
     public static final class Found {
         public final String source; public final long size; public String sha256 = "", versions = "";
+        /** What SignalDeck already knows this file as (its built-in images and the signed catalogue), "" when it is new. */
+        public String known = "";
         File cached;                                                       // a copy readable by the app (root-only files), deleted after use
         Found(String source, long size) { this.source = source; this.size = size; }
         public String name() { int s = Math.max(source.lastIndexOf('/'), source.lastIndexOf('!')); return source.substring(s + 1); }
-        public String line() { return String.format(Locale.US, "%s  %d bytes  sha256 %s%s", source, size, sha256, versions.isEmpty() ? "" : "  contains " + versions); }
+        public String line() { return String.format(Locale.US, "%s  %d bytes  sha256 %s%s%s", source, size, sha256, versions.isEmpty() ? "" : "  contains " + versions, known.isEmpty() ? "" : "  already known: " + known); }
+    }
+
+    /**
+     * The stock radio apps' APK paths: the profile's stock app first, then the ranked radio apps, each step on its own
+     * so one failure (package visibility, a root shell that answers nothing) cannot empty the list silently. Every step
+     * is logged under the FirmwareFinder tag.
+     */
+    public static List<String> stockApks(Context c, String profileStockApp) {
+        List<String> pkgs = new ArrayList<>();
+        if (profileStockApp != null && !profileStockApp.isEmpty()) pkgs.add(profileStockApp);
+        try {
+            for (RadioAppFinder.App a : RadioAppFinder.rank(c)) if (pkgs.size() < 3 && a.score >= 5 && !pkgs.contains(a.pkg)) pkgs.add(a.pkg);
+        } catch (Throwable t) { android.util.Log.w("FirmwareFinder", "radio app ranking failed: " + t); }
+        android.util.Log.i("FirmwareFinder", "stock packages: " + pkgs);
+        List<String> apks = new ArrayList<>();
+        for (String pk : pkgs) {
+            try {
+                List<String> paths = StockApk.paths(c, pk);
+                android.util.Log.i("FirmwareFinder", "stock app " + pk + ": " + (paths.isEmpty() ? "no APK path" : paths));
+                for (String a : paths) if (!apks.contains(a)) apks.add(a);
+            } catch (Throwable t) { android.util.Log.w("FirmwareFinder", "stock app " + pk + ": " + t); }
+        }
+        return apks;
+    }
+
+    /** The entry that stands in for the stock app's APK when none was found, so the report says so instead of saying nothing. */
+    public static Found noStockApk(String profileStockApp) {
+        return new Found((profileStockApp == null || profileStockApp.isEmpty() ? "stock app" : profileStockApp) + "! (APK not found: not installed, or the package manager hides it and root gave no path)", 0);
     }
 
     /** The radio firmware files on this phone. Off the main thread; needs root for the system folders. */
@@ -64,7 +96,10 @@ public final class FirmwareFinder {
         if (RootSetup.haveRoot()) scanFolders(FOLDERS, ROOT_FS, tmp, p, out);
         for (String apk : stockApks) {
             p.step("Looking in " + new File(apk).getName());
-            try (ZipFile z = new ZipFile(apk)) {
+            File readable = StockApk.readable(c, apk, "fwfind.apk");
+            android.util.Log.i("FirmwareFinder", "apk " + apk + ": " + (readable == null ? "not readable" : "readable as " + readable.getPath()));
+            if (readable == null) { out.add(new Found(apk + "! (could not read)", 0)); continue; }
+            try (ZipFile z = new ZipFile(readable)) {
                 for (Enumeration<? extends ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
                     ZipEntry ze = e.nextElement();
                     if (ze.isDirectory() || !APK_IMAGE.matcher(ze.getName()).matches() || ze.getSize() > MAX_BYTES) continue;
@@ -75,8 +110,36 @@ public final class FirmwareFinder {
                     out.add(f);
                 }
             } catch (Throwable t) { out.add(new Found(apk + "! (could not read: " + t.getMessage() + ")", 0)); }
+            finally { if (!readable.getPath().equals(apk)) readable.delete(); }
         }
+        com.macdmr.radio.fw.FirmwareCatalog.Doc cat = com.macdmr.radio.fw.FirmwareCatalog.cached(c);
+        markKnown(out, cat == null ? null : cat.images);
         return out;
+    }
+
+    /** The stock apps of the Atom XL and the Armor 3WT flash a .bin from this folder into the module by themselves, when its name sorts after
+     *  the module's version + ".bin" (read from their code). */
+    static final String AUTO_FLASH_DIR = "/sdcard/intercom/dmr/";
+
+    static boolean autoFlash(String source) { return source.startsWith(AUTO_FLASH_DIR) || source.startsWith("/storage/self/primary/intercom/dmr/"); }
+
+    /** Name every file whose SHA-256 SignalDeck already has: the built-in images first, then the signed catalogue's rows. */
+    static void markKnown(List<Found> fs, List<com.macdmr.radio.fw.FirmwareCatalog.Image> catalogue) {
+        for (Found f : fs) f.known = known(f.sha256, catalogue);
+    }
+
+    static String known(String sha, List<com.macdmr.radio.fw.FirmwareCatalog.Image> catalogue) {
+        if (sha == null || sha.length() != 64) return "";
+        com.macdmr.radio.fw.ImageTable.Row r = com.macdmr.radio.fw.ImageTable.bySha(sha);
+        if (r != null) return r.tag + (r.factory ? ", the factory image for the " + r.model : ", a SignalDeck bench image for the " + r.model);
+        if (catalogue != null) for (com.macdmr.radio.fw.FirmwareCatalog.Image im : catalogue) {
+            if (!sha.equalsIgnoreCase(im.sha256)) continue;
+            String model = im.model == null || im.model.isEmpty() ? "another phone" : "the " + im.model;
+            if (im.factory) return im.tag + ", the factory image for " + model;
+            if ("released".equals(im.status)) return im.tag + ", a released image for " + model;
+            return im.tag + ", a stock copy for " + model + " kept for research (not offered for loading)";
+        }
+        return "";
     }
     public interface Progress { void step(String s); }
 
@@ -135,7 +198,11 @@ public final class FirmwareFinder {
     public static String describe(List<Found> fs) {
         if (fs.isEmpty()) return "no radio firmware files found in " + String.join(", ", FOLDERS) + " or in the stock app\n";
         StringBuilder s = new StringBuilder();
-        for (Found f : fs) s.append("  ").append(f.line()).append('\n');
+        boolean anyKnown = false, anyAuto = false;
+        for (Found f : fs) { s.append("  ").append(f.line()).append('\n'); anyKnown |= !f.known.isEmpty(); anyAuto |= autoFlash(f.source); }
+        if (anyKnown) s.append("Files marked already known are in SignalDeck or its firmware catalogue: nobody needs a copy of those.\n");
+        if (anyAuto) s.append("Note: on some phones (Unihertz Atom XL, Ulefone Armor 3WT) the stock walkie-talkie app loads a .bin from " + AUTO_FLASH_DIR
+                + " into the radio module by itself when its name sorts after the module's version. Leave nothing there you do not mean to load.\n");
         return s.append("Nothing was copied or sent. Copy files only if the SignalDeck maintainer asks for them, and hand them over privately: they are the phone maker's.\n").toString();
     }
 

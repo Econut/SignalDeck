@@ -51,6 +51,12 @@ public final class CwDecoder {
     /** The squelch closed or the channel changed: finish what was heard. */
     public void flush() { if (keyDown && markSteps >= 2) durations.add(markSteps); emit(); keyDown = false; markSteps = spaceSteps = 0; tone = 0; stableLooks = 0; }
 
+    /** Packet audio started: drop what was gathered so far (it may be AFSK read as keying) without reporting it. */
+    public void discard() {
+        durations.clear(); java.util.Arrays.fill(ring, (short) 0); ringPos = sinceLook = stepFill = 0;
+        keyDown = false; markSteps = spaceSteps = 0; tone = candidate = 0; stableLooks = 0; sigLevel = floor = 0; idleSteps = 0;
+    }
+
     private void sample(short s) {
         ring[ringPos] = s; ringPos = (ringPos + 1) & (ring.length - 1);
         if (++sinceLook >= LOOK_EVERY) { sinceLook = 0; look(); }
