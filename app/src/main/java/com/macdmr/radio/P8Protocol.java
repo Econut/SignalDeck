@@ -72,6 +72,34 @@ public final class P8Protocol {
         return f.toString();
     }
 
+    /** Strict bounded capture parser. Valid unsolicited frames are never acknowledged here.
+     * A transport success without a valid successful version response is not radio success.
+     */
+    public static String versionFromCapture(String hex) {
+        if(hex==null || hex.length()<18 || hex.length()>4096 || (hex.length()&1)!=0 || !hex.matches("[0-9a-fA-F]+"))
+            throw new IllegalArgumentException("invalid bounded capture");
+        byte[] bytes=new byte[hex.length()/2];
+        for(int i=0;i<bytes.length;i++)bytes[i]=(byte)Integer.parseInt(hex.substring(i*2,i*2+2),16);
+        String version=null;
+        for(int off=0;off<bytes.length;) {
+            Frame[] decoded=new Frame[1];
+            int consumed=Frame.tryDecode(bytes,off,bytes.length-off,decoded);
+            if(consumed<=0)throw new IllegalArgumentException("invalid checksum, framing or partial response at "+off);
+            Frame f=decoded[0];
+            if(f.cmd==0x34) {
+                String current=versionText(f);
+                if(current.isEmpty() || (version!=null && !version.equals(current)))
+                    throw new IllegalArgumentException("empty or conflicting module version");
+                version=current;
+            }
+            if(f.cmd==0x36 && f.body.length==1 && (f.body[0]==3 || f.body[0]==4))
+                throw new IllegalArgumentException("unexpected transmit status; stop");
+            off+=consumed;
+        }
+        if(version==null)throw new IllegalArgumentException("no successful version reply");
+        return version;
+    }
+
     /** One complete checksummed frame; rejects junk, truncated data and multiple frames. */
     public static Frame decodeHex(String text) {
         if (text == null) throw new IllegalArgumentException("missing hex");

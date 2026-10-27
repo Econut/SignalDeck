@@ -32,7 +32,8 @@ public final class P8OwnershipAudit {
             File f=new File(path);out.append(path).append(" exists=").append(f.exists()).append(" read=").append(f.canRead()).append(" write=").append(f.canWrite()).append('\n');
         }
         out.append("UART ownership: UNKNOWN; no descriptor audit or exclusive access proven\n");
-        out.append("UART open/close test: DISABLED pending review; no bytes/read/write/ioctl/GPIO test\n");
+        out.append(BuildConfig.P8_OPEN_PROBE_REVIEWED ? "Reviewed host-driven root-free diagnostics are available; this audit never opens a port. Normal radio/TX remains disabled.\n"
+                : "UART open/close test: DISABLED in this build; no bytes/read/write/ioctl/GPIO test\n");
         out.append("Do not swipe Intercom away for a test: its task-removal handler writes module-power controls.\n");
         return out.toString();
     }

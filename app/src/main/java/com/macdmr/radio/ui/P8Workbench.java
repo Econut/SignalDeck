@@ -23,6 +23,10 @@ public final class P8Workbench {
         int pad = (int) (16 * Theme.dp(c)); body.setPadding(pad, pad, pad, pad);
         TextView intro = Neo.text(c, "Preview an analogue channel or decode a saved module reply. Nothing here opens a port, changes the stock app, tunes the radio or transmits. Wire values are experimental; this is not live radio support.", Neo.MUTED, 14, Neo.ui(c));
         body.addView(intro);
+        String last=c.getSharedPreferences("p8_diagnostic",Context.MODE_PRIVATE).getString("lastResult","");
+        TextView liveResult=Neo.text(c,last.isEmpty()?"Root-free development transport available to the authorised host test. No stored result yet.":
+                "LAST ROOT-FREE TEST (historical, not current ownership):\n"+last,Neo.GREEN_LIGHT,13,Neo.mono(c));
+        liveResult.setTextIsSelectable(true);body.addView(liveResult);
         TextView ownership = Neo.button(c, "Check stock-app ownership (passive)", "report", Neo.AMBER); body.addView(ownership);
         TextView ownershipText = Neo.text(c, "Reports visible state only. Does not stop Intercom or open a port.", Neo.MUTED, 13, Neo.mono(c));
         ownershipText.setTextIsSelectable(true); body.addView(ownershipText);

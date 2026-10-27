@@ -1,5 +1,9 @@
 # P8 root-free ownership and first open test — REVIEW REQUIRED
 
+Superseding development status: owner has authorised routine root-free, non-transmitting tests. Open-only and stock version communication have now passed under ordinary app UID; see [measured implementation progress](p8-rootfree-progress.md). This document retains the initial narrow proposal and its historical restrictions. It is not the current live-test status.
+
+Current status: the owner subsequently approved the conditional single open-only test; preflight stopped before handover/open because ownership remained unresolved. See [temporary Intercom release review](p8-intercom-force-stop-review.md) for the requested ADB force-stop lifecycle analysis and revised conditional procedure. No force-stop or UART open has been executed. Earlier approval-status wording below records the original proposal state, not a new approval request. Runtime safety gates remain unchanged.
+
 No live open or handover has been authorised or performed. Default build is passive/offline. This proposal supersedes the earlier idea of starting with a version query: **first verify only open/fstat/close, with zero serial bytes and no line-setting ioctl**.
 
 ## Verified evidence
