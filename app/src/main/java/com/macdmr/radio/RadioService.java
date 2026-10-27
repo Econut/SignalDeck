@@ -1834,8 +1834,14 @@ public class RadioService extends Service implements RadioEngine.Events {
                 hopped = true;
                 Thread.sleep(3500);
             }
-            Frame setup = sym40(com.macdmr.radio.ham.Pocsag.waveform(baud));
-            if (setup == null || setup.sr != 0) { history("warn", "⚠️ This firmware did not accept the pager waveform"); return; }
+            Frame rst = sym40(new byte[] { 3 });
+            if (rst == null || rst.sr != 0) { log("page: no symbol engine"); history("warn", "⚠️ This firmware did not accept the pager waveform"); return; }
+            Frame setup = null;
+            for (int t = 0; t < 8 && (setup == null || setup.sr != 0); t++) {
+                if (t > 0) Thread.sleep(40);
+                setup = sym40(com.macdmr.radio.ham.Pocsag.waveform(baud));
+            }
+            if (setup == null || setup.sr != 0) { log("page: waveform not accepted"); history("warn", "⚠️ This firmware did not accept the pager waveform"); return; }
             byte[] packed = com.macdmr.radio.ham.Pocsag.pack(bits);
             int sent = 0;
             while (sent < packed.length) {
