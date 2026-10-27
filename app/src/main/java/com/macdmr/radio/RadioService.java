@@ -1316,6 +1316,25 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public ChannelStore store() { return store; }
     public ChannelStore.Channel current() { return current; }
+
+    // ---- talkgroup picked on the intercom (TalkgroupOverride) ----
+    private final TalkgroupOverride tgOverride = new TalkgroupOverride();
+    /** The talkgroup picked for the current channel, 0 when it uses its own call number. */
+    public int talkgroupOverride() { return tgOverride.talkgroup(current); }
+    /** The current channel's programmed call, then the group contacts. */
+    public java.util.List<TalkgroupOverride.Option> talkgroupOptions() { ChannelStore.Channel ch = current; return ch == null || !ch.isDigital() ? java.util.Collections.<TalkgroupOverride.Option>emptyList() : TalkgroupOverride.options(ch, store.contacts()); }
+    /** Transmit to (and hear) {@code tg} on the current DMR channel until another channel is tuned; 0 or the channel's own talkgroup goes back to it. Null when done, else why not. */
+    public String pickTalkgroup(final int tg) {
+        final ChannelStore.Channel ch = current;
+        if (ch == null || !ch.isDigital() || ch.id <= 0 || vfo != null) return "Pick a talkgroup on a saved DMR channel";
+        if (pttDown) return "Not while transmitting";
+        tgOverride.set(ch, tg);
+        worker.execute(() -> {
+            if (current != ch) return;
+            if (applyChannelNow(ch, true)) { int t = tgOverride.talkgroup(ch); history("tg", t > 0 ? "Talkgroup " + t + " on " + ch.name + " until you change channel (the channel keeps " + ch.txContact + ")" : "Back to " + ch.name + "'s own call " + ch.txContact); }
+        });
+        return null;
+    }
     /** Something is being heard right now (the Soft SQ gate when it is on, else the module's own receive state). */
     public boolean rxActive() { return softSq.isEnabled() ? squelchOpen : receiving; }
     public DeviceProfile profile() { return profile; }
@@ -1415,9 +1434,11 @@ public class RadioService extends Service implements RadioEngine.Events {
         }
         try {
             synchronized (tunes) { if (tunes.size() > 8) tunes.clear(); tunes.addLast(new Object[] { ch, fromStore }); }
+            tgOverride.onApply(ch);                                          // a talkgroup picked on the intercom lasts until another channel is tuned
             if (ch.isDigital()) {
                 int id = !fromStore && ch.mode > 0 ? ch.mode : localId();          // VFO may transmit under another DMR ID
-                engine.setDigital(ch.rxFreq, ch.txFreq, id, ch.groups, ch.txContact, ch.contactType, ch.power, ch.cc, ch.inSlot, ch.outSlot, 8, 4);
+                int[] call = tgOverride.call(ch);
+                engine.setDigital(ch.rxFreq, ch.txFreq, id, tgOverride.groups(ch), call[0], call[1], ch.power, ch.cc, ch.inSlot, ch.outSlot, 8, 4);
                 engine.setInterrupt(ch.interrupt == 1);
             } else if (ch.isM17()) {
                 engine.setAnalog(ch.rxFreq, ch.txFreq, 1, ch.power, hardwareSq(ch), 0, 0, 0, 0, 8, 2);   // wide FM; M17 is layered on top
@@ -1675,7 +1696,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (pttDown) return;
                     pttDown = true; refreshControls();
                     txChannel = current; txInCar = inCar; txCharging = charging(); txDropNoted = false; txStartedAt = System.currentTimeMillis();
-                    try { ChannelStore.Channel tc = current; if (tc != null && tc.isDigital() && tc.txContact > 0) { ChannelStore.Contact pc = store.contactByNumber(tc.txContact, tc.contactType == 0 ? 0 : 1); if (pc != null) store.contactSent(pc.id, txStartedAt, "DMR voice", "on " + tc.name); } } catch (Throwable e) { }
+                    try { ChannelStore.Channel tc = current; int[] tcall = tc != null ? tgOverride.call(tc) : null; if (tc != null && tc.isDigital() && tcall[0] > 0) { ChannelStore.Contact pc = store.contactByNumber(tcall[0], tcall[1] == 0 ? 0 : 1); if (pc != null) store.contactSent(pc.id, txStartedAt, "DMR voice", "on " + tc.name); } } catch (Throwable e) { }
                     idTimerOnKey();
                     if (audio != null) audio.stopRx();              // never play the RX stream while the mic is live (feedback)
                     boolean carMic = webFeed == null && (fromCall || (inCar && carMic() && !fromWheel && startBluetoothMic()));   // a talk call: Telecom has opened the car's link   // not for the wheel's Next: the hands-free link turns the wheel into call controls and the stop press never arrives   // in the car: its microphone, through the hands-free link

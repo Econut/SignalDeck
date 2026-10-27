@@ -48,6 +48,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     private SMeterView smeter;
     private String zoneName = "ALL";
     private LinearLayout scanZoneRow;
+    private LinearLayout sqRow;                       // new look's Soft SQ slider row: shown only while Soft SQ is on an FM channel
+    private boolean sqShown = true, chanFm = true;
     private String lastZoneText = "";
 
     /**
@@ -391,6 +393,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             val[i] = Neo.text(c, "", Neo.TEXT, 15.5f, Neo.mono(c)); val[i].setSingleLine(true); val[i].setPadding(0, (int) (4 * d), 0, 0);
             cell.addView(val[i], new LayoutParams(LayoutParams.MATCH_PARENT, (int) (22 * d)));
             ro.addView(cell, new LayoutParams(0, LayoutParams.WRAP_CONTENT, wts[i]));
+            if (i == 3) cell.setOnLongClickListener(v -> { pickTalkgroup(); return true; });   // long-press only: no accidental change
         }
         send = val[0]; receive = val[1]; squelch = val[2]; power = val[3];
         rcard.addView(ro);
@@ -445,8 +448,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         sq.addView(seek, new LayoutParams(0, (int) (32 * d), 1f));
         sqValue = Neo.text(c, "5", Neo.CYAN, 20, Neo.mono(c)); sqValue.setGravity(Gravity.END);
         sq.addView(sqValue, new LayoutParams((int) (24 * d), LayoutParams.WRAP_CONTENT));
-        LayoutParams sql = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); sql.setMargins(m + (int) (2 * d), (int) (2 * d), m, 0);
-        addView(sq, sql);
+        LayoutParams sql = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); sql.setMargins(m + (int) (2 * d), (int) (14 * d), m, 0);   // 14 dp under SCAN / ZONE: room for a thumb (was 2 dp)
+        addView(sq, sql); sqRow = sq;
     }
 
     private static FrameLayout.LayoutParams sat(float d, int wDp, int side, int sideMarginDp, int topDp) {
@@ -533,17 +536,47 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         readLabel[0].setText("TX"); readLabel[1].setText("RX");
         send.setText(ChannelsView.mhz(ch.txFreq)); receive.setText(ChannelsView.mhz(ch.rxFreq));
         if (ch.isM17()) {
-            readLabel[2].setText("CAN"); squelch.setText(String.valueOf(ch.can()));
+            readLabel[2].setText("CAN"); squelch.setText(String.valueOf(ch.can())); power.setTextColor(Neo.TEXT);
             readLabel[3].setText("DEST"); power.setText(ch.m17Dest());
         } else if (ch.isDigital()) {
             readLabel[2].setText("CC · TS"); squelch.setText(ch.cc + " · " + (ch.inSlot + 1));
-            readLabel[3].setText("CALL"); power.setText((ch.contactType == 1 ? "TG " : ch.contactType == 2 ? "ALL " : "ID ") + ch.txContact);
+            int picked = svc != null && !isVfo ? svc.talkgroupOverride() : 0;          // a talkgroup picked here (long-press) shows in amber
+            readLabel[3].setText(picked > 0 ? "CALL · PICKED" : "CALL");
+            power.setText(picked > 0 ? "TG " + picked : (ch.contactType == 1 ? "TG " : ch.contactType == 2 ? "ALL " : "ID ") + ch.txContact);
+            power.setTextColor(picked > 0 ? Neo.AMBER : Neo.TEXT);
         } else {
-            readLabel[2].setText("SQ"); squelch.setText(String.valueOf(ch.sq));
+            readLabel[2].setText("SQ"); squelch.setText(String.valueOf(ch.sq)); power.setTextColor(Neo.TEXT);
             readLabel[3].setText("TONE");
             String tone = ch.rxType == 1 && com.macdmr.radio.dsp.ToneTable.ctcssHz(ch.rxSubCode) > 0 ? String.format(java.util.Locale.US, "%.1f", com.macdmr.radio.dsp.ToneTable.ctcssHz(ch.rxSubCode)) : ch.rxType == 2 || ch.rxType == 3 ? com.macdmr.radio.dsp.ToneTable.toneLabel(ch.rxType, ch.rxSubCode) : "NONE";
             power.setText(tone);
         }
+    }
+
+    /** Long-press on CALL (DMR): transmit to another talkgroup without editing the channel, until the channel changes. */
+    private void pickTalkgroup() {
+        final ChannelStore.Channel ch = svc != null ? svc.current() : null;
+        if (ch == null || !ch.isDigital()) return;
+        final java.util.List<com.macdmr.radio.TalkgroupOverride.Option> opts = svc.talkgroupOptions();
+        int picked = svc.talkgroupOverride();
+        String[] items = new String[opts.size()];
+        for (int i = 0; i < items.length; i++) {
+            com.macdmr.radio.TalkgroupOverride.Option o = opts.get(i);
+            boolean on = picked > 0 ? !o.programmed && o.number == picked : o.programmed;
+            items[i] = (on ? "✓  " : "     ") + o.label;
+        }
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(getContext()).setTitle("Talkgroup on " + ch.name)
+                .setItems(items, (d, w) -> {
+                    com.macdmr.radio.TalkgroupOverride.Option o = opts.get(w);
+                    String err = svc.pickTalkgroup(o.programmed ? 0 : o.number);
+                    if (err != null) android.widget.Toast.makeText(getContext(), err, android.widget.Toast.LENGTH_SHORT).show();
+                });
+        if (opts.size() == 1) {                                                 // a message would hide the list: say what to do instead
+            new android.app.AlertDialog.Builder(getContext()).setTitle("Talkgroup on " + ch.name)
+                    .setMessage("No group contacts yet. Add talkgroups on the Contacts page (type Group) to pick them here.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        b.show();
     }
 
     // RadioService.Listener
@@ -553,6 +586,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             neoChannel(ch, isVfo); vfo.setOn(isVfo);
             historyHeader.setText(ch.isM17() ? "M17" : ch.isDigital() ? "DMR ACTIVITY" : "ANALOG HISTORY");
             softSq.setVisibility(ch.isDigital() || ch.isM17() ? INVISIBLE : VISIBLE);
+            chanFm = !ch.isDigital() && !ch.isM17(); showSqRow(softSq.isOn());
             history.clear();
             if (svc != null && !panelClosed) for (String l : svc.store().recentHistory(ch.number, 3)) history.addLast(l);
             renderHistory(); refreshHeadline();
@@ -613,6 +647,13 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         captionLive.setText(live == null ? "" : live); captionLive.setVisibility(live == null || live.isEmpty() ? GONE : VISIBLE);
         captionScroll.post(() -> captionScroll.fullScroll(android.view.View.FOCUS_DOWN));
     }
+    /** The slider only while Soft SQ is on and the channel is FM; the activity panel takes the room otherwise (the talk key does not move). */
+    private void showSqRow(boolean sqOn) {
+        if (sqRow == null) return;
+        boolean show = sqOn && chanFm;
+        if (show == sqShown) return;
+        sqShown = show; sqRow.setVisibility(show ? VISIBLE : GONE);
+    }
     private boolean gateWasOpen;
     private int lastScanState = -1;
     @Override public void onModes(boolean sq, int level, boolean open, boolean monitor, boolean recording, boolean scanning, boolean holding, String zoneName) {
@@ -620,6 +661,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         boolean was = gateWasOpen; gateWasOpen = sq && open;   // Soft SQ channels: the gate opening is the reception
         if (was != gateWasOpen) { updateMeter(); refreshHeadline(); }   // headline and talk key follow what is actually heard
         softSq.setOn(sq); mon.setOn(monitor); rec.setOn(recording); pkt.setOn(svc != null && svc.packetActive());
+        showSqRow(sq);
         if (!sqFromUser) { sqSeek.setProgress(level); sqValue.setText(String.valueOf(level)); }
         sqValue.setTextColor(sq ? (open ? Theme.GREEN : Theme.AMBER) : Theme.CYAN);
         zoneBtn.setText("ZONE: " + zoneName.toUpperCase(java.util.Locale.US));

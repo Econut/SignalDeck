@@ -37,7 +37,9 @@ public class ChannelEditorView extends LinearLayout {
     private final LinearLayout form;
     private EditText name, tx, rx, call, key, groups, notes;
     private EditText lat, lon;
-    private TextView txCodeV, rxCodeV;
+    private TextView txCodeV, rxCodeV, callPickV;
+    private View callTypedRow, callPickRow;
+    private boolean callFromContacts;
     private EditText m17Dest;
     private LinearLayout digitalGroup, analogGroup, m17Group;
 
@@ -67,6 +69,8 @@ public class ChannelEditorView extends LinearLayout {
     private static final String H_MODE = "Direct: radio to radio (simplex). Double slot: through a DMR repeater, which carries two time slots at once. Use Double slot for repeater channels.";
     private static final String H_SLOT = "A DMR repeater carries two separate conversations, time slot 1 and 2. Use the slot your talkgroup is on (the repeater's listing says). On a simplex channel every radio must use the same slot, usually TS1.";
     private static final String H_CTYPE = "Who you call: Private (one DMR ID), Group (a talkgroup) or All (every radio). On this radio a channel set to All reports callers as ID 16777215 and does not pass received audio, so use Group for normal talkgroup traffic.";
+    private static final String H_CALLFROM = "Type the call number yourself, or pick it from your contacts: group contacts (talkgroups) for a group call, private contacts (DMR IDs) for a private call. Either way the channel stores the number; add talkgroups on the Contacts page with type Group. On the intercom, a long-press on CALL picks another talkgroup for a while without editing the channel.";
+    private static final String H_CALLPICK = "The contact this channel calls. Tap to choose another one; the list follows the contact type above.";
     private static final String H_CALL = "The DMR ID (private call) or talkgroup number (group call) you transmit to. For a group call it is added to the RX group list when you save, because the radio only passes group calls whose talkgroup is in that list.";
     private static final String H_GROUPS = "Talkgroups you want to hear on this channel, separated by commas, up to 32. The radio passes a group call only if its talkgroup is in this list. Private calls to your own DMR ID always pass, and MON on the intercom passes every call the radio can decode. Talkgroup lists below inserts a saved list (the module's lists come over from the stock app) or saves this one under a name.";
     private static final String H_ENC = "The radio's own DMR privacy scrambling with an 8-character key. Only radios using the same scheme and the same key hear you; most other DMR radios cannot. Encryption is not allowed on amateur frequencies.";
@@ -111,8 +115,9 @@ public class ChannelEditorView extends LinearLayout {
         name = textInto(form, "Channel name", H_NAME, ch.name, InputType.TYPE_CLASS_TEXT);
         nameCounter(name);
         choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog", "M17" }, ch.type, v -> { ch.type = v; refreshGroups(); });
-        tx = textInto(form, "Send frequency (MHz)", H_TX, ch.txFreq > 0 ? String.format(Locale.US, "%.5f", ch.txFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        // receive first: repeater lists give the output (what you hear) and the offset
         rx = textInto(form, "Receive frequency (MHz)", H_RX, ch.rxFreq > 0 ? String.format(Locale.US, "%.5f", ch.rxFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        tx = textInto(form, "Send frequency (MHz)", H_TX, ch.txFreq > 0 ? String.format(Locale.US, "%.5f", ch.txFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         form.addView(VfoDialog.bandPlanLine(getContext(), rx, tx));
 
         section(form, "Radio");
@@ -125,8 +130,15 @@ public class ChannelEditorView extends LinearLayout {
         choiceInto(digitalGroup, "Color code", H_CC, names(0, 15), ch.cc, v -> ch.cc = v);
         choiceInto(digitalGroup, "Mode", H_MODE, new String[] { "Direct", "Double slot" }, ch.mode == 4 ? 1 : 0, v -> ch.mode = v == 1 ? 4 : 0);
         choiceInto(digitalGroup, "Time slot", H_SLOT, new String[] { "TS1", "TS2" }, ch.inSlot, v -> { ch.inSlot = v; ch.outSlot = v; });
-        choiceInto(digitalGroup, "Contact type", H_CTYPE, new String[] { "Private", "Group", "All" }, ch.contactType, v -> ch.contactType = v);
+        choiceInto(digitalGroup, "Contact type", H_CTYPE, new String[] { "Private", "Group", "All" }, ch.contactType, v -> { ch.contactType = v; showCallSource(); });
+        callFromContacts = contactFor(ch.txContact, ch.contactType) != null;
+        choiceInto(digitalGroup, "Call number from", H_CALLFROM, new String[] { "Typed number", "Contacts" }, callFromContacts ? 1 : 0, v -> { callFromContacts = v == 1; showCallSource(); });
         call = textInto(digitalGroup, "Call number (DMR ID / talkgroup)", H_CALL, ch.txContact > 0 ? String.valueOf(ch.txContact) : "", InputType.TYPE_CLASS_NUMBER);
+        callTypedRow = (View) call.getParent().getParent();
+        callPickV = choiceInto(digitalGroup, "Contact", H_CALLPICK, null, 0, null);
+        callPickRow = (View) callPickV.getParent();
+        callPickV.setOnClickListener(v -> pickCallContact()); callPickRow.setOnClickListener(v -> pickCallContact());
+        showCallSource();
         groups = textInto(digitalGroup, "RX group list (talkgroups, comma separated, up to 32)", H_GROUPS, join(ch.groups), InputType.TYPE_CLASS_TEXT);
         TextView lists = Neo.button(c, "Talkgroup lists\u2026", "channels", Neo.VIOLET); lists.setTextSize(14);
         LayoutParams tll = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); tll.bottomMargin = (int) (6 * Theme.dp(c));
@@ -291,6 +303,45 @@ public class ChannelEditorView extends LinearLayout {
                 android.widget.Toast.makeText(c, "Saved \u201C" + t.name + "\u201D", android.widget.Toast.LENGTH_SHORT).show();
             }).setNegativeButton("Cancel", null).show();
         }).show();
+    }
+
+    /** The contact of this type (private for a private call, group otherwise) with this number, or null. */
+    private com.macdmr.radio.ChannelStore.Contact contactFor(int number, int contactType) {
+        if (number <= 0) return null;
+        for (com.macdmr.radio.ChannelStore.Contact ct : callContacts(contactType)) if (ct.number == number) return ct;
+        return null;
+    }
+    private java.util.List<com.macdmr.radio.ChannelStore.Contact> callContacts(int contactType) {
+        java.util.List<com.macdmr.radio.ChannelStore.Contact> out = new java.util.ArrayList<>();
+        Context c = getContext();
+        if (!(c instanceof com.macdmr.radio.MainActivity) || ((com.macdmr.radio.MainActivity) c).service() == null) return out;
+        int want = contactType == 0 ? 0 : 1;
+        for (com.macdmr.radio.ChannelStore.Contact ct : ((com.macdmr.radio.MainActivity) c).service().store().contacts()) if (ct.type == want && ct.number > 0) out.add(ct);
+        return out;
+    }
+    private int typedCall() { try { return Integer.parseInt(call.getText().toString().trim()); } catch (Exception e) { return 0; } }
+    /** Show the number field or the contact row, and what the contact row holds. */
+    private void showCallSource() {
+        if (callTypedRow == null || callPickRow == null) return;
+        callTypedRow.setVisibility(callFromContacts ? GONE : VISIBLE);
+        callPickRow.setVisibility(callFromContacts ? VISIBLE : GONE);
+        com.macdmr.radio.ChannelStore.Contact ct = contactFor(typedCall(), ch.contactType);
+        int n = typedCall();
+        callPickV.setText(ct != null ? ct.name + " · " + ct.number : n > 0 ? n + " (not in contacts)" : "Choose…");
+    }
+    private void pickCallContact() {
+        final java.util.List<com.macdmr.radio.ChannelStore.Contact> all = callContacts(ch.contactType);
+        String kind = ch.contactType == 0 ? "private" : "group";
+        if (all.isEmpty()) {
+            new android.app.AlertDialog.Builder(getContext()).setTitle("No " + kind + " contacts")
+                    .setMessage("Add them on the Contacts page (type " + (ch.contactType == 0 ? "Private" : "Group") + "), or switch Call number from back to Typed number.")
+                    .setPositiveButton("OK", null).show();
+            return;
+        }
+        String[] items = new String[all.size()];
+        for (int i = 0; i < items.length; i++) items[i] = all.get(i).name + "  ·  " + all.get(i).number;
+        new android.app.AlertDialog.Builder(getContext()).setTitle(ch.contactType == 0 ? "Private contacts" : "Group contacts (talkgroups)")
+                .setItems(items, (d, w) -> { call.setText(String.valueOf(all.get(w).number)); showCallSource(); }).show();
     }
 
     private void pickM17Dest() {

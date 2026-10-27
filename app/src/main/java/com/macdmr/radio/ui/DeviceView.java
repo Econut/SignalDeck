@@ -819,7 +819,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     private void firmwareFilesIntro() {
         final Context c = getContext();
         new android.app.AlertDialog.Builder(c).setTitle("Radio firmware files")
-                .setMessage("Needs Magisk root. Looks in the folders where radio phones keep their radio chip images, and in the stock walkie-talkie app, and lists what it finds: name, size, a fingerprint (SHA-256) and the module version written inside. "
+                .setMessage("Needs Magisk root. Looks in the folders where radio phones keep their radio chip images, and in the stock walkie-talkie app, and lists what it finds: name, size, a fingerprint (SHA-256) and the module version written inside. SignalDeck's own files (serial captures, recordings, reports) are left out; in /sdcard/DMR only a module image counts. "
                         + "The list goes into the device report. Nothing is copied unless you tick files, and then only into Download/DMR/FoundFirmware on this phone; nothing is sent anywhere. "
                         + "These files belong to the phone maker: share them only privately, and only if the SignalDeck maintainer asks.")
                 .setPositiveButton("Look", (dd, w) -> firmwareFilesScan()).setNegativeButton("Cancel", null).show();
