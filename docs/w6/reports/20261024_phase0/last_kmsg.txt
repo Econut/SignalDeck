@@ -1,0 +1,60 @@
+[   61.166178]c3  Process cat (pid: 3090, stack limit = 0x00b1fd5e)
+[   61.166183]c3  Stack: (0xd4cd5eb0 to 0xd4cd6000)
+[   61.166191]c3  5ea0:                                     c0f646a8 bf0e8198 00001000 d6f01000
+[   61.166200]c3  5ec0: c0b0dc24 c0560280 d6f01000 bf0e6d20 e6b164d0 c05ff6b0 e6b164d0 e0485400
+[   61.166208]c3  5ee0: e6b164f8 c03632b4 00000000 00000001 fffff000 e6b164d0 00000000 e6b164e8
+[   61.166217]c3  5f00: e6b164f8 c02f3e70 db950f97 db0b6200 db0b6288 e6b164f0 d4cd5f78 e6b164e8
+[   61.166225]c3  5f20: e6b16500 022e33b8 00001000 00000000 db0b6200 00001000 022e33b8 d4cd5f78
+[   61.166234]c3  5f40: d4cd4000 db0b6240 80080000 c02cb08c c0f063c8 c02ca45c db0b6200 db0b6200
+[   61.166242]c3  5f60: 022e33b8 d4cd5f78 00001000 c0f063c8 80080000 c02cb630 00000000 00000000
+[   61.166251]c3  5f80: db950f97 db950f97 022e2378 0228baae b12bf014 00000003 c0101204 d4cd4000
+[   61.166259]c3  5fa0: 00000003 c0101000 022e2378 0228baae 00000003 022e33b8 00001000 00001000
+[   61.166268]c3  5fc0: 022e2378 0228baae b12bf014 00000003 022e33b8 02292ace 00001000 80080000
+[   61.166277]c3  5fe0: 0228bf0c bed1d168 022b26a7 b10b6310 60070010 00000003 00000000 00000000
+[   61.166295]c3  [<c055f21c>] (gpiod_get_raw_value_commit) from [<c0560280>] (gpiod_get_value_cansleep+0x24/0x40)
+[   61.166309]c3  [<c0560280>] (gpiod_get_value_cansleep) from [<bf0e6d20>] (af_en_show+0x14/0x2c [misc_flyscale])
+[   61.166333]c3  [<bf0e6d20>] (af_en_show [misc_flyscale]) from [<c05ff6b0>] (dev_attr_show+0x18/0x44)
+[   61.166347]c3  [<c05ff6b0>] (dev_attr_show) from [<c03632b4>] (sysfs_kf_seq_show+0x80/0xe4)
+[   61.166360]c3  [<c03632b4>] (sysfs_kf_seq_show) from [<c02f3e70>] (seq_read+0x228/0x5e4)
+[   61.166372]c3  [<c02f3e70>] (seq_read) from [<c02cb08c>] (vfs_read+0x9c/0x14c)
+[   61.166382]c3  [<c02cb08c>] (vfs_read) from [<c02cb630>] (ksys_read+0x68/0xc4)
+[   61.166400]c3  [<c02cb630>] (ksys_read) from [<c0101000>] (ret_fast_syscall+0x0/0x54)
+[   61.166416]c3  Exception stack(0xd4cd5fa8 to 0xd4cd5ff0)
+[   61.166430]c3  5fa0:                   022e2378 0228baae 00000003 022e33b8 00001000 00001000
+[   61.166449]c3  5fc0: 022e2378 0228baae b12bf014 00000003 022e33b8 02292ace 00001000 80080000
+[   61.166460]c3  5fe0: 0228bf0c bed1d168 022b26a7 b10b6310
+[   61.166477]c3  Code: e92d41f0 e5901000 e1a05000 e59102f0 (e5902024) 
+[   61.166484]c3  ---[ end trace 9d4f78f13c275852 ]---
+[   61.203771]c0  sh3001_get_accel_data: accel_data:-559,233,-1525
+[   61.205687]c3  type=1400 audit(1782530436.239:82): avc: denied { read } for comm="cat" name="af_en" dev="sysfs" ino=27338 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+[   61.206074]c3  type=1400 audit(1782530436.239:83): avc: denied { open } for comm="cat" path="/sys/devices/virtual/misc/flyscale_misc/af_en" dev="sysfs" ino=27338 scontext=u:r:shell:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+[   61.214499]c3  Kernel panic - not syncing: Fatal exception
+[   61.214515]c1  CPU1: stopping
+[   61.214566]c0  CPU0: stopping
+[   61.214637]c2  CPU2: stopping
+[   61.231635]c3  sprd-sysdump: (sysdump_panic_event) ------ in (0)
+[   62.231681]c3  sprd-sysdump: 
+[   62.231698]c3  sprd-sysdump: *****************************************************
+[   62.231703]c3  sprd-sysdump: *                                                   *
+[   62.231709]c3  sprd-sysdump: *  Sysdump enter, preparing debug info to dump ...  *
+[   62.231715]c3  sprd-sysdump: *                                                   *
+[   62.231720]c3  sprd-sysdump: *****************************************************
+[   62.231726]c3  sprd-sysdump: 
+[   62.231735]c3  sprd-sysdump: reason: Fatal exception, sprd_sysdump_info->crash_key: 0
+[   62.231817]c3  sprd-sysdump: KTXT VERIFY...
+[   62.248807]c3  sprd-sysdump: KTXT [0xc0100000--0xc0ab1da0]
+[   62.248814]c3  sprd-sysdump: SHA1:
+[   62.248821]c3  sprd-sysdump: 801ebc83 26d297f1 95055985 53f355b6 bb6d2039
+[   62.248826]c3  sprd-sysdump: 
+[   62.248832]c3  sprd-sysdump: *****************************************************
+[   62.248837]c3  sprd-sysdump: *                                                   *
+[   62.248843]c3  sprd-sysdump: *  Try to reboot system ...                         *
+[   62.248849]c3  sprd-sysdump: *                                                   *
+[   62.248862]c3  sprd-sysdump: *****************************************************
+[   62.248867]c3  sprd-sysdump: 
+[   63.248905]c3  sprd-trusty-log: trusty-log panic notifier - trusty version Unisoc TEE v2.1.1, sharkle-lowmemory, Built: 14:32:22 Feb 21 2024, 26e6cd2a (builder@zishcicd0093)
+[   63.294619]c3  Rebooting in 5 seconds..
+
+Boot info:
+Last boot reason: kernel_panic,fatal_exception
+

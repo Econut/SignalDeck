@@ -1,0 +1,681 @@
+Activity Resolver Table:
+  Full MIME Types:
+      text/plain:
+        3b5120d com.corget/.NfcActivity filter 2a6d5c2
+          Action: "android.nfc.action.NDEF_DISCOVERED"
+          Category: "android.intent.category.DEFAULT"
+          StaticType: "text/plain"
+
+  Base MIME Types:
+      text:
+        3b5120d com.corget/.NfcActivity filter 2a6d5c2
+          Action: "android.nfc.action.NDEF_DISCOVERED"
+          Category: "android.intent.category.DEFAULT"
+          StaticType: "text/plain"
+
+  Non-Data Actions:
+      android.nfc.action.TECH_DISCOVERED:
+        3b5120d com.corget/.NfcActivity filter c364fd3
+          Action: "android.nfc.action.TECH_DISCOVERED"
+      android.intent.action.MAIN:
+        dab7737 com.corget/.MainView filter bdeb4a4
+          Action: "android.intent.action.MAIN"
+          Category: "android.intent.category.LAUNCHER"
+          Category: "android.intent.category.UNIPRO"
+      com.motorolasolutions.buttonfeatures.action.WORK_TICKETING:
+        1c1f43c com.corget/.OtherExtraReceiveActivity filter a6775c5
+          Action: "com.motorolasolutions.buttonfeatures.action.WORK_TICKETING"
+          Category: "android.intent.category.DEFAULT"
+      android.intent.action.POC.upload:
+        fa47710 com.corget/.UploadVideoActivity filter badc209
+          Action: "android.intent.action.POC.upload"
+          Category: "android.intent.category.DEFAULT"
+      com.motorolasolutions.buttonfeatures.action.BARCODE_SCANNING:
+        6108c0e com.corget/.OtherInfoReceiveActivity filter 8c162f
+          Action: "com.motorolasolutions.buttonfeatures.action.BARCODE_SCANNING"
+          Category: "android.intent.category.DEFAULT"
+
+  MIME Typed Actions:
+      android.nfc.action.NDEF_DISCOVERED:
+        3b5120d com.corget/.NfcActivity filter 2a6d5c2
+          Action: "android.nfc.action.NDEF_DISCOVERED"
+          Category: "android.intent.category.DEFAULT"
+          StaticType: "text/plain"
+
+Receiver Resolver Table:
+  Non-Data Actions:
+      com.motorolasolutions.intent.action.ACTION_EMERGENCY_CLEAR:
+        6aa8ed4 com.corget/.MotoPhoneBroadcastReceiver filter a1b987d
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_DOWN"
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_UP"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_NEXT"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_PREV"
+          Action: "com.motorolasolutions.intent.action.ACTION_EMERGENCY_CLEAR"
+      com.corget.ircut.on:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      cn.frontstar.OK_IRCUT_OPENED:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_UP:
+        6aa8ed4 com.corget/.MotoPhoneBroadcastReceiver filter a1b987d
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_DOWN"
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_UP"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_NEXT"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_PREV"
+          Action: "com.motorolasolutions.intent.action.ACTION_EMERGENCY_CLEAR"
+      cn.frontstar.OK_IRCUT_UP:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.google.android.gms.measurement.UPLOAD:
+        dd81828 com.corget/com.google.android.gms.measurement.AppMeasurementReceiver filter 34ea941
+          Action: "com.google.android.gms.measurement.UPLOAD"
+          Action: "com.android.vending.INSTALL_REFERRER"
+      com.motorolasolutions.intent.action.ACTION_CHANNEL_NEXT:
+        6aa8ed4 com.corget/.MotoPhoneBroadcastReceiver filter a1b987d
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_DOWN"
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_UP"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_NEXT"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_PREV"
+          Action: "com.motorolasolutions.intent.action.ACTION_EMERGENCY_CLEAR"
+      com.motorolasolutions.intent.action.ACTION_CHANNEL_PREV:
+        6aa8ed4 com.corget/.MotoPhoneBroadcastReceiver filter a1b987d
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_DOWN"
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_UP"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_NEXT"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_PREV"
+          Action: "com.motorolasolutions.intent.action.ACTION_EMERGENCY_CLEAR"
+      android.intent.action.PTT.down:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.hytera.action.ACTION_POWER_OFF:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.android.vending.INSTALL_REFERRER:
+        dd81828 com.corget/com.google.android.gms.measurement.AppMeasurementReceiver filter 34ea941
+          Action: "com.google.android.gms.measurement.UPLOAD"
+          Action: "com.android.vending.INSTALL_REFERRER"
+      com.android.action.START_PTT:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      cn.frontstar.OK_IRCUT_DOWN:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      android.intent.action.DROPBOX_ENTRY_ADDED:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.corget.set.account:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      android.intent.action.BOOT_COMPLETED:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      android.intent.action.MY_PACKAGE_REPLACED:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.corget.ircut.off:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      android.intent.action.ACTION_SHUTDOWN:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      android.intent.action.MEDIA_BUTTON:
+        9560ee6 com.corget/.MediaButtonReceiver filter e129c27
+          Action: "android.intent.action.MEDIA_BUTTON"
+          mPriority=1001, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      android.intent.action.REBOOT:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.corget.login:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      cn.frontstar.OK_IRCUT_CLOSED:
+        f4d5b1a com.corget/.MyStaticBroadcastReceiver filter 5cde64b
+          Action: "android.intent.action.BOOT_COMPLETED"
+          Action: "android.intent.action.ACTION_SHUTDOWN"
+          Action: "android.intent.action.REBOOT"
+          Action: "android.intent.action.MY_PACKAGE_REPLACED"
+          Action: "com.hytera.action.ACTION_POWER_OFF"
+          Action: "com.corget.login"
+          Action: "com.corget.set.account"
+          Action: "cn.frontstar.OK_IRCUT_DOWN"
+          Action: "cn.frontstar.OK_IRCUT_UP"
+          Action: "cn.frontstar.OK_IRCUT_OPENED"
+          Action: "cn.frontstar.OK_IRCUT_CLOSED"
+          Action: "android.intent.action.PTT.down"
+          Action: "com.corget.ircut.on"
+          Action: "com.corget.ircut.off"
+          Action: "android.intent.action.DROPBOX_ENTRY_ADDED"
+          Action: "com.android.action.START_PTT"
+          mPriority=1000, mOrder=0, mHasStaticPartialTypes=false, mHasDynamicPartialTypes=false
+      com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_DOWN:
+        6aa8ed4 com.corget/.MotoPhoneBroadcastReceiver filter a1b987d
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_DOWN"
+          Action: "com.motorolasolutions.intent.action.ACTION_PTT_BUTTON_UP"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_NEXT"
+          Action: "com.motorolasolutions.intent.action.ACTION_CHANNEL_PREV"
+          Action: "com.motorolasolutions.intent.action.ACTION_EMERGENCY_CLEAR"
+
+Service Resolver Table:
+  Non-Data Actions:
+      android.accessibilityservice.AccessibilityService:
+        3e43372 com.corget/.MyAccessibilityService filter c02d3c3 permission android.permission.BIND_ACCESSIBILITY_SERVICE
+          Action: "android.accessibilityservice.AccessibilityService"
+
+Domain verification status:
+
+Registered ContentProviders:
+  com.corget/android.support.v4.content.FileProvider:
+    Provider{de93a92 com.corget/android.support.v4.content.FileProvider}
+  com.corget/com.bozhou.mode.PttProvider:
+    Provider{b129c63 com.corget/com.bozhou.mode.PttProvider}
+  com.corget/com.mapbox.android.telemetry.provider.MapboxTelemetryInitProvider:
+    Provider{a24f060 com.corget/com.mapbox.android.telemetry.provider.MapboxTelemetryInitProvider}
+  com.corget/.PocContentProvider:
+    Provider{d37c919 com.corget/.PocContentProvider}
+
+ContentProvider Authorities:
+  [smart.settings]:
+    Provider{b129c63 com.corget/com.bozhou.mode.PttProvider}
+      applicationInfo=ApplicationInfo{25c6dde com.corget}
+  [com.corget.PocContentProvider]:
+    Provider{d37c919 com.corget/.PocContentProvider}
+      applicationInfo=ApplicationInfo{2889bbf com.corget}
+  [com.corget.mapboxtelemetryinitprovider]:
+    Provider{a24f060 com.corget/com.mapbox.android.telemetry.provider.MapboxTelemetryInitProvider}
+      applicationInfo=ApplicationInfo{858b28c com.corget}
+  [com.corget.provider]:
+    Provider{de93a92 com.corget/android.support.v4.content.FileProvider}
+      applicationInfo=ApplicationInfo{872ddd5 com.corget}
+
+Key Set Manager:
+  [com.corget]
+      Signing KeySets: 11
+
+Packages:
+  Package [com.corget] (3d89ea):
+    userId=10110
+    pkg=Package{f3534db com.corget}
+    codePath=/system/vital-app/ZhuoZhiDa
+    resourcePath=/system/vital-app/ZhuoZhiDa
+    legacyNativeLibraryDir=/data/app-lib/ZhuoZhiDa
+    extractNativeLibs=true
+    primaryCpuAbi=armeabi
+    secondaryCpuAbi=null
+    cpuAbiOverride=null
+    versionCode=10201 minSdk=22 targetSdk=34
+    minExtensionVersions=[]
+    versionName=10.2.1
+    usesNonSdkApi=false
+    splits=[base]
+    apkSigningVersion=2
+    applicationInfo=PackageImpl{f3534db com.corget}
+    flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA LARGE_HEAP ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVATE_FLAG_REQUEST_LEGACY_EXTERNAL_STORAGE PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    forceQueryable=false
+    dataDir=/data/user/0/com.corget
+    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]
+    usesOptionalLibraries:
+      org.apache.http.legacy
+    usesLibraryFiles:
+      /system/framework/org.apache.http.legacy.jar
+    timeStamp=2009-01-01 08:00:00
+    firstInstallTime=2009-01-01 08:00:00
+    lastUpdateTime=2009-01-01 08:00:00
+    signatures=PackageSignatures{c246b78 version:2, signatures:[3a21a9b9], past signatures:[]}
+    installPermissionsFixed=true
+    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA LARGE_HEAP ]
+    requested permissions:
+      android.permission.READ_PRIVILEGED_PHONE_STATE
+      android.permission.WRITE_OWNER_DATA
+      android.permission.READ_OWNER_DATA
+      android.permission.READ_EXTERNAL_STORAGE
+      android.permission.WRITE_EXTERNAL_STORAGE
+      android.permission.RECORD_AUDIO
+      android.permission.INTERNET
+      android.permission.ACCESS_NETWORK_STATE
+      android.permission.VIBRATE
+      android.permission.RESTART_PACKAGES
+      android.permission.KILL_BACKGROUND_PROCESSES
+      android.permission.ACCESS_WIFI_STATE
+      android.permission.CHANGE_WIFI_STATE
+      android.permission.CHANGE_NETWORK_STATE
+      android.permission.ACCESS_COARSE_LOCATION
+      android.permission.ACCESS_FINE_LOCATION
+      android.permission.FOREGROUND_SERVICE_LOCATION
+      android.permission.MODIFY_AUDIO_SETTINGS
+      android.permission.WAKE_LOCK
+      android.permission.BLUETOOTH
+      android.permission.BLUETOOTH_ADMIN
+      android.permission.READ_PHONE_STATE
+      android.permission.MOUNT_UNMOUNT_FILESYSTEMS
+      android.permission.BAIDU_LOCATION_SERVICE
+      android.permission.RECEIVE_BOOT_COMPLETED
+      android.permission.READ_SETTINGS
+      android.permission.GET_TASKS
+      android.permission.WRITE_SETTINGS
+      android.permission.SYSTEM_ALERT_WINDOW
+      android.permission.DISABLE_KEYGUARD
+      android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+      android.permission.CAMERA
+      android.permission.FLASHLIGHT
+      android.permission.NFC
+      android.permission.INJECT_EVENTS
+      android.permission.USES_POLICY_FORCE_LOCK
+      android.permission.ANSWER_PHONE_CALLS
+      android.permission.SCHEDULE_EXACT_ALARM
+      android.permission.TRANSMIT_IR
+      android.permission.CHANGE_CONFIGURATION
+      android.permission.USB_PERMISSION
+      android.permission.SILENT_INSTALL_PACKAGES
+      android.permission.CALL_PHONE
+      android.permission.ACCESS_NOTIFICATION_POLICY
+      android.permission.POST_NOTIFICATIONS
+      android.permission.REORDER_TASKS
+      android.permission.REQUEST_INSTALL_PACKAGES
+      android.permission.FOREGROUND_SERVICE
+      android.permission.FOREGROUND_SERVICE_MICROPHONE
+      android.permission.CAPTURE_AUDIO_HOTWORD
+      android.permission.CAPTURE_AUDIO_OUTPUT
+      android.permission.CAPTURE_MEDIA_OUTPUT
+      android.permission.CAPTURE_TUNER_AUDIO_INPUT
+      android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT
+      android.permission.MODIFY_PHONE_STATE
+      android.permission.BLUETOOTH_SCAN
+      android.permission.BLUETOOTH_ADVERTISE
+      android.permission.BLUETOOTH_CONNECT
+      android.permission.INSTALL_PACKAGES
+      android.permission.DELETE_PACKAGES
+      android.permission.CLEAR_APP_USER_DATA
+      android.permission.CLEAR_APP_CACHE
+      android.permission.WRITE_SECURE_SETTINGS
+      android.permission.MANAGE_USB
+      android.permission.REAL_GET_TASKS
+      android.permission.SHUTDOWN
+      android.permission.GRANT_RUNTIME_PERMISSIONS
+      android.permission.ACCESS_BACKGROUND_LOCATION
+      android.permission.ACCESS_LOCATION_EXTRA_COMMANDS
+      android.permission.INTERACT_ACROSS_USERS_FULL
+      android.permission.GET_TOP_ACTIVITY_INFO
+      android.permission.BODY_SENSORS
+      android.permission.DEVICE_POWER
+      android.permission.WRITE_MEDIA_STORAGE
+      com.tdtech.permission.PTT_KEY
+      com.tdtech.permission.FUNCTION_KEY
+      com.tdtech.permission.AUDIO_RECORD_KEY
+      com.tdtech.permission.IMP_KEY
+      com.tdtech.permission.MEDIA_RECORD_KEY
+      com.tdtech.permission.CAMERA_KEY
+      com.tdtech.permission.LIGHT_MANAGER
+      android.permission.QUERY_ALL_PACKAGES
+      com.motorolasolutions.permission.PTT_INPUT
+      android.permission.READ_MEDIA_IMAGES
+      android.permission.READ_MEDIA_AUDIO
+      android.permission.READ_MEDIA_VIDEO
+      android.permission.READ_MEDIA_VISUAL_USER_SELECTED
+      android.permission.FORCE_STOP_PACKAGES
+      android.permission.MANAGE_EXTERNAL_STORAGE
+    install permissions:
+      android.permission.RESTART_PACKAGES: granted=true
+      android.permission.MODIFY_AUDIO_SETTINGS: granted=true
+      android.permission.ACCESS_NOTIFICATION_POLICY: granted=true
+      android.permission.NFC: granted=true
+      android.permission.CHANGE_NETWORK_STATE: granted=true
+      android.permission.FOREGROUND_SERVICE: granted=true
+      android.permission.RECEIVE_BOOT_COMPLETED: granted=true
+      android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: granted=true
+      android.permission.BLUETOOTH: granted=true
+      android.permission.GET_TASKS: granted=true
+      android.permission.INTERNET: granted=true
+      android.permission.TRANSMIT_IR: granted=true
+      android.permission.REORDER_TASKS: granted=true
+      android.permission.BLUETOOTH_ADMIN: granted=true
+      android.permission.ACCESS_LOCATION_EXTRA_COMMANDS: granted=true
+      android.permission.CHANGE_WIFI_STATE: granted=true
+      android.permission.FLASHLIGHT: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+      android.permission.DISABLE_KEYGUARD: granted=true
+      android.permission.KILL_BACKGROUND_PROCESSES: granted=true
+      android.permission.SCHEDULE_EXACT_ALARM: granted=true
+      android.permission.VIBRATE: granted=true
+      android.permission.ACCESS_WIFI_STATE: granted=true
+      android.permission.QUERY_ALL_PACKAGES: granted=true
+      android.permission.WAKE_LOCK: granted=true
+    User 0: ceDataInode=2183 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+      overlay paths:
+        /data/resource-cache/com.android.systemui-neutral-1n3E.frro
+        /data/resource-cache/com.android.systemui-accent-Hg4U.frro
+      gids=[3002, 3003, 3001]
+      runtime permissions:
+        android.permission.ACCESS_FINE_LOCATION: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.ANSWER_PHONE_CALLS: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BODY_SENSORS: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BLUETOOTH_CONNECT: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.READ_EXTERNAL_STORAGE: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|RESTRICTION_SYSTEM_EXEMPT|RESTRICTION_UPGRADE_EXEMPT]
+        android.permission.ACCESS_COARSE_LOCATION: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.READ_PHONE_STATE: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.CALL_PHONE: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.CAMERA: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.BLUETOOTH_ADVERTISE: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.WRITE_EXTERNAL_STORAGE: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|RESTRICTION_SYSTEM_EXEMPT|RESTRICTION_UPGRADE_EXEMPT]
+        android.permission.RECORD_AUDIO: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+        android.permission.ACCESS_BACKGROUND_LOCATION: granted=true, flags=[ GRANTED_BY_DEFAULT|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED|RESTRICTION_SYSTEM_EXEMPT|RESTRICTION_UPGRADE_EXEMPT]
+        android.permission.BLUETOOTH_SCAN: granted=false, flags=[ USER_SET|USER_SENSITIVE_WHEN_GRANTED|USER_SENSITIVE_WHEN_DENIED]
+
+Queries:
+  system apps queryable: false
+  queries via package name:
+  queries via intent:
+    com.android.settings.intelligence:
+      com.corget
+  queryable via interaction:
+    User 0:
+      [com.android.inputdevices,com.android.keychain,com.android.networkstack.tethering.inprocess,com.sprd.srmi,android,com.android.providers.settings,com.android.location.fused,com.android.settings,com.sprd.validationtools,com.myavro.update,com.sprd.engineermode,com.android.networkstack.inprocess,com.android.dynsystem,com.android.localtransport,com.flyscale.analogpoc,com.android.wallpaperbackup,com.android.server.telecom]:
+        com.corget
+      com.android.bluetooth:
+        com.corget
+      com.android.inputmethod.latin:
+        com.corget
+      com.android.permissioncontroller:
+        com.corget
+      com.corget:
+        com.android.webview
+  queryable via uses-library:
+
+Package Changes:
+  Sequence number=4
+  User 0:
+    seq=1, package=com.google.android.gms
+    seq=2, package=com.android.shell
+    seq=3, package=com.android.settings
+
+
+Dexopt state:
+  [com.corget]
+    path: /system/vital-app/ZhuoZhiDa/ZhuoZhiDa.apk
+      arm: [status=verify] [reason=first-boot]
+
+
+Compiler stats:
+  [com.corget]
+    (No recorded stats)
+Snapshot statistics
+   Unrecorded-hits: 2208  Cork-level: 0
+   Summary stats               TotBlds     TotUsed     TotCork     BigBlds    ShortLvd     TotTime     MaxTime
+          0:28         now           0           0           0           0           0           0           0
+          1:28        0:28           0           0           0           0           0           0           0
+          2:28        1:28           0           0           0           0           0           0           0
+          3:28        2:28           0           0           0           0           0           0           0
+          4:28        3:28           0           0           0           0           0           0           0
+          5:28        4:28           3       16358           0           0           0           1           0
+          6:28        5:28           4        1742           0           0           1           8           6
+          7:28        6:28           0           0           0           0           0           0           0
+          8:28        7:28          11       10864           0           0           3           8           2
+          9:28        8:28          82       50485           0           1          14          73          13
+          9:28         now         100       79449           0           1          18          92          13
+
+   Build times                  <= 1ms      <= 2ms      <= 5ms     <= 10ms     <= 20ms     <= 50ms    <= 100ms     > 100ms
+          0:28         now           0           0           0           0           0           0           0           0
+          1:28        0:28           0           0           0           0           0           0           0           0
+          2:28        1:28           0           0           0           0           0           0           0           0
+          3:28        2:28           0           0           0           0           0           0           0           0
+          4:28        3:28           0           0           0           0           0           0           0           0
+          5:28        4:28           3           0           0           0           0           0           0           0
+          6:28        5:28           3           0           0           1           0           0           0           0
+          7:28        6:28           0           0           0           0           0           0           0           0
+          8:28        7:28          10           1           0           0           0           0           0           0
+          9:28        8:28          75           0           5           1           1           0           0           0
+          9:28         now          91           1           5           2           1           0           0           0
+
+   Use counters                   <= 1        <= 2        <= 5       <= 10       <= 20       <= 50      <= 100       > 100
+          0:28         now           0           0           0           0           0           0           0           0
+          1:28        0:28           0           0           0           0           0           0           0           0
+          2:28        1:28           0           0           0           0           0           0           0           0
+          3:28        2:28           0           0           0           0           0           0           0           0
+          4:28        3:28           0           0           0           0           0           0           0           0
+          5:28        4:28           0           0           0           0           0           0           1           2
+          6:28        5:28           1           0           0           0           0           0           1           2
+          7:28        6:28           0           0           0           0           0           0           0           0
+          8:28        7:28           2           1           0           0           1           0           2           5
+          9:28        8:28          11           2           0           4           1          13           4          46
+          9:28         now          14           3           0           4           2          13           8          55

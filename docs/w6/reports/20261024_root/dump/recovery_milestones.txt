@@ -1,0 +1,52 @@
+===== /tmp/w6-id6.log =====
+CHECK_BAUD bootrom
+BSL_REP_VER: "SPRD3\0"
+CMD_CONNECT bootrom
+FDL NOT READY
+===== /tmp/w6-fdl1-reset.log =====
+CMD_CONNECT bootrom
+EXEC FDL1
+CHECK_BAUD FDL1
+BSL_REP_VER: "Spreadtrum Boot Block version 1.1\0"
+CMD_CONNECT FDL1
+KEEP_CHARGE FDL1
+timeout reached
+===== /tmp/w6-spl-read.log =====
+CHECK_BAUD bootrom
+BSL_REP_VER: "SPRD3\0"
+CMD_CONNECT bootrom
+EXEC FDL1
+CHECK_BAUD FDL1
+BSL_REP_VER: "Spreadtrum Boot Block version 1.1\0"
+CMD_CONNECT FDL1
+KEEP_CHARGE FDL1
+FDL2: incompatible partition
+EXEC FDL2
+DISABLE_TRANSCODE
+Read Part Done: splloader+0x0, target: 0x40000, read: 0x40000
+Read Part Done: splloader_bak+0x0, target: 0x40000, read: 0x40000
+FDL2 >
+===== /tmp/w6-heads.log =====
+DISABLE_TRANSCODE
+Read Part Done: boot_a+0x0, target: 0x1000, read: 0x1000
+Read Part Done: uboot_a+0x0, target: 0x1000, read: 0x1000
+Read Part Done: vbmeta_a+0x0, target: 0x1000, read: 0x1000
+FDL2 >
+===== /tmp/w6-parts2.log =====
+CMD_CONNECT bootrom
+EXEC FDL1
+CHECK_BAUD FDL1
+BSL_REP_VER: "Spreadtrum Boot Block version 1.1\0"
+CMD_CONNECT FDL1
+KEEP_CHARGE FDL1
+FDL2: incompatible partition
+EXEC FDL2
+DISABLE_TRANSCODE
+Reading Partition List
+Read Part Done: user_partition+0x0, target: 0x8000, read: 0x0
+Partition table not available
+Read Part Done: sml_a+0x0, target: 0x1000, read: 0x1000
+Read Part Done: teecfg_a+0x0, target: 0x1000, read: 0x1000
+Read Part Done: trustos_a+0x0, target: 0x1000, read: 0x1000
+Read Part Done: uboot_a+0x0, target: 0x10000, read: 0x10000
+FDL2 >

@@ -1,0 +1,119 @@
+add device 1: /dev/input/event14
+  name:     "sprdphone Headset Keyboard"
+  events:
+    KEY (0001): KEY_VOLUMEDOWN        KEY_VOLUMEUP          KEY_MEDIA             BTN_3                
+                BTN_4                
+  input props:
+    <none>
+add device 2: /dev/input/event13
+  name:     "sprdphone Headset Jack"
+  events:
+    SW  (0005): SW_HEADPHONE_INSERT   SW_MICROPHONE_INSERT 
+  input props:
+    <none>
+add device 3: /dev/input/event12
+  name:     "hook_dmr"
+  events:
+    KEY (0001): KEY_F2                KEY_F3               
+  input props:
+    <none>
+add device 4: /dev/input/event11
+  name:     "sf-keys"
+  events:
+    KEY (0001): KEY_F11               KEY_HOME              KEY_UP                KEY_LEFT             
+                KEY_RIGHT             KEY_DOWN              KEY_MENU              KEY_WAKEUP           
+                KEY_BACK             
+  input props:
+    <none>
+add device 5: /dev/input/event9
+  name:     "accelerometer"
+  events:
+    ABS (0003): ABS_X                 : value -553, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+                ABS_Y                 : value 238, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+                ABS_Z                 : value -1522, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+  input props:
+    <none>
+add device 6: /dev/input/event6
+  name:     "al_pxy"
+  events:
+    ABS (0003): ABS_MISC              : value 0, min 0, max 144176, fuzz 0, flat 0, resolution 0
+  input props:
+    <none>
+add device 7: /dev/input/event1
+  name:     "rotary"
+  events:
+    KEY (0001): KEY_F11               KEY_F12              
+    REL (0002): REL_Y                
+  input props:
+    <none>
+could not get driver version for /dev/input/mice, Inappropriate ioctl for device
+add device 8: /dev/input/event10
+  name:     "gyroscope"
+  events:
+    ABS (0003): ABS_RX                : value 0, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+                ABS_RY                : value 0, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+                ABS_RZ                : value 0, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+  input props:
+    <none>
+add device 9: /dev/input/event8
+  name:     "compass"
+  events:
+    ABS (0003): ABS_X                 : value 0, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+                ABS_Y                 : value 0, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+                ABS_Z                 : value 0, min -32768, max 32767, fuzz 0, flat 0, resolution 0
+  input props:
+    <none>
+add device 10: /dev/input/event0
+  name:     "sprd-keypad"
+  events:
+    KEY (0001): KEY_F4                KEY_F5               
+  input props:
+    <none>
+add device 11: /dev/input/event4
+  name:     "sc27xx:vibrator"
+  events:
+    FF  (0015): FF_RUMBLE             FF_PERIODIC           FF_SQUARE             FF_TRIANGLE          
+                FF_SINE               FF_GAIN              
+  input props:
+    <none>
+add device 12: /dev/input/event3
+  name:     "Betterlife_ts"
+  events:
+    ABS (0003): ABS_MT_TOUCH_MAJOR    : value 0, min 0, max 255, fuzz 0, flat 0, resolution 0
+                ABS_MT_WIDTH_MAJOR    : value 0, min 0, max 255, fuzz 0, flat 0, resolution 0
+                ABS_MT_POSITION_X     : value 0, min 0, max 480, fuzz 0, flat 0, resolution 0
+                ABS_MT_POSITION_Y     : value 0, min 0, max 854, fuzz 0, flat 0, resolution 0
+  input props:
+    INPUT_PROP_DIRECT
+add device 13: /dev/input/event2
+  name:     "aw9523-key"
+  events:
+    KEY (0001): KEY_4                 KEY_8                 KEY_9                 KEY_0                
+                KEY_MINUS             KEY_BACKSPACE         KEY_ENTER             KEY_S                
+                KEY_D                 KEY_F                 KEY_G                 KEY_H                
+                KEY_K                 KEY_L                 KEY_Z                 KEY_X                
+                KEY_C                 KEY_V                 KEY_B                 KEY_N                
+                KEY_M                 KEY_DOT               KEY_SPACE             KEY_CAPSLOCK         
+                KEY_F5                KEY_F7                KEY_F8                KEY_F9               
+                KEY_F10               KEY_F11               KEY_F12               KEY_UP               
+                KEY_LEFT              KEY_RIGHT             KEY_DOWN              KEY_MUTE             
+                KEY_VOLUMEDOWN        KEY_VOLUMEUP          KEY_STOP              KEY_AGAIN            
+                KEY_PROPS             KEY_UNDO              KEY_FRONT             KEY_COPY             
+                KEY_OPEN              KEY_PASTE             KEY_FIND              KEY_CUT              
+                KEY_BACK              KEY_PHONE             KEY_HOMEPAGE          KEY_CAMERA           
+                KEY_ALTERASE          KEY_SWITCHVIDEOMODE   KEY_APPSELECT        
+  input props:
+    <none>
+add device 14: /dev/input/event7
+  name:     "ps_pxy"
+  events:
+    ABS (0003): ABS_DISTANCE          : value 0, min 0, max 1, fuzz 0, flat 0, resolution 0
+                ABS_MISC              : value 0, min 0, max 100001, fuzz 0, flat 0, resolution 0
+  input props:
+    <none>
+add device 15: /dev/input/event5
+  name:     "gpio-keys"
+  events:
+    KEY (0001): KEY_F1                KEY_POWER             KEY_XFER             
+  input props:
+    <none>

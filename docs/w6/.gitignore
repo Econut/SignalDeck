@@ -1,0 +1,5 @@
+reports/**/*.apk
+reports/**/apk/
+reports/**/apk_*/
+reports/**/*.png
+reports/**/*.xml
