@@ -2,6 +2,19 @@
 
 Newest first. Phone: ANYSECU W6+ replacement unit, adb `-s W6202601000904` (USB). Plan: `docs/W6_DEVICE_REPORT_PLAN.md`.
 
+## 2026-10-27 18:50 CDT: Engine design written (docs/w6/ENGINE_DESIGN.md)
+
+- Branch `w6/engine-design`, stacked on `w6/clues-32bit`. Docs only.
+- Read the stock app with the SDK's `dexdump` and `aapt2` (the downloaded jadx stays unused: running it was blocked).
+  Found: the GPIO map (power `gpio322`, PTT `gpio188`, mic `gpio222`, receive detect `gpio189` as an input, audio
+  routes `gpio183`/`gpio249`, amplifiers in `/sys/kernel/*_pa_en`), receive start/end as system broadcasts
+  (`android.flyscale.rece.dmr.start/end`), the side key as `fly.privkey.poc.down/up`, the full AT command set and the
+  SETGROUP field order (tx tone before rx tone), the tone code table (0 none, 1-38 CTCSS, 240-252 extra tones, 39-121
+  DCS). Every factory channel uses 62.5 Hz (code 240) both ways.
+- Received audio is switched in hardware to the speaker amplifier, the microphone in hardware to the module; whether
+  Android can hear or feed audio is the open question that decides the feature set (design section 6, test 1).
+- Next: the owner reviews the design and the tests in section 7.
+
 ## 2026-10-27 18:15 CDT — 32-bit clues (gaps 2, 8, B12); a second kernel panic; a silent module
 
 - Branch `w6/clues-32bit`, stacked on `w6/serial-sniff`. Native libraries of every ABI, `AT+…` names and a protocol
