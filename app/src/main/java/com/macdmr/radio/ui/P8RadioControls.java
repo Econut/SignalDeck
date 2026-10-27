@@ -20,13 +20,15 @@ public final class P8RadioControls extends LinearLayout {
         note=Neo.text(c,"P8 · ROOT-FREE · TX LOCKED",Neo.AMBER,12,Neo.ui(c));addView(note);
         state=Neo.text(c,service.p8Status(),Neo.MUTED,11,Neo.ui(c));state.setMaxLines(2);addView(state);
         LinearLayout row=new LinearLayout(c);addView(row);
-        button(row,"Intercom release",()->{if(service.isReady()){toast("Hand back before opening Intercom settings");return;}c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr")));});
-        button(row,"Connect",service::bringUp);button(row,"Hand back",()->service.shutDown(true));button(row,"Volume",this::audio);
-        TextView tx=Neo.button(c,"Arm one 2-second TX test", "ptt",Neo.AMBER);addView(tx);
-        TextView keys=Neo.button(c,"Programmable buttons", "settings",Neo.CYAN);addView(keys);keys.setOnClickListener(v->buttons());
-        tx.setOnClickListener(v->new android.app.AlertDialog.Builder(c).setTitle("First transmit test — 446.10625 MHz")
+        button(row,"Connect",service::bringUp);button(row,"Hand back",()->service.shutDown(true));button(row,"P8 controls",this::controls);
+    }
+    private void controls(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("P8 controls").setItems(new String[]{"Intercom App info / release","Receive volume","Arm one 2-second TX test","Programmable buttons"},(d,index)->{
+        if(index==0){if(service.isReady()){toast("Hand back first");return;}c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr")));}
+        else if(index==1)audio();else if(index==2)arm();else buttons();
+    }).show();}
+    private void arm(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("First transmit test — 446.10625 MHz")
             .setMessage("Only use the approved, authorised test setup. Fit the correct antenna or a correctly rated 50-ohm dummy load. Set the other receiver to Channel 9, narrow FM, no tones, and keep it far enough away to avoid feedback. Arming does not transmit. The next physical/on-screen PTT press is limited to two seconds. TX arm expires after 60 seconds and is never saved. DMR TX is disabled.")
-            .setPositiveButton("Arm one test",(d,w)->toast(service.p8ArmTransmitTest())).setNegativeButton("Cancel",null).show());
+            .setPositiveButton("Arm one test",(d,w)->toast(service.p8ArmTransmitTest())).setNegativeButton("Cancel",null).show();
     }
     private void toast(String text){Toast.makeText(getContext(),text,Toast.LENGTH_LONG).show();}
     private void buttons(){service.p8CancelTransmitTest();Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("Foreground programmable buttons").setItems(new String[]{"Assign button 1","Assign button 2","Clear assignments"},(d,which)->{
@@ -42,7 +44,7 @@ public final class P8RadioControls extends LinearLayout {
             learn.setOnDismissListener(x->com.macdmr.radio.P8ButtonBindings.learning=null);learn.show();
         }).show();
     }).show();}
-    private void button(LinearLayout row,String title,Runnable run){TextView b=Neo.button(getContext(),title,"",Neo.CYAN);b.setTextSize(11);row.addView(b,new LayoutParams(0,LayoutParams.WRAP_CONTENT,1));b.setOnClickListener(v->run.run());}
+    private void button(LinearLayout row,String title,Runnable run){TextView b=Neo.button(getContext(),title,"",Neo.CYAN);b.setTextSize(11);b.setSingleLine(true);row.addView(b,new LayoutParams(0,Theme.dp(getContext(),44),1));b.setOnClickListener(v->run.run());}
     private void audio(){Context c=getContext();LinearLayout body=new LinearLayout(c);body.setOrientation(VERTICAL);body.setPadding(24,12,24,12);
         TextView notice=new TextView(c);notice.setText("Saved controls apply on Connect; module and gain also apply during RX.");body.addView(notice);
         AudioManager am=(AudioManager)c.getSystemService(Context.AUDIO_SERVICE);

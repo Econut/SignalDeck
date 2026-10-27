@@ -175,6 +175,15 @@ JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_prepareTransmit(JNI
     fail(e,"TX disabled in this build");
 #endif
 }
+JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_acknowledgeStatus(JNIEnv *e,jclass c){
+    (void)c;
+#if P8_OPEN_PROBE_REVIEWED && P8_TX_TEST_REVIEWED
+    const unsigned char ack[10]={0x68,0x36,1,1,0x95,0xb7,0,1,1,0x10};
+    if(control<0 || write(control,ack,sizeof ack)!=(ssize_t)sizeof ack)fail(e,"Status acknowledgement write failed; stop");
+#else
+    fail(e,"Status acknowledgement disabled in this build");
+#endif
+}
 JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_key(JNIEnv *e,jclass c,jboolean down){
     (void)c;
 #if P8_OPEN_PROBE_REVIEWED && P8_TX_TEST_REVIEWED
