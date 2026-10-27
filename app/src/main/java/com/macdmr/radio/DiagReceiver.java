@@ -57,6 +57,8 @@ public final class DiagReceiver extends BroadcastReceiver {
                 break;
             }
             case "checks": FirstRunCheck.benchRun(c.getApplicationContext(), s, i.getStringExtra("watch"), i.getBooleanExtra("trial", false), i.getLongExtra("hosttime", 0)); break;   // bench: Run all checks with no screen (--es watch auto|none|<pkg>, --ez trial, --el hosttime ms); scripts/w6/run_checks.sh
+            case "audioprobe": { final int ms = i.getIntExtra("ms", 2000); final double hz = i.getIntExtra("hz", 1000); final String tag = String.valueOf(i.getStringExtra("tag"));   // bench: does the receive audio reach Android's recorder? one line per source to the log
+                new Thread(() -> { for (String l : AudioSourceProbe.run(ms, hz).split("\n")) Log.i("AudioProbe", tag + " " + l); Log.i("AudioProbe", tag + " done"); }, "audioprobe").start(); break; }
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
             case "txwav": { String nm = i.getStringExtra("name"); if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) Log.i("DiagReceiver", "txwav: " + s.diagTxWav(new java.io.File(c.getCacheDir(), "tx_" + nm + ".wav"))); break; }   // bench: transmit cache/tx_<name>.wav (low power VFO)
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel
