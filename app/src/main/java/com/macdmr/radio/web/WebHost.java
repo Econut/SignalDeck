@@ -474,7 +474,6 @@ public final class WebHost {
         android.content.SharedPreferences rp = svc.getSharedPreferences("radio", Context.MODE_PRIVATE);
         l.add(new Setting("dmrId", "Identity", "Your DMR ID", "What other radios see when you talk on DMR channels", "int", null, svc::localId, b -> {
             int v = b.getInt("value"); if (v < 1 || v > 0xFFFFFF) throw new IllegalArgumentException("A DMR ID is 1 to 16777215"); svc.setLocalId(v); }));
-        l.add(new Setting("ownAtBoot", "Radio", "Own the radio at boot", "Otherwise the stock app is restored after a reboot", "bool", null, svc::ownAtBoot, b -> svc.setOwnAtBoot(b.getBoolean("value"))));
         l.add(new Setting("hwPtt", "Radio", "Side PTT key", "The phone's hardware push-to-talk button transmits", "bool", null, svc::hwPtt, b -> svc.setHwPtt(b.getBoolean("value"))));
         l.add(new Setting("volPtt", "Radio", "Volume-up transmits", "While the Intercom page is open on the phone", "bool", null, () -> rp.getBoolean("volPtt", false), b -> rp.edit().putBoolean("volPtt", b.getBoolean("value")).apply()));
         l.add(new Setting("customPtt", "Radio", "Custom PTT key", "The button learned on the phone (Device → Custom PTT key) transmits; learning needs the phone in hand", "bool", null, () -> com.macdmr.radio.CustomPttKey.enabled(svc), b -> { if (com.macdmr.radio.CustomPttKey.saved(svc) != null) { com.macdmr.radio.CustomPttKey.setEnabled(svc, b.getBoolean("value")); svc.customPttChanged(); } }));
@@ -1355,7 +1354,11 @@ public final class WebHost {
                         .put("frames", h.frames).put("good", h.good).put("encrypted", h.encrypted).put("data", h.data));
                 }
                 com.macdmr.radio.M17Station.Heard cur = m7.current();
-                return ok(new JSONObject().put("running", m7.running()).put("receiving", cur != null).put("quality", Math.round(m7.quality() * 100))
+                String mine = svc.packet() != null && svc.packet().callsignSet() ? svc.packet().callsign() : null;
+                JSONArray texts = new JSONArray();
+                for (com.macdmr.radio.M17Station.Text t : m7.texts())
+                    texts.put(new JSONObject().put("ts", t.ts).put("sent", t.sent).put("src", hideCall(t.src, mine)).put("dst", hideCall(t.dst, mine)).put("body", hideCall(t.body, mine)));
+                return ok(new JSONObject().put("running", m7.running()).put("receiving", cur != null).put("quality", Math.round(m7.quality() * 100)).put("texts", texts).put("webTx", allowTx()).put("canSend", svc.m17CanSend())
                     .put("current", cur == null ? JSONObject.NULL : new JSONObject().put("src", cur.src).put("dst", cur.dst).put("meta", cur.meta == null ? JSONObject.NULL : cur.meta).put("frames", cur.frames).put("seconds", (cur.end - cur.start) / 1000.0).put("encrypted", cur.encrypted))
                     .put("heard", hl).put("calibration", m7.calibration()).put("analog", svc.current() != null && !svc.current().isDigital()));
             }
@@ -1602,20 +1605,37 @@ public final class WebHost {
             case "/api/conversations": {
                 JSONArray a = new JSONArray();
                 for (ChannelStore.Conversation c : svc.conversations())
-                    a.put(new JSONObject().put("peer", c.peer).put("type", c.type).put("name", c.name).put("lastText", c.lastText).put("lastTs", c.lastTs).put("outgoing", c.outgoing));
+                    a.put(new JSONObject().put("peer", c.peer).put("type", c.type).put("name", c.name).put("lastText", c.lastText).put("lastTs", c.lastTs).put("outgoing", c.outgoing)
+                            .put("transport", c.transport == null || c.transport.isEmpty() ? "dmr" : c.transport)
+                            .put("threadKey", c.threadKey == null ? "" : c.threadKey).put("address", c.address == null ? "" : c.address).put("unread", c.unread));
                 return ok(new JSONObject().put("conversations", a).put("quickReplies", new JSONArray(quickReplies())));
             }
             case "/api/messages": {
-                if (post) {                                                     // send {peer, type, text}
+                if (post) {                                                     // DMR {peer, type, text}; a page or M17 thread sends on that transport
                     if (!allowTx()) return WebServer.Response.error(403, TX_OFF);
-                    String text = b.optString("text", "").trim(); int peer = b.optInt("peer", 0), type = b.optInt("type", 0);
-                    if (text.isEmpty() || peer <= 0) return WebServer.Response.error(400, "A recipient and a text are needed");
+                    String transport = b.optString("transport", "dmr");
+                    String text = b.optString("text", "").trim();
+                    if ("page".equals(transport)) return sendWebPage(b, text);
+                    if ("m17".equals(transport)) return sendWebM17(b, text);
+                    WebServer.Response denied = gate("/api/messages"); if (denied != null) return denied;
+                    if (text.isEmpty() || b.optInt("peer", 0) <= 0) return WebServer.Response.error(400, "A recipient and a text are needed");
                     if (text.length() > 140) return WebServer.Response.error(400, "Texts are at most 140 characters");
                     if (!svc.isReady()) return WebServer.Response.error(409, "The radio is not ready");
+                    int peer = b.optInt("peer", 0), type = b.optInt("type", 0);
                     ChannelStore.Contact to = new ChannelStore.Contact(); to.number = peer; to.type = type;
                     String nm = svc.store().contactName(peer, type); to.name = nm == null ? "" : nm;
                     onMain(() -> { svc.sendSms(to, text); return null; });
                     return ok("Sending to " + (to.name.isEmpty() ? String.valueOf(peer) : to.name));
+                }
+                String thread = r.param("thread");
+                if (thread != null && !thread.isEmpty()) {
+                    svc.watchingThread(thread);
+                    String mine = svc.packet() != null && svc.packet().callsignSet() ? svc.packet().callsign() : null;
+                    JSONArray a = new JSONArray();
+                    for (ChannelStore.PageRow row : svc.store().pagesIn(thread))
+                        a.put(new JSONObject().put("id", row.id).put("outgoing", row.outgoing).put("ts", row.ts).put("text", hideCall(row.text, mine)).put("status", 1)
+                                .put("transport", row.transport).put("baud", row.baud).put("hz", row.hz).put("ric", row.ric));
+                    return ok(new JSONObject().put("messages", a));
                 }
                 int peer = parse(r.param("peer"), 0), type = parse(r.param("type"), 0);
                 JSONArray a = new JSONArray();
@@ -1624,8 +1644,171 @@ public final class WebHost {
                             .put("sender", m.sender).put("senderName", m.sender > 0 ? svc.callerName(m.sender) : ""));
                 return ok(new JSONObject().put("messages", a));
             }
+            case "/api/pager/pages": {
+                int ricFilter = parse(r.param("ric"), -1);
+                String mine = svc.packet() != null && svc.packet().callsignSet() ? svc.packet().callsign() : null;
+                JSONArray a = new JSONArray();
+                for (ChannelStore.PageRow row : svc.store().recentPages(200)) {
+                    if (!"page".equals(row.transport)) continue;
+                    if (ricFilter >= 0 && row.ric != ricFilter) continue;
+                    a.put(new JSONObject().put("id", row.id).put("ts", row.ts).put("hz", row.hz).put("ric", row.ric).put("func", row.func).put("baud", row.baud)
+                            .put("text", hideCall(row.text, mine)).put("corrected", row.corrected).put("outgoing", row.outgoing).put("threadKey", row.threadKey));
+                }
+                com.macdmr.radio.PagerStation pg = svc.pager();
+                ChannelStore.Channel cur = svc.current();
+                return ok(new JSONObject().put("pages", a).put("listening", svc.pagerRunning()).put("monitor", pg != null && pg.monitoring())
+                        .put("hz", cur == null ? 467625000 : cur.rxFreq).put("webTx", allowTx()).put("scan", pagerScanText()));
+            }
+            case "/api/pager/monitor": if (!post) break; {
+                WebServer.Response denied = gate("/api/pager/monitor"); if (denied != null) return denied;
+                boolean on = b.optBoolean("on", false);
+                String err = onMain(() -> on ? svc.setPagerMonitor(true, pagerScanHz(), b.optInt("baud", 1200)) : stopPagerMonitor());
+                if (err != null) return WebServer.Response.error(409, err);
+                return ok(on ? "Pager monitor on" : "Pager monitor off");
+            }
+            case "/api/pager/send": if (!post) break; {
+                WebServer.Response denied = gate("/api/pager/send"); if (denied != null) return denied;
+                if (!allowTx()) return WebServer.Response.error(403, TX_OFF);
+                return sendWebPage(b, b.optString("text", "").trim());
+            }
+            case "/api/m17/sms": if (!post) break; {
+                WebServer.Response denied = gate("/api/m17/sms"); if (denied != null) return denied;
+                if (!allowTx()) return WebServer.Response.error(403, TX_OFF);
+                return sendWebM17(b, b.optString("text", "").trim());
+            }
+            case "/api/device": return ok(deviceJson());
+            case "/api/device/restart": if (!post) break; {
+                WebServer.Response denied = gateAdmin("/api/device/restart"); if (denied != null) return denied;
+                if (!b.optBoolean("confirm", false)) return WebServer.Response.error(400, "Confirm on the page first");
+                onMain(() -> { svc.diagRestartModule(); return null; });
+                return ok("Restarting the radio module");
+            }
+            case "/api/device/update": if (!post) break; {
+                WebServer.Response denied = gateAdmin("/api/device/update"); if (denied != null) return denied;
+                if (!b.optBoolean("confirm", false)) return WebServer.Response.error(400, "Confirm on the page first");
+                return deviceUpdate(b.optBoolean("install", false));
+            }
             default: break;
         }
         return null;
+    }
+
+    /** One modeAllowed or adminAllowed call, from the part-B route tables. */
+    static final String[][] ROUTE_MODES = WebRoutes.ROUTE_MODES;
+    static final String[][] ROUTE_ADMIN = WebRoutes.ROUTE_ADMIN;
+    private static final String RESTRICTED = "That is turned off in Restricted mode";
+    private WebServer.Response gate(String path) {
+        String id = null;
+        for (String[] m : ROUTE_MODES) if (path.equals(m[0])) id = m[1];
+        if (id != null && !svc.modeAllowed(id)) return WebServer.Response.error(403, RESTRICTED);
+        return null;
+    }
+    private WebServer.Response gateAdmin(String path) {
+        String id = null;
+        for (String[] a : ROUTE_ADMIN) if (path.equals(a[0])) id = a[1];
+        if (id != null && !svc.adminAllowed(id)) return WebServer.Response.error(403, RESTRICTED);
+        return null;
+    }
+    private int[] ricsOf(String token) {
+        String key = PagerTargets.key(token);
+        for (ChannelStore.Contact ct : svc.store().contacts()) {
+            String name = ct.name == null ? "" : ct.name.toUpperCase(java.util.Locale.US);
+            String call = ct.baseCall() == null ? "" : ct.baseCall().toUpperCase(java.util.Locale.US);
+            if (key.equals(name) || key.equals(call)) return ct.ricList();
+        }
+        return null;
+    }
+    private int[] pagerScanHz() {
+        String raw = svc.getSharedPreferences("pager", Context.MODE_PRIVATE).getString("scan", "467625000,467650000");
+        java.util.List<Integer> hz = new java.util.ArrayList<>();
+        for (String s : raw.split("[,\\s]+")) { try { int n = Integer.parseInt(s.trim()); if (ChannelStore.inBand(n)) hz.add(n); } catch (Exception ignored) { } }
+        int[] a = new int[hz.size()]; for (int i = 0; i < a.length; i++) a[i] = hz.get(i); return a;
+    }
+    private String pagerScanText() {
+        StringBuilder sb = new StringBuilder();
+        for (int hz : pagerScanHz()) { if (sb.length() > 0) sb.append(", "); sb.append(String.format(java.util.Locale.US, "%.4f", hz / 1e6)); }
+        return sb.toString();
+    }
+    private String stopPagerMonitor() {
+        com.macdmr.radio.PagerStation p = svc.pager();
+        if (p != null) p.monitor(false);
+        return null;
+    }
+    private WebServer.Response sendWebPage(JSONObject b, String text) throws Exception {
+        WebServer.Response denied = gate("/api/pager/send"); if (denied != null) return denied;
+        if (!allowTx()) return WebServer.Response.error(403, TX_OFF);
+        if (text == null || text.trim().isEmpty()) return WebServer.Response.error(400, "Write the message");
+        int hz = b.optInt("hz", 0);
+        if (hz <= 0 && svc.current() != null) hz = svc.current().rxFreq;
+        int[] rics;
+        if (b.has("ric") && !b.has("to")) {
+            int ric = b.optInt("ric", -1);
+            if (ric < 0 || ric > 0x1FFFFF) return WebServer.Response.error(400, "Add a RIC");
+            rics = new int[] { ric };
+        } else {
+            try { rics = PagerTargets.resolve(b.optString("to", ""), this::ricsOf); }
+            catch (IllegalArgumentException e) { return WebServer.Response.error(400, e.getMessage()); }
+        }
+        final int fhz = hz, baud = b.optInt("baud", 1200), func = b.optInt("func", 3);
+        final int[] fr = rics; final boolean sign = b.optBoolean("sign", true); final String body = text.trim();
+        String err = onMain(() -> svc.sendPage(baud, fhz, fr, func, body, sign));
+        if (err != null) return WebServer.Response.error(409, err);
+        return ok("Sending to " + rics.length + (rics.length == 1 ? " RIC" : " RICs"));
+    }
+    private WebServer.Response sendWebM17(JSONObject b, String text) throws Exception {
+        WebServer.Response denied = gate("/api/m17/sms"); if (denied != null) return denied;
+        if (!allowTx()) return WebServer.Response.error(403, TX_OFF);
+        final String dest = b.optString("dest", ""); final String body = text == null ? "" : text.trim();
+        String err = onMain(() -> svc.sendM17Sms(dest, body));
+        if (err != null) return WebServer.Response.error(409, err);
+        return ok("Sending");
+    }
+    private JSONObject deviceJson() throws Exception {
+        String tag = svc.moduleVersion() == null ? "" : svc.moduleVersion().trim();
+        String stock = svc.stockFirmware() == null ? "" : svc.stockFirmware().trim();
+        boolean factory = !tag.isEmpty() && (stock.isEmpty() ? tag.contains("UV4T") && !tag.contains(".FW") : tag.equals(stock));
+        com.macdmr.radio.DeviceProfile p = svc.profile();
+        double ap = svc.thermal.readC();
+        double bat = com.macdmr.radio.ThermalGuard.batteryC(svc);
+        String prop = com.macdmr.radio.RootSetup.run("getprop persist.adb.tcp.port");
+        String port = prop == null ? "" : prop.trim();
+        int nl = port.indexOf('\n'); if (nl >= 0) port = port.substring(0, nl).trim();
+        JSONObject o = new JSONObject().put("tag", tag).put("stock", stock).put("factory", factory).put("ready", svc.isReady())
+                .put("profile", p == null ? "" : p.name).put("profileId", p == null ? "" : p.id).put("profileRevision", p == null ? 0 : p.revision)
+                .put("version", com.macdmr.radio.BuildConfig.VERSION_NAME).put("ownAtBoot", svc.ownAtBoot())
+                .put("wifiAdb", "5555".equals(port)).put("wifiAdbPort", port);
+        if (!Double.isNaN(bat)) o.put("batteryC", Math.round(bat * 10) / 10.0);
+        if (!Double.isNaN(ap)) o.put("apC", Math.round(ap * 10) / 10.0);
+        return o;
+    }
+    private WebServer.Response deviceUpdate(boolean install) {
+        try {
+            com.macdmr.radio.Updater.Release rel = com.macdmr.radio.Updater.fetchLatest();
+            String have = com.macdmr.radio.BuildConfig.VERSION_NAME;
+            if (rel == null) return ok(new JSONObject().put("ok", true).put("message", "No SignalDeck release is published yet").put("installed", have).put("newer", false));
+            boolean newer = com.macdmr.radio.Updater.compareVersions(rel.version, have) > 0;
+            if (!newer || !install) {
+                String msg = newer ? ("Update " + rel.version + " is available") : ("You are on the latest version (" + have + ")");
+                return ok(new JSONObject().put("ok", true).put("message", msg).put("installed", have).put("latest", rel.version == null ? "" : rel.version).put("newer", newer).put("notes", rel.notes == null ? "" : rel.notes));
+            }
+            String name = rel.apkName == null ? "SignalDeck-update.apk" : rel.apkName.replaceAll("[^A-Za-z0-9._-]", "_");
+            if (!name.endsWith(".apk")) name = name + ".apk";
+            java.io.File dest = new java.io.File(svc.getCacheDir(), name);
+            downloadTo(rel.apkUrl, dest);
+            String result = com.macdmr.radio.Updater.rootInstall(dest.getAbsolutePath());
+            return ok(new JSONObject().put("ok", true).put("message", "Installing " + rel.version).put("installed", have).put("latest", rel.version).put("newer", true).put("install", result == null ? "" : result));
+        } catch (Exception e) {
+            String m = e.getMessage() == null ? "Update check failed" : e.getMessage();
+            return WebServer.Response.error(502, m);
+        }
+    }
+    private static void downloadTo(String url, java.io.File dest) throws Exception {
+        if (url == null || !url.startsWith("https://")) throw new IllegalArgumentException("The update has no download address");
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setInstanceFollowRedirects(true); c.setConnectTimeout(15000); c.setReadTimeout(120000);
+        try (java.io.InputStream in = c.getInputStream(); java.io.OutputStream out = new java.io.FileOutputStream(dest)) {
+            byte[] buf = new byte[65536]; int n; long total = 0;
+            while ((n = in.read(buf)) > 0) { total += n; if (total > 80L * 1024 * 1024) throw new IllegalStateException("The update is larger than 80 MB"); out.write(buf, 0, n); }
+        } finally { c.disconnect(); }
     }
 }

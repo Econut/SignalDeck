@@ -37,7 +37,7 @@ $('logout').addEventListener('click', async () => { await fetch('/api/logout'); 
 // ---- pages ----
 function route() {
   const p = (location.hash || '#intercom').slice(1);
-  S.page = ['intercom', 'channels', 'messages', 'contacts', 'aprs', 'sstv', 'pkt', 'sat', 'scope', 'map', 'log', 'rec', 'trans', 'exam', 'settings', 'help'].includes(p) ? p : 'intercom';
+  S.page = ['intercom', 'channels', 'messages', 'contacts', 'aprs', 'sstv', 'pkt', 'pager', 'sat', 'scope', 'map', 'log', 'rec', 'trans', 'exam', 'settings', 'help'].includes(p) ? p : 'intercom';
   document.querySelectorAll('.page').forEach(el => el.classList.toggle('hidden', el.id !== 'page-' + S.page));
   document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('on', a.dataset.page === S.page));
   const on = document.querySelector('#nav a.on'); if (on && on.scrollIntoView) on.scrollIntoView({ inline: 'center', block: 'nearest' });   // narrow screens scroll the tabs
@@ -55,8 +55,9 @@ function route() {
   if (S.page === 'rec') loadRecordings();
   if (S.page === 'trans') { loadTrans(); loadModels(); }
   if (S.page === 'exam') { loadExam(); loadTrainer(); }
-  if (S.page === 'settings') { loadSettings(); loadBackups(); loadDiagLog(); loadSchedules(); }
+  if (S.page === 'settings') { loadSettings(); loadBackups(); loadDiagLog(); loadSchedules(); loadDevice(); }
   if (S.page === 'pkt') { loadPacket(); loadKeyer(); loadFinder(); }
+  if (S.page === 'pager') loadPager();
 }
 window.addEventListener('hashchange', route);
 

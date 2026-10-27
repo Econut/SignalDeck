@@ -3244,6 +3244,12 @@ public class RadioService extends Service implements RadioEngine.Events {
         return pager;
     }
     public boolean pagerRunning() { PagerStation p = pager; return p != null && p.running(); }
+    /**
+     * Restricted mode (PR 26) hides a mode or an admin action. That branch is not merged here, so
+     * every id is allowed. Each new web route calls one of these once; the merge keeps the call.
+     */
+    public boolean modeAllowed(String id) { return true; }
+    public boolean adminAllowed(String id) { return true; }
     /** Hear pages on the current analog channel. A stub-tagged module holds the voice filter open. */
     public synchronized String setPager(boolean on) { return setPager(on, true); }
     public synchronized String setPager(boolean on, boolean hold) {
