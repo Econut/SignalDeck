@@ -64,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
             applyPendingLocation(); applyOpenNets(); applyCodeplug();
             ui.postDelayed(MainActivity.this::announceCoverage, 3000);
             variantTries = 0; ui.removeCallbacks(variantCheck); ui.postDelayed(variantCheck, 8000);
-            if (!svc.profile().verified && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("unsupportedShown", false)) { getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("unsupportedShown", true).apply(); show(4); device.offerChecks(true); }
+            if (!svc.p8Main() && !svc.profile().verified && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("unsupportedShown", false)) { getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("unsupportedShown", true).apply(); show(4); device.offerChecks(true); }
         }
         @Override public void onServiceDisconnected(ComponentName n) { svc = null; }
     };
@@ -405,6 +405,7 @@ public class MainActivity extends AppCompatActivity {
     /** Volume-up as PTT (Device tab option) while the Intercom page is showing. */
     private boolean volPttDown;
     @Override public boolean dispatchKeyEvent(android.view.KeyEvent e) {
+        if(svc!=null && svc.p8Main() && P8ButtonBindings.handle(this,svc,e))return true;
         java.util.function.Consumer<android.view.KeyEvent> cap = DeviceReport.keyCapture; if (cap != null) { cap.accept(e); return true; }
         java.util.function.Consumer<android.view.KeyEvent> learn = CustomPttKey.activityKey; if (learn != null) { learn.accept(e); return true; }
         if (svc != null && svc.customPttConsumes(e.getKeyCode())) return true;     // the learned PTT key: keyed from the input device, not here

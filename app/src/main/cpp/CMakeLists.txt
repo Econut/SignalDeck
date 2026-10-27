@@ -9,6 +9,8 @@ target_compile_definitions(p8probejni PRIVATE P8_OPEN_PROBE_REVIEWED=$<BOOL:${P8
 add_library(p8rxjni SHARED p8_receive.c)
 target_compile_options(p8rxjni PRIVATE -Wall -Wextra -Werror)
 target_compile_definitions(p8rxjni PRIVATE P8_OPEN_PROBE_REVIEWED=$<BOOL:${P8_OPEN_PROBE_REVIEWED}>)
+option(P8_TX_TEST_REVIEWED "Enable the separately reviewed two-second analogue TX test" OFF)
+target_compile_definitions(p8rxjni PRIVATE P8_TX_TEST_REVIEWED=$<BOOL:${P8_TX_TEST_REVIEWED}>)
 file(GLOB CODEC2_SRC ${CMAKE_CURRENT_SOURCE_DIR}/codec2/*.c)
 add_library(codec2jni SHARED ${CODEC2_SRC} codec2_jni.c)
 target_include_directories(codec2jni PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/codec2)

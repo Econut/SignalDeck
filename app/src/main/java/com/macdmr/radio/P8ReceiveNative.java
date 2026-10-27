@@ -9,6 +9,9 @@ final class P8ReceiveNative {
         System.loadLibrary("p8rxjni");
     }
     static native void open() throws IOException;
+    static native void prepareTransmit() throws IOException;
+    static native void key(boolean down) throws IOException;
+    static native void writeMicrophone(byte[] pcm,int length) throws IOException;
     static native byte[] tune(byte[] packet) throws IOException;
     static native byte[] volume(int level) throws IOException;
     static native byte[] readPcm() throws IOException;

@@ -466,7 +466,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         return t;
     }
 
-    public void attach(RadioService s) { svc = s; s.addListener(this); }
+    private P8RadioControls p8Controls;
+    public void attach(RadioService s) { svc = s; s.addListener(this);if(s.p8Main() && p8Controls==null){p8Controls=new P8RadioControls(getContext(),s);addView(p8Controls,0);softSq.setVisibility(GONE);pkt.setVisibility(GONE);txt.setVisibility(GONE);rec.setVisibility(GONE);} }
 
     private void editGoogleKey() {
         if (svc == null) return;

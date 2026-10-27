@@ -488,7 +488,7 @@ public class ChannelEditorView extends LinearLayout {
             ch.txFreq = (int) Math.round(Double.parseDouble(tx.getText().toString().trim()) * 1e6);
             ch.rxFreq = (int) Math.round(Double.parseDouble(rx.getText().toString().trim()) * 1e6);
             if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) throw new IllegalArgumentException("Frequencies must be 136–174 or 400–480 MHz");
-            if (ch.rxFreq < 300_000_000) ch.band = 1;                                  // VHF must be wide on this radio
+            if (!com.macdmr.radio.BuildConfig.P8_OFFLINE && ch.rxFreq < 300_000_000) ch.band = 1;
             String la = lat.getText().toString().trim(), lo = lon.getText().toString().trim();
             if (la.isEmpty() && lo.isEmpty()) { ch.lat = 0; ch.lon = 0; }
             else { ch.lat = Double.parseDouble(la); ch.lon = Double.parseDouble(lo); if (Math.abs(ch.lat) > 90 || Math.abs(ch.lon) > 180) throw new IllegalArgumentException("Latitude must be within ±90 and longitude within ±180"); }

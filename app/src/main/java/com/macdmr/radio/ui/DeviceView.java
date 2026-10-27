@@ -82,6 +82,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         hero.addView(hb);
         takeOver.setOnClickListener(v -> {
             if (svc == null) return;
+            if (svc.p8Main()) { svc.bringUp(); return; }
             if (svc.profile().offlineOnly()) { P8Workbench.show(c); return; }
             if (svc.profile().verified || svc.isReady()) { svc.bringUp(); return; }
             new android.app.AlertDialog.Builder(getContext()).setTitle("Untested profile")
@@ -104,7 +105,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         hero.addView(reportNow, new LayoutParams(bl)); reportNow.setVisibility(GONE);
         reportNow.setOnClickListener(v -> supportMenu());
         TextView note = Neo.text(c, com.macdmr.radio.DeviceProfile.detectBuiltIn().offlineOnly()
-                ? "P8 offline development: no root needed. The stock Intercom keeps the radio. Use the workbench for packet previews and saved replies; channel edits stay in this app. Hardware access is disabled."
+                ? "P8 root-free radio: use Connect on the Intercom page after Android App info → Force stop Intercom. Hand back closes both UARTs before restoring Intercom. No boot persistence. TX remains locked pending the first approved RF test."
                 : "Needs root (Magisk). While this app owns the radio the stock walkie-talkie app is paused and its icon hidden; Hand back restores it. The Magisk module keeps the SELinux rules across reboots so the radio can be owned straight from boot.", Neo.MUTED, 13, Neo.uiMedium(c));
         note.setLineSpacing(0, 1.1f); note.setPadding(0, (int) (10 * d), 0, 0);
         hero.addView(note);
