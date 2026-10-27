@@ -23,6 +23,10 @@ public final class P8Workbench {
         int pad = (int) (16 * Theme.dp(c)); body.setPadding(pad, pad, pad, pad);
         TextView intro = Neo.text(c, "Preview an analogue channel or decode a saved module reply. Nothing here opens a port, changes the stock app, tunes the radio or transmits. Wire values are experimental; this is not live radio support.", Neo.MUTED, 14, Neo.ui(c));
         body.addView(intro);
+        TextView ownership = Neo.button(c, "Check stock-app ownership (passive)", "report", Neo.AMBER); body.addView(ownership);
+        TextView ownershipText = Neo.text(c, "Reports visible state only. Does not stop Intercom or open a port.", Neo.MUTED, 13, Neo.mono(c));
+        ownershipText.setTextIsSelectable(true); body.addView(ownershipText);
+        ownership.setOnClickListener(v -> ownershipText.setText(com.macdmr.radio.P8OwnershipAudit.collect(c)));
         EditText rx = field(c, body, "Receive frequency (Hz)", "446006250", true);
         EditText tx = field(c, body, "Transmit frequency field (Hz; preview only)", "446006250", true);
         EditText bandwidth = field(c, body, "Bandwidth wire value (0 narrow, 1 wide)", "0", true);

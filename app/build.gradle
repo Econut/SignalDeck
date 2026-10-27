@@ -13,6 +13,7 @@ def releaseStore = signingValue('signaldeck.storeFile', 'SIGNALDECK_STORE_FILE')
 def sdalsaAssets = layout.buildDirectory.dir('generated/sdalsa-assets').get().asFile
 // Local, separately installed development edition; never updates an official installation.
 def p8OfflineBuild = project.findProperty('p8Offline') == 'true'
+def p8OpenProbeReviewed = project.findProperty('p8OpenProbeReviewed') == 'true'
 
 android {
     testOptions { unitTests.returnDefaultValues = true }   // host tests: android.util.Log calls in shared DSP code are no-ops
@@ -22,12 +23,13 @@ android {
     defaultConfig {
         applicationId p8OfflineBuild ? "com.macdmr.radio.p8lab" : "com.macdmr.radio"
         buildConfigField 'boolean', 'P8_OFFLINE', p8OfflineBuild.toString()
+        buildConfigField 'boolean', 'P8_OPEN_PROBE_REVIEWED', p8OpenProbeReviewed.toString()
         manifestPlaceholders = [appLabel: p8OfflineBuild ? 'P8 Radio Lab (modified)' : 'SignalDeck',
                                 appIcon: p8OfflineBuild ? '@drawable/ic_p8_lab' : '@mipmap/ic_launcher']
         minSdk 29
         targetSdk 34
         versionCode 119
-        versionName p8OfflineBuild ? "1.0.0-beta.20-p8-offline.2" : "1.0.0-beta.20"
+        versionName p8OfflineBuild ? "1.0.0-beta.20-p8-offline.3" : "1.0.0-beta.20"
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }   // the phones this radio family ships in are ARM; keeps the Vosk natives to two ABIs
     }
 
@@ -36,6 +38,7 @@ android {
     externalNativeBuild { cmake { path 'src/main/cpp/CMakeLists.txt'; version '3.22.1' } }   // Codec 2 for M17 voice; the sdalsa audio helper
     // sdalsa is an executable: CMake writes it into this folder per ABI and it ships as an asset (sdalsa/<abi>/sdalsa)
     defaultConfig { externalNativeBuild { cmake { arguments "-DSDALSA_ASSET_DIR=${sdalsaAssets.absolutePath.replace(File.separator, '/')}" } } }
+    defaultConfig { externalNativeBuild { cmake { arguments "-DP8_OPEN_PROBE_REVIEWED=${p8OpenProbeReviewed ? 'ON' : 'OFF'}" } } }
     sourceSets { main { assets.srcDirs += sdalsaAssets } }
     // One key for debug and release (the project's release key): adb install -r keeps working across both and users
     // can move from a test build to a release without uninstalling. Official builds are signed with it.

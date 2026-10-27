@@ -87,6 +87,10 @@ public final class DeviceReport {
         if (vn != null) kv(r, "phone (vendor partition)", vn);
         DeviceProfile dp = DeviceProfile.detect();
         kv(r, "profile detected", profileDescription(dp));
+        if (dp.offlineOnly()) {
+            h(r, "P8 root-free ownership audit (passive)");
+            r.append(P8OwnershipAudit.collect(c));
+        }
 
         p.step("Serial ports");
         h(r, "Serial ports (File API)");
