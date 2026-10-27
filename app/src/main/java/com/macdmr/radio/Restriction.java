@@ -33,7 +33,7 @@ public final class Restriction {
     public static final String[] MODES = {
         "aprs", "kiss", "aprsis", "digipeater", "parrot", "dtmf", "sstv", "ft8", "textmodes", "m17", "pocsag", "winlink",
         "terminal", "nets", "logbook", "keyer", "trainer", "schedules", "satellites", "scope", "fox", "exam", "pages",
-        "pota", "finder", "wx", "dmrtext", "captions" };
+        "pota", "finder", "wx", "forms", "dmrtext", "captions" };
     /** Admin ids: items on the Device page or elsewhere that can be removed. */
     public static final String[] ADMIN = {
         "editChannels", "editZones", "editContacts", "backup", "firmware", "advanced", "web", "report", "exit", "vfo", "scan" };
