@@ -4,7 +4,7 @@
 
 | Backlog | Change | Files | Test |
 |---|---|---|---|
-| Plan A review | An address word that fails its parity check after BCH is not given a guessed RIC: the page is listed as RIC unreadable and the text is kept. Hear pages does not start on the firmware the phone shipped with. At 512 baud the slicer re-centres its threshold on each sync word. | `ham/Pocsag.java`, `ham/PocsagDecoder.java`, `RadioService.java`, `PagerStation.java`, `ui/HelpView.java`, `DiagReceiver.java` | Host: a three-error address stays unreadable with the text kept; one and two bit repairs still restore the word; a drooping 512 baud baseline still decodes; clean pages at 512/1200/2400. Bench, held path, 2.5 kHz: 512 baud still reported RIC 123617 for one text and missed another. A signed 1200 baud page filed under the callsign; a bare page under its RIC. Monitor stepped 467.625 and 467.650. |
+| Plan A review | The 512 baud slicer holds one threshold for a batch, the average of the sync word, and does not track a mean across the bits. An address that fails its check does not open a page. Hear pages does not start on stock firmware. | `ham/Pocsag.java`, `ham/PocsagDecoder.java`, `RadioService.java`, `ui/HelpView.java` | Host: the generator's 512 baud file resampled to 8 kHz decodes as RIC 1001. A three-error address opens no page. Bench, held path: 512 baud still returned RIC 123617. |
 
 
 

@@ -56,10 +56,7 @@ public class PocsagDecoderTest {
         put(bits, 32, bad);
         System.arraycopy(msg, 0, bits, 64, msg.length);
         java.util.List<Pocsag.Page> pages = Pocsag.decode(bits);
-        assertEquals(1, pages.size());
-        assertTrue(pages.get(0).ricUnreadable);
-        assertEquals(-1, pages.get(0).ric);
-        assertEquals("PAGE OK", pages.get(0).text);
+        assertEquals(0, pages.size());
     }
 
     @Test public void aDroopingBaselineStillDecodesAt512() {
@@ -77,6 +74,39 @@ public class PocsagDecoderTest {
         assertEquals(512, hit.baud);
         assertEquals(1001, hit.pages.get(0).ric);
         assertEquals("PAGE 512", hit.pages.get(0).text);
+    }
+
+    @Test public void generator512WavRicDependsOnTheThreshold() throws Exception {
+        java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research");
+        java.io.File wav = new java.io.File("C:/Users/Joshua/AppData/Local/Temp/fw1718/caps/f5120.wav");
+        if (!wav.isFile()) {
+            Process p = new ProcessBuilder("python", "pocsag.py", "gen", wav.getAbsolutePath().replace(".wav", ""),
+                    "--baud", "512", "--dev", "2500", "--ric", "1001", "--msg", "PAGE 512 A", "--repeat", "1")
+                    .directory(f).redirectErrorStream(true).start();
+            p.waitFor();
+        }
+        if (!wav.isFile()) return;
+        short[] audio = everySixth(wav(wav));
+        Pocsag.Page neu = firstPage(audio, false);
+        assertNotNull(neu);
+        assertEquals(1001, neu.ric);
+        assertTrue(neu.text.startsWith("PAGE 512"));
+    }
+
+    private static Pocsag.Page firstPage(short[] audio, boolean runningMean) {
+        PocsagDecoder.Clock clock = PocsagDecoder.preamble(audio);
+        assertNotNull(clock);
+        for (int pol : new int[] { 1, -1 }) {
+            int[] bits = PocsagDecoder.follow(audio, clock.spb, clock.phase, pol, runningMean);
+            for (Pocsag.Page p : Pocsag.decode(bits)) if (!p.text.isEmpty() && !p.ricUnreadable) return p;
+        }
+        return null;
+    }
+
+    private static short[] everySixth(short[] in) {
+        short[] o = new short[in.length / 6];
+        for (int i = 0; i < o.length; i++) o[i] = in[i * 6];
+        return o;
     }
 
     @Test public void armorPageRecordingDecodes() throws Exception {

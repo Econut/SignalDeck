@@ -241,11 +241,7 @@ public final class Pocsag {
                 int raw = wordAt(bits, at);
                 int cw = correct(raw);
                 if (cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
-                if (!check(cw)) {
-                    if (cur == null) { cur = new Page(-1, 3, ""); cur.ricUnreadable = true; text.setLength(0); leftover.clear(); }
-                    else { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); }
-                    continue;
-                }
+                if (!check(cw)) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
                 if (cur != null) cur.corrected += Integer.bitCount(raw ^ cw);
                 int data = (int) ((cw & 0xFFFFFFFFL) >>> 11);
                 if ((data & (1 << 20)) == 0) {

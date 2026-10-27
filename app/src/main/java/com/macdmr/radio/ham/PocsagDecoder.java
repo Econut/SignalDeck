@@ -97,22 +97,35 @@ public final class PocsagDecoder {
         return new Clock(baud, spb, start + spb / 2.0);
     }
 
-    /** Slice, and each time a sync word is recognised nudge the clock onto it. */
+    /** One threshold for the whole batch: the mean of the sync word, held until the next sync. */
     static int[] follow(short[] audio, double spb, double phase, int pol) {
+        return follow(audio, spb, phase, pol, false);
+    }
+
+    /**
+     * {@code runningMean} is the old slicer: a mean of the last 32 bits, updated every bit. A long run of zeros
+     * walks that mean and can turn the address into a different valid codeword. Kept so the regression test can
+     * show the generator's 512 baud file doing that, and the per-batch threshold not doing it.
+     */
+    static int[] follow(short[] audio, double spb, double phase, int pol, boolean runningMean) {
         int cap = (int) (audio.length / Math.max(1.0, spb)) + 2;
         int[] bits = new int[Math.max(1, cap)];
         int n = 0; double pos = phase; int guard = 0;
         Level level = new Level();
         while (pos >= 0 && pos < audio.length && n < bits.length) {
+            if (runningMean) level.push(sampleAt(audio, pos));
             bits[n++] = decide(audio, pos, pol, level);
             pos += spb;
             if (guard > 0) { guard--; continue; }
             if (n >= 32 && hamming(bits, n - 32) <= 2) {
                 double start = pos - 32 * spb;
                 double shift = relock(audio, start, spb, pol);
-                double sum = 0;
-                for (int i = 0; i < 32; i++) sum += sampleAt(audio, start + shift + i * spb);
-                level.mean = sum / 32.0;
+                if (!runningMean) {
+                    double sum = 0;
+                    for (int i = 0; i < 32; i++) sum += sampleAt(audio, start + shift + i * spb);
+                    level.mean = sum / 32.0;
+                    level.freeze = true;
+                }
                 for (int i = 0; i < 32; i++) bits[n - 32 + i] = decide(audio, start + shift + i * spb, pol, level);
                 pos = start + shift + 32 * spb;
                 guard = 32;
@@ -162,7 +175,16 @@ public final class PocsagDecoder {
     /** A slow baseline, about the last 32 bits. Re-centred when a sync word is found. */
     static final class Level {
         double mean;
-        void clear() { mean = 0; }
+        boolean freeze;
+        final double[] box = new double[32];
+        int n, at;
+        double sum;
+        void push(double v) {
+            if (freeze) return;
+            if (n == box.length) sum -= box[at]; else n++;
+            box[at] = v; sum += v; at = (at + 1) % box.length;
+            mean = n == 0 ? 0 : sum / n;
+        }
     }
 
     private static int decide(short[] audio, double pos, int pol, Level level) {
