@@ -16,6 +16,8 @@ entry and a device test.
 
 ## Later (owner notes)
 
+- **Range test with two SignalDeck radios** (owner, 2026-10-27): a base that stays put and a rover that beacons by distance; packets both ways carry the level heard and the base's noise floor; uplink, downlink and misses go into the coverage store with a fitted range band per sector on the map. Plan: phonedmrapp `docs/plan-range-test.md`. After the new phones are compatible and the hotspot session.
+
 - **Winlink gateway list, automatic**: ask Winlink for an API access key so SignalDeck can refresh the gateway list itself (today: the user downloads the CSV in the browser and imports it; winlink.org is behind a Cloudflare bot check, which SignalDeck never works around).
 
 ## Research, later
