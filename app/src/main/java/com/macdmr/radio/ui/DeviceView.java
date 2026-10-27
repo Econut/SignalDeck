@@ -831,7 +831,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                 java.util.List<String> pkgs = new java.util.ArrayList<>();
                 if (svc != null && !svc.profile().stockApp.isEmpty()) pkgs.add(svc.profile().stockApp);
                 for (com.macdmr.radio.RadioAppFinder.App a : com.macdmr.radio.RadioAppFinder.rank(c)) if (pkgs.size() < 3 && a.score >= 5 && !pkgs.contains(a.pkg)) pkgs.add(a.pkg);
-                for (String pk : pkgs) try { android.content.pm.ApplicationInfo ai = c.getPackageManager().getApplicationInfo(pk, 0); apks.add(ai.sourceDir); if (ai.splitSourceDirs != null) java.util.Collections.addAll(apks, ai.splitSourceDirs); } catch (Throwable ignored) { }
+                for (String pk : pkgs) for (String a : com.macdmr.radio.StockApk.paths(c, pk)) if (!apks.contains(a)) apks.add(a);   // root pm path when the stock app is not visible
             } catch (Throwable ignored) { }
             final java.util.List<com.macdmr.radio.FirmwareFinder.Found> fs = com.macdmr.radio.FirmwareFinder.scan(c, apks, s -> post(() -> pd.setMessage(s + "…")));
             final java.io.File dir = com.macdmr.radio.DeviceReport.append("Radio firmware files found (root)", com.macdmr.radio.FirmwareFinder.describe(fs));

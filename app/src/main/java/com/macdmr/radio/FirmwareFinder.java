@@ -68,7 +68,9 @@ public final class FirmwareFinder {
         if (RootSetup.haveRoot()) scanFolders(FOLDERS, ROOT_FS, tmp, p, out);
         for (String apk : stockApks) {
             p.step("Looking in " + new File(apk).getName());
-            try (ZipFile z = new ZipFile(apk)) {
+            File readable = StockApk.readable(c, apk, "fwfind.apk");
+            if (readable == null) { out.add(new Found(apk + "! (could not read)", 0)); continue; }
+            try (ZipFile z = new ZipFile(readable)) {
                 for (Enumeration<? extends ZipEntry> e = z.entries(); e.hasMoreElements(); ) {
                     ZipEntry ze = e.nextElement();
                     if (ze.isDirectory() || !APK_IMAGE.matcher(ze.getName()).matches() || ze.getSize() > MAX_BYTES) continue;
@@ -79,6 +81,7 @@ public final class FirmwareFinder {
                     out.add(f);
                 }
             } catch (Throwable t) { out.add(new Found(apk + "! (could not read: " + t.getMessage() + ")", 0)); }
+            finally { if (!readable.getPath().equals(apk)) readable.delete(); }
         }
         com.macdmr.radio.fw.FirmwareCatalog.Doc cat = com.macdmr.radio.fw.FirmwareCatalog.cached(c);
         markKnown(out, cat == null ? null : cat.images);
