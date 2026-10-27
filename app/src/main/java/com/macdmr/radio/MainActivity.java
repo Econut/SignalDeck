@@ -63,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
             ui.post(rssiTick); ui.removeCallbacks(modeTick); ui.post(modeTick);
             applyPendingLocation(); applyOpenNets(); applyCodeplug();
             ui.postDelayed(MainActivity.this::announceCoverage, 3000);
+            variantTries = 0; ui.removeCallbacks(variantCheck); ui.postDelayed(variantCheck, 8000);
             if (!svc.profile().verified && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("unsupportedShown", false)) { getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("unsupportedShown", true).apply(); show(4); device.offerChecks(true); }
         }
         @Override public void onServiceDisconnected(ComponentName n) { svc = null; }
@@ -142,6 +143,21 @@ public class MainActivity extends AppCompatActivity {
         startForegroundService(si);
         bindService(si, conn, Context.BIND_AUTO_CREATE);
     }
+
+    /** Once the radio is up and its version known: is this phone's stock firmware in the firmware catalogue? Asks once per new variant. */
+    private int variantTries;
+    private final Runnable variantCheck = new Runnable() { @Override public void run() {
+        final RadioService s = svc;
+        if (s == null || !s.profile().supported) return;
+        if (!s.isReady() || s.stockFirmware().isEmpty()) { if (++variantTries < 18) ui.postDelayed(this, 10_000); return; }   // up to three minutes for the take-over
+        new Thread(() -> {
+            final FirmwareVariantCheck.Finding f = FirmwareVariantCheck.run(MainActivity.this, s);
+            ui.post(() -> {
+                if (device != null) device.refreshVariant();
+                if (f != null && !isFinishing() && !isDestroyed()) com.macdmr.radio.ui.DeviceView.offerVariant(MainActivity.this, f, () -> { if (device != null) device.refreshVariant(); });
+            });
+        }, "fwvariant").start();
+    } };
 
     /** The bound radio service (null until connected). */
     public RadioService service() { return svc; }
