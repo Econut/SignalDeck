@@ -10,6 +10,7 @@ final class P8ReceiveNative {
     }
     static native void open() throws IOException;
     static native byte[] tune(byte[] packet) throws IOException;
+    static native byte[] volume(int level) throws IOException;
     static native byte[] readPcm() throws IOException;
     static native byte[] readControl() throws IOException;
     static native void close() throws IOException;

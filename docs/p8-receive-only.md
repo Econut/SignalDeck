@@ -1,5 +1,7 @@
 # UNIWA P8 receive-only build rx.5d
 
+Latest: [rx.6b receive-volume controls and measured results](p8-receive-volume.md) adds separate persistent module/media/software sliders, PCM level/clipping meters and durable save notices. The instructions/results below record the earlier receiver milestone.
+
 Testable modified SignalDeck edition: `com.macdmr.radio.p8lab`, ordinary UID10195 on this P8, no root. Original Android, drivers, stock Intercom, protected factory firmware and backups are retained. This is a foreground-only experimental analogue receiver, not general P8/DMR or transmit support.
 
 ## Using the installed build

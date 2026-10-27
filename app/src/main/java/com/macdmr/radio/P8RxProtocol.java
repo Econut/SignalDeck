@@ -12,6 +12,7 @@ public final class P8RxProtocol {
             this.name=name==null?"RX":name.trim();this.hz=hz;this.bandwidth=bandwidth;this.squelch=squelch;this.monitor=monitor;this.volume=volume;
         }
         public byte[] packet() {return P8Protocol.analog(hz,hz,bandwidth,0,squelch,0,0,0,0,2,volume,monitor).encode();}
+        public byte[] packet(int moduleLevel) {P8AudioSettings.module(moduleLevel);return P8Protocol.analog(hz,hz,bandwidth,0,squelch,0,0,0,0,2,moduleLevel,monitor).encode();}
         @Override public String toString(){return name+" · "+String.format(java.util.Locale.US,"%.5f MHz",hz/1e6);}
     }
     public interface Sink {void frame(Frame f);}
@@ -36,13 +37,16 @@ public final class P8RxProtocol {
         requireTuneAck(new Stream(),data,f->{});
     }
     public static void requireTuneAck(Stream stream,byte[] data,Sink unsolicited) {
+        requireAck(stream,data,unsolicited,0x23);
+    }
+    public static void requireAck(Stream stream,byte[] data,Sink unsolicited,int command) {
         final boolean[] ack={false};
-        stream.feed(data,f->{if(f.cmd==0x23){if(f.rw!=0 || f.sr!=0)throw new IllegalArgumentException("Tune rejected by module");ack[0]=true;}else unsolicited.frame(f);});
-        if(!ack[0])throw new IllegalArgumentException("No successful analogue tune acknowledgement");
+        stream.feed(data,f->{if(f.cmd==command){if(f.rw!=0 || f.sr!=0)throw new IllegalArgumentException("Command rejected by module");ack[0]=true;}else unsolicited.frame(f);});
+        if(!ack[0])throw new IllegalArgumentException("No successful acknowledgement for command "+Integer.toHexString(command));
     }
     /** Gain modifies local speaker PCM only, never a module register. */
     public static int amplify(byte[] bytes,int off,int len,int gain) {
-        if(gain<1 || gain>4 || (len&1)!=0)throw new IllegalArgumentException("PCM gain/alignment");
+        if(gain<1 || gain>P8AudioSettings.DSP_GAIN_MAX || (len&1)!=0)throw new IllegalArgumentException("PCM gain/alignment");
         int clips=0;
         for(int i=off;i<off+len;i+=2){int s=(short)((bytes[i]&255)|(bytes[i+1]<<8));int v=s*gain;
             if(v>32767){v=32767;clips++;}if(v< -32768){v=-32768;clips++;}bytes[i]=(byte)v;bytes[i+1]=(byte)(v>>8);}

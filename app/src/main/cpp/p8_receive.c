@@ -79,10 +79,17 @@ JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_tune(JNIEnv *
     (void)c;
 #if P8_OPEN_PROBE_REVIEWED
     unsigned char bytes[28];
-    if(control<0 || (*e)->GetArrayLength(e,packet)!=28){fail(e,"Invalid receive tune/session");return NULL;}
-    (*e)->GetByteArrayRegion(e,packet,0,28,(jbyte*)bytes);
-    if(!valid_tune(bytes)){fail(e,"Command rejected by receive-only native allowlist");return NULL;}
-    if(write(control,bytes,28)!=28){fail(e,"Tune write failure; no retry");return NULL;}
+    int length=(*e)->GetArrayLength(e,packet);
+    if(control<0 || (length!=28 && length!=10)){fail(e,"Invalid receive command/session");return NULL;}
+    (*e)->GetByteArrayRegion(e,packet,0,length,(jbyte*)bytes);
+    int valid=length==28?valid_tune(bytes):0;
+    if(length==10 && bytes[0]==0x68 && bytes[1]==0x2e && bytes[2]==1 && bytes[3]==1 && bytes[6]==0 && bytes[7]==1 && bytes[8]>=1 && bytes[8]<=9 && bytes[9]==0x10){
+        unsigned int sum=0x682e + 0x0101 + 1 + ((unsigned int)bytes[8]<<8) + 0x10;
+        while(sum>>16)sum=(sum&65535)+(sum>>16);
+        valid=(sum^65535)==((unsigned int)bytes[4]<<8|bytes[5]);
+    }
+    if(!valid){fail(e,"Command rejected by receive-only native allowlist");return NULL;}
+    if(write(control,bytes,(size_t)length)!=length){fail(e,"Receive command write failure; no retry");return NULL;}
     /* Accumulate response fragments without emitting ACKs or any other command. */
     unsigned char reply[4096];int used=0;long end=millis()+700;
     while(millis()<end && used<(int)sizeof reply) {
@@ -96,13 +103,27 @@ JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_tune(JNIEnv *
         while(used-off>=9 && reply[off]==0x68){
             int size=9+((reply[off+6]<<8)|reply[off+7]);
             if(size>1033 || used-off<size)break;
-            if(reply[off+1]==0x23){complete_ack=1;break;}off+=size;
+            if(reply[off+1]==bytes[1]){complete_ack=1;break;}off+=size;
         }
         if(complete_ack)break; /* Java validates full checksum/status; do not wait out the deadline. */
     }
     jbyteArray out=(*e)->NewByteArray(e,used);if(out && used)(*e)->SetByteArrayRegion(e,out,0,used,(jbyte*)reply);return out;
 #else
     (void)packet;fail(e,"Receive transport disabled");return NULL;
+#endif
+}
+JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_volume(JNIEnv *e,jclass c,jint level) {
+#if P8_OPEN_PROBE_REVIEWED
+    if(level<1 || level>9){fail(e,"Module volume outside bounded development range");return NULL;}
+    unsigned char bytes[10]={0x68,0x2e,1,1,0,0,0,1,(unsigned char)level,0x10};
+    unsigned int sum=0x682e + 0x0101 + 1 + ((unsigned int)level<<8) + 0x10;
+    while(sum>>16)sum=(sum&65535)+(sum>>16);
+    unsigned int checksum=sum^65535;bytes[4]=(unsigned char)(checksum>>8);bytes[5]=(unsigned char)checksum;
+    jbyteArray packet=(*e)->NewByteArray(e,10);if(!packet)return NULL;
+    (*e)->SetByteArrayRegion(e,packet,0,10,(jbyte*)bytes);
+    jbyteArray result=Java_com_macdmr_radio_P8ReceiveNative_tune(e,c,packet);(*e)->DeleteLocalRef(e,packet);return result;
+#else
+    (void)c;(void)level;fail(e,"Receive transport disabled");return NULL;
 #endif
 }
 JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_readPcm(JNIEnv *e,jclass c) {

@@ -11,15 +11,19 @@ import java.io.FileInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Foreground-only RX controller. One worker owns native descriptors, tuning, scan and speaker playback.
  * No microphone, PTT/GPIO-write, transmit, arbitrary command or module-upgrade API.
  */
 public final class P8Receiver {
-    public interface Listener {void status(String text);void closed(boolean safe,String reason);}
+    public interface Listener {void status(String text);void closed(boolean safe,String reason);
+        default void levels(double peak,double rms,long clips,long recent){} default void moduleApplied(int level){} }
     private static final AtomicBoolean ACTIVE=new AtomicBoolean();
     private final Context context;private final Listener listener;
     private volatile boolean stop,scanning;private volatile int gain=1;
+    private volatile int moduleLevel=1;private final AtomicInteger pendingVolume=new AtomicInteger(-1);
+    private boolean mutedTestPlayback;
     private final AtomicReference<P8RxProtocol.Channel> requested=new AtomicReference<>();private volatile P8RxProtocol.Channel[] channels;
     private long frames,bytes,clipped,tunes;private String current="";
     public P8Receiver(Context c,Listener l){context=c.getApplicationContext();listener=l;}
@@ -31,7 +35,9 @@ public final class P8Receiver {
     }
     public void tune(P8RxProtocol.Channel ch){scanning=false;requested.set(ch);}
     public void scan(boolean enabled){scanning=enabled;}
-    public void gain(int n){if(n<1 || n>4)throw new IllegalArgumentException("gain");gain=n;}
+    public void gain(int n){P8AudioSettings.gain(n);gain=n;}
+    public void moduleVolume(int n){P8AudioSettings.module(n);moduleLevel=n;pendingVolume.set(n);}
+    public void muteTestPlayback(boolean mute){mutedTestPlayback=mute;}
     public void stop(){stop=true;}
     private void guard() throws Exception {
         if((context.getPackageManager().getApplicationInfo("com.wtwd.ucee.dmr",0).flags&ApplicationInfo.FLAG_STOPPED)==0)throw new Exception("Intercom is running/not force-stopped; close RX first");
@@ -44,6 +50,7 @@ public final class P8Receiver {
     private void run(){
         AudioTrack audio=null;String reason="RX closed";boolean safe=true;
         P8RxProtocol.Scan scan=new P8RxProtocol.Scan();P8RxProtocol.Stream control=new P8RxProtocol.Stream();PcmFramer pcm=new PcmFramer();P8AudioQueue speaker=new P8AudioQueue();
+        P8AudioSettings.Meter meter=new P8AudioSettings.Meter();long previousClips=0;
         P8RxProtocol.Sink receiveStatus=f->{if(f.cmd==0x36 && f.body.length==1 && (f.body[0]==1 || f.body[0]==10 || f.body[0]==12))scan.signal(SystemClock.elapsedRealtime());};
         try{
             guard();P8ReceiveNative.load();P8ReceiveNative.open();
@@ -52,25 +59,28 @@ public final class P8Receiver {
                 .setAudioFormat(new AudioFormat.Builder().setSampleRate(8000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
                 .setBufferSizeInBytes(size).setTransferMode(AudioTrack.MODE_STREAM).build();
             if(audio.getState()!=AudioTrack.STATE_INITIALIZED)throw new Exception("AudioTrack initialisation failed");
-            audio.play();final AudioTrack player=audio;long nextStatus=0;
+            audio.setVolume(mutedTestPlayback?0:1);audio.play();final AudioTrack player=audio;long nextStatus=0;
             while(!stop){
                 guard();
                 P8RxProtocol.Channel ch=requested.getAndSet(null);
-                if(ch!=null){byte[] reply=P8ReceiveNative.tune(ch.packet());P8RxProtocol.requireTuneAck(control,reply,receiveStatus);current=ch.toString();tunes++;
+                if(ch!=null){byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));P8RxProtocol.requireTuneAck(control,reply,receiveStatus);current=ch.toString();tunes++;
                     int index=0;for(int i=0;i<channels.length;i++)if(channels[i]==ch)index=i;
                     scan.tuned(index,SystemClock.elapsedRealtime());listener.status("TUNED (ACK) · "+current);}
+                int level=pendingVolume.getAndSet(-1);
+                if(level>=0){byte[] reply=P8ReceiveNative.volume(level);P8RxProtocol.requireAck(control,reply,receiveStatus,0x2e);listener.moduleApplied(level);listener.status("Module receive level ACK: "+level);}
                 control.feed(P8ReceiveNative.readControl(),receiveStatus);
                 byte[] data=P8ReceiveNative.readPcm();bytes+=data.length;
                 pcm.feed(data,data.length,(b,o,n)->{
                     frames++;long magnitude=0;for(int i=o;i<o+n;i+=2)magnitude+=Math.abs((int)(short)((b[i]&255)|(b[i+1]<<8)));
                     if(magnitude/(n/2)>300)scan.signal(SystemClock.elapsedRealtime());
-                    clipped+=P8RxProtocol.amplify(b,o,n,gain);
+                    int appliedGain=gain;meter.feed(b,o,n,appliedGain);clipped+=P8RxProtocol.amplify(b,o,n,appliedGain);
                     speaker.add(b,o,n);
                 });
                 speaker.drain((b,o,n)->player.write(b,o,n,AudioTrack.WRITE_NON_BLOCKING));
                 long now=SystemClock.elapsedRealtime();
                 if(scanning){int i=scan.advance(now,channels.length);if(i>=0)requested.compareAndSet(null,channels[i]);}
-                if(now>=nextStatus){listener.status((scanning?"SCANNING · ":"RX · ")+current+"\nPCM bytes "+bytes+" · frames "+frames+" · clipped "+clipped+" · queued audio bytes "+speaker.pending()+" · gain ×"+gain+" · tunes "+tunes);nextStatus=now+500;}
+                if(now>=nextStatus){listener.status((scanning?"SCANNING · ":"RX · ")+current+"\nPCM bytes "+bytes+" · frames "+frames+" · clipped "+clipped+" · queued audio bytes "+speaker.pending()+" · gain ×"+gain+" · module "+moduleLevel+" · tunes "+tunes);
+                    listener.levels(meter.peakDb(),meter.rmsDb(),meter.clips(),meter.clips()-previousClips);previousClips=meter.clips();meter.resetWindow();nextStatus=now+500;}
             }
         }catch(Exception | LinkageError e){reason="STOP: "+e.getMessage();if(reason.contains("restoration") || reason.contains("close error"))safe=false;}
         finally{
