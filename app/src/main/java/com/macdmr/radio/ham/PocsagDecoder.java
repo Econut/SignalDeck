@@ -28,17 +28,29 @@ public final class PocsagDecoder {
     /** Undo a one-pole high-pass of time constant {@code tauSec}, then remove the mean. A non-positive tau leaves the audio unchanged. */
     public static short[] restore(short[] x, double tauSec) {
         if (x == null || tauSec <= 0) return x;
-        double b = Math.exp(-1.0 / (RATE * tauSec));
+        double coef = Math.exp(-1.0 / (RATE * tauSec));
         double[] acc = new double[x.length];
         double state = 0, prev = 0, sum = 0;
         for (int i = 0; i < x.length; i++) {
             double s = x[i];
-            state = s - b * prev + state;
+            state = s - coef * prev + state;
             prev = s;
             acc[i] = state;
             sum += state;
         }
+        // The unknown starting level of the inverse shows up as an offset. The preamble is balanced,
+        // so its mean is that offset. A mean over the whole clip is pulled by the long padding run.
         double mean = sum / Math.max(1, x.length);
+        Clock pre = preamble(x);
+        if (pre != null) {
+            int from = (int) Math.max(0, pre.phase);
+            int to = (int) Math.min(x.length, pre.phase + 80 * pre.spb);
+            if (to > from + 8) {
+                double ps = 0;
+                for (int i = from; i < to; i++) ps += acc[i];
+                mean = ps / (to - from);
+            }
+        }
         short[] y = new short[x.length];
         for (int i = 0; i < x.length; i++) {
             double v = acc[i] - mean;
@@ -166,6 +178,7 @@ public final class PocsagDecoder {
         double spbNow = spb;
         double lastSync = -1, nextSync = -1;
         Level level = new Level();
+        armRunHold(level, audio, spb);
         while (pos >= 0 && pos < audio.length && n < bits.length) {
             if (runningMean) level.push(sampleAt(audio, pos));
             double here = pos;
@@ -282,15 +295,46 @@ public final class PocsagDecoder {
         for (double t = phase + spb / 2; t < audio.length; t += spb) n++;
         int[] bits = new int[n];
         Level level = new Level();
+        armRunHold(level, audio, spb);
         int i = 0;
         for (double t = phase + spb / 2; t < audio.length; t += spb) bits[i++] = decide(audio, t, pol, level);
         return bits;
+    }
+
+    /** 512 baud only: a long run sags toward the threshold, so keep the last bit until the sample is a quarter of the eye past it. */
+    private static void armRunHold(Level level, short[] audio, double spb) {
+        if (Math.abs(spb - (double) RATE / 512.0) >= 1.5) return;
+        level.holdRuns = true;
+        level.eye = eyeOf(audio);
+    }
+
+    /** Peak-to-peak opening measured on the preamble, where the two levels alternate. */
+    private static double eyeOf(short[] audio) {
+        Clock c = preamble(audio);
+        int from = 0, to = audio.length;
+        if (c != null) {
+            from = (int) Math.max(0, c.phase);
+            to = (int) Math.min(audio.length, c.phase + 80 * c.spb);
+        }
+        double mad = 0;
+        int n = 0;
+        for (int i = from; i < to; i++) {
+            int a = Math.abs(audio[i]);
+            if (a < 500) continue;
+            mad += a;
+            n++;
+        }
+        return n < 20 ? 8000 : 2.0 * mad / n;
     }
 
     /** A slow baseline, about the last 32 bits. Re-centred when a sync word is found. */
     static final class Level {
         double mean;
         boolean freeze;
+        boolean holdRuns;
+        double eye = 8000;
+        int prev = -1;
+        int run;
         final double[] box = new double[32];
         int n, at;
         double sum;
@@ -303,6 +347,15 @@ public final class PocsagDecoder {
     }
 
     private static int decide(short[] audio, double pos, int pol, Level level) {
-        return (pol * (sampleAt(audio, pos) - level.mean) < 0) ? 1 : 0;
+        double v = pol * (sampleAt(audio, pos) - level.mean);
+        int bit = v < 0 ? 1 : 0;
+        if (level.holdRuns && level.prev >= 0 && bit != level.prev && level.run >= 3
+                && Math.abs(v) < level.eye / 4.0) {
+            bit = level.prev;
+        }
+        if (bit == level.prev) level.run++;
+        else level.run = 1;
+        level.prev = bit;
+        return bit;
     }
 }

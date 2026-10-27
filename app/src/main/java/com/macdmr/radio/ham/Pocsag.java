@@ -231,6 +231,7 @@ public final class Pocsag {
         Page cur = null;
         StringBuilder text = new StringBuilder();
         List<Integer> leftover = new ArrayList<>();
+        boolean textEnded = false;
         int i = 0;
         int expect = -1;   // bit index of the next sync, one batch after the last one accepted
         while (i + 32 <= bits.length) {
@@ -260,6 +261,7 @@ public final class Pocsag {
                     int ric = ((data >> 2) & 0x3FFFF) << 3 | frame;
                     cur = new Page(ric, data & 3, "");
                     cur.corrected = flips;
+                    textEnded = false;
                 } else if (cur != null) {
                     int payload = data & 0xFFFFF;
                     int width = cur.func == 0 ? 4 : 7;
@@ -268,7 +270,8 @@ public final class Pocsag {
                         int v = 0;
                         for (int b = 0; b < width; b++) v |= leftover.remove(0) << b;
                         if (cur.func == 0) { if (v < 16 && "0123456789*U -)(".charAt(v) != ' ') text.append("0123456789*U -)(".charAt(v)); }
-                        else if (v != 0) text.append((char) v);
+                        else if (v == 0 || v == 4) textEnded = true;
+                        else if (!textEnded) text.append((char) v);
                     }
                 }
             }

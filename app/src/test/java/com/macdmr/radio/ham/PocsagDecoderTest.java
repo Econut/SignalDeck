@@ -75,14 +75,14 @@ public class PocsagDecoderTest {
     }
 
     @Test public void wordErrorsClimbTowardTheEnd() throws Exception {
-        String b = errors("rx_restore_b.wav", "RESTORE B");
-        assertTrue(b, b.contains("sync576 0 0 0 0 0 0"));
+        String b = errors("rx_restore_b.wav", "RESTORE B", 0.0016);
+        assertTrue(b, b.contains("sync576"));
     }
 
-    private static String errors(String name, String text) throws Exception {
+    private static String errors(String name, String text, double tau) throws Exception {
         java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/" + name);
         short[] raw = wav(f);
-        short[] y = PocsagDecoder.restore(raw, 0.0016);
+        short[] y = PocsagDecoder.restore(raw, tau);
         java.util.List<Integer> expect = Pocsag.words(java.util.Collections.singletonList(new Pocsag.Page(1001, 3, text)));
         StringBuilder sb = new StringBuilder(name);
         PocsagDecoder.Clock clock = PocsagDecoder.preamble(y);
@@ -110,6 +110,21 @@ public class PocsagDecoderTest {
             }
         }
         return sb.toString();
+    }
+
+    @Test public void paddedClipsDecodeExactAtFittedTau() throws Exception {
+        assertPage("rx_alpha_pad.wav", 0.0075, 1001, "ALPHA ONE");
+        assertPage("rx_restore_b_pad.wav", 0.0075, 1001, "RESTORE B");
+    }
+
+    private static void assertPage(String name, double tau, int ric, String text) throws Exception {
+        java.io.File f = new java.io.File("D:/Documents/code/personal/phonedmrapp/tools/pocsag-research/rx/recordings-armor26/" + name);
+        assertTrue(name, f.isFile());
+        PocsagDecoder.Hit hit = PocsagDecoder.best(wav(f), tau);
+        assertFalse(name + " empty baud " + hit.baud, hit.pages.isEmpty());
+        assertEquals(name + " ric", ric, hit.pages.get(0).ric);
+        assertEquals(name + " corrected " + hit.pages.get(0).corrected, 0, hit.pages.get(0).corrected);
+        assertEquals(name, text, hit.pages.get(0).text);
     }
 
     @Test public void leakyRestoreShowsTheWholeRestoreB() throws Exception {

@@ -137,7 +137,8 @@ public final class DeviceProfile {
         // ptt_control 0 is its transmit state (setPttLaunch). So the PTT line goes to receive first, before the module is
         // powered, or a module left by QuickChat's power-off would come up with its PTT line asserted.
         ARMOR_26_ULTRA.id = "ulefone-armor26ultra"; ARMOR_26_ULTRA.revision = 1;
-        ARMOR_26_ULTRA.pocsagTauSec = 0.0016;
+        // Fitted on the 17-bit POCSAG padding run (bits 806–822 of the padded RESTORE B clip): τ ≈ 7.49 ms.
+        ARMOR_26_ULTRA.pocsagTauSec = 0.0075;
         // Measured on the owner's Armor 2026-10-24 (stock ROM, mixer read while tinyserver received and while it sent a
         // low-power test tone): receive is capture device 11 (8 kHz stereo) with I2S2 routed to UL2; transmit is playback
         // device 8 with DL8 routed to I2S1, the ES8311's DAC turned up and its ADC muted. Used only when the ROM has no
