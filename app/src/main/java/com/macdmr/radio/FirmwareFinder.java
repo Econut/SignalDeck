@@ -61,23 +61,7 @@ public final class FirmwareFinder {
     public static List<Found> scan(Context c, List<String> stockApks, Progress p) {
         List<Found> out = new ArrayList<>();
         File tmp = new File(c.getCacheDir(), "fwfind"); tmp.mkdirs();
-        boolean root = RootSetup.haveRoot();
-        for (String dir : FOLDERS) {
-            p.step("Looking in " + dir);
-            boolean shared = dir.endsWith("/firmware");
-            String ls = root ? RootSetup.run("find " + dir + " -maxdepth 2 -type f 2>/dev/null | head -200") : "";
-            for (String path : ls.split("\n")) {
-                path = path.trim(); if (path.isEmpty() || (shared && !RADIO_NAME.matcher(path).matches())) continue;
-                long size = parseLong(RootSetup.run("stat -c %s '" + path + "' 2>/dev/null").trim());
-                Found f = new Found(path, size);
-                if (size > 0 && size <= MAX_BYTES) {
-                    File copy = new File(tmp, "f" + out.size());
-                    RootSetup.run("cat '" + path + "' > '" + copy.getAbsolutePath() + "' && chmod 644 '" + copy.getAbsolutePath() + "'");
-                    if (copy.length() == size) { f.cached = copy; digest(f); }
-                }
-                out.add(f);
-            }
-        }
+        if (RootSetup.haveRoot()) scanFolders(FOLDERS, ROOT_FS, tmp, p, out);
         for (String apk : stockApks) {
             p.step("Looking in " + new File(apk).getName());
             try (ZipFile z = new ZipFile(apk)) {
@@ -95,6 +79,57 @@ public final class FirmwareFinder {
         return out;
     }
     public interface Progress { void step(String s); }
+
+    /** Where the folders are read from: the phone through root, or a test tree on the host. */
+    interface Fs {
+        List<String> files(String dir);                      // files up to two levels down
+        long size(String path);
+        boolean copy(String path, File to);                  // to a file the app can read
+    }
+    static final Fs ROOT_FS = new Fs() {
+        @Override public List<String> files(String dir) {
+            List<String> l = new ArrayList<>();
+            for (String path : RootSetup.run("find " + dir + " -maxdepth 2 -type f 2>/dev/null | head -200").split("\n")) if (!path.trim().isEmpty()) l.add(path.trim());
+            return l;
+        }
+        @Override public long size(String path) { return parseLong(RootSetup.run("stat -c %s '" + path + "' 2>/dev/null").trim()); }
+        @Override public boolean copy(String path, File to) { RootSetup.run("cat '" + path + "' > '" + to.getAbsolutePath() + "' && chmod 644 '" + to.getAbsolutePath() + "'"); return to.isFile(); }
+    };
+
+    /** SignalDeck's and the old module's folder, where the user may also have put a radio image by hand. */
+    static final String APP_DIR = "/sdcard/DMR";
+    /** Folders under it that hold what the apps write themselves (serial captures, recordings, reports, logs...), never vendor images. */
+    static final java.util.Set<String> OWN_OUTPUT = new java.util.HashSet<>(java.util.Arrays.asList("uart_logs", "Audio", "DeviceReport", "Firmware",
+            "FoundFirmware", "APRS", "DMR_Backups", "SSTV", "NOAA", "Coverage", "Transcription", "RadioID"));
+    /** Under {@link #APP_DIR} only a module image counts: a .bin of at least this size with a module version string inside. */
+    static final long APP_DIR_MIN_BYTES = 100 * 1024;
+
+    static void scanFolders(String[] folders, Fs fs, File tmp, Progress p, List<Found> out) {
+        for (String dir : folders) {
+            p.step("Looking in " + dir);
+            boolean shared = dir.endsWith("/firmware"), appDir = dir.equals(APP_DIR);
+            for (String path : fs.files(dir)) {
+                if (shared && !RADIO_NAME.matcher(path).matches()) continue;
+                if (appDir && (ownOutput(path) || !path.toLowerCase(Locale.US).endsWith(".bin"))) continue;
+                long size = fs.size(path);
+                if (appDir && size < APP_DIR_MIN_BYTES) continue;
+                Found f = new Found(path, size);
+                if (size > 0 && size <= MAX_BYTES) {
+                    File copy = new File(tmp, "f" + out.size());
+                    if (fs.copy(path, copy) && copy.length() == size) { f.cached = copy; digest(f); }
+                }
+                if (appDir && f.versions.isEmpty()) { if (f.cached != null) f.cached.delete(); continue; }   // a capture or the app's own data, not an image
+                out.add(f);
+            }
+        }
+    }
+
+    /** A file in one of the apps' own output folders under {@link #APP_DIR}. */
+    static boolean ownOutput(String path) {
+        if (!path.startsWith(APP_DIR + "/")) return false;
+        String rest = path.substring(APP_DIR.length() + 1); int slash = rest.indexOf('/');
+        return slash > 0 && OWN_OUTPUT.contains(rest.substring(0, slash));
+    }
 
     /** The report section: one line per file, then what to do with them. */
     public static String describe(List<Found> fs) {
