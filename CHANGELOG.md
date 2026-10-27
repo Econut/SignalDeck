@@ -4,6 +4,11 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-26 — Your own zone first; receive frequency before send
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner suggestions 2026-10-26 | Zones → Add a zone now starts with **Your own** (New zone from your channels), the one most people use, with the standard lists under it. The channel editor, on the phone and in SignalDeck Web, asks for the **receive frequency first**, then the send frequency: repeater lists give the output you hear and the offset, so the listed frequency goes straight in. The VFO already had receive first; tone fields are unchanged (TX tone first, as repeater lists show it). Help: Channels → Zones and standard lists. | `ui/ZonesDialog.java`, `ui/ChannelEditorView.java`, `assets/web/editor.js`, `ui/HelpView.java` | Host: build and host suite (layout order only, no logic change). **Device test owed:** the Add a zone sheet order, and the editor field order on the phone and in the browser. |
 ## 2026-10-26 — Talkgroups from contacts: in the channel editor, and picked on the intercom
 
 | Backlog | Change | Files | Test |
