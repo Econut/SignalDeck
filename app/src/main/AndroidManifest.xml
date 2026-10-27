@@ -44,6 +44,8 @@
         <!-- Reviewed host-driven lab diagnostic only; ordinary third-party apps lack DUMP. -->
         <activity android:name=".P8DiagnosticActivity" android:exported="true"
             android:permission="android.permission.DUMP" android:excludeFromRecents="true" />
+        <activity android:name=".P8ReceiveActivity" android:exported="true" android:permission="android.permission.DUMP"
+            android:screenOrientation="portrait" android:excludeFromRecents="true" />
 
         <!-- Ulefone's radio audio class. On the stock ROM it is on the boot class path anyway; a custom ROM or GSI that
              gets it from a Magisk module ships it as a shared library, which only reaches an app that asks for it.

@@ -23,6 +23,8 @@ public final class P8Workbench {
         int pad = (int) (16 * Theme.dp(c)); body.setPadding(pad, pad, pad, pad);
         TextView intro = Neo.text(c, "Preview an analogue channel or decode a saved module reply. Nothing here opens a port, changes the stock app, tunes the radio or transmits. Wire values are experimental; this is not live radio support.", Neo.MUTED, 14, Neo.ui(c));
         body.addView(intro);
+        if(com.macdmr.radio.BuildConfig.P8_OPEN_PROBE_REVIEWED){TextView rxScreen=Neo.button(c,"P8 receive-only radio", "radio",Neo.GREEN);body.addView(rxScreen);
+            rxScreen.setOnClickListener(v->c.startActivity(new android.content.Intent(c,com.macdmr.radio.P8ReceiveActivity.class)));}
         String last=c.getSharedPreferences("p8_diagnostic",Context.MODE_PRIVATE).getString("lastResult","");
         TextView liveResult=Neo.text(c,last.isEmpty()?"Root-free development transport available to the authorised host test. No stored result yet.":
                 "LAST ROOT-FREE TEST (historical, not current ownership):\n"+last,Neo.GREEN_LIGHT,13,Neo.mono(c));

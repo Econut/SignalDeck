@@ -1,5 +1,7 @@
 # Root-free P8 implementation — live communication milestone
 
+Latest milestone: [testable receive-only app rx.5d](p8-receive-only.md) adds analogue tuning, audible PCM playback, local channel management and live-tested two-channel scanning. The earlier diagnostic-only limitations below are retained as historical progress.
+
 Owner authorisation now covers routine stock stop/restart, UART open/close and verified non-transmitting communication tests. No bootloader, firmware, calibration or RF-transmit operation is permitted. Earlier per-operation approval statements are historical. No root is needed for the results below.
 
 ## Measured results

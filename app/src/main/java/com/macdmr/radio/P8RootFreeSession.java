@@ -21,6 +21,7 @@ public final class P8RootFreeSession {
         return null;
     }
     static String run(boolean stopped, boolean absent, long ageMs, int ptt, int mode) throws IOException {
+        if(P8Receiver.active())throw new IOException("Close receive session before diagnostics");
         String reason=blockReason(BuildConfig.P8_OFFLINE && BuildConfig.P8_OPEN_PROBE_REVIEWED,
                 stopped,absent,ageMs,ptt,mode);
         if(reason!=null)throw new IOException(reason);
