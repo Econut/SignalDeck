@@ -88,6 +88,7 @@ public final class M17Station {
             @Override public void lsfFromLich(M17.Lsf l) { onLink(l); }
             @Override public void ended(int frames, int good, String why) { finish(frames, good, why); }
             @Override public void packet(M17.Lsf l, byte[] body) { onPacket(l, body); }
+            @Override public void framesLost() { noteLost(); }
         };
         heldEar = new HeldPathReceiver.Listener() {
             @Override public void started(M17.Lsf l) { begin(l); }
@@ -95,6 +96,7 @@ public final class M17Station {
             @Override public void frame(M17.Stream s, float q) { onFrame(s, q); }
             @Override public void ended(int frames, int good, String why) { finish(frames, good, why); }
             @Override public void packet(M17.Lsf l, byte[] body) { onPacket(l, body); }
+            @Override public void framesLost() { noteLost(); }
         };
         rx = new M17Receiver(coef, dfeEar);
         running = true; host.changed();
@@ -170,6 +172,7 @@ public final class M17Station {
         host.text((sms != null ? "✉ " : "") + src + " → " + dst + ": " + shown);
         host.heard(src); host.changed();
     }
+    private void noteLost() { host.text("✉ M17: frames lost"); host.changed(); }
     private void begin(M17.Lsf l) {
         Heard h = new Heard(System.currentTimeMillis());
         if (l.crcOk) fill(h, l);

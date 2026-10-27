@@ -32,6 +32,8 @@ public final class HeldPathReceiver {
         void ended(int frames, int good, String why);
         /** A packet whose CRC checked. The body is the type byte and the payload, without the CRC. */
         default void packet(M17.Lsf lsf, byte[] body) { }
+        /** The last frame arrived and the packet CRC failed, or a frame in the run was missing. */
+        default void framesLost() { }
     }
 
     private static final Logger LOG = Logger.getLogger("HeldPath");
@@ -170,6 +172,7 @@ public final class HeldPathReceiver {
                             M17.Lsf who = packetLsf != null ? packetLsf : id;
                             byte[] body = M17.assemble(packetFrames);
                             if (body != null && who != null) listener.packet(who, body);
+                            else if (body == null) listener.framesLost();
                             endBit = true;
                         }
                     }

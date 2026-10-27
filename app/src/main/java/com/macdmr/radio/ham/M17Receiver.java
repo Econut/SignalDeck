@@ -22,6 +22,8 @@ public final class M17Receiver {
         void ended(int frames, int good, String why);
         /** A packet whose CRC checked. The body is the type byte and the payload, without the CRC. */
         default void packet(M17.Lsf lsf, byte[] body) { }
+        /** The last frame arrived and the packet CRC failed, or a frame in the run was missing. */
+        default void framesLost() { }
     }
 
     public static final int L = 8, FB = 24, GROUPS = 4, NCOEF = GROUPS * (2 * L + 1) + FB + 1;
@@ -201,7 +203,7 @@ public final class M17Receiver {
         if (packets != null) packets.add(p);
         if (p.eof) {
             byte[] body = M17.assemble(packets);
-            if (body != null) listener.packet(lsf, body);
+            if (body != null) listener.packet(lsf, body); else listener.framesLost();
             end("last frame");
         }
     }
