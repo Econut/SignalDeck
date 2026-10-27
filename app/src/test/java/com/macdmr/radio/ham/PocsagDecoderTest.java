@@ -46,6 +46,48 @@ public class PocsagDecoderTest {
         assertFalse(Pocsag.check(cw ^ (1 << 3) ^ (1 << 8) ^ (1 << 19)));
     }
 
+    @Test public void twoBitAddressDoesNotOpenAPage() {
+        int addr = Pocsag.addressWord(1001, 3);
+        int bad = addr ^ (1 << 6) ^ (1 << 18);
+        int[] msg = messageBits("PAGE OK");
+        int[] bits = new int[256 + 32 + 32 + msg.length];
+        for (int i = 0; i < 256; i++) bits[i] = 1 - (i % 2);
+        put(bits, 256, Pocsag.SYNC);
+        put(bits, 288, bad);
+        System.arraycopy(msg, 0, bits, 320, msg.length);
+        assertEquals(0, Pocsag.decode(bits).size());
+    }
+
+    @Test public void lengthsOneToFortyRoundTrip() {
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?-.";
+        for (int baud : PocsagDecoder.RATES) {
+            for (int n = 1; n <= 40; n++) {
+                StringBuilder msg = new StringBuilder();
+                for (int i = 0; i < n; i++) msg.append(alphabet.charAt(i % alphabet.length()));
+                Pocsag.Page page = new Pocsag.Page(1001, 3, msg.toString());
+                int[] rawBits = Pocsag.bits(java.util.Collections.singletonList(page));
+                java.util.List<Pocsag.Page> direct = Pocsag.decode(rawBits);
+                assertFalse("direct " + baud + " len " + n, direct.isEmpty());
+                assertEquals("direct " + baud + " len " + n, msg.toString(), direct.get(0).text);
+                assertEquals(1001, direct.get(0).ric);
+            }
+        }
+    }
+
+    @Test public void minuteOfNoiseOpensNoPage() {
+        java.util.Random r = new java.util.Random(1718);
+        short[] audio = new short[8000 * 60];
+        double y = 0;
+        for (int i = 0; i < audio.length; i++) {
+            y += 0.2 * (r.nextGaussian() - y);
+            double v = y * 5000;
+            if (v > 32767) v = 32767;
+            else if (v < -32767) v = -32767;
+            audio[i] = (short) v;
+        }
+        assertEquals(0, PocsagDecoder.best(audio).pages.size());
+    }
+
     @Test public void threeErrorsInTheAddressDoNotInventARic() {
         int addr = Pocsag.addressWord(1001, 3);
         int bad = addr ^ (1 << 5) ^ (1 << 12) ^ (1 << 20);

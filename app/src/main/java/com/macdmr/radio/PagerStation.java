@@ -47,8 +47,11 @@ public final class PagerStation {
     public boolean running() { return running; }
     public boolean monitoring() { return monitor; }
     public boolean preamble() { return preamble; }
-    /** About a second on each frequency. A preamble, then one batch, holds the step. */
-    public static long dwellMs(int baud) { return 1000; }
+    /**
+     * Long enough for the receiver to settle after the retune (measured about 0.8 s) and then
+     * a preamble plus one batch. A preamble still holds the step after this.
+     */
+    public static long dwellMs(int baud) { return 2500; }
 
     public synchronized void start(boolean heldPath) {
         running = true; held = heldPath; fresh = 0; sincePreamble = 0; holdUntil = 0;

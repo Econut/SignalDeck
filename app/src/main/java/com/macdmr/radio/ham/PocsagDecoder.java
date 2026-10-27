@@ -86,7 +86,8 @@ public final class PocsagDecoder {
                 int n = score(h); if (n > score) { score = n; best = h; }
             }
         }
-        for (int baud : RATES) {
+        int[] rates = clock == null ? RATES : new int[] { clock.baud };
+        for (int baud : rates) {
             double spb = (double) RATE / baud;
             for (int pol : new int[] { 1, -1 }) {
                 for (int s = 0; s < 8; s++) {
@@ -167,7 +168,7 @@ public final class PocsagDecoder {
             bits[n++] = decide(audio, pos, pol, level);
             pos += spb;
             if (guard > 0) { guard--; continue; }
-            if (n >= 32 && hamming(bits, n - 32) <= 2) {
+            if (n >= 32 && hamming(bits, n - 32) <= 2 && heardPreamble(audio, pos - 32 * spb, spb)) {
                 double start = pos - 32 * spb;
                 double shift = relock(audio, start, spb, pol);
                 if (!runningMean) {
@@ -182,6 +183,24 @@ public final class PocsagDecoder {
             }
         }
         return java.util.Arrays.copyOf(bits, n);
+    }
+
+    /** Alternation at this baud in the half second before the sync word. */
+    private static boolean heardPreamble(short[] audio, double syncStart, double spb) {
+        int end = (int) Math.max(0, syncStart);
+        int begin = Math.max(0, end - RATE / 2);
+        int last = -1, run = 0, best = 0;
+        double tol = Math.max(1.5, spb * 0.25);
+        for (int i = begin + 1; i < end && i < audio.length; i++) {
+            if ((audio[i] < 0) == (audio[i - 1] < 0)) continue;
+            if (last >= 0) {
+                int d = i - last;
+                if (d >= 2 && Math.abs(d - spb) <= tol) { if (++run > best) best = run; }
+                else run = 0;
+            }
+            last = i;
+        }
+        return best >= 40;
     }
 
     private static double relock(short[] audio, double start, double spb, int pol) {

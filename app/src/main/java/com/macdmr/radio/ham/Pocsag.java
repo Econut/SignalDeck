@@ -234,7 +234,8 @@ public final class Pocsag {
         int i = 0;
         while (i + 32 <= bits.length) {
             int w = wordAt(bits, i);
-            if (w != SYNC) { i++; continue; }
+            // The first sync of a transmission follows the preamble. The next batch's sync does not.
+            if (w != SYNC || (cur == null && !preambleBefore(bits, i))) { i++; continue; }
             for (int k = 0; k < 16; k++) {
                 int at = i + 32 + 32 * k;
                 if (at + 32 > bits.length) break;
@@ -242,16 +243,19 @@ public final class Pocsag {
                 int cw = correct(raw);
                 if (cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
                 if (!check(cw)) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
-                if (cur != null) cur.corrected += Integer.bitCount(raw ^ cw);
+                int flips = Integer.bitCount(raw ^ cw);
+                if (cur != null) cur.corrected += flips;
                 int data = (int) ((cw & 0xFFFFFFFFL) >>> 11);
                 if ((data & (1 << 20)) == 0) {
                     finish(out, cur, text, leftover);
+                    cur = null; text.setLength(0); leftover.clear();
+                    if (flips > 1) continue;   // an address repaired by two bits is how noise becomes a RIC
                     int frame = k / 2;
                     int ric = ((data >> 2) & 0x3FFFF) << 3 | frame;
                     cur = new Page(ric, data & 3, "");
-                    cur.corrected = Integer.bitCount(raw ^ cw);
-                    text.setLength(0); leftover.clear();
+                    cur.corrected = flips;
                 } else if (cur != null) {
+                    if (flips > 1) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
                     int payload = data & 0xFFFFF;
                     int width = cur.func == 0 ? 4 : 7;
                     for (int b = 19; b >= 0; b--) leftover.add((payload >> b) & 1);
@@ -275,6 +279,15 @@ public final class Pocsag {
         p.corrected = cur.corrected;
         p.ricUnreadable = cur.ricUnreadable;
         out.add(p);
+    }
+
+    /** The 256 bits before a sync word are the tail of the preamble: mostly alternating. */
+    private static boolean preambleBefore(int[] bits, int at) {
+        int window = 256;
+        if (at < window) return false;
+        int changes = 0;
+        for (int k = at - window; k < at - 1; k++) if ((bits[k] & 1) != (bits[k + 1] & 1)) changes++;
+        return changes >= 192;
     }
 
     private static int wordAt(int[] bits, int at) {
