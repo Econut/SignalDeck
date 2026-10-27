@@ -41,8 +41,8 @@ public class RadioProbeAtTest {
         assertFalse(RadioProbe.looksLikeAt("41 54 2b 44 4d 4f 56 45 52 51 0d 0a"));                          // a loopback: "AT+DMOVERQ"
         assertFalse(RadioProbe.looksLikeModule(fail));
         assertEquals("FAIL: Invalid command", RadioProbe.asText(fail));
-        assertEquals("AT+DMOCONNECT\r\n", new String(RadioProbe.AT_CONNECT));
-        assertEquals("AT+DMOVERQ\r\n", new String(RadioProbe.AT_VERSION));
+        assertEquals("AT+DMOCONNECT\r", new String(RadioProbe.AT_CONNECT));      // a bare \r, as the stock app sends it
+        assertEquals("AT+DMOVERQ\r", new String(RadioProbe.AT_VERSION));
     }
 
     @Test public void anEchoOfTheQueryIsNotAnAnswer() {

@@ -2,13 +2,30 @@
 
 Newest first. Phone: ANYSECU W6+ replacement unit, adb `-s W6202601000904` (USB). Plan: `docs/W6_DEVICE_REPORT_PLAN.md`.
 
+## 2026-10-27 17:25 CDT — Serial sniff + start-up watch (B3, B4; plan items 1, 2)
+
+- Branch `w6/serial-sniff`, stacked on `w6/probe-at`.
+- Wrote `sdtrace` (our own ptrace sniffer, no strace/LGPL): waits for the process, attaches to every thread, logs
+  open/TCSETS/read/write on `/dev/tty*`. The watch stops the stock app first and starts it under the sniffer.
+- **The W6's start-up, from the report:** `/dev/ttyS2` 9600 8N1 raw; `AT+DMOCONNECT\r` → `+DMOCONNECT:0`;
+  `AT+DMOVERQ\r` → `+DMOVERQ:PB202EU05`; `AT+DMOSETGROUP=1,435.025,435.025,240,240,3,1\r` → `+DMOSETGROUP:0`;
+  `AT+DMOSETVOLUME=1\r` → `+DMOSETVOLUME:0`; one write per command, ~100 ms apart; then `FIONREAD` every 150 ms.
+  Its log adds the power step: `SerialHandle: patch == /sys/class/gpio/gpio322/value; value == 1` right after the
+  port opens (`openModule()`).
+- So the earlier "lost byte" was not the module: commands end in `\r` only, and the probe's first command after its
+  speed changes loses its first byte. The engine stays at 9600 and sends `\r`.
+- Report kept in `reports/20261027_serial_sniff/` (with `stock_serial.txt`).
+- Next: 32-bit native code in the clue scan (gap 8), then safe node discovery (gaps 3, 5, 6, 9, B11). After that I
+  have enough for `ENGINE_DESIGN.md`.
+
 ## 2026-10-27 16:55 CDT — Probe: the stock app's port and the AT probe (B1, B2, B5)
 
 - Branch `w6/probe-at`, stacked on `w6/bench-driver`.
 - The probe takes the ports the stock app or the profile name (W6: `/dev/ttyS2`) and skips the rest (`ttySE0`); the
   sepolicy line is now `console_device`. AT probe added (`AT+DMOCONNECT`, `AT+DMOVERQ`).
 - **W6 facts from it:** the module answers at 9600 on `/dev/ttyS2` with version **`PB202EU05`** (`+DMOVERQ:PB202EU05`).
-  The handshake came back three times as an error echo with one byte lost (`T+DMOCONNECT:1`, `AT+DMOCONNEC:1`), while
+  The handshake came back three times as an error echo with one byte lost (`T+DMOCONNECT
+:1`, `AT+DMOCONNEC:1`), while
   the shorter version query answered cleanly: the engine design has to check how the stock app writes (pacing, one
   write per command) before it relies on long commands. The module also echoes unknown binary input wrapped in `:1`,
   which the old probe took for a DMR answer (fixed).
