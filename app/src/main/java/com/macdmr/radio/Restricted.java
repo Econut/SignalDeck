@@ -82,6 +82,20 @@ public final class Restricted {
         return ch != null && ch.number > 0 && channelVisible(r, zones, ch.number);
     }
 
+    /** The zones of this list the policy in force lets the user see. */
+    public static List<ChannelStore.Zone> filterZones(Context c, List<ChannelStore.Zone> zones) {
+        Restriction r = effective(c); java.util.List<ChannelStore.Zone> out = new java.util.ArrayList<>();
+        if (zones != null) for (ChannelStore.Zone z : zones) if (zoneVisible(r, z)) out.add(z);
+        return out;
+    }
+    /** The channels of this list the policy in force lets the user see. */
+    public static List<ChannelStore.Channel> filterChannels(Context c, List<ChannelStore.Zone> zones, List<ChannelStore.Channel> all) {
+        Restriction r = effective(c); if (r.allZones || all == null) return all == null ? new java.util.ArrayList<>() : all;
+        java.util.List<ChannelStore.Channel> out = new java.util.ArrayList<>();
+        for (ChannelStore.Channel ch : all) if (channelVisible(r, zones, ch.number)) out.add(ch);
+        return out;
+    }
+
     /** Is a zone visible by name. */
     public static boolean zoneVisible(Restriction r, ChannelStore.Zone z) { return r == null || z == null || r.zoneVisible(z.name); }
 }

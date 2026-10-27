@@ -1687,6 +1687,10 @@ public class RadioService extends Service implements RadioEngine.Events {
     public boolean channelVisible(ChannelStore.Channel ch) { Restriction r = restriction(); if (r.allZones) return true; return ch != null && ch.number > 0 && Restricted.channelVisible(r, store.zones(), ch.number); }
     private boolean restrictedTx() { Restriction r = restriction(); return r.transmit != Restriction.TX_ALL && !Restricted.mayTransmitOn(r, store.zones(), current); }
     /** The zones the policy lets the user see (all of them when it limits none). */
+    /** Every channel the policy lets the user see, in channel order (all of them when zones are not limited). */
+    public java.util.List<ChannelStore.Channel> visibleChannels() { return Restricted.filterChannels(this, store.zones(), store.all()); }
+    /** After the mode was turned on, off, edited, unlocked or locked: the screens and the car redraw. */
+    public void restrictionChanged() { pushModes(); if (current != null && !channelVisible(current) && vfo == null) { java.util.List<ChannelStore.Channel> in = zoneChannels(); if (!in.isEmpty()) selectChannel(in.get(0).number); } }
     public java.util.List<ChannelStore.Zone> visibleZones() { Restriction r = restriction(); java.util.List<ChannelStore.Zone> out = new java.util.ArrayList<>(); for (ChannelStore.Zone z : store.zones()) if (Restricted.zoneVisible(r, z)) out.add(z); return out; }
 
     public boolean txInhibited() {
