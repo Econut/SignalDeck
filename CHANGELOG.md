@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Engine interface (ModuleEngine), no change in behaviour
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 engine design §5 step 1 (owner approved the design 2026-10-27) | `ModuleEngine` is the interface RadioService, the device report and the firmware loader use to reach the radio module; `RadioEngine` (the DMR module's `68 … 10` frames) implements it unchanged, and its default `protocol()` = "mcu68", `dmr()` = true. A second engine for another module family (the W6's SA818-class AT module) can now sit beside it. Nothing changes on any phone. | `ModuleEngine.java`, `RadioEngine.java` (implements), `RadioService.java` (field and getter type), `fw/FirmwareSession.java`, `ModuleEngineTest.java` | Host: all host tests pass, `ModuleEngineTest`. Not device-tested (types only: the same object is called the same way). |
+
 ## 2026-10-26 — Firmware the catalogue does not list yet: asked once, noticed on the Device page
 
 | Backlog | Change | Files | Test |

@@ -60,7 +60,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public static volatile RadioService running;
 
     private DeviceProfile profile;
-    private RadioEngine engine;
+    private ModuleEngine engine;
     private AudioBackend audio;
     private ChannelStore store;
     private ChannelStore.Channel current;
@@ -2528,7 +2528,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** The last signal reading (dBm, -999 none) and whether the module reports a reception (for the bench tests). */
     public int rssiNow() { return rssi; }
     public boolean receivingNow() { return receiving; }
-    public RadioEngine engine() { return engine; }
+    public ModuleEngine engine() { return engine; }
     /** One history line, voice announcement and caller report per call (the caller is asked at the start, a second in, and at the end). */
     private volatile boolean callLogged; private volatile int loggedCaller, loggedTarget;
     @Override public void callerInfo(int type, int caller, int target, int cc, int slot) {

@@ -16,7 +16,7 @@ import java.util.Locale;
  * The shared protocol layer: module power, boot banner, commands, acks, status events.
  * Command set and bodies per docs/deep-dive/01, 02 (PriInterPhone) — identical in the Blackview SDK.
  */
-public final class RadioEngine implements UartPort.Listener {
+public final class RadioEngine implements UartPort.Listener, ModuleEngine {
     // commands (A→M unless noted)
     public static final int CMD_SET_DIGITAL = 0x22, CMD_SET_ANALOG = 0x23, CMD_LAUNCH = 0x26, CMD_QUERY_INIT = 0x27,
             CMD_ENHANCE = 0x28, CMD_MIC = 0x2A, CMD_CALLER_INFO = 0x2B, CMD_SEND_SMS = 0x2C, CMD_FETCH_SMS = 0x2D, CMD_VOLUME = 0x2E, CMD_MONITOR = 0x2F,
