@@ -54,6 +54,17 @@ public final class Pocsag {
         return (r & 0x3FF) == 0 && (Long.bitCount(cw & 0xFFFFFFFFL) % 2 == 0);
     }
 
+    /**
+     * The codeword, or the same word with one or two bits repaired. Unrepairable words come back unchanged,
+     * so {@link #check} still fails.
+     */
+    public static int correct(int cw) {
+        if (check(cw)) return cw;
+        for (int i = 0; i < 32; i++) { int t = cw ^ (1 << i); if (check(t)) return t; }
+        for (int i = 0; i < 32; i++) for (int j = i + 1; j < 32; j++) { int t = cw ^ (1 << i) ^ (1 << j); if (check(t)) return t; }
+        return cw;
+    }
+
     public static int addressWord(int ric, int func) {
         return codeword((((ric & 0x1FFFFF) >> 3) << 2) | (func & 3));
     }
@@ -193,7 +204,7 @@ public final class Pocsag {
             for (int k = 0; k < 16; k++) {
                 int at = i + 32 + 32 * k;
                 if (at + 32 > bits.length) break;
-                int cw = wordAt(bits, at);
+                int cw = correct(wordAt(bits, at));
                 if (!check(cw) || cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
                 int data = (int) ((cw & 0xFFFFFFFFL) >>> 11);
                 if ((data & (1 << 20)) == 0) {

@@ -27,6 +27,25 @@ public class PocsagDecoderTest {
         }
     }
 
+    @Test public void thirtyPartsPerMillionStillDecodes() {
+        Pocsag.Page page = new Pocsag.Page(123456, 3, "HELLO");
+        int[] bits = Pocsag.bits(java.util.Collections.singletonList(page));
+        double spb = 8000.0 / 1200.0 * (1 + 30e-6);
+        int n = (int) Math.ceil(bits.length * spb);
+        short[] a = new short[n];
+        for (int i = 0; i < n; i++) { int b = Math.min(bits.length - 1, (int) (i / spb)); a[i] = (short) (bits[b] == 1 ? -8000 : 8000); }
+        PocsagDecoder.Hit hit = PocsagDecoder.best(a);
+        assertEquals(1200, hit.baud);
+        assertEquals("HELLO", hit.pages.get(0).text);
+    }
+
+    @Test public void oneAndTwoBitErrorsAreRepaired() {
+        int cw = Pocsag.addressWord(123456, 3);
+        assertEquals(cw, Pocsag.correct(cw ^ (1 << 4)));
+        assertEquals(cw, Pocsag.correct(cw ^ (1 << 4) ^ (1 << 17)));
+        assertFalse(Pocsag.check(cw ^ (1 << 3) ^ (1 << 8) ^ (1 << 19)));
+    }
+
     /** Bit 1 is the negative level, matching the slicer. */
     static short[] audio(int[] bits, int baud) {
         double spb = 8000.0 / baud;
