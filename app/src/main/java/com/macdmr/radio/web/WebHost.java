@@ -474,7 +474,7 @@ public final class WebHost {
     private java.util.List<Setting> settings() {
         java.util.List<Setting> l = new java.util.ArrayList<>();
         android.content.SharedPreferences rp = svc.getSharedPreferences("radio", Context.MODE_PRIVATE);
-        l.add(new Setting("dmrId", "Identity", "Your DMR ID", "What other radios see when you talk on DMR channels", "int", null, svc::localId, b -> {
+        if (svc.profile().dmr()) l.add(new Setting("dmrId", "Identity", "Your DMR ID", "What other radios see when you talk on DMR channels", "int", null, svc::localId, b -> {
             int v = b.getInt("value"); if (v < 1 || v > 0xFFFFFF) throw new IllegalArgumentException("A DMR ID is 1 to 16777215"); svc.setLocalId(v); }));
         l.add(new Setting("ownAtBoot", "Radio", "Own the radio at boot", "Otherwise the stock app is restored after a reboot", "bool", null, svc::ownAtBoot, b -> svc.setOwnAtBoot(b.getBoolean("value"))));
         l.add(new Setting("hwPtt", "Radio", "Side PTT key", "The phone's hardware push-to-talk button transmits", "bool", null, svc::hwPtt, b -> svc.setHwPtt(b.getBoolean("value"))));
@@ -486,7 +486,7 @@ public final class WebHost {
         l.add(new Setting("keywords", "Radio", "Keyword alerts", "Words in live captions that raise an alert, separated by commas", "text", null, svc::keywords, b -> svc.setKeywords(b.getString("value"))));
         l.add(new Setting("logHeard", "Logbook", "Log stations heard", "DMR callers and APRS stations go into the logbook as Heard", "bool", null, svc::logHeard, b -> svc.setLogHeard(b.getBoolean("value"))));
         l.add(new Setting("lookupOnline", "Logbook", "Look up names online", "RadioID / callsign lookups for callers and stations", "bool", null, svc::lookupOnline, b -> svc.setLookupOnline(b.getBoolean("value"))));
-        l.add(new Setting("roaming", "Radio", "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup (needs repeater channels with a location)", "bool", null, svc::roaming, b -> svc.setRoaming(b.getBoolean("value"))));
+        if (svc.profile().dmr()) l.add(new Setting("roaming", "Radio", "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup (needs repeater channels with a location)", "bool", null, svc::roaming, b -> svc.setRoaming(b.getBoolean("value"))));
         l.add(new Setting("coverage", "Coverage", "Coverage logging", "Records signal and key-ups with GPS for the coverage maps", "bool", null, () -> svc.coverage().enabled(), b -> svc.setCoverageLogging(b.getBoolean("value"))));
         l.add(new Setting("covInCar", "Coverage", "Log coverage in the car", "Coverage logging while Android Auto is connected", "bool", null, svc::coverageInCar, b -> svc.setCoverageInCar(b.getBoolean("value"))));
         l.add(new Setting("carMic", "Car", "Car microphone in Android Auto", "Talk uses the car's microphone through its hands-free link", "bool", null, svc::carMic, b -> svc.setCarMic(b.getBoolean("value"))));

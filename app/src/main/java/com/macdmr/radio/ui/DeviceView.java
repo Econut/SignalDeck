@@ -126,7 +126,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         addRow(set, Neo.switchRow(c, "diag", Neo.CYAN, "Animated panel when quiet", "Falling lines on an idle channel (uses a little battery)", animSw));
         addRow(set, Neo.switchRow(c, "signal", Neo.VIOLET, "Coverage logging", "Records signal and key-ups with GPS for the coverage maps (Map → Coverage)", covSw));
         roamSw = sw();
-        addRow(set, Neo.switchRow(c, "repeaters", Neo.GREEN, "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup", roamSw));
+        if (com.macdmr.radio.DeviceProfile.detect().dmr())                       // talkgroups: DMR only
+            addRow(set, Neo.switchRow(c, "repeaters", Neo.GREEN, "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup", roamSw));
         roamSw.setOnChange(on -> { if (svc != null) { svc.setRoaming(on); android.widget.Toast.makeText(c, on ? "DMR roaming is on: it checks every 30 s while you move" : "DMR roaming is off", android.widget.Toast.LENGTH_SHORT).show(); } });
         addRow(set, Neo.switchRow(c, "ptt", Neo.AMBER, "Car microphone in Android Auto", "Talk uses the car's microphone through its hands-free link", carMicSw));
         carMicSw.setOnChange(on -> { if (svc != null) svc.setCarMic(on); });
@@ -185,6 +186,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         TextView setId = Neo.button(c, "Change", null, Neo.CYAN); setId.setMinHeight((int) (40 * d));
         idRow.addView(setId, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         id.addView(idRow);
+        if (!com.macdmr.radio.DeviceProfile.detect().dmr()) id.setVisibility(GONE);    // no digital channels to send it on
         setId.setOnClickListener(v -> {
             final EditText e = new EditText(c); e.setInputType(InputType.TYPE_CLASS_NUMBER); e.setText(svc != null ? String.valueOf(svc.localId()) : "");
             new android.app.AlertDialog.Builder(c).setTitle("Your DMR ID").setMessage("The radio sends this as the caller ID on digital channels.").setView(e)
@@ -229,7 +231,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         widget.setOnClickListener(v -> widgetSheet());
         sos.setOnClickListener(v -> EmergencyDialog.show(c, svc));
 
-        TextView foot = Neo.text(c, "Backups are the five CSV files (Contacts, TG_Lists, Channels, Zones, DTMF) the DMRModHooks module and the OpenGD77 CPS fork use, in Download/DMR/DMR_Backups.\n\nSignalDeck " + com.macdmr.radio.BuildConfig.VERSION_NAME + ", the standalone edition of DMRModHooks.", Neo.DIM, 12.5f, Neo.uiMedium(c));
+        TextView foot = Neo.text(c, (com.macdmr.radio.DeviceProfile.detect().dmr()
+                ? "Backups are the five CSV files (Contacts, TG_Lists, Channels, Zones, DTMF) the DMRModHooks module and the OpenGD77 CPS fork use, in Download/DMR/DMR_Backups."
+                : "Backups are CSV files (Channels, Zones, DTMF and the others, in the layout the OpenGD77 CPS fork reads) in Download/DMR/DMR_Backups.")
+                + "\n\nSignalDeck " + com.macdmr.radio.BuildConfig.VERSION_NAME + ", the standalone edition of DMRModHooks.", Neo.DIM, 12.5f, Neo.uiMedium(c));
         foot.setLineSpacing(0, 1.1f); foot.setPadding((int) (2 * d), (int) (8 * d), (int) (2 * d), 0);
         body.addView(foot);
     }
