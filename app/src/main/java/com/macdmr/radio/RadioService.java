@@ -1437,7 +1437,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private synchronized boolean applyChannelNow(ChannelStore.Channel ch, boolean fromStore) {
         if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) {         // the module refuses these and stays where it is: never show them as tuned
             ChannelStore.Channel on = current;
-            history("warn", "⚠ " + ch.name + " (" + ch.freqText(ch.rxFreq) + (ch.txFreq != ch.rxFreq ? " / " + ch.freqText(ch.txFreq) : "") + " MHz) is outside what this radio can tune (136–174 and 400–480 MHz)"
+            history("warn", "⚠ " + ch.name + " (" + ch.freqText(ch.rxFreq) + (ch.txFreq != ch.rxFreq ? " / " + ch.freqText(ch.txFreq) : "") + " MHz) is outside what this radio can tune (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + ")"
                     + (on != null ? "; still on " + on.name + ", " + on.freqText(on.rxFreq) + " MHz" : ""));
             if (!fromStore && vfo == ch) vfo = on != null && on.number == 0 ? on : null;
             return false;
@@ -1794,7 +1794,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public String sendPage(int baud, int hz, int[] rics, int func, String text, boolean sign) {
         if (rics == null || rics.length == 0) return "Add at least one RIC";
         if (text == null || text.trim().isEmpty()) return "Write the message";
-        if (!ChannelStore.inBand(hz)) return "Frequency must be 136–174 or 400–480 MHz";
+        if (!ChannelStore.inBand(hz)) return "Frequency must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText();
         if (firmwareBusy) return "Radio busy, loading firmware";
         if (!isReady()) return "Radio not ready";
         if (txInhibited()) return "Transmit is off on this channel";

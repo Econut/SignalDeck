@@ -122,7 +122,7 @@ public final class VfoDialog {
         try {
             v.rxFreq = (int) Math.round(Double.parseDouble(rx.getText().toString().trim()) * 1e6);
             v.txFreq = (int) Math.round(Double.parseDouble(tx.getText().toString().trim()) * 1e6);
-            if (!com.macdmr.radio.ChannelStore.inBand(v.rxFreq) || !com.macdmr.radio.ChannelStore.inBand(v.txFreq)) throw new IllegalArgumentException("Frequencies must be within 136–174 or 400–480 MHz");
+            if (!com.macdmr.radio.ChannelStore.inBand(v.rxFreq) || !com.macdmr.radio.ChannelStore.inBand(v.txFreq)) throw new IllegalArgumentException("Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText());
             if (v.rxFreq < 300_000_000) v.band = 1;
             if (v.isDigital()) {
                 String cn = call.getText().toString().trim();

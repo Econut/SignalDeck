@@ -272,7 +272,7 @@ public final class WebHost {
             ch.type = asked == ChannelStore.Channel.TYPE_M17 ? ChannelStore.Channel.TYPE_M17 : asked == 0 ? 0 : 1;
             ch.txFreq = (int) Math.round(b.getDouble("txMHz") * 1e6);
             ch.rxFreq = (int) Math.round(b.getDouble("rxMHz") * 1e6);
-            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be 136–174 or 400–480 MHz";
+            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText();
             ch.power = b.optInt("power", ch.power) == 1 ? 1 : 0;
             ch.relay = b.optInt("relay", ch.relay) == 1 ? 1 : 2;
             if (b.has("notes")) ch.notes = b.optString("notes", "").trim();

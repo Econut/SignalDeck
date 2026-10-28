@@ -98,7 +98,7 @@ public final class Codeplug {
                     if (!ns.isEmpty()) p.nets.put(c, ns);
                 }
                 c.encryptSw = 2; c.encryptKey = "";
-                if (!ChannelStore.inBand(c.rxFreq) || (c.txFreq != 0 && !ChannelStore.inBand(c.txFreq) && !ChannelStore.receiveOnly(c.txFreq))) { p.skipped.add(c.name + ": outside 136–174 / 400–480 MHz"); continue; }
+                if (!ChannelStore.inBand(c.rxFreq) || (c.txFreq != 0 && !ChannelStore.inBand(c.txFreq) && !ChannelStore.receiveOnly(c.txFreq))) { p.skipped.add(c.name + ": outside " + com.macdmr.radio.DeviceProfile.detect().bandsText()); continue; }
                 p.channels.add(c);
             } catch (RuntimeException e) { p.skipped.add("A channel line could not be read"); }
         }
@@ -247,7 +247,7 @@ public final class Codeplug {
                 if (c.txType >= 2 && c.txSubCode < 0) c.txType = 0; if (c.rxType >= 2 && c.rxSubCode < 0) c.rxType = 0;
                 c.location = g.apply("Comment");
                 c.sq = 2; c.relay = 2; c.encryptSw = 2;
-                if (!ChannelStore.inBand(c.rxFreq)) { p.skipped.add(c.name + " (" + g.apply("Frequency") + " MHz): outside 136–174 / 400–480 MHz"); continue; }
+                if (!ChannelStore.inBand(c.rxFreq)) { p.skipped.add(c.name + " (" + g.apply("Frequency") + " MHz): outside " + com.macdmr.radio.DeviceProfile.detect().bandsText()); continue; }
                 if (c.txFreq != 0 && !ChannelStore.inBand(c.txFreq)) { p.skipped.add(c.name + ": transmit frequency outside the radio's bands"); continue; }
                 if (g.apply("Mode").matches("(?i)AM|DV|USB|LSB|CW|DMR|DN")) { p.skipped.add(c.name + ": " + g.apply("Mode") + " is not FM"); continue; }
                 p.channels.add(c);

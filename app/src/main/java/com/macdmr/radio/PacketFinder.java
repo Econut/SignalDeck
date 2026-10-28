@@ -152,7 +152,7 @@ public final class PacketFinder {
             if (p.trim().isEmpty()) continue;
             try { int hz = (int) Math.round(Double.parseDouble(p.trim()) * 1e6); if (ok(hz)) good.append(good.length() > 0 ? "," : "").append(p.trim()); else bad.add(p.trim()); } catch (NumberFormatException e) { bad.add(p.trim()); }
         }
-        if (!bad.isEmpty()) return "Not a frequency the radio can tune (136–174 or 400–480 MHz): " + String.join(", ", bad);
+        if (!bad.isEmpty()) return "Not a frequency the radio can tune (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + "): " + String.join(", ", bad);
         prefs.edit().putString("freqs", good.toString()).putInt("dwell", Math.max(1, Math.min(30, dwell))).putInt("hours", Math.max(1, Math.min(24, hrs))).apply();
         return null;
     }
