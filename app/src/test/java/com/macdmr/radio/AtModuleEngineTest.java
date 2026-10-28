@@ -74,6 +74,8 @@ public class AtModuleEngineTest {
         assertEquals("sa818", w6.copy(true, false).protocol);                               // an advisory's copy keeps the protocol and lines
         assertSame(w6.rxLinesOn, w6.copy(true, false).rxLinesOn);
         assertFalse(w6.dmr());                                                              // the DMR pages and choices are hidden
+        assertFalse(w6.hasMessages() || w6.hasContacts());                                 // until a text mode works on it
+        assertTrue(DeviceProfile.ARMOR_26_ULTRA.hasMessages() && DeviceProfile.ARMOR_26_ULTRA.hasContacts());
         assertTrue(DeviceProfile.ARMOR_26_ULTRA.dmr() && DeviceProfile.XPLORE_1.dmr() && DeviceProfile.UNKNOWN.dmr());
     }
 

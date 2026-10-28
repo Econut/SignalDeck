@@ -217,6 +217,14 @@ public final class DeviceProfile {
 
     /** False on a phone whose module has no DMR (an SA818-class analog module): the DMR pages and choices are hidden. */
     public boolean dmr() { return !"sa818".equals(protocol); }
+    /**
+     * Whether the Messages page has anything to carry on this phone. Today it holds DMR texts, so it follows {@link #dmr};
+     * once APRS or another text mode works on an analog-only radio (owner, 2026-10-27: expected on the W6), return true
+     * here for it and the page comes back.
+     */
+    public boolean hasMessages() { return dmr(); }
+    /** Whether the Contacts page is useful here: its entries are DMR IDs and talkgroups today; same rule as {@link #hasMessages}. */
+    public boolean hasContacts() { return dmr(); }
 
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
