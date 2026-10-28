@@ -102,6 +102,9 @@ public final class SatelliteDialog {
         long now = System.currentTimeMillis();
         final Map<TextView, String> statusViews = new java.util.LinkedHashMap<>();
         List<Satellites.Sat> order = new java.util.ArrayList<>(java.util.Arrays.asList(Satellites.all(c)));
+        int outside = 0;                                                      // satellites whose downlink this radio cannot tune (the W6: UHF only)
+        for (java.util.Iterator<Satellites.Sat> it = order.iterator(); it.hasNext(); ) if (!com.macdmr.radio.DeviceProfile.inBands(it.next().downHz)) { it.remove(); outside++; }
+        if (outside > 0) body.addView(Neo.sheetHint(c, outside + " satellite" + (outside == 1 ? " sends" : "s send") + " outside what this radio tunes (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + ") and " + (outside == 1 ? "is" : "are") + " not listed."));
         if (me != null) {                                                     // the FM satellites from AMSAT's list: soonest pass first
             final Map<String, Long> next = new java.util.HashMap<>();
             for (Satellites.Sat s : order) {

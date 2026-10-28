@@ -105,6 +105,9 @@ function applyRadio(rd) {
   rd = rd || { dmr: true, messages: true, contacts: true };
   S.dmr = rd.dmr !== false;
   document.body.classList.toggle('no-dmr', !S.dmr);
+  document.body.classList.toggle('no-rssi', rd.rssi === false);               // no signal readings: no band scope
+  document.body.classList.toggle('no-aprs144', rd.aprs144 === false);         // 144.390 out of band: no APRS monitoring
+  document.body.classList.toggle('no-wx', rd.weather === false);              // no 162 MHz weather channels
   const nav = p => document.querySelector('a[data-page="' + p + '"]');
   if (nav('messages')) nav('messages').classList.toggle('hidden', rd.messages === false);
   if (nav('contacts')) nav('contacts').classList.toggle('hidden', rd.contacts === false);
@@ -436,7 +439,7 @@ function refreshLive() {
 function renderSstvState() {
   const s = (S.status && S.status.sstv) || {}; const c = $('sstvState');
   c.textContent = s.on ? (s.status || 'LISTENING').toUpperCase() : 'OFF'; c.className = 'chip ' + (s.on ? 'green' : 'dim');
-  $('sstvToggle').textContent = s.on ? 'Stop listening' : 'Listen on 144.500';
+  $('sstvToggle').textContent = s.on ? 'Stop listening' : 'Listen on this channel';
 }
 $('sstvToggle').onclick = () => act('sstv/monitor', { on: !(S.status.sstv || {}).on });
 

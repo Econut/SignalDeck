@@ -143,7 +143,7 @@ public final class PacketFinder {
     public String freqText() { StringBuilder b = new StringBuilder(); for (int hz : freqs()) b.append(b.length() > 0 ? ", " : "").append(String.format(Locale.US, "%.3f", hz / 1e6)); return b.toString(); }
     public int dwellMin() { return prefs.getInt("dwell", 3); }
     public int hours() { return prefs.getInt("hours", 2); }
-    static boolean ok(int hz) { return (hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000); }
+    static boolean ok(int hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }
 
     /** Save the frequency list (MHz, commas), minutes per frequency and hours; returns an error text or null. */
     public String setSettings(String freqsMhz, int dwell, int hrs) {

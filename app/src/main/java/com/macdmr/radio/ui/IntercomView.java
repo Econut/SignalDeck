@@ -466,7 +466,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         return t;
     }
 
-    public void attach(RadioService s) { svc = s; s.addListener(this); }
+    public void attach(RadioService s) { svc = s; s.addListener(this); updateMeter(); }
 
     private void editGoogleKey() {
         if (svc == null) return;
@@ -618,6 +618,13 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     }
     /** New look: the meter shows a reading only while something is received; otherwise it is dark and says NO SIGNAL, with the noise floor beside it. */
     private void updateMeter() {
+        if (svc != null && !svc.profile().rssi) {                            // no signal readings (the W6): say whether something is received, no bars
+            boolean r = receivingNow();
+            if (!neo) { signal.setText(r ? "Receiving" : "No signal"); return; }
+            smeter.setVisibility(GONE);
+            smeterText.setText(r ? "RECEIVING" : "QUIET"); smeterText.setTextColor(r ? Neo.GREEN_LIGHT : Neo.DIM); smeterText.setTextSize(r ? 17 : 12.5f);
+            return;
+        }
         if (!neo) { boolean on2 = receivingNow() && lastDbm != -999; signal.setText(on2 ? "Signal: " + lastDbm + " dBm" : "No signal"); return; }   // classic: the yellow box reads only while something is heard
         boolean on = receivingNow() && lastDbm != -999;
         smeter.setDbm(on ? lastDbm : -999);

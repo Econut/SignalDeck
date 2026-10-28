@@ -43,7 +43,7 @@ public final class RmsList {
             if (hz <= 0) continue;
             if (hz < 30_000_000L) { r.hf++; continue; }
             if (!mode.toLowerCase(Locale.US).startsWith("packet") || baud(mode) != 1200) { r.otherBaud++; continue; }
-            if (!((hz >= 136_000_000L && hz <= 174_000_000L) || (hz >= 400_000_000L && hz <= 480_000_000L))) { r.outOfRange++; continue; }
+            if (!com.macdmr.radio.DeviceProfile.inBands(hz)) { r.outOfRange++; continue; }
             Gateway g = new Gateway(); g.call = row.get(cCall).trim().toUpperCase(Locale.US); g.hz = (int) hz; g.mode = mode;
             g.grid = cGrid >= 0 && cGrid < row.size() ? row.get(cGrid).trim() : ""; g.hours = cHours >= 0 && cHours < row.size() ? row.get(cHours).trim() : ""; g.qth = cQth >= 0 && cQth < row.size() ? row.get(cQth).trim() : "";
             if (g.call.matches("[A-Z0-9]{3,6}(-[0-9]{1,2})?")) r.usable.add(g);

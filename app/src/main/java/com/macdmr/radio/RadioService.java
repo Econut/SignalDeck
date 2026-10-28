@@ -209,6 +209,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public String trackSat(final com.macdmr.radio.ham.Satellites.Sat sat, final com.macdmr.radio.ham.Sgp4 el, final com.macdmr.radio.ham.SatTrack.Pass pass) {
         final android.location.Location me = lastKnownLocation();
         if (me == null) return "No position fix: turn on location";
+        if (!profile.tunable(sat.downHz)) return "This radio tunes " + profile.bandsText() + ": " + sat.name + " sends on " + String.format(java.util.Locale.US, "%.3f", sat.downHz / 1e6) + " MHz";
         stopSatTrack();
         final SatState st = new SatState(); st.name = sat.name; st.aos = pass.aos; st.los = pass.los; st.maxEl = pass.maxEl; st.waiting = true;
         st.mode = sat.mode; st.listenOnly = sat.listenOnly(); st.nominalHz = sat.downHz; satState = st; updateModeWake();
@@ -465,6 +466,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public String sstvMonitor(boolean on, boolean park) {
         if (packet == null) return "not ready";
         if (on) {
+            if (park && !profile.tunable(PacketEngine.SSTV_FREQ_HZ)) return "This radio tunes " + profile.bandsText() + ", not 144.500 MHz: use Receive here";
             if (park) {
                 ChannelStore.Channel a = new ChannelStore.Channel();
                 a.type = 1; a.rxFreq = a.txFreq = PacketEngine.SSTV_FREQ_HZ; a.band = 1; a.power = 1; a.name = "SSTV 144.500"; dataModeSquelch(a);
@@ -712,6 +714,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** APRS monitoring on another frequency (the ISS digipeater on 145.825). */
     public String aprsMonitorAt(boolean on, int hz, String name) {
         if (packet == null) return "not ready";
+        if (on && !profile.tunable(hz)) return "This radio tunes " + profile.bandsText() + ", not " + String.format(java.util.Locale.US, "%.3f", hz / 1e6) + " MHz";
         if (on) {
             aprsMonitorHz = hz;
             ChannelStore.Channel a = new ChannelStore.Channel();
@@ -1638,7 +1641,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         ChannelStore.Channel v = vfoCopy(vfo);
         int hz = delta * vfoStepHz();
         v.rxFreq += hz; v.txFreq += hz;
-        if (v.rxFreq > 174_000_000 && v.rxFreq < 400_000_000) { v.rxFreq = delta > 0 ? 400_000_000 : 174_000_000; v.txFreq = v.rxFreq; }   // jump the gap the radio cannot tune
+        long next = profile.nextTunable(v.rxFreq, delta);                                                                                  // jump a gap the radio cannot tune
+        if (next > 0 && next != v.rxFreq) { v.rxFreq = (int) next; v.txFreq = v.rxFreq; }
         if (!ChannelStore.inBand(v.rxFreq) || !ChannelStore.inBand(v.txFreq)) return;                                                     // at an end, or a repeater offset would leave the band
         v.name = "";
         applyVfo(v);

@@ -49,6 +49,13 @@ public final class DeviceProfile {
     public DirectAudio directAudio;
     /** "mcu68" (the DMR module's 68 … 10 frames, RadioEngine) or "sa818" (AT+DMO… text commands, AtModuleEngine). */
     public String protocol = "mcu68";
+    /**
+     * What the module tunes, as {low, high} pairs in Hz (both ends included). The HR-C7000 module itself refuses
+     * anything outside 136-174 and 400-480 MHz (measured 2026-10-21); the W6's SA818-class module is UHF only.
+     */
+    public long[] bandsHz = { 136_000_000L, 174_000_000L, 400_000_000L, 480_000_000L };
+    /** Whether the module reports signal strength (S-meter, band scope, fox hunt); the W6's answers no RSSI query. */
+    public boolean rssi = true;
     /** sa818: the module's receive line, a GPIO input that reads 1 while the squelch is open (null = none). */
     public String rxDetectNode;
     /** sa818: {node, value} written in order when reception starts / ends and when the transmitter keys / unkeys (the stock app's audio and PTT lines). */
@@ -180,6 +187,7 @@ public final class DeviceProfile {
             null, true, false);
     static {
         ANYSECU_W6.id = "anysecu-w6plus"; ANYSECU_W6.revision = 1; ANYSECU_W6.protocol = "sa818";
+        ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false;
         ANYSECU_W6.rxDetectNode = "/sys/class/gpio/gpio189/value";
         // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)
         ANYSECU_W6.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
@@ -232,10 +240,38 @@ public final class DeviceProfile {
      */
     public boolean firmwareCatalogued() { return dmr(); }
 
+    /** Whether the module family has the bench firmware's symbol engine (POCSAG pages, M17 voice out): the HR-C7000 family, never an SA818 module. */
+    public boolean symbolEngine() { return "mcu68".equals(protocol); }
+
+    /** Whether the module tunes {@code hz}. */
+    public boolean tunable(long hz) { for (int i = 0; i + 1 < bandsHz.length; i += 2) if (hz >= bandsHz[i] && hz <= bandsHz[i + 1]) return true; return false; }
+    /** Whether this phone's radio tunes {@code hz} (the active profile). */
+    public static boolean inBands(long hz) { return detect().tunable(hz); }
+    /** The nearest tunable frequency from {@code hz} going up ({@code dir} > 0) or down, or {@code hz} itself when it is tunable; -1 when there is none that way. */
+    public long nextTunable(long hz, int dir) {
+        if (tunable(hz)) return hz;
+        long best = -1;
+        for (int i = 0; i + 1 < bandsHz.length; i += 2) {
+            long edge = dir > 0 ? bandsHz[i] : bandsHz[i + 1];
+            if (dir > 0 ? edge > hz && (best < 0 || edge < best) : edge < hz && (best < 0 || edge > best)) best = edge;
+        }
+        return best;
+    }
+    /** The bands for people: "136–174 and 400–480 MHz". */
+    public String bandsText() {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i + 1 < bandsHz.length; i += 2) {
+            if (b.length() > 0) b.append(i + 2 >= bandsHz.length ? " and " : ", ");
+            b.append(mhz(bandsHz[i])).append('–').append(mhz(bandsHz[i + 1]));
+        }
+        return b.append(" MHz").toString();
+    }
+    private static String mhz(long hz) { return hz % 1_000_000L == 0 ? String.valueOf(hz / 1_000_000L) : String.format(java.util.Locale.US, "%.3f", hz / 1e6); }
+
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -249,6 +285,14 @@ public final class DeviceProfile {
         org.json.JSONArray ls = o.optJSONArray("lineSetup");
         if (ls != null) { p.lineSetup = new String[ls.length()][]; for (int i = 0; i < ls.length(); i++) p.lineSetup[i] = strings(ls.getJSONArray(i)); }
         p.protocol = o.optString("protocol", "mcu68"); p.rxDetectNode = o.optString("rxDetectNode", null);
+        org.json.JSONArray bands = o.optJSONArray("bandsHz");                // {low, high} pairs in Hz; default the HR-C7000 module's
+        if (bands != null) {
+            if (bands.length() < 2 || bands.length() % 2 != 0) throw new org.json.JSONException("bandsHz: pairs of low, high");
+            p.bandsHz = new long[bands.length()];
+            for (int i = 0; i < bands.length(); i++) p.bandsHz[i] = bands.getLong(i);
+            for (int i = 0; i < bands.length(); i += 2) if (p.bandsHz[i] >= p.bandsHz[i + 1]) throw new org.json.JSONException("bandsHz: low below high");
+        }
+        p.rssi = o.optBoolean("rssi", true);
         p.rxLinesOn = pairs(o.optJSONArray("rxLinesOn")); p.rxLinesOff = pairs(o.optJSONArray("rxLinesOff"));
         p.txLinesOn = pairs(o.optJSONArray("txLinesOn")); p.txLinesOff = pairs(o.optJSONArray("txLinesOff"));
         org.json.JSONObject da = o.optJSONObject("directAudio");

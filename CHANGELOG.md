@@ -4,6 +4,14 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Radio capabilities in the profile: bands, signal readings, symbol engine
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 (UHF-only module, no RSSI) | `DeviceProfile` carries what the radio tunes (`bandsHz`, default the HR-C7000 module's measured 136–174 / 400–480 MHz; W6 400–470), whether it reports signal strength (`rssi`; W6 no) and whether its module has the bench symbol engine (`symbolEngine()`); the signed profile list may set `bandsHz` and `rssi`. The eleven copies of the band check (channels, VFO arrows, band scope, satellites, nets, POTA, packet finder, Winlink gateways, web, diagnostics) use the profile; the VFO arrows jump whatever gap the radio has | `DeviceProfile`, `ChannelStore`, `RadioService`, `BandScope`, `PacketFinder`, `ham/FmSats`, `ham/NetFinder`, `ham/Pota`, `winlink/RmsList`, `web/WebHost`, `DiagReceiver` | `RadioCapsTest`; existing suites |
+| W6 | What the radio cannot do is hidden or refused, on the phone and in SignalDeck Web: APRS monitoring on 144.390 and its hints, SSTV on 144.500 and ISS SSTV outside the bands, the NOAA weather alerts, satellites sending outside the bands (counted in a note), the band scope (no RSSI), the POCSAG pager (no symbol engine); the fox hunt keeps only Be the fox; the intercom meter says RECEIVING or QUIET instead of S-units; the services refuse an out-of-band park or satellite with the bands named. Help: Device → Radios that do less | `ui/PktDialog`, `ui/SatelliteDialog`, `ui/FoxHuntDialog`, `ui/IntercomView`, `ui/HelpView`, `RadioService`, web `index.html`/`app.js`/`app.css` | W6: walked through on the phone and the web (see the PR) |
+| SignalDeck Web | The SSTV button said "Listen on 144.500" but has always listened on the current channel; it now says so | web `app.js`, `index.html` | — |
+
 ## 2026-10-27 — SignalDeck Web hides the DMR parts on a radio without DMR
 
 | Backlog | Change | Files | Test |

@@ -122,6 +122,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
 .sel-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 10px; padding: 8px 12px; border: 1px solid var(--cyan); border-radius: 12px; background: rgba(25,211,255,.06); }
 .gallery.selecting a { position: relative; }
 .no-dmr .dmr-only { display: none !important; }
+.no-rssi .rssi-only, .no-aprs144 .aprs144-only, .no-wx .wx-only { display: none !important; }
 .gallery.selecting a::after { content: ''; position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,.8); background: rgba(2,6,10,.55); }
 .gallery.selecting a.sel { border-color: var(--cyan); box-shadow: 0 0 0 2px var(--cyan); }
 .gallery.selecting a.sel::after { background: var(--cyan); border-color: var(--cyan); content: '\2713'; color: #02121a; font: 700 15px/22px sans-serif; text-align: center; }

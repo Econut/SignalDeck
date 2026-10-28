@@ -65,6 +65,10 @@ public final class FoxHuntDialog {
         for (TextView b : new TextView[] { map, clear }) { b.setTextSize(14); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (6 * d), (int) (3 * d), 0); r2.addView(b, lp); }
         body.addView(r2);
 
+        if (!svc.profile().rssi) {                                          // no signal readings (the W6): only the fox side works
+            for (int i = body.getChildCount() - 1; i >= 1; i--) body.removeViewAt(i);   // keep the title, drop the hunt
+            body.addView(Neo.sheetHint(c, "This radio does not report signal strength, so it cannot hunt a fox. It can be one: the beacon below is what the hunters look for."));
+        }
         body.addView(Neo.sheetSection(c, "Be the fox"));
         final TextView foxBtn = Neo.button(c, svc.foxTxOn() ? "Stop the fox beacon" : "Start the fox beacon", "bolt", Neo.VIOLET);
         body.addView(foxBtn, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
