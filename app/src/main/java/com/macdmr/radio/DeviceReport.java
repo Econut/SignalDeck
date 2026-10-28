@@ -54,15 +54,32 @@ public final class DeviceReport {
     /** Packages the last report took for the stock walkie-talkie app (the first-run check watches the first one). */
     public static volatile List<String> lastCandidates = new ArrayList<>();
 
+    /**
+     * Bench (adb {@code checks --el hosttime}): the host's clock minus the phone's. A phone whose clock is wrong (the W6 boots
+     * at its build date) would otherwise name its folders months off and sort them wrongly. 0 = trust the phone.
+     */
+    public static volatile long clockOffsetMs;
+    static long now() { return System.currentTimeMillis() + clockOffsetMs; }
+
+    /** One line about the phone's clock when the host's differs by two minutes or more, else null. */
+    static String clockNote(long phoneMs, long offsetMs) {
+        if (Math.abs(offsetMs) < 120_000L) return null;
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US); f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        long d = Math.abs(offsetMs) / 86_400_000L, h = Math.abs(offsetMs) / 3600_000L % 24, m = Math.abs(offsetMs) / 60_000L % 60;
+        return "phone " + f.format(new Date(phoneMs)) + " UTC, host " + f.format(new Date(phoneMs + offsetMs)) + " UTC: the phone is "
+                + (d > 0 ? d + " d " : "") + (d > 0 || h > 0 ? h + " h " : "") + m + " min " + (offsetMs > 0 ? "behind" : "ahead") + " (folder and header use the host's time)";
+    }
+
     public static File generate(Context c, Progress p) throws Exception {
         String tag = (Build.MANUFACTURER + "_" + Build.MODEL).replaceAll("[^A-Za-z0-9._-]+", "_");
-        File dir = new File(reportRoot(), tag + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()));
+        File dir = new File(reportRoot(), tag + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date(now())));
         if (!dir.mkdirs() && !dir.isDirectory()) throw new Exception("cannot create " + dir);
         StringBuilder r = new StringBuilder();
         boolean root = suPresent() && RootSetup.haveRoot();
 
         p.step("Phone");
-        h(r, "SignalDeck device report " + BuildConfig.VERSION_NAME + "  " + new Date());
+        h(r, "SignalDeck device report " + BuildConfig.VERSION_NAME + "  " + new Date(now()));
+        String clock = clockNote(System.currentTimeMillis(), clockOffsetMs); if (clock != null) kv(r, "clock", clock);
         kv(r, "manufacturer", Build.MANUFACTURER); kv(r, "brand", Build.BRAND); kv(r, "model", Build.MODEL); kv(r, "device", Build.DEVICE); kv(r, "product", Build.PRODUCT);
         kv(r, "board", Build.BOARD); kv(r, "hardware", Build.HARDWARE); kv(r, "fingerprint", Build.FINGERPRINT); kv(r, "display", Build.DISPLAY);
         kv(r, "android", Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ", security patch " + Build.VERSION.SECURITY_PATCH + ")");
@@ -209,7 +226,7 @@ public final class DeviceReport {
     /** The report folder a follow-up step (listen check) should add to: the newest one if it was made today, else a new report. */
     public static File currentOrNew(Context c) {
         File d = newestDir();
-        if (d != null && System.currentTimeMillis() - createdAt(d) < 12 * 3600_000L) return d;
+        if (d != null && now() - createdAt(d) < 12 * 3600_000L) return d;
         try { generate(c, s -> { }); } catch (Throwable ignored) { }
         return newestDir();
     }

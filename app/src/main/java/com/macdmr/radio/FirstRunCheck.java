@@ -121,6 +121,42 @@ public final class FirstRunCheck {
         return r.toString();
     }
 
+    /**
+     * Bench (adb {@code checks --es watch …}): which app the 15 s watch opens, as the Run all checks dialog would offer it.
+     * "none" skips the watch, a package name is taken as given, "auto" (or nothing) takes the profile's stock app, else
+     * the best-ranked candidate with a launcher icon, else none.
+     */
+    static String benchWatch(String arg, String profileApp, java.util.List<RadioAppFinder.App> ranked) {
+        if ("none".equals(arg)) return null;
+        if (arg != null && !arg.isEmpty() && !"auto".equals(arg)) return arg;
+        if (profileApp != null && !profileApp.isEmpty()) return profileApp;
+        for (RadioAppFinder.App a : ranked) if (a.launcher) return a.pkg;
+        return null;
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean benchBusy = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Bench (adb): Run all checks with no screen, as {@code DiagReceiver checks}. Progress, the folder and the zip go to the
+     * log under the tag "BenchChecks" ("done <folder> <zip>" or "failed …" ends a run), which scripts/w6/run_checks.sh waits for.
+     */
+    static void benchRun(Context c, RadioService svc, String watchArg, boolean trial, long hostTime) {
+        if (!benchBusy.compareAndSet(false, true)) { android.util.Log.w("BenchChecks", "busy: a run is in progress"); return; }
+        if (hostTime > 0) DeviceReport.clockOffsetMs = hostTime - System.currentTimeMillis();
+        new Thread(() -> {
+            try {
+                String watch = benchWatch(watchArg, svc.profile().supported ? svc.profile().stockApp : "",
+                        "none".equals(watchArg) || svc.isReady() || !RootSetup.haveRoot() ? new java.util.ArrayList<>() : RadioAppFinder.rank(c));
+                android.util.Log.i("BenchChecks", "start watch=" + watch + " trial=" + trial + " clockOffsetMs=" + DeviceReport.clockOffsetMs);
+                File zip = run(c, svc, trial, watch, t -> android.util.Log.i("BenchChecks", "step " + t));
+                c.getSharedPreferences("radio", Context.MODE_PRIVATE).edit().putLong("supportChecks", System.currentTimeMillis()).apply();
+                File dir = DeviceReport.newestDir();
+                android.util.Log.i("BenchChecks", "done " + (dir == null ? "-" : dir.getAbsolutePath()) + " " + zip.getAbsolutePath());
+            } catch (Throwable t) { android.util.Log.w("BenchChecks", "failed " + t); }
+            finally { benchBusy.set(false); }
+        }, "bench-checks").start();
+    }
+
     static final String STOCK_ANSWERS = "module replies in its log: ", NONE_RECOGNISED = "none recognised";
 
     /** The module-replies line of a stock-app watch, or null when it found none. */

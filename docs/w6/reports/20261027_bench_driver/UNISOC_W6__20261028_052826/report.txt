@@ -1,0 +1,1523 @@
+
+==== SignalDeck device report 1.0.0-beta.20  Wed Oct 28 05:28:26 GMT+08:00 2026 ====
+  clock                        phone 2026-05-25 11:05 UTC, host 2026-10-27 21:28 UTC: the phone is 155 d 10 h 22 min behind (folder and header use the host's time)
+  manufacturer                 UNISOC
+  brand                        UNISOC
+  model                        W6+
+  device                       sl8541e_3h10_32b
+  product                      sl8541e_3h10_go_32b
+  board                        sl8541e_3h10_32b
+  hardware                     sl8541e_3h10_32b
+  fingerprint                  UNISOC/sl8541e_1h10_32b_Natv/sl8541e_1h10_32b:12/SP1A.210812.016/58:user/release-keys
+  display                      W6+_V1.0_UHF_JG_FT13_R_202605251847
+  android                      12 (SDK 31, security patch 2023-04-05)
+  abis                         armeabi-v7a,armeabi
+  kernel                       5.4.147+-ab58
+  selinux                      permissive
+  su present                   true
+  root granted to this app     true
+  magisk                       31.1:MAGISK:R 31100
+  ro.product.model             W6+
+  ro.board.platform            sp9832e
+  ro.hardware                  sl8541e_3h10_32b
+  ro.build.version.sdk         31
+  ro.vendor.build.fingerprint  UNISOC/sl8541e_1h10_32b_Natv/sl8541e_1h10_32b:12/SP1A.210812.016/58:user/release-keys
+  persist.sys.usb.config       adb
+  ro.boot.verifiedbootstate    orange
+  ro.product.vendor.brand      UNISOC
+  ro.product.vendor.manufacturer UNISOC
+  ro.product.vendor.model      W6+
+  ro.product.vendor.device     sl8541e_3h10_32b
+  ro.product.odm.model         W6+
+  ro.product.board             sl8541e_3h10_32b
+  ro.board.platform            sp9832e
+  profile detected             none (this is an unsupported phone)
+
+==== Serial ports (File API) ====
+  ttyGS7         read=false write=false
+  ttyGS6         read=false write=false
+  ttyGS5         read=false write=false
+  ttyGS4         read=false write=false
+  ttyGS3         read=false write=false
+  ttyGS2         read=false write=false
+  ttyGS1         read=false write=false
+  ttyGS0         read=false write=false
+  ttyS2          read=true write=true
+/dev/tty             /dev/tty        5       0 system:/dev/tty
+/dev/console         /dev/console    5       1 system:console
+/dev/ptmx            /dev/ptmx       5       2 system
+sprd-serial-ex       /dev/ttySE    496 0-7 serial
+ttyBT                /dev/ttyBT    497       0 system:/dev/tty
+g_serial             /dev/ttyGS    245 0-7 serial
+usbserial            /dev/ttyUSB   188 0-511 serial
+acm                  /dev/ttyACM   166 0-255 serial
+sprd_serial          /dev/ttyS     246 0-7 serial
+pty_slave            /dev/pts      136 0-1048575 pty:slave
+pty_master           /dev/ptm      128 0-1048575 pty:master
+
+==== Serial ports (root: labels, drivers) ====
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   0 1970-01-01 08:00 /dev/ttyGS0
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   1 1970-01-01 08:00 /dev/ttyGS1
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   2 1970-01-01 08:00 /dev/ttyGS2
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   3 1970-01-01 08:00 /dev/ttyGS3
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   4 1970-01-01 08:00 /dev/ttyGS4
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   5 1970-01-01 08:00 /dev/ttyGS5
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   6 1970-01-01 08:00 /dev/ttyGS6
+crw-rw---- 1 system system u:object_r:serial_device:s0   245,   7 1970-01-01 08:00 /dev/ttyGS7
+crw-rw-rw- 1 system system u:object_r:console_device:s0  246,   2 2026-05-25 19:01 /dev/ttyS2
+crw-rw-rw- 1 system system u:object_r:device:s0          496,   0 2026-05-25 19:02 /dev/ttySE0
+
+/dev/tty             /dev/tty        5       0 system:/dev/tty
+/dev/console         /dev/console    5       1 system:console
+/dev/ptmx            /dev/ptmx       5       2 system
+sprd-serial-ex       /dev/ttySE    496 0-7 serial
+ttyBT                /dev/ttyBT    497       0 system:/dev/tty
+g_serial             /dev/ttyGS    245 0-7 serial
+usbserial            /dev/ttyUSB   188 0-511 serial
+acm                  /dev/ttyACM   166 0-255 serial
+sprd_serial          /dev/ttyS     246 0-7 serial
+pty_slave            /dev/pts      136 0-1048575 pty:slave
+pty_master           /dev/ptm      128 0-1048575 pty:master
+
+/dev/ttyS2: speed 9600 baud; rows 0; columns 0; line = 0;
+/dev/ttySE0: speed 115200 baud; rows 0; columns 0; line = 0;
+
+==== Platform devices that look like a radio module (/sys/devices/platform) ====
+  flash-gpios
+      driver_override          r=true w=false  (null)
+      modalias                 r=true w=false  of:Nflash-gpiosT(null)Csprd,flash-sgm3785
+      uevent                   r=true w=false  DRIVER=flash-sgm3785 OF_NAME=flash-gpios OF_FULLNAME=/flash-gpios OF_COMPATIBLE_
+  gpio-keys
+      disabled_switches        r=true w=false  
+      hook_status              r=true w=true  0
+      disabled_keys            r=true w=false  
+      switches                 r=true w=false  
+      driver_override          r=true w=false  (null)
+      keys                     r=true w=false  59,116,147
+      modalias                 r=true w=false  of:Ngpio-keysT(null)Cgpio-keys
+      uevent                   r=true w=false  DRIVER=gpio-keys OF_NAME=gpio-keys OF_FULLNAME=/gpio-keys OF_COMPATIBLE_0=gpio-k
+  extcon-gpio
+      driver_override          r=true w=false  (null)
+      modalias                 r=true w=false  of:Nextcon-gpioT(null)Clinux,extcon-usb-gpio
+      uevent                   r=true w=false  DRIVER=extcon-usb-gpio OF_NAME=extcon-gpio OF_FULLNAME=/extcon-gpio OF_COMPATIBL
+(rc=1)
+
+==== Device tree of the radio module (root) ====
+
+
+==== GPIO / misc nodes ====
+crw-------  1 root        root         u:object_r:device:s0                        10, 120 1970-01-01 08:00 flyscale_misc
+crw-------  1 root        root         u:object_r:device:s0                       254,   0 1970-01-01 08:00 gpiochip0
+crw-------  1 root        root         u:object_r:device:s0                       254,   1 1970-01-01 08:00 gpiochip1
+crw-------  1 root        root         u:object_r:device:s0                       254,   2 1970-01-01 08:00 gpiochip2
+crw-------  1 root        root         u:object_r:device:s0                       254,   3 1970-01-01 08:00 gpiochip3
+crw-------  1 root        root         u:object_r:device:s0                       254,   4 1970-01-01 08:00 gpiochip4
+crw-------  1 root        root         u:object_r:device:s0                       254,   5 1970-01-01 08:00 gpiochip5
+export
+gpio179
+gpio181
+gpio183
+gpio187
+gpio188
+gpio189
+gpio212
+gpio215
+gpio222
+gpio223
+gpio237
+gpio247
+gpio249
+gpio285
+gpio322
+gpiochip144
+gpiochip160
+gpiochip416
+gpiochip440
+gpiochip464
+gpiochip488
+unexport
+
+==== Installed apps that look like the stock walkie-talkie app ====
+
+==== Walkie-talkie app candidates, ranked (score: evidence) ====
+  12  Intercom (com.flyscale.analogpoc): its name sounds like a radio app, has a launcher icon, ships a serial-port library, its code opens /dev/tty… ports
+  examined below: com.flyscale.analogpoc
+  copied com.flyscale.analogpoc_FlyscaleAnalog400.apk (10966 kB)
+
+==== dumpsys package com.flyscale.analogpoc (root) ====
+Activity Resolver Table:
+  Non-Data Actions:
+      android.intent.action.MAIN:
+        ###### com.flyscale.analogpoc/.main.ChannelActivity filter be489be
+          Action: "android.intent.action.MAIN"
+Receiver Resolver Table:
+  Non-Data Actions:
+      android.intent.action.LOCALE_CHANGED:
+        ###### com.flyscale.analogpoc/.receiver.LocaleChangeReceiver filter f5b83ca
+          Action: "android.intent.action.LOCALE_CHANGED"
+      android.intent.action.BOOT_COMPLETED:
+        93aba1f com.flyscale.analogpoc/.receiver.BootReceiver filter 5b0e16c
+          Action: "android.intent.action.BOOT_COMPLETED"
+    sharedUser=SharedUserSetting{c2871fb android.uid.system/1000}
+    codePath=/system/priv-app/FlyscaleAnalog400
+    resourcePath=/system/priv-app/FlyscaleAnalog400
+    primaryCpuAbi=armeabi-v7a
+    versionName=1.0
+    flags=[ SYSTEM HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE PRIVILEGED PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]
+    installPermissionsFixed=false
+    pkgFlags=[ SYSTEM HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]
+    requested permissions:
+      android.permission.KILL_BACKGROUND_PROCESSES
+      android.permission.RECEIVE_BOOT_COMPLETED
+      android.permission.FOREGROUND_SERVICE
+      android.permission.MODIFY_AUDIO_SETTINGS
+      android.permission.WRITE_EXTERNAL_STORAGE
+      android.permission.READ_EXTERNAL_STORAGE
+    install permissions:
+      android.permission.ACCESS_CACHE_FILESYSTEM: granted=true
+      android.permission.BIND_INCALL_SERVICE: granted=true
+      android.permission.WRITE_SETTINGS: granted=true
+      android.permission.CONFIGURE_WIFI_DISPLAY: granted=true
+      android.permission.CONFIGURE_DISPLAY_COLOR_MODE: granted=true
+      android.permission.RECOVERY: granted=true
+      android.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS: granted=true
+      android.permission.BIND_ATTENTION_SERVICE: granted=true
+      com.android.unisoc.telephony.server.permission.RADIO_INTERACTOR_COMMON: granted=true
+      android.permission.USE_CREDENTIALS: granted=true
+      android.permission.MODIFY_AUDIO_SETTINGS: granted=true
+      android.permission.MANAGE_EXTERNAL_STORAGE: granted=true
+      android.permission.ACCESS_CHECKIN_PROPERTIES: granted=true
+      android.permission.MODIFY_AUDIO_ROUTING: granted=true
+      android.permission.INSTALL_LOCATION_PROVIDER: granted=true
+      android.permission.USE_RESERVED_DISK: granted=true
+      android.permission.SYSTEM_ALERT_WINDOW: granted=true
+      com.spreadtrum.ims.permisson.IMS_COMMON: granted=true
+      android.permission.BROADCAST_PHONE_ACCOUNT_REGISTRATION: granted=true
+      android.permission.CLEAR_APP_USER_DATA: granted=true
+      android.permission.BROADCAST_CALLLOG_INFO: granted=true
+      android.permission.ACCESS_FM_RADIO: granted=true
+      android.permission.NFC: granted=true
+      android.permission.BIND_ROTATION_RESOLVER_SERVICE: granted=true
+      android.permission.NETWORK_SETTINGS: granted=true
+      android.permission.CHANGE_OVERLAY_PACKAGES: granted=true
+      android.permission.CALL_PRIVILEGED: granted=true
+      android.permission.CHANGE_NETWORK_STATE: granted=true
+      android.permission.MASTER_CLEAR: granted=true
+      android.permission.FOREGROUND_SERVICE: granted=true
+      android.permission.WRITE_SYNC_SETTINGS: granted=true
+      android.permission.MANAGE_DYNAMIC_SYSTEM: granted=true
+      android.permission.RECEIVE_BOOT_COMPLETED: granted=true
+      com.google.android.googleapps.permission.GOOGLE_AUTH: granted=true
+      android.permission.MANAGE_ROLE_HOLDERS: granted=true
+      android.permission.PEERS_MAC_ADDRESS: granted=true
+      com.spreadtrum.ims.permisson.SRMI_COMMON: granted=true
+      android.permission.DEVICE_POWER: granted=true
+      android.permission.READ_PRINT_SERVICES: granted=true
+      android.permission.MANAGE_PROFILE_AND_DEVICE_OWNERS: granted=true
+      android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: granted=true
+      android.permission.READ_PROFILE: granted=true
+      android.permission.BLUETOOTH: granted=true
+      android.permission.WRITE_MEDIA_STORAGE: granted=true
+      android.permission.WRITE_BLOCKED_NUMBERS: granted=true
+      android.permission.INTERNET: granted=true
+      com.unisoc.permisson.SMS_COMMON: granted=true
+      android.permission.ACCESS_BROADCAST_RADIO: granted=true
+      android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION: granted=true
+      android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND: granted=true
+      android.permission.BLUETOOTH_ADMIN: granted=true
+      android.permission.CONTROL_VPN: granted=true
+      android.permission.UPDATE_DEVICE_STATS: granted=true
+      android.permission.MANAGE_FINGERPRINT: granted=true
+      android.permission.READ_PROJECTION_STATE: granted=true
+      android.permission.BIND_CONNECTION_SERVICE: granted=true
+      android.permission.ACCESS_INSTANT_APPS: granted=true
+      android.permission.ACCESS_CONTEXT_HUB: granted=true
+      android.permission.MANAGE_USB: granted=true
+      android.permission.INTERACT_ACROSS_USERS_FULL: granted=true
+      android.permission.STOP_APP_SWITCHES: granted=true
+      android.permission.BATTERY_STATS: granted=true
+      android.permission.PACKAGE_USAGE_STATS: granted=true
+      android.permission.MOUNT_UNMOUNT_FILESYSTEMS: granted=true
+      android.permission.TETHER_PRIVILEGED: granted=true
+      android.permission.WRITE_SECURE_SETTINGS: granted=true
+      android.permission.MANAGE_DEBUGGING: granted=true
+      android.permission.MOVE_PACKAGE: granted=true
+      android.permission.READ_BLOCKED_NUMBERS: granted=true
+      android.permission.READ_SEARCH_INDEXABLES: granted=true
+      android.permission.READ_PRIVILEGED_PHONE_STATE: granted=true
+      android.permission.TRIGGER_TIME_ZONE_RULES_CHECK: granted=true
+      android.permission.ACCESS_DOWNLOAD_MANAGER: granted=true
+      android.permission.BROADCAST_STICKY: granted=true
+      android.permission.BLUETOOTH_PRIVILEGED: granted=true
+      android.permission.HARDWARE_TEST: granted=true
+      android.permission.USE_BIOMETRIC_INTERNAL: granted=true
+      android.permission.INSTALL_DYNAMIC_SYSTEM: granted=true
+      android.permission.SUBSTITUTE_NOTIFICATION_APP_NAME: granted=true
+      android.intent.category.MASTER_CLEAR.permission.C2D_MESSAGE: granted=true
+      android.permission.BIND_JOB_SERVICE: granted=true
+      android.permission.CONFIRM_FULL_BACKUP: granted=true
+      android.permission.WRITE_APN_SETTINGS: granted=true
+      android.permission.CHANGE_WIFI_STATE: granted=true
+      com.myavro.update.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+      android.permission.MANAGE_USERS: granted=true
+      android.permission.DELETE_CACHE_FILES: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+      android.permission.DISABLE_KEYGUARD: granted=true
+      android.permission.BACKUP: granted=true
+      android.permission.CHANGE_CONFIGURATION: granted=true
+      android.permission.USER_ACTIVITY: granted=true
+      android.permission.LOCAL_MAC_ADDRESS: granted=true
+      android.permission.READ_LOGS: granted=true
+      android.permission.COPY_PROTECTED_DATA: granted=true
+      android.permission.INTERACT_ACROSS_USERS: granted=true
+      android.permission.SET_KEYBOARD_LAYOUT: granted=true
+      android.permission.BROADCAST_CLOSE_SYSTEM_DIALOGS: granted=true
+      android.permission.READ_DREAM_STATE: granted=true
+      com.unisoc.permission.UPLMNSETTINGS: granted=true
+      android.permission.MANAGE_APP_OPS_RESTRICTIONS: granted=true
+      android.permission.KILL_BACKGROUND_PROCESSES: granted=true
+      android.permission.MANAGE_USER_OEM_UNLOCK_STATE: granted=true
+      android.permission.REQUEST_NETWORK_SCORES: granted=true
+      android.permission.CONNECTIVITY_USE_RESTRICTED_NETWORKS: granted=true
+      android.permission.WRITE_USER_DICTIONARY: granted=true
+      android.permission.READ_DREAM_SUPPRESSION: granted=true
+      android.permission.READ_SYNC_STATS: granted=true
+      android.permission.REBOOT: granted=true
+      android.permission.SCHEDULE_EXACT_ALARM: granted=true
+      android.permission.REQUEST_DELETE_PACKAGES: granted=true
+      android.permission.OEM_UNLOCK_STATE: granted=true
+      android.permission.MANAGE_DEVICE_ADMINS: granted=true
+      android.permission.CHANGE_APP_IDLE_STATE: granted=true
+      android.permission.BIND_SETTINGS_SUGGESTIONS_SERVICE: granted=true
+      android.permission.MANAGE_NOTIFICATION_LISTENERS: granted=true
+      android.permission.SET_POINTER_SPEED: granted=true
+      android.permission.MANAGE_NOTIFICATIONS: granted=true
+      android.permission.SEND_SHOW_SUSPENDED_APP_DETAILS: granted=true
+      android.permission.READ_SYNC_SETTINGS: granted=true
+      android.permission.BIND_CELL_BROADCAST_SERVICE: granted=true
+      android.permission.LOADER_USAGE_STATS: granted=true
+      android.permission.OVERRIDE_WIFI_CONFIG: granted=true
+      android.permission.FORCE_STOP_PACKAGES: granted=true
+      android.permission.SUGGEST_MANUAL_TIME_AND_ZONE: granted=true
+      android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS: granted=true
+      android.permission.ACCESS_NOTIFICATIONS: granted=true
+      android.permission.HANDLE_CALL_INTENT: granted=true
+      android.permission.MEDIA_RESOURCE_OVERRIDE_PID: granted=true
+      android.permission.VIBRATE: granted=true
+      android.permission.MANAGE_APP_HIBERNATION: granted=true
+      android.permission.HANDLE_CAR_MODE_CHANGES: granted=true
+      android.permission.READ_USER_DICTIONARY: granted=true
+      android.permission.MANAGE_SCOPED_ACCESS_DIRECTORY_PERMISSIONS: granted=true
+      android.permission.ACCESS_WIFI_STATE: granted=true
+      android.permission.USE_BIOMETRIC: granted=true
+      android.permission.MANAGE_APP_OPS_MODES: granted=true
+      android.permission.CONTROL_INCALL_EXPERIENCE: granted=true
+      android.permission.MODIFY_PHONE_STATE: granted=true
+      android.permission.STATUS_BAR: granted=true
+      android.permission.QUERY_ALL_PACKAGES: granted=true
+      android.permission.READ_DEVICE_CONFIG: granted=true
+      android.permission.LOCATION_HARDWARE: granted=true
+      android.permission.UNLIMITED_TOASTS: granted=true
+      android.permission.WAKE_LOCK: granted=true
+      android.permission.BIND_NETWORK_RECOMMENDATION_SERVICE: granted=true
+      android.permission.UPDATE_APP_OPS_STATS: granted=true
+      android.permission.READ_OEM_UNLOCK_STATE: granted=true
+      android.permission.MEDIA_CONTENT_CONTROL: granted=true
+      android.permission.DELETE_PACKAGES: granted=true
+    User 0: ceDataInode=1867 installed=true hidden=false suspended=false distractionFlags=0 stopped=true notLaunched=false enabled=0 instant=false virtual=false
+  queryable via interaction:
+        [com.spreadtrum.ims,com.android.mms.service,com.android.providers.telephony,com.android.cellbroadcastservice,com.sprd.firewall,com.unisoc.phone,com.android.ons,com.android.phone,com.android.unisoc.telephony.server]
+        com.android.statementservice
+        com.android.cellbroadcastreceiver
+        com.android.permissioncontroller
+        android.ext.services
+      com.android.permissioncontroller:
+      android.ext.services:
+  SharedUser [android.uid.system] (c2871fb):
+    install permissions:
+      android.permission.ACCESS_CACHE_FILESYSTEM: granted=true
+      android.permission.BIND_INCALL_SERVICE: granted=true
+      android.permission.WRITE_SETTINGS: granted=true
+      android.permission.CONFIGURE_WIFI_DISPLAY: granted=true
+      android.permission.CONFIGURE_DISPLAY_COLOR_MODE: granted=true
+      android.permission.RECOVERY: granted=true
+      android.permission.CONTROL_DISPLAY_COLOR_TRANSFORMS: granted=true
+      android.permission.BIND_ATTENTION_SERVICE: granted=true
+      com.android.unisoc.telephony.server.permission.RADIO_INTERACTOR_COMMON: granted=true
+      android.permission.USE_CREDENTIALS: granted=true
+      android.permission.MODIFY_AUDIO_SETTINGS: granted=true
+      android.permission.MANAGE_EXTERNAL_STORAGE: granted=true
+      android.permission.ACCESS_CHECKIN_PROPERTIES: granted=true
+      android.permission.MODIFY_AUDIO_ROUTING: granted=true
+      android.permission.INSTALL_LOCATION_PROVIDER: granted=true
+      android.permission.USE_RESERVED_DISK: granted=true
+      android.permission.SYSTEM_ALERT_WINDOW: granted=true
+      com.spreadtrum.ims.permisson.IMS_COMMON: granted=true
+      android.permission.BROADCAST_PHONE_ACCOUNT_REGISTRATION: granted=true
+      android.permission.CLEAR_APP_USER_DATA: granted=true
+      android.permission.BROADCAST_CALLLOG_INFO: granted=true
+      android.permission.ACCESS_FM_RADIO: granted=true
+      android.permission.NFC: granted=true
+      android.permission.BIND_ROTATION_RESOLVER_SERVICE: granted=true
+      android.permission.NETWORK_SETTINGS: granted=true
+      android.permission.CHANGE_OVERLAY_PACKAGES: granted=true
+      android.permission.CALL_PRIVILEGED: granted=true
+      android.permission.CHANGE_NETWORK_STATE: granted=true
+      android.permission.MASTER_CLEAR: granted=true
+      android.permission.FOREGROUND_SERVICE: granted=true
+      android.permission.WRITE_SYNC_SETTINGS: granted=true
+      android.permission.MANAGE_DYNAMIC_SYSTEM: granted=true
+      android.permission.RECEIVE_BOOT_COMPLETED: granted=true
+      com.google.android.googleapps.permission.GOOGLE_AUTH: granted=true
+      android.permission.MANAGE_ROLE_HOLDERS: granted=true
+      android.permission.PEERS_MAC_ADDRESS: granted=true
+      com.spreadtrum.ims.permisson.SRMI_COMMON: granted=true
+      android.permission.DEVICE_POWER: granted=true
+      android.permission.READ_PRINT_SERVICES: granted=true
+      android.permission.MANAGE_PROFILE_AND_DEVICE_OWNERS: granted=true
+      android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS: granted=true
+      android.permission.READ_PROFILE: granted=true
+      android.permission.BLUETOOTH: granted=true
+      android.permission.WRITE_MEDIA_STORAGE: granted=true
+      android.permission.WRITE_BLOCKED_NUMBERS: granted=true
+      android.permission.INTERNET: granted=true
+      com.unisoc.permisson.SMS_COMMON: granted=true
+      android.permission.ACCESS_BROADCAST_RADIO: granted=true
+      android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION: granted=true
+      android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND: granted=true
+      android.permission.BLUETOOTH_ADMIN: granted=true
+      android.permission.CONTROL_VPN: granted=true
+      android.permission.UPDATE_DEVICE_STATS: granted=true
+      android.permission.MANAGE_FINGERPRINT: granted=true
+      android.permission.READ_PROJECTION_STATE: granted=true
+      android.permission.BIND_CONNECTION_SERVICE: granted=true
+      android.permission.ACCESS_INSTANT_APPS: granted=true
+      android.permission.ACCESS_CONTEXT_HUB: granted=true
+      android.permission.MANAGE_USB: granted=true
+      android.permission.INTERACT_ACROSS_USERS_FULL: granted=true
+      android.permission.STOP_APP_SWITCHES: granted=true
+      android.permission.BATTERY_STATS: granted=true
+      android.permission.PACKAGE_USAGE_STATS: granted=true
+      android.permission.MOUNT_UNMOUNT_FILESYSTEMS: granted=true
+      android.permission.TETHER_PRIVILEGED: granted=true
+      android.permission.WRITE_SECURE_SETTINGS: granted=true
+      android.permission.MANAGE_DEBUGGING: granted=true
+      android.permission.MOVE_PACKAGE: granted=true
+      android.permission.READ_BLOCKED_NUMBERS: granted=true
+      android.permission.READ_SEARCH_INDEXABLES: granted=true
+      android.permission.READ_PRIVILEGED_PHONE_STATE: granted=true
+      android.permission.TRIGGER_TIME_ZONE_RULES_CHECK: granted=true
+      android.permission.ACCESS_DOWNLOAD_MANAGER: granted=true
+      android.permission.BROADCAST_STICKY: granted=true
+      android.permission.BLUETOOTH_PRIVILEGED: granted=true
+      android.permission.HARDWARE_TEST: granted=true
+      android.permission.USE_BIOMETRIC_INTERNAL: granted=true
+      android.permission.INSTALL_DYNAMIC_SYSTEM: granted=true
+      android.permission.SUBSTITUTE_NOTIFICATION_APP_NAME: granted=true
+      android.intent.category.MASTER_CLEAR.permission.C2D_MESSAGE: granted=true
+      android.permission.BIND_JOB_SERVICE: granted=true
+      android.permission.CONFIRM_FULL_BACKUP: granted=true
+      android.permission.WRITE_APN_SETTINGS: granted=true
+      android.permission.CHANGE_WIFI_STATE: granted=true
+      com.myavro.update.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true
+      android.permission.MANAGE_USERS: granted=true
+      android.permission.DELETE_CACHE_FILES: granted=true
+      android.permission.ACCESS_NETWORK_STATE: granted=true
+      android.permission.DISABLE_KEYGUARD: granted=true
+      android.permission.BACKUP: granted=true
+      android.permission.CHANGE_CONFIGURATION: granted=true
+      android.permission.USER_ACTIVITY: granted=true
+      android.permission.LOCAL_MAC_ADDRESS: granted=true
+      android.permission.READ_LOGS: granted=true
+      android.permission.COPY_PROTECTED_DATA: granted=true
+      android.permission.INTERACT_ACROSS_USERS: granted=true
+      android.permission.SET_KEYBOARD_LAYOUT: granted=true
+      android.permission.BROADCAST_CLOSE_SYSTEM_DIALOGS: granted=true
+      android.permission.READ_DREAM_STATE: granted=true
+      com.unisoc.permission.UPLMNSETTINGS: granted=true
+      android.permission.MANAGE_APP_OPS_RESTRICTIONS: granted=true
+      android.permission.KILL_BACKGROUND_PROCESSES: granted=true
+      android.permission.MANAGE_USER_OEM_UNLOCK_STATE: granted=true
+      android.permission.REQUEST_NETWORK_SCORES: granted=true
+      android.permission.CONNECTIVITY_USE_RESTRICTED_NETWORKS: granted=true
+      android.permission.WRITE_USER_DICTIONARY: granted=true
+      android.permission.READ_DREAM_SUPPRESSION: granted=true
+      android.permission.READ_SYNC_STATS: granted=true
+
+
+==== Databases of com.flyscale.analogpoc (structure only: tables, columns, row counts; root) ====
+  files: channel_list_detial.db channel_list_detial.db-journal
+  channel_list_detial.db:
+    android_metadata (1 rows): locale
+    CHANNEL_INFO (128 rows): CHANNEL_ID GBW TFV RFV RXCXCSS TXCXCSS SQ POWER
+
+
+==== Clues in com.flyscale.analogpoc's code (paths, audio parameters, serial speeds, PTT log texts) ====
+  paths: /dev/ttyS2  /proc/self/fd/  /proc/tty/drivers  /sys/class/gpio/gpio179/value  /sys/class/gpio/gpio181/value  /sys/class/gpio/gpio183/value  /sys/class/gpio/gpio188/value  /sys/class/gpio/gpio189/value  /sys/class/gpio/gpio212/value  /sys/class/gpio/gpio222/value  /sys/class/gpio/gpio223/value  /sys/class/gpio/gpio249/value  /sys/class/gpio/gpio322/value  /sys/class/leds/sc27xx  /sys/kernel/dmr_state/dmr_state  /sys/kernel/ext_pa_en/ext_pa_en  /sys/kernel/m6_pa_en/m6_pa_en
+  audio/system parameters: -
+  serial speeds: -
+  log texts about the radio:
+    , isPttButton ==
+    FPTt\@n
+    in onInterceptTouchEvent
+
+
+==== Framework / vendor files of interest ====
+  /system/framework          boot-radio_interactor_common.vdex radio_interactor_common.jar 
+  /system_ext/framework      -
+  /vendor/framework          (not readable)
+  /system/lib64              (not readable)
+  /system/lib                android.hardware.broadcastradio@1.0.so android.hardware.broadcastradio@1.1.so android.hardware.radio@1.0.so android.hardware.radio@1.1.so android.hardware.radio@1.2.so android.hardware.radio@1.3.so android.hardware.radio@1.4.so android.hardware.radio@1.6.so libradio_metadata.so libtinyalsa.so libtinyxml2.so 
+  /vendor/lib64              (not readable)
+  /vendor/lib                android.hardware.broadcastradio@1.0.so android.hardware.broadcastradio@2.0.so android.hardware.radio.config@1.0.so android.hardware.radio.config@1.1.so android.hardware.radio.config@1.2.so android.hardware.radio.config@1.3.so android.hardware.radio.deprecated@1.0.so android.hardware.radio@1.0.so android.hardware.radio@1.1.so android.hardware.radio@1.2.so android.hardware.radio@1.3.so android.hardware.radio@1.4.so android.hardware.radio@1.5.so android.hardware.radio@1.6.so libtinyalsa_utils.so libtinycompress.so libtinyxml.so vendor.sprd.hardware.radio.ims@1.0.so vendor.sprd.hardware.radio.ims@1.1.so vendor.sprd.hardware.radio.lite@1.0.so vendor.sprd.hardware.radio@1.0.so vendor.sprd.hardware.radio@1.1.so 
+  /system/etc/init           -
+  /vendor/etc/init           vendor.sprd.hardware.broadcastradio@2.0-service.rc 
+  /system/etc/permissions    -
+  /vendor/etc/permissions    android.hardware.broadcastradio.xml 
+  /system/priv-app           -
+  /system/app                -
+  /vendor/app                -
+  /product/app               -
+  /product/priv-app          -
+  /system_ext/priv-app       radio_interactor_service 
+
+==== Serial-looking system libraries and their JNI classes ====
+
+==== Binder services ====
+Found 248 services:
+0	DockObserver: []
+1	SurfaceFlinger: [android.ui.ISurfaceComposer]
+2	accessibility: [android.view.accessibility.IAccessibilityManager]
+3	account: [android.accounts.IAccountManager]
+4	activity: [android.app.IActivityManager]
+5	activity_task: [android.app.IActivityTaskManager]
+6	adb: [android.debug.IAdbManager]
+7	alarm: [android.app.IAlarmManager]
+8	android.frameworks.stats.IStats/default: [android.frameworks.stats.IStats]
+9	android.hardware.light.ILights/default: [android.hardware.light.ILights]
+10	android.hardware.memtrack.IMemtrack/default: [android.hardware.memtrack.IMemtrack]
+11	android.hardware.power.IPower/default: [android.hardware.power.IPower]
+12	android.hardware.power.stats.IPowerStats/default: [android.hardware.power.stats.IPowerStats]
+13	android.hardware.rebootescrow.IRebootEscrow/default: [android.hardware.rebootescrow.IRebootEscrow]
+14	android.hardware.security.keymint.IKeyMintDevice/default: [android.hardware.security.keymint.IKeyMintDevice]
+15	android.hardware.security.keymint.IRemotelyProvisionedComponent/default: [android.hardware.security.keymint.IRemotelyProvisionedComponent]
+16	android.hardware.security.secureclock.ISecureClock/default: [android.hardware.security.secureclock.ISecureClock]
+17	android.hardware.security.sharedsecret.ISharedSecret/default: [android.hardware.security.sharedsecret.ISharedSecret]
+18	android.hardware.vibrator.IVibrator/default: [android.hardware.vibrator.IVibrator]
+19	android.os.UpdateEngineService: [android.os.IUpdateEngine]
+20	android.os.UpdateEngineStableService: [android.os.IUpdateEngineStable]
+21	android.security.apc: [android.security.apc.IProtectedConfirmation]
+22	android.security.authorization: [android.security.authorization.IKeystoreAuthorization]
+23	android.security.compat: [android.security.compat.IKeystoreCompatService]
+24	android.security.identity: [android.security.identity.ICredentialStoreFactory]
+25	android.security.legacykeystore: [android.security.legacykeystore.ILegacyKeystore]
+26	android.security.maintenance: [android.security.maintenance.IKeystoreMaintenance]
+27	android.security.metrics: [android.security.metrics.IKeystoreMetrics]
+28	android.security.remoteprovisioning: [android.security.remoteprovisioning.IRemoteProvisioning]
+29	android.service.gatekeeper.IGateKeeperService: [android.service.gatekeeper.IGateKeeperService]
+30	android.system.keystore2.IKeystoreService/default: [android.system.keystore2.IKeystoreService]
+31	app_binding: []
+32	app_hibernation: [android.apphibernation.IAppHibernationService]
+33	app_integrity: [android.content.integrity.IAppIntegrityManager]
+34	app_search: [android.app.appsearch.aidl.IAppSearchManager]
+35	appops: [com.android.internal.app.IAppOpsService]
+36	appwidget: [com.android.internal.appwidget.IAppWidgetService]
+37	audio: [android.media.IAudioService]
+38	audio_ex: [android.media.IAudioServiceEx]
+39	auth: [android.hardware.biometrics.IAuthService]
+40	autofill: [android.view.autofill.IAutoFillManager]
+41	backup: [android.app.backup.IBackupManager]
+42	battery: []
+43	batteryproperties: [android.os.IBatteryPropertiesRegistrar]
+44	batterystats: [com.android.internal.app.IBatteryStats]
+45	binder_calls_stats: []
+46	biometric: [android.hardware.biometrics.IBiometricService]
+47	blob_store: [android.app.blob.IBlobStoreManager]
+48	bluetooth_manager: [android.bluetooth.IBluetoothManager]
+49	broadcastradio: [android.hardware.radio.IRadioService]
+50	bugreport: [android.os.IDumpstate]
+51	cacheinfo: []
+52	carrier_config: [com.android.internal.telephony.ICarrierConfigLoader]
+53	clipboard: [android.content.IClipboard]
+54	color_display: [android.hardware.display.IColorDisplayManager]
+55	companiondevice: [android.companion.ICompanionDeviceManager]
+56	connectivity: [android.net.IConnectivityManager]
+57	connmetrics: [android.net.IIpConnectivityMetrics]
+58	consumer_ir: [android.hardware.IConsumerIrService]
+59	content: [android.content.IContentService]
+60	country_detector: [android.location.ICountryDetector]
+61	cpuinfo: []
+62	crossprofileapps: [android.content.pm.ICrossProfileApps]
+63	dataloader_manager: [android.content.pm.IDataLoaderManager]
+64	dbinfo: []
+65	device_config: []
+66	device_identifiers: [android.os.IDeviceIdentifiersPolicyService]
+67	device_policy: [android.app.admin.IDevicePolicyManager]
+68	device_state: [android.hardware.devicestate.IDeviceStateManager]
+69	deviceidle: [android.os.IDeviceIdleController]
+70	devicestoragemonitor: []
+71	diskstats: []
+72	display: [android.hardware.display.IDisplayManager]
+73	dnsresolver: [android.net.IDnsResolver]
+74	domain_verification: [android.content.pm.verify.domain.IDomainVerificationManager]
+75	dreams: [android.service.dreams.IDreamManager]
+76	drm.drmManager: [drm.IDrmManagerService]
+77	dropbox: [com.android.internal.os.IDropBoxManagerService]
+78	dynamic_system: [android.os.image.IDynamicSystemService]
+79	emergency_affordance: []
+80	ethernet: [android.net.IEthernetManager]
+81	external_vibrator_service: [android.os.IExternalVibratorService]
+82	file_integrity: [android.security.IFileIntegrityService]
+83	fingerprint: [android.hardware.fingerprint.IFingerprintService]
+84	flyscale: [android.flyscale.IFlyscaleManager]
+85	font: [com.android.internal.graphics.fonts.IFontManager]
+86	game: [android.app.IGameManagerService]
+87	gfxinfo: []
+88	gpu: [android.graphicsenv.IGpuService]
+89	graphicsstats: [android.view.IGraphicsStats]
+90	hardware_properties: [android.os.IHardwarePropertiesManager]
+91	imms: [com.android.internal.telephony.IMms]
+92	ims_ex: []
+93	ims_ut_ex: []
+94	incident: [android.os.IIncidentManager]
+95	incidentcompanion: [android.os.IIncidentCompanion]
+96	incremental: [android.os.incremental.IIncrementalService]
+97	input: [android.hardware.input.IInputManager]
+98	input_method: [com.android.internal.view.IInputMethodManager]
+99	inputflinger: [android.os.IInputFlinger]
+100	installd: [android.os.IInstalld]
+101	ions: [com.android.internal.telephony.IOns]
+102	ions_ex: []
+103	iphonesubinfo: [com.android.internal.telephony.IPhoneSubInfo]
+104	ipsec: [android.net.IIpSecService]
+105	irit: []
+106	isms: [com.android.internal.telephony.ISms]
+107	ismsEx: [com.android.internal.telephony.ISmsEx]
+108	isub: [com.android.internal.telephony.ISub]
+109	jobscheduler: [android.app.job.IJobScheduler]
+110	launcherapps: [android.content.pm.ILauncherApps]
+111	ledsrv: [android.os.ledservice.ILedService]
+112	legacy_permission: [android.permission.ILegacyPermissionManager]
+113	lights: [android.hardware.lights.ILightsManager]
+114	location: [android.location.ILocationManager]
+115	location_time_zone_manager: []
+116	lock_settings: [com.android.internal.widget.ILockSettings]
+117	looper_stats: []
+118	manager: [android.os.IServiceManager]
+119	media.audio_flinger: [android.media.IAudioFlingerService]
+120	media.audio_policy: [android.media.IAudioPolicyService]
+121	media.camera: [android.hardware.ICameraService]
+122	media.camera.proxy: [android.hardware.ICameraServiceProxy]
+123	media.extractor: [android.IMediaExtractorService]
+124	media.metrics: [android.media.IMediaMetricsService]
+125	media.player: [android.media.IMediaPlayerService]
+126	media.resource_manager: [android.media.IResourceManagerService]
+127	media.resource_observer: [android.media.IResourceObserverService]
+128	media_communication: [android.media.IMediaCommunicationService]
+129	media_metrics: [android.media.metrics.IMediaMetricsManager]
+130	media_projection: [android.media.projection.IMediaProjectionManager]
+131	media_router: [android.media.IMediaRouterService]
+132	media_session: [android.media.session.ISessionManager]
+133	meminfo: []
+134	memtrack.proxy: [android.hardware.memtrack.IMemtrack]
+135	midi: [android.media.midi.IMidiManager]
+136	mount: [android.os.storage.IStorageManager]
+137	netd: [android.net.INetd]
+138	netd_listener: [android.net.metrics.INetdEventListener]
+139	netpolicy: [android.net.INetworkPolicyManager]
+140	netstats: [android.net.INetworkStatsService]
+141	network_adapter: [android.net.INetworkAdapterService]
+142	network_management: [android.os.INetworkManagementService]
+143	network_score: [android.net.INetworkScoreService]
+144	network_stack: [android.net.INetworkStackConnector]
+145	network_time_update_service: []
+146	network_watchlist: [com.android.internal.net.INetworkWatchlistManager]
+147	nfc: [android.nfc.INfcAdapter]
+148	notification: [android.app.INotificationManager]
+149	oem_lock: [android.service.oemlock.IOemLockService]
+150	otadexopt: [android.content.pm.IOtaDexopt]
+151	overlay: [android.content.om.IOverlayManager]
+152	pac_proxy: [android.net.IPacProxyManager]
+153	package: [android.content.pm.IPackageManager]
+154	package_native: [android.content.pm.IPackageManagerNative]
+155	people: [android.app.people.IPeopleManager]
+156	performance_fw: [android.app.performance.IPerformanceManagerInternal]
+157	performance_hint: [android.os.IHintManager]
+158	performancemanager: [com.android.server.performance]
+159	permission: [android.os.IPermissionController]
+160	permission_checker: [android.permission.IPermissionChecker]
+161	permissionmgr: [android.permission.IPermissionManager]
+162	persistent_data_block: [android.service.persistentdata.IPersistentDataBlockService]
+163	phone: [com.android.internal.telephony.ITelephony]
+164	pinner: []
+165	platform_compat: [com.android.internal.compat.IPlatformCompat]
+166	platform_compat_native: [com.android.internal.compat.IPlatformCompatNative]
+167	power: [android.os.IPowerManager]
+168	power_ex: [android.os.sprdpower.IPowerManagerEx]
+169	powerguru: [android.app.sprdpower.IPowerGuru]
+170	powerstats: []
+171	print: [android.print.IPrintManager]
+172	processinfo: [android.os.IProcessInfoService]
+173	procstats: [com.android.internal.app.procstats.IProcessStats]
+174	reboot_readiness: [android.scheduling.IRebootReadinessManager]
+175	recovery: [android.os.IRecoverySystem]
+176	restrictions: [android.content.IRestrictionsManager]
+177	role: [android.app.role.IRoleManager]
+178	rollback: [android.content.rollback.IRollbackManager]
+179	runtime: []
+180	scheduling_policy: [android.os.ISchedulingPolicyService]
+181	search: [android.app.ISearchManager]
+182	search_ui: [android.app.search.ISearchUiManager]
+183	sec_key_att_app_id_provider: [android.security.keymaster.IKeyAttestationApplicationIdProvider]
+184	sensor_privacy: [android.hardware.ISensorPrivacyManager]
+185	sensorservice: [android.gui.SensorServer]
+186	serial: [android.hardware.ISerialManager]
+187	servicediscovery: [android.net.nsd.INsdManager]
+188	settings: []
+189	shortcut: [android.content.pm.IShortcutService]
+190	simphonebook: [com.android.internal.telephony.IIccPhoneBook]
+191	slice: [android.app.slice.ISliceManager]
+192	smartspace: [android.app.smartspace.ISmartspaceManager]
+193	soundtrigger: [com.android.internal.app.ISoundTriggerService]
+194	soundtrigger_middleware: [android.media.soundtrigger_middleware.ISoundTriggerMiddlewareService]
+195	speech_recognition: [android.speech.IRecognitionServiceManager]
+196	sprd_power: []
+197	sprdssense: [android.os.sprdpower.ISSense]
+198	srmi: []
+199	stats: [android.os.IStatsd]
+200	statscompanion: [android.os.IStatsCompanionService]
+201	statsmanager: [android.os.IStatsManagerService]
+202	statusbar: [com.android.internal.statusbar.IStatusBarService]
+203	storaged: [android.os.IStoraged]
+204	storaged_pri: [android.os.storaged.IStoragedPrivate]
+205	storagestats: [android.app.usage.IStorageStatsManager]
+206	suspend_control: [android.system.suspend.ISuspendControlService]
+207	suspend_control_internal: [android.system.suspend.internal.ISuspendControlServiceInternal]
+208	system_config: [android.os.ISystemConfig]
+209	system_server_dumper: []
+210	system_update: [android.os.ISystemUpdateManager]
+211	telecom: [com.android.internal.telecom.ITelecomService]
+212	telephony.registry: [com.android.internal.telephony.ITelephonyRegistry]
+213	telephony_ims: [android.telephony.ims.aidl.IImsRcsController]
+214	testharness: []
+215	tethering: [android.net.ITetheringConnector]
+216	textclassification: [android.service.textclassifier.ITextClassifierService]
+217	textservices: [com.android.internal.textservice.ITextServicesManager]
+218	texttospeech: [android.speech.tts.ITextToSpeechManager]
+219	thermalservice: [android.os.IThermalService]
+220	time_detector: [android.app.timedetector.ITimeDetectorService]
+221	time_zone_detector: [android.app.timezonedetector.ITimeZoneDetectorService]
+222	tracing.proxy: [android.tracing.ITracingServiceProxy]
+223	trust: [android.app.trust.ITrustManager]
+224	uimode: [android.app.IUiModeManager]
+225	uni_carrierconfig: [com.android.internal.telephony.IUniCarrierConfigLoader]
+226	uni_phone: [com.unisoc.sdk.common.telephony.IUniPhone]
+227	uni_simphonebook: [com.android.internal.telephony.phonebook.IUniIccPhoneBook]
+228	uni_telephony: [com.android.internal.telephony.IUniTelephony]
+229	unisoc_wifi: [android.net.wifi.IUnisocWifiManager]
+230	updatelock: [android.os.IUpdateLock]
+231	uri_grants: [android.app.IUriGrantsManager]
+232	usagestats: [android.app.usage.IUsageStatsManager]
+233	usb: [android.hardware.usb.IUsbManager]
+234	usbethernet: [android.net.IUsbEthernetManager]
+235	user: [android.os.IUserManager]
+236	vcn_management: [android.net.vcn.IVcnManagementService]
+237	vibrator_manager: [android.os.IVibratorManagerService]
+238	voiceinteraction: [com.android.internal.app.IVoiceInteractionManagerService]
+239	vold: [android.os.IVold]
+240	vpn_management: [android.net.IVpnManager]
+241	wallpaper: [android.app.IWallpaperManager]
+242	webviewupdate: [android.webkit.IWebViewUpdateService]
+243	wifi: [android.net.wifi.IWifiManager]
+244	wifinl80211: [android.net.wifi.nl80211.IWificond]
+245	wifip2p: [android.net.wifi.p2p.IWifiP2pManager]
+246	wifiscanner: [android.net.wifi.IWifiScanner]
+247	window: [android.view.IWindowManager]
+
+
+==== Audio clues (does radio audio go through Android's audio system?) ====
+
+
+
+==== Audio devices ====
+ 0 [alli2s         ]: all-i2s - all-i2s
+                      all-i2s
+ 1 [sprdphone      ]: sprdphone - sprdphone
+                      sprdphone
+ 2 [saudiolte      ]: saudiolte - saudiolte
+                      saudiolte
+ 3 [saudiovoip     ]: saudiovoip - saudiovoip
+                      saudiovoip
+controlC3 pcmC3D1p pcmC3D0c pcmC3D0p controlC2 pcmC2D2p pcmC2D1p pcmC2D0c pcmC2D0p controlC1 pcmC1D5p pcmC1D4p pcmC1D3c pcmC1D2c pcmC1D1c pcmC1D1p pcmC1D0c pcmC1D0p controlC0 pcmC0D0c pcmC0D0p timer 
+
+==== USB devices (a radio behind a USB MCU shows here: serial = CDC, sound = audio class) ====
+  (none besides the root hubs)
+
+
+==== Radio-related system properties ====
+[net.qtaguid_enabled]: [1]
+
+
+==== Processes with a radio-looking name (root) ====
+u:r:untrusted_app:s0:c113,c256,c512,c768 u0_a113 25362 416 1205044 223764 do_epoll_wait    0 S com.macdmr.radio
+
+==== Who holds the serial ports (root) ====
+engpc (460): /dev/ttyGS0 /dev/ttyGS1 
+(rc=1)
+
+==== Recent logcat lines mentioning the radio (root, redacted) ====
+05-25 19:05:09.895  1970  1970 I Finsky  : [2] VerifyInstallTask.mJ(6): Verification complete: id=2, package_name=com.macdmr.radio
+05-25 19:05:09.913   830   888 D PackageManager: Replace existing pacakge: com.macdmr.radio
+05-25 19:05:09.913   830   888 D PackageManager: Existing package: PackageSetting{a28e65c com.macdmr.radio/10113}
+05-25 19:05:09.915   830   888 D PackageManager: Renaming /data/app/vmdl1617213762.tmp to /data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==
+05-25 19:05:09.920   830   856 I ActivityManager: Force stopping com.macdmr.radio appid=10113 user=-1: installPackageLI
+05-25 19:05:09.921   830   856 I ActivityManager: Killing 11991:com.macdmr.radio/u0a113 (adj 0): stop com.macdmr.radio due to installPackageLI
+05-25 19:05:09.922   830   856 V ActivityManager: Clean up application record for ProcessRecord{4c59fc1 11991:com.macdmr.radio/u0a113} restarting=false allowRestart=false index=-1 replacingPid=false fromBinderDied=false
+05-25 19:05:09.923   830   888 D PackageManager: replacePackageLI: new=Package{e6fb516 com.macdmr.radio}, old=Package{99f170c com.macdmr.radio}
+05-25 19:05:09.923   830   888 D PackageManager: replaceNonSystemPackageLI: new=Package{e6fb516 com.macdmr.radio}, old=Package{99f170c com.macdmr.radio}
+05-25 19:05:09.926   830   888 I PackageManager: Update package com.macdmr.radio code path from /data/app/~~a1dG-c5050l4Qvnn_y9Kzg==/com.macdmr.radio-kQfvVTDqtlSkMGcT187biQ== to /data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==; Retain data and using new
+05-25 19:05:09.927   830   888 D PackageManager: Removing non-system package: com.macdmr.radio
+05-25 19:05:09.928   830   888 D PackageManager: removePackageDataLI: PackageSetting{a28e65c com.macdmr.radio/10113}
+05-25 19:05:09.929   830   888 D PackageManager:   Permissions: com.macdmr.radio.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+05-25 19:05:09.933   830   888 D PackageManager: New package installed in /data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==
+05-25 19:05:09.936   830   856 W ActivityTaskManager: Force removing ActivityRecord{fe44ecf u0 com.macdmr.radio/.MainActivity t24 f}}: app died, no saved state
+05-25 19:05:10.011   830   888 I PackageManager: Not granting permission android.permission.REQUEST_INSTALL_PACKAGES from package com.macdmr.radio(10113) (protectionLevel=66 flags=0x2008be44)
+05-25 19:05:10.133   830  1051 V ActivityManager: Got obituary of 11991:com.macdmr.radio
+05-25 19:05:10.162   830   888 I PackageDexOptimizer: Running dexopt (dexoptNeeded=1) on: /data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==/base.apk pkg=com.macdmr.radio isa=arm dexoptFlags=boot_complete,profile_guided,public,enable_hidden_api_checks targetFilter=speed-profile oatDir=/data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==/oat profileName=primary.prof dexMetadataPath=null profileAnalysisResult=2 classLoaderContext=PCL[]{}
+05-25 19:05:10.166   417   417 V installd: DexInv: --- BEGIN '/data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==/base.apk' ---
+05-25 19:05:10.166   417   417 V installd: Running /apex/com.android.art/bin/dex2oat32 in=base.apk out=/data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==/oat/arm/base.odex
+05-25 19:05:10.212  1019  1144 D PeopleSpaceWidgetMgr: Sbn doesn't contain valid PeopleTileKey: null/0/com.macdmr.radio
+05-25 19:05:10.258 25305 25305 I dex2oat32: /apex/com.android.art/bin/dex2oat32 --input-vdex-fd=-1 --output-vdex-fd=9 --classpath-dir=/data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg== --class-loader-context=PCL[]{} --compact-dex-level=none --compiler-filter=speed-profile --compilation-reason=install --max-image-block-size=###### --resolve-startup-const-strings=true --generate-mini-debug-info --compile-individually
+05-25 19:05:12.010   417   417 V installd: DexInv: --- END '/data/app/~~oO4BUNqo1LFJ5zY5xxkr0Q==/com.macdmr.radio-Tux6JrNGiyAPZxUhURVySg==/base.apk' (success) ---
+05-25 19:05:12.030   830   888 V PackageManager: restoreAndPostInstall userId=-1 package=Package{e6fb516 com.macdmr.radio}
+05-25 19:05:12.044   830   888 I ActivityManager: Force stopping com.macdmr.radio appid=10113 user=0: pkg removed
+05-25 19:05:12.060  1592  1592 I MediaProvider: Invalidating LocalCallingIdentity cache for package com.macdmr.radio. Reason: package android.intent.action.PACKAGE_REMOVED
+05-25 19:05:12.070   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.android.gallery3d/.app.PackagesMonitor
+05-25 19:05:12.135   830   830 I Telecom : CarModeTracker: Package com.macdmr.radio is not tracked.: SSH.oR@AEk
+05-25 19:05:12.140   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemanager.impl.PackageMonitorReceiverImpl$RegisteredReceiver
+05-25 19:05:12.142   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.instantapps.appmanagement.InstantAppRemoveMonitor
+05-25 19:05:12.143   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.google.android.gms/.games.chimera.GamesSystemBroadcastReceiverProxy
+05-25 19:05:12.143   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REMOVED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+05-25 19:05:12.191  1970  1970 I Finsky  : [2] rzf.n(8): Invalidating cached PackageState for com.macdmr.radio
+05-25 19:05:12.196  1592  1592 I MediaProvider: Invalidating LocalCallingIdentity cache for package com.macdmr.radio. Reason: package android.intent.action.PACKAGE_ADDED
+05-25 19:05:12.215   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.android.packageinstaller/.PackageInstalledReceiver
+05-25 19:05:12.221   830   983 D SSense.AppInfoUtil: new APK:com.macdmr.radio is installed! for userId:0
+05-25 19:05:12.259   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.android.gallery3d/.app.PackagesMonitor
+05-25 19:05:12.291   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.android.vending/com.google.android.finsky.packagemanager.impl.PackageMonitorReceiverImpl$RegisteredReceiver
+05-25 19:05:12.292   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.google.android.gms/.games.chimera.GamesSystemBroadcastReceiverProxy
+05-25 19:05:12.292   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
+05-25 19:05:12.293   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_ADDED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+05-25 19:05:12.294   830   983 D SSense.AppInfoUtil: new APK:com.macdmr.radio is installed! for userId:0
+05-25 19:05:12.486  1741 25331 W SQLiteLog: (28) double-quoted string literal: "com.macdmr.radio"
+05-25 19:05:12.486  1970  1970 I Finsky  : [2] mql.mD(2): Installer: package com.macdmr.radio was removed. replacing: true
+05-25 19:05:12.505  1000  1000 D ImsResolver: maybeAddedImsService, packageName: com.macdmr.radio
+05-25 19:05:12.552  1970  1970 I Finsky  : [2] mqy.N(12): Installer: Notifying status update. package=com.macdmr.radio, status=UNINSTALLED
+05-25 19:05:12.570   830   846 D CompanionDeviceManagerService: onPackageModified(packageName = com.macdmr.radio)
+05-25 19:05:12.681  1970  1970 I Finsky  : [2] rzf.n(8): Invalidating cached PackageState for com.macdmr.radio
+05-25 19:05:12.740  1970 25344 I Finsky  : [164] gcy.a(10): Cancelled 0 ongoing asset module downloads for package com.macdmr.radio due to a concurrent app update.
+05-25 19:05:12.858  1276  1276 D UNISOC-LAUNCHER3: LauncherAppMonitor, onPackagesUpdated, packageNames:[com.macdmr.radio] user:UserHandle{0} type:2
+05-25 19:05:12.930  1970  1970 I Finsky  : [2] rzf.n(8): Invalidating cached PackageState for com.macdmr.radio
+05-25 19:05:12.932  1970 25344 I Finsky  : [164] gcy.a(14): Asset module broadcast after update successful for package com.macdmr.radio. 0 sessions broadcast.
+05-25 19:05:12.953  1970  1970 I Finsky  : [2] rzf.n(8): Invalidating cached PackageState for com.macdmr.radio
+05-25 19:05:13.006  1970 25349 I Finsky  : [166] ndj.F(2): IQ: Notifying installation update. package=com.macdmr.radio, status=UNINSTALLED
+05-25 19:05:14.223   830  1131 D PowerController.BgClean: new APK:com.macdmr.radio is installed! for userId:0
+05-25 19:05:14.293   830  1131 D PowerController.BgClean: new APK:com.macdmr.radio is installed! for userId:0
+05-25 19:05:21.363   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.google.android.gms/.gass.chimera.PackageChangeBroadcastReceiver
+05-25 19:05:21.364   830   856 W BroadcastQueue: Background execution not allowed: receiving Intent { act=android.intent.action.PACKAGE_REPLACED dat=package:com.macdmr.radio flg=0x4000010 (has extras) } to com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+05-25 19:05:27.899   830  3746 I ActivityTaskManager: START u0 {flg=0x10000000 cmp=com.macdmr.radio/.MainActivity} from uid 2000, pid 25359
+05-25 19:05:27.923   830  3746 I ActivityTaskManager: ->startActivity for ActivityRecord{8c1d738 u0 com.macdmr.radio/.MainActivity t27} result:START_SUCCESS
+05-25 19:05:27.938   830   896 D performance: getRecentTaskThumbnail----->Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.macdmr.radio/.MainActivity }
+05-25 19:05:27.956   830   857 I ActivityManager: Start proc 25362:com.macdmr.radio/u0a113 for pre-top-activity {com.macdmr.radio/com.macdmr.radio.MainActivity}
+05-25 19:05:27.989 25362 25362 E om.macdmr.radi: Not starting debugger since process cannot load the jdwp agent.
+05-25 19:05:28.013   459   459 I Layer   : sf layer Visibility: (BufferStateLayer)layer name =Splash Screen com.macdmr.radio#0, isVisible=0 (Hiddenflag = 1, Alpha = 1.######, [BufferInfo.mBuffer||mSidebandStream] = 2)
+05-25 19:05:28.013   459   459 I Layer   : sf layer not visible reason: parentlayer(592ee4 Splash Screen com.macdmr.radio#0) Hiddenflag = 1
+05-25 19:05:28.019   435   435 D vendor.unisoc.hardware.power-service: Enter getSceneIdByName: sceneName:com.macdmr.radio
+05-25 19:05:28.055 25362 25362 V GraphicsEnvironment: ANGLE Developer option for 'com.macdmr.radio' set to: 'default'
+05-25 19:05:28.056 25362 25362 D ApplicationPackageManager: hasSystemFeature:name=android.hardware.vulkan.version version=###### getOpPackageName=com.macdmr.radio hasSystemFeature=false
+05-25 19:05:28.056 25362 25362 D ApplicationPackageManager: hasSystemFeature:name=android.hardware.vulkan.version version=###### getOpPackageName=com.macdmr.radio hasSystemFeature=false
+05-25 19:05:28.125 25362 25362 D ApplicationPackageManager: hasSystemFeature:name=android.software.picture_in_picture version=0 getOpPackageName=com.macdmr.radio hasSystemFeature=false
+05-25 19:05:28.509 25362 25362 D ApplicationPackageManager: hasSystemFeature:name=android.hardware.type.automotive version=0 getOpPackageName=com.macdmr.radio hasSystemFeature=false
+05-25 19:05:28.542   830  3746 I Telecom : PhoneAccountRegistrar: Modify account: [ComponentInfo{com.macdmr.radio/com.macdmr.radio.car.RadioCallService}, ***, UserHandle{0}(lbl: SignalDeck Talk -> SignalDeck)]: TSI.rPA@AE0
+05-25 19:05:28.542   830  3746 I Telecom : AppLabelProxy: package com.macdmr.radio: name is SignalDeck: TSI.rPA@AE0
+05-25 19:05:28.544   830  3746 I Telecom : CallsManager: handlePhoneAccountChanged: phoneAccount=[[X] PhoneAccount: ComponentInfo{com.macdmr.radio/com.macdmr.radio.car.RadioCallService}, ***, UserHandle{0} Capabilities: SelfManaged  Audio Routes: BESW Schemes: radio  Extras: null GroupId: ***]: TSI.rPA@AE0
+05-25 19:05:28.601   459   716 E HWComposer: getSupportedContentTypes: getSupportedContentTypes failed for display 0: Unsupported (8)
+05-25 19:05:28.632 25362 25378 E om.macdmr.radi: Shared attribute region not available to be mapped
+05-25 19:05:28.905   830   846 I ActivityTaskManager: Displayed com.macdmr.radio/.MainActivity: +1s0ms
+05-25 19:05:28.911   459   459 I Layer   : sf layer Visibility: (BufferStateLayer)layer name =com.macdmr.radio/com.macdmr.radio.MainActivity#0, isVisible=1 (Hiddenflag = 0, Alpha = 1.######, [BufferInfo.mBuffer||mSidebandStream] = 2)
+05-25 19:05:28.959 25362 25378 E om.macdmr.radi: Shared attribute region not available to be mapped
+05-25 19:05:29.015 25362 25378 E om.macdmr.radi: Shared attribute region not available to be mapped
+05-25 19:05:34.147   830  3746 D BroadcastQueue: Add broadcast <BroadcastRecord{5b27f3b u0 com.macdmr.radio.DIAG}> into [ordered | background], pending size 0
+05-25 19:05:34.147   830  3746 D BroadcastQueue: Header is BroadcastRecord{5b27f3b u0 com.macdmr.radio.DIAG} now
+05-25 19:05:34.155   830 17061 D BroadcastQueue: Finished with ordered broadcast BroadcastRecord{5b27f3b u0 com.macdmr.radio.DIAG} receivers:(1) take 8ms in [background], remains 0
+05-25 19:05:38.741  1019  1019 D InterruptionStateProvider: No bubble up: not allowed to bubble: 0|com.macdmr.radio|1|null|10113
+05-25 19:05:38.742  1019  1019 D InterruptionStateProvider: No heads up: unimportant notification: 0|com.macdmr.radio|1|null|10113
+05-25 19:05:38.743  1019  1144 D PeopleSpaceWidgetMgr: Sbn doesn't contain valid PeopleTileKey: null/0/com.macdmr.radio
+05-25 19:05:46.509 25362 25362 I bench-checks: type=1400 audit(0.0:2998): avc: denied { read } for name="enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:46.509 25362 25362 I bench-checks: type=1400 audit(0.0:2999): avc: denied { open } for path="/sys/fs/selinux/enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:47.229 25362 25417 I BenchChecks: step Report: Serial ports
+05-25 19:05:47.219 25362 25362 I bench-checks: type=1400 audit(0.0:3000): avc: denied { read } for name="/" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+05-25 19:05:47.219 25362 25362 I bench-checks: type=1400 audit(0.0:3001): avc: denied { open } for path="/dev" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+05-25 19:05:47.259 25362 25362 I bench-checks: type=1400 audit(0.0:3002): avc: denied { write } for name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+05-25 19:05:47.865 25362 25417 I BenchChecks: step Report: Walkie-talkie apps
+05-25 19:05:47.964 25362 25417 I BenchChecks: step Report: Ranking the walkie-talkie app candidates
+05-25 19:05:49.690 25362 25371 I om.macdmr.radi: Background concurrent copying GC freed 15251(611KB) AllocSpace objects, 7(17MB) LOS objects, 49% free, 10MB/20MB, paused 99us total 137.599ms
+05-25 19:05:51.713 25362 25371 I om.macdmr.radi: NativeAlloc concurrent copying GC freed ######(6559KB) AllocSpace objects, 0(0B) LOS objects, 49% free, 14MB/28MB, paused 97us total 311.190ms
+05-25 19:05:54.196 25362 25371 I om.macdmr.radi: NativeAlloc concurrent copying GC freed ######(12MB) AllocSpace objects, 0(0B) LOS objects, 50% free, 15MB/31MB, paused 98us total 388.007ms
+05-25 19:05:56.771 25362 25371 I om.macdmr.radi: NativeAlloc concurrent copying GC freed ######(14MB) AllocSpace objects, 0(0B) LOS objects, 50% free, 16MB/32MB, paused 98us total 403.771ms
+05-25 19:05:57.329 26352 26352 I service : type=1400 audit(0.0:3012): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.329 26352 26352 I service : type=1400 audit(0.0:3013): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.339 26352 26352 I service : type=1400 audit(0.0:3014): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.339 26352 26352 I service : type=1400 audit(0.0:3015): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.349 26352 26352 I service : type=1400 audit(0.0:3016): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.550   262   262 E SELinux : avc:  denied  { find } for pid=26352 uid=10113 name=serial scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:serial_service:s0 tclass=service_manager permissive=1
+05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3570): avc: denied { search } for name="asound" dev="proc" ino=###### scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3571): avc: denied { read } for name="cards" dev="proc" ino=###### scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3572): avc: denied { open } for path="/proc/asound/cards" dev="proc" ino=###### scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3573): avc: denied { getattr } for path="/proc/asound/cards" dev="proc" ino=###### scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:59.099 25362 25362 I bench-checks: type=1400 audit(0.0:3574): avc: denied { read } for name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+
+
+==== SELinux denials seen so far (root) ====
+  05-25 18:57:55.549   830   830 I auditd  : type=1400 audit(0.0:1171): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:57:58.139   830   830 I auditd  : type=1400 audit(0.0:1172): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:58:03.899   415   415 I auditd  : type=1400 audit(0.0:1173): avc: denied { add_name } for comm="Binder:415_3" name="globalAlert" scontext=u:r:netd:s0 tcontext=u:object_r:proc_net:s0 tclass=dir permissive=1
+  05-25 18:58:03.899   415   415 I auditd  : type=1400 audit(0.0:1174): avc: denied { create } for comm="Binder:415_3" name="globalAlert" scontext=u:r:netd:s0 tcontext=u:object_r:proc_net:s0 tclass=file permissive=1
+  05-25 18:58:04.149   830   830 I auditd  : type=1400 audit(0.0:1175): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:58:14.159   830   830 I auditd  : type=1400 audit(0.0:1176): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] 05-25 18:58:15.569 11991 11991 I auditd  : type=1400 audit(0.0:1177): avc: denied { read } for comm="bench-checks" name="enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:15.569 11991 11991 I auditd  : type=1400 audit(0.0:1178): avc: denied { open } for comm="bench-checks" path="/sys/fs/selinux/enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:16.329 11991 11991 I auditd  : type=1400 audit(0.0:1179): avc: denied { read } for comm="bench-checks" name="/" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:16.329 11991 11991 I auditd  : type=1400 audit(0.0:1180): avc: denied { open } for comm="bench-checks" path="/dev" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:16.359 11991 11991 I auditd  : type=1400 audit(0.0:1181): avc: denied { write } for comm="bench-checks" name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:16.369 11991 11991 I auditd  : type=1400 audit(0.0:1182): avc: denied { read } for comm="bench-checks" name="drivers" dev="proc" ino=4026531852 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_tty_drivers:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:16.369 11991 11991 I auditd  : type=1400 audit(0.0:1183): avc: denied { open } for comm="bench-checks" path="/proc/tty/drivers" dev="proc" ino=4026531852 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_tty_drivers:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:16.369 11991 11991 I auditd  : type=1400 audit(0.0:1184): avc: denied { getattr } for comm="bench-checks" path="/proc/tty/drivers" dev="proc" ino=4026531852 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_tty_drivers:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:16.549 11991 11991 I auditd  : type=1400 audit(0.0:1185): avc: denied { read } for comm="bench-checks" name="platform" dev="sysfs" ino=3266 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:sysfs:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  05-25 18:58:23.169   830   830 I auditd  : type=1400 audit(0.0:1191): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] 05-25 18:58:26.349 13168 13168 I auditd  : type=1400 audit(0.0:1192): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.359 13168 13168 I auditd  : type=1400 audit(0.0:1193): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.359 13168 13168 I auditd  : type=1400 audit(0.0:1194): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.359 13168 13168 I auditd  : type=1400 audit(0.0:1195): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.369 13168 13168 I auditd  : type=1400 audit(0.0:1196): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.439 13168 13168 I auditd  : type=1400 audit(0.0:1197): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:netd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.459 13168 13168 I auditd  : type=1400 audit(0.0:1198): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:incidentd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.489 13168 13168 I auditd  : type=1400 audit(0.0:1199): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:installd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:26.569 13168 13168 I auditd  : type=1400 audit(0.0:1200): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:performancemanager:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:28.209 11991 11991 I auditd  : type=1400 audit(0.0:1750): avc: denied { search } for comm="bench-checks" name="asound" dev="proc" ino=4026531977 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:28.209 11991 11991 I auditd  : type=1400 audit(0.0:1751): avc: denied { read } for comm="bench-checks" name="cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:28.209 11991 11991 I auditd  : type=1400 audit(0.0:1752): avc: denied { open } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:28.209 11991 11991 I auditd  : type=1400 audit(0.0:1753): avc: denied { getattr } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 18:58:28.219 11991 11991 I auditd  : type=1400 audit(0.0:1754): avc: denied { read } for comm="bench-checks" name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  05-25 18:58:32.169   830   830 I auditd  : type=1400 audit(0.0:2046): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:58:33.169   830   830 I auditd  : type=1400 audit(0.0:2047): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:58:42.179   830   830 I auditd  : type=1400 audit(0.0:2048): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:58:48.179   830   830 I auditd  : type=1400 audit(0.0:2049): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:58:49.179   830   830 I auditd  : type=1400 audit(0.0:2050): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:09.199   830   830 I auditd  : type=1400 audit(0.0:2051): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:15.719 16811 16811 I auditd  : type=1400 audit(0.0:2052): avc: denied { read } for comm="scale.analogpoc" name="value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:15.719 16811 16811 I auditd  : type=1400 audit(0.0:2053): avc: denied { open } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:15.719 16811 16811 I auditd  : type=1400 audit(0.0:2054): avc: denied { getattr } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:17.069   830   830 I auditd  : type=1400 audit(0.0:2055): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:28.069   830   830 I auditd  : type=1400 audit(0.0:2056): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:35.769   830   830 I auditd  : type=1400 audit(0.0:2057): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 18:59:51.779   830   830 I auditd  : type=1400 audit(0.0:2059): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] 05-25 19:00:29.919 11991 11991 I auditd  : type=1400 audit(0.0:2060): avc: denied { read } for comm="bench-checks" name="enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:29.919 11991 11991 I auditd  : type=1400 audit(0.0:2061): avc: denied { open } for comm="bench-checks" path="/sys/fs/selinux/enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:30.689 11991 11991 I auditd  : type=1400 audit(0.0:2062): avc: denied { read } for comm="bench-checks" name="/" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:30.689 11991 11991 I auditd  : type=1400 audit(0.0:2063): avc: denied { open } for comm="bench-checks" path="/dev" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:30.739 11991 11991 I auditd  : type=1400 audit(0.0:2064): avc: denied { write } for comm="bench-checks" name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:30.739 11991 11991 I auditd  : type=1400 audit(0.0:2065): avc: denied { read } for comm="bench-checks" name="drivers" dev="proc" ino=4026531852 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_tty_drivers:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:30.929 11991 11991 I auditd  : type=1400 audit(0.0:2073): avc: denied { write } for comm="bench-checks" name="hook_status" dev="sysfs" ino=20247 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  05-25 19:00:32.799   830   830 I auditd  : type=1400 audit(0.0:2074): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] 05-25 19:00:40.829 19343 19343 I auditd  : type=1400 audit(0.0:2075): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:40.829 19343 19343 I auditd  : type=1400 audit(0.0:2076): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:40.829 19343 19343 I auditd  : type=1400 audit(0.0:2077): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:40.839 19343 19343 I auditd  : type=1400 audit(0.0:2078): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:40.849 19343 19343 I auditd  : type=1400 audit(0.0:2079): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:40.899 19343 19343 I auditd  : type=1400 audit(0.0:2080): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:netd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:40.929 19343 19343 I auditd  : type=1400 audit(0.0:2081): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:incidentd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:40.939 19343 19343 I auditd  : type=1400 audit(0.0:2082): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:installd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:42.609 11991 11991 I auditd  : type=1400 audit(0.0:2633): avc: denied { search } for comm="bench-checks" name="asound" dev="proc" ino=4026531977 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:42.609 11991 11991 I auditd  : type=1400 audit(0.0:2634): avc: denied { read } for comm="bench-checks" name="cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:42.609 11991 11991 I auditd  : type=1400 audit(0.0:2635): avc: denied { open } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:42.609 11991 11991 I auditd  : type=1400 audit(0.0:2636): avc: denied { getattr } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:00:42.609 11991 11991 I auditd  : type=1400 audit(0.0:2637): avc: denied { read } for comm="bench-checks" name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  05-25 19:00:47.399 19728 19728 I auditd  : type=1400 audit(0.0:2978): avc: denied { read } for comm="cat" name="test" dev="sysfs" ino=27449 scontext=u:r:platform_app:s0:c512,c768 tcontext=u:object_r:sysfs_sensor:s0 tclass=file permissive=1 app=com.android.systemui
+  05-25 19:00:47.409 19728 19728 I auditd  : type=1400 audit(0.0:2979): avc: denied { open } for comm="cat" path="/sys/devices/virtual/misc/sprd_flash/test" dev="sysfs" ino=27449 scontext=u:r:platform_app:s0:c512,c768 tcontext=u:object_r:sysfs_sensor:s0 tclass=file permissive=1 app=com.android.systemui
+  05-25 19:00:47.809   830   830 I auditd  : type=1400 audit(0.0:2980): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:00:52.809   830   830 I auditd  : type=1400 audit(0.0:2981): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:00.809   830   830 I auditd  : type=1400 audit(0.0:2982): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:19.819   830   830 I auditd  : type=1400 audit(0.0:2983): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:29.329 22986 22986 I auditd  : type=1400 audit(0.0:2984): avc: denied { read } for comm="scale.analogpoc" name="value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:29.329 22986 22986 I auditd  : type=1400 audit(0.0:2985): avc: denied { open } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:29.329 22986 22986 I auditd  : type=1400 audit(0.0:2986): avc: denied { getattr } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:30.569   830   830 I auditd  : type=1400 audit(0.0:2987): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:41.579   830   830 I auditd  : type=1400 audit(0.0:2988): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:01:49.239   830   830 I auditd  : type=1400 audit(0.0:2989): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:02:00.239   830   830 I auditd  : type=1400 audit(0.0:2990): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:02:05.239   830   830 I auditd  : type=1400 audit(0.0:2992): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:07.989   830   830 I auditd  : type=1400 audit(0.0:2993): avc: denied { getopt } for comm="Binder:830_13" scontext=u:r:system_server:s0 tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=1
+  05-25 19:05:07.989   830   830 I Binder:830_13: type=1400 audit(0.0:2993): avc: denied { getopt } for scontext=u:r:system_server:s0 tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=1
+  05-25 19:05:11.369   830   830 I auditd  : type=1400 audit(0.0:2994): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:11.369   830   830 I SSense  : type=1400 audit(0.0:2994): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:29.279   830   830 I auditd  : type=1400 audit(0.0:2995): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:29.279   830   830 I SSense  : type=1400 audit(0.0:2995): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:34.279   830   830 I auditd  : type=1400 audit(0.0:2996): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:34.279   830   830 I SSense  : type=1400 audit(0.0:2996): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:44.289   830   830 I auditd  : type=1400 audit(0.0:2997): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:05:44.289   830   830 I SSense  : type=1400 audit(0.0:2997): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] 05-25 19:05:46.509 25362 25362 I auditd  : type=1400 audit(0.0:2998): avc: denied { read } for comm="bench-checks" name="enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:46.509 25362 25362 I bench-checks: type=1400 audit(0.0:2998): avc: denied { read } for name="enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:46.509 25362 25362 I auditd  : type=1400 audit(0.0:2999): avc: denied { open } for comm="bench-checks" path="/sys/fs/selinux/enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:46.509 25362 25362 I bench-checks: type=1400 audit(0.0:2999): avc: denied { open } for path="/sys/fs/selinux/enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:47.219 25362 25362 I auditd  : type=1400 audit(0.0:3000): avc: denied { read } for comm="bench-checks" name="/" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:47.219 25362 25362 I bench-checks: type=1400 audit(0.0:3000): avc: denied { read } for name="/" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:47.219 25362 25362 I auditd  : type=1400 audit(0.0:3001): avc: denied { open } for comm="bench-checks" path="/dev" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:47.219 25362 25362 I bench-checks: type=1400 audit(0.0:3001): avc: denied { open } for path="/dev" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:47.259 25362 25362 I auditd  : type=1400 audit(0.0:3002): avc: denied { write } for comm="bench-checks" name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:47.259 25362 25362 I bench-checks: type=1400 audit(0.0:3002): avc: denied { write } for name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.329 26352 26352 I auditd  : type=1400 audit(0.0:3012): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.329 26352 26352 I service : type=1400 audit(0.0:3012): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.329 26352 26352 I auditd  : type=1400 audit(0.0:3013): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.329 26352 26352 I service : type=1400 audit(0.0:3013): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.339 26352 26352 I auditd  : type=1400 audit(0.0:3014): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.339 26352 26352 I service : type=1400 audit(0.0:3014): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.339 26352 26352 I auditd  : type=1400 audit(0.0:3015): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.339 26352 26352 I service : type=1400 audit(0.0:3015): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.349 26352 26352 I auditd  : type=1400 audit(0.0:3016): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:57.349 26352 26352 I service : type=1400 audit(0.0:3016): avc: denied { call } for scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3570): avc: denied { search } for comm="bench-checks" name="asound" dev="proc" ino=4026531977 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3570): avc: denied { search } for name="asound" dev="proc" ino=4026531977 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3571): avc: denied { read } for comm="bench-checks" name="cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3571): avc: denied { read } for name="cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3572): avc: denied { open } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3572): avc: denied { open } for path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3573): avc: denied { getattr } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.089 25362 25362 I bench-checks: type=1400 audit(0.0:3573): avc: denied { getattr } for path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.099 25362 25362 I auditd  : type=1400 audit(0.0:3574): avc: denied { read } for comm="bench-checks" name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] 05-25 19:05:59.099 25362 25362 I bench-checks: type=1400 audit(0.0:3574): avc: denied { read } for name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  05-25 19:06:03.299   830   830 I auditd  : type=1400 audit(0.0:3908): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  05-25 19:06:03.299   830   830 I SSense  : type=1400 audit(0.0:3908): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] [ 2249.593593] c1type=1400 audit(1779706829.919:2060): avc: denied { read } for comm="bench-checks" name="enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2249.593859] c1type=1400 audit(1779706829.919:2061): avc: denied { open } for comm="bench-checks" path="/sys/fs/selinux/enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2250.360710] c3type=1400 audit(1779706830.689:2062): avc: denied { read } for comm="bench-checks" name="/" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2250.361218] c3type=1400 audit(1779706830.689:2063): avc: denied { open } for comm="bench-checks" path="/dev" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2250.417334] c3type=1400 audit(1779706830.739:2064): avc: denied { write } for comm="bench-checks" name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2250.419990] c3type=1400 audit(1779706830.739:2065): avc: denied { read } for comm="bench-checks" name="drivers" dev="proc" ino=4026531852 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_tty_drivers:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2250.605449] c3type=1400 audit(1779706830.929:2073): avc: denied { write } for comm="bench-checks" name="hook_status" dev="sysfs" ino=20247 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [ 2252.474689] c0type=1400 audit(1779706832.799:2074): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] [ 2260.503900] c0type=1400 audit(1779706840.829:2075): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2260.506868] c0type=1400 audit(1779706840.829:2076): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2260.509062] c0type=1400 audit(1779706840.829:2077): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2260.512518] c0type=1400 audit(1779706840.839:2078): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2260.521001] c0type=1400 audit(1779706840.849:2079): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2260.580429] c0type=1400 audit(1779706840.899:2080): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:netd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2260.604706] c0type=1400 audit(1779706840.929:2081): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:incidentd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2260.612460] c0type=1400 audit(1779706840.939:2082): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:installd:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2262.282768] c0type=1400 audit(1779706842.609:2633): avc: denied { search } for comm="bench-checks" name="asound" dev="proc" ino=4026531977 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2262.283270] c0type=1400 audit(1779706842.609:2634): avc: denied { read } for comm="bench-checks" name="cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2262.283676] c0type=1400 audit(1779706842.609:2635): avc: denied { open } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2262.283961] c0type=1400 audit(1779706842.609:2636): avc: denied { getattr } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2262.289967] c0type=1400 audit(1779706842.609:2637): avc: denied { read } for comm="bench-checks" name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [ 2267.080345] c0type=1400 audit(1779706847.399:2978): avc: denied { read } for comm="cat" name="test" dev="sysfs" ino=27449 scontext=u:r:platform_app:s0:c512,c768 tcontext=u:object_r:sysfs_sensor:s0 tclass=file permissive=1 app=com.android.systemui
+  [ 2267.080941] c0type=1400 audit(1779706847.409:2979): avc: denied { open } for comm="cat" path="/sys/devices/virtual/misc/sprd_flash/test" dev="sysfs" ino=27449 scontext=u:r:platform_app:s0:c512,c768 tcontext=u:object_r:sysfs_sensor:s0 tclass=file permissive=1 app=com.android.systemui
+  [ 2267.480876] c0type=1400 audit(1779706847.809:2980): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2272.482655] c2type=1400 audit(1779706852.809:2981): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2280.486192] c2type=1400 audit(1779706860.809:2982): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2299.500233] c2type=1400 audit(1779706879.819:2983): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2309.012258] c0type=1400 audit(1779706889.329:2984): avc: denied { read } for comm="scale.analogpoc" name="value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2309.015206] c0type=1400 audit(1779706889.329:2985): avc: denied { open } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2309.015465] c0type=1400 audit(1779706889.329:2986): avc: denied { getattr } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2310.250621] c0type=1400 audit(1779706890.569:2987): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2321.259733] c0type=1400 audit(1779706901.579:2988): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2328.911156] c0type=1400 audit(1779706909.239:2989): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2339.917566] c2type=1400 audit(1779706920.239:2990): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2344.919070] c0type=1400 audit(1779706925.239:2992): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2527.666395] c0type=1400 audit(1779707107.989:2993): avc: denied { getopt } for comm="Binder:830_13" scontext=u:r:system_server:s0 tcontext=u:r:shell:s0 tclass=unix_stream_socket permissive=1
+  [ 2531.047701] c2type=1400 audit(1779707111.369:2994): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2548.954274] c2type=1400 audit(1779707129.279:2995): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2553.957772] c3type=1400 audit(1779707134.279:2996): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [ 2563.964092] c3type=1400 audit(1779707144.289:2997): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  [SignalDeck] [ 2566.183570] c2type=1400 audit(1779707146.509:2998): avc: denied { read } for comm="bench-checks" name="enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2566.185594] c2type=1400 audit(1779707146.509:2999): avc: denied { open } for comm="bench-checks" path="/sys/fs/selinux/enforce" dev="selinuxfs" ino=4 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:selinuxfs:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2566.893616] c2type=1400 audit(1779707147.219:3000): avc: denied { read } for comm="bench-checks" name="/" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2566.894077] c2type=1400 audit(1779707147.219:3001): avc: denied { open } for comm="bench-checks" path="/dev" dev="tmpfs" ino=8193 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2566.931013] c2type=1400 audit(1779707147.259:3002): avc: denied { write } for comm="bench-checks" name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2577.006816] c2type=1400 audit(1779707157.329:3012): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2577.009198] c2type=1400 audit(1779707157.329:3013): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2577.011191] c2type=1400 audit(1779707157.339:3014): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2577.014647] c2type=1400 audit(1779707157.339:3015): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2577.021811] c2type=1400 audit(1779707157.349:3016): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2578.770572] c2type=1400 audit(1779707159.089:3570): avc: denied { search } for comm="bench-checks" name="asound" dev="proc" ino=4026531977 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2578.770860] c2type=1400 audit(1779707159.089:3571): avc: denied { read } for comm="bench-checks" name="cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2578.771026] c2type=1400 audit(1779707159.089:3572): avc: denied { open } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2578.771166] c2type=1400 audit(1779707159.089:3573): avc: denied { getattr } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+  [SignalDeck] [ 2578.778042] c2type=1400 audit(1779707159.099:3574): avc: denied { read } for comm="bench-checks" name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+  [ 2582.975107] c2type=1400 audit(1779707163.299:3908): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+  (108 lines marked [SignalDeck] come from this app itself, mostly the report reading what an app may not)
+
+
+==== Vendor radio services and programs (root: HIDL list, vendor HAL and daemon names and sizes) ====
+HIDL services (lshal):
+  (none matching)
+programs (size, path):
+  (none matching)
+
+
+==== Programs listening on local sockets (root) ====
+  (no TCP port is listening)
+unix sockets with a radio-looking name:
+  (none)
+
+
+==== Programs holding USB serial, sound or radio devices (root, full command line) ====
+/vendor/bin/hw/android.hardware.audio.service  (pid 424): /dev/snd/controlC1 /dev/snd/controlC2 
+  /vendor/bin/engpc  (pid 460): /dev/ttyGS0 /dev/ttyGS1
+
+==== Magisk modules (root: id, name, version, file names) ====
+  (none)
+
+
+==== Sound card streams and mixer (root) ====
+00-00: i2s_bt_sco0-snd-soc-dummy-dai snd-soc-dummy-dai-0 :  : playback 1 : capture 1
+01-00: vbc-r1p0v3-sprd-codec-normal sprd-codec-normal-0 :  : playback 1 : capture 1
+01-01: vaudio-sprd-codec-normal sprd-codec-normal-1 :  : playback 1 : capture 1
+01-02: vbc-r1p0v3-ad23-sprd-codec-ad1 sprd-codec-ad1-2 :  : capture 1
+01-03: vaudio-ad23-sprd-codec-ad1 sprd-codec-ad1-3 :  : capture 1
+01-04: vbc-dfm-sprd-codec-normal sprd-codec-normal-4 :  : playback 1
+01-05: vbc-deep-buf-sprd-codec-normal sprd-codec-normal-5 :  : playback 1
+02-00: SAUDIO PCM : SAUDIO PCM : playback 1 : capture 1
+02-01: SAUDIO PCM : SAUDIO PCM : playback 1
+02-02: SAUDIO PCM : SAUDIO PCM : playback 1
+03-00: SAUDIO PCM : SAUDIO PCM : playback 1 : capture 1
+03-01: SAUDIO PCM : SAUDIO PCM : playback 1
+card 0: alli2s (all-i2s)
+PCM_TOTAL_NORMAL	0
+PCM_TOTAL_DEEPBUF	0
+fs	8000
+force_fs	0
+hw_port	0
+slave_timeout	3857
+bus_type	1
+byte_per_chan	1
+mode	0
+lsb	0
+rtx_mode	3
+lrck_inv	0
+sync_mode	1
+clk_inv	0
+i2s_bus_mode	0
+pcm_bus_mode	1
+pcm_slot	1
+pcm_cycle	1
+tx_watermark	12
+rx_watermark	20
+
+
+==== PTT key capture ====
+Activity key events and known PTT broadcasts:
+  (none reached the app)
+
+Input events (root getevent):
+add device 1: /dev/input/event14
+  name:     "sprdphone Headset Keyboard"
+add device 2: /dev/input/event13
+  name:     "sprdphone Headset Jack"
+add device 3: /dev/input/event12
+  name:     "hook_dmr"
+add device 4: /dev/input/event11
+  name:     "sf-keys"
+add device 5: /dev/input/event1
+  name:     "rotary"
+add device 6: /dev/input/event10
+  name:     "gyroscope"
+add device 7: /dev/input/event9
+  name:     "accelerometer"
+add device 8: /dev/input/event8
+  name:     "compass"
+add device 9: /dev/input/event6
+  name:     "al_pxy"
+could not get driver version for /dev/input/mice, Inappropriate ioctl for device
+add device 10: /dev/input/event4
+  name:     "sc27xx:vibrator"
+add device 11: /dev/input/event0
+  name:     "sprd-keypad"
+add device 12: /dev/input/event3
+  name:     "Betterlife_ts"
+add device 13: /dev/input/event2
+  name:     "aw9523-key"
+add device 14: /dev/input/event7
+  name:     "ps_pxy"
+add device 15: /dev/input/event5
+  name:     "gpio-keys"
+[    2619.170655] /dev/input/event9: EV_ABS       ABS_X                ffffff6a            
+[    2619.170655] /dev/input/event9: EV_ABS       ABS_Y                0000006d            
+[    2619.170655] /dev/input/event9: EV_ABS       ABS_Z                fffff9d9            
+[    2619.200469] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2619.200469] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2619.200469] /dev/input/event9: EV_ABS       ABS_Z                fffff9db            
+[    2619.230684] /dev/input/event9: EV_ABS       ABS_Z                fffff9da            
+[    2619.260660] /dev/input/event9: EV_ABS       ABS_Y                00000066            
+[    2619.260660] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2619.290426] /dev/input/event9: EV_ABS       ABS_Y                00000067            
+[    2619.290426] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2619.320638] /dev/input/event9: EV_ABS       ABS_Y                0000006b            
+[    2619.320638] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2619.350536] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2619.380606] /dev/input/event9: EV_ABS       ABS_X                ffffff6f            
+[    2619.380606] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2619.410624] /dev/input/event9: EV_ABS       ABS_X                ffffff70            
+[    2619.410624] /dev/input/event9: EV_ABS       ABS_Y                0000006a            
+[    2619.410624] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2619.440583] /dev/input/event9: EV_ABS       ABS_X                ffffff6f            
+[    2619.440583] /dev/input/event9: EV_ABS       ABS_Y                00000070            
+[    2619.440583] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2619.470567] /dev/input/event9: EV_ABS       ABS_X                ffffff6d            
+[    2619.470567] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2619.470567] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2619.500573] /dev/input/event9: EV_ABS       ABS_Y                0000006f            
+[    2619.500573] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2619.530514] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2619.530514] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2619.560633] /dev/input/event9: EV_ABS       ABS_X                ffffff6c            
+[    2619.560633] /dev/input/event9: EV_ABS       ABS_Y                0000006a            
+[    2619.560633] /dev/input/event9: EV_ABS       ABS_Z                fffff9d8            
+[    2619.590541] /dev/input/event9: EV_ABS       ABS_Y                0000006e            
+[    2619.590541] /dev/input/event9: EV_ABS       ABS_Z                fffff9d9            
+[    2619.620679] /dev/input/event9: EV_ABS       ABS_X                ffffff6b            
+[    2619.620679] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2619.620679] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2619.650703] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2619.650703] /dev/input/event9: EV_ABS       ABS_Y                00000064            
+[    2619.650703] /dev/input/event9: EV_ABS       ABS_Z                fffff9d9            
+[    2619.680457] /dev/input/event9: EV_ABS       ABS_X                ffffff70            
+[    2619.680457] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2619.710696] /dev/input/event9: EV_ABS       ABS_X                ffffff71            
+[    2619.710696] /dev/input/event9: EV_ABS       ABS_Y                00000065            
+[    2619.710696] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2619.740596] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2619.740596] /dev/input/event9: EV_ABS       ABS_Y                0000005e            
+[    2619.740596] /dev/input/event9: EV_ABS       ABS_Z                fffff9d8            
+[    2619.770531] /dev/input/event9: EV_ABS       ABS_X                ffffff6d            
+[    2619.770531] /dev/input/event9: EV_ABS       ABS_Y                00000061            
+[    2619.770531] /dev/input/event9: EV_ABS       ABS_Z                fffff9db            
+[    2619.810462] /dev/input/event9: EV_ABS       ABS_Y                00000063            
+[    2619.810462] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2619.840507] /dev/input/event9: EV_ABS       ABS_X                ffffff6a            
+[    2619.840507] /dev/input/event9: EV_ABS       ABS_Y                00000064            
+[    2619.840507] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2619.881305] /dev/input/event9: EV_ABS       ABS_X                ffffff69            
+[    2619.881305] /dev/input/event9: EV_ABS       ABS_Y                00000067            
+[    2619.920754] /dev/input/event9: EV_ABS       ABS_X                ffffff70            
+[    2619.920754] /dev/input/event9: EV_ABS       ABS_Y                00000063            
+[    2619.920754] /dev/input/event9: EV_ABS       ABS_Z                fffff9d3            
+[    2619.950807] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2619.950807] /dev/input/event9: EV_ABS       ABS_Y                00000065            
+[    2619.950807] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2619.980763] /dev/input/event9: EV_ABS       ABS_X                ffffff71            
+[    2619.980763] /dev/input/event9: EV_ABS       ABS_Y                00000064            
+[    2619.980763] /dev/input/event9: EV_ABS       ABS_Z                fffff9da            
+[    2620.010879] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2620.010879] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2620.010879] /dev/input/event9: EV_ABS       ABS_Z                fffff9d9            
+[    2620.040840] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2620.040840] /dev/input/event9: EV_ABS       ABS_Z                fffff9da            
+[    2620.070913] /dev/input/event9: EV_ABS       ABS_X                ffffff6d            
+[    2620.070913] /dev/input/event9: EV_ABS       ABS_Y                0000006a            
+[    2620.070913] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2620.100847] /dev/input/event9: EV_ABS       ABS_X                ffffff6f            
+[    2620.100847] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2620.100847] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2620.130725] /dev/input/event9: EV_ABS       ABS_X                ffffff70            
+[    2620.130725] /dev/input/event9: EV_ABS       ABS_Y                0000006a            
+[    2620.130725] /dev/input/event9: EV_ABS       ABS_Z                fffff9d1            
+[    2620.160622] /dev/input/event9: EV_ABS       ABS_X                ffffff6d            
+[    2620.160622] /dev/input/event9: EV_ABS       ABS_Y                0000006d            
+[    2620.160622] /dev/input/event9: EV_ABS       ABS_Z                fffff9d8            
+[    2620.190783] /dev/input/event9: EV_ABS       ABS_X                ffffff6b            
+[    2620.190783] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2620.190783] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2620.220780] /dev/input/event9: EV_ABS       ABS_X                ffffff6d            
+[    2620.220780] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2620.220780] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2620.250931] /dev/input/event9: EV_ABS       ABS_X                ffffff71            
+[    2620.250931] /dev/input/event9: EV_ABS       ABS_Y                0000006a            
+[    2620.250931] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2620.280722] /dev/input/event9: EV_ABS       ABS_X                ffffff69            
+[    2620.280722] /dev/input/event9: EV_ABS       ABS_Y                0000006e            
+[    2620.280722] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2620.310863] /dev/input/event9: EV_ABS       ABS_X                ffffff6a            
+[    2620.310863] /dev/input/event9: EV_ABS       ABS_Y                0000006b            
+[    2620.310863] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2620.340852] /dev/input/event9: EV_ABS       ABS_X                ffffff6f            
+[    2620.340852] /dev/input/event9: EV_ABS       ABS_Y                0000006d            
+[    2620.340852] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2620.370889] /dev/input/event9: EV_ABS       ABS_X                ffffff70            
+[    2620.370889] /dev/input/event9: EV_ABS       ABS_Y                0000006e            
+[    2620.370889] /dev/input/event9: EV_ABS       ABS_Z                fffff9d8            
+[    2620.400879] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2620.400879] /dev/input/event9: EV_ABS       ABS_Y                0000006b            
+[    2620.400879] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2620.430846] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2620.460834] /dev/input/event9: EV_ABS       ABS_X                ffffff6f            
+[    2620.460834] /dev/input/event9: EV_ABS       ABS_Y                0000006b            
+[    2620.490914] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2620.490914] /dev/input/event9: EV_ABS       ABS_Z                fffff9d3            
+[    2620.520748] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2620.520748] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2620.520748] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2620.550571] /dev/input/event9: EV_ABS       ABS_X                ffffff6d            
+[    2620.550571] /dev/input/event9: EV_ABS       ABS_Y                0000006e            
+[    2620.550571] /dev/input/event9: EV_ABS       ABS_Z                fffff9d3            
+[    2620.580745] /dev/input/event9: EV_ABS       ABS_X                ffffff6f            
+[    2620.580745] /dev/input/event9: EV_ABS       ABS_Y                0000006d            
+[    2620.580745] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2620.610852] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2620.610852] /dev/input/event9: EV_ABS       ABS_Y                0000006b            
+[    2620.610852] /dev/input/event9: EV_ABS       ABS_Z                fffff9d0            
+[    2620.640905] /dev/input/event9: EV_ABS       ABS_X                ffffff70            
+[    2620.640905] /dev/input/event9: EV_ABS       ABS_Y                0000006a            
+[    2620.640905] /dev/input/event9: EV_ABS       ABS_Z                fffff9d2            
+[    2620.670603] /dev/input/event9: EV_ABS       ABS_Y                00000066            
+[    2620.670603] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2620.700497] /dev/input/event9: EV_ABS       ABS_Y                0000006c            
+[    2620.730947] /dev/input/event9: EV_ABS       ABS_X                ffffff72            
+[    2620.760914] /dev/input/event9: EV_ABS       ABS_X                ffffff6e            
+[    2620.760914] /dev/input/event9: EV_ABS       ABS_Y                0000006a            
+[    2620.760914] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2620.790826] /dev/input/event9: EV_ABS       ABS_X                ffffff6a            
+[    2620.790826] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2620.790826] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2620.820900] /dev/input/event9: EV_ABS       ABS_X                ffffff67            
+[    2620.820900] /dev/input/event9: EV_ABS       ABS_Y                0000006b            
+[    2620.820900] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2620.850879] /dev/input/event9: EV_ABS       ABS_X                ffffff69            
+[    2620.850879] /dev/input/event9: EV_ABS       ABS_Y                00000065            
+[    2620.850879] /dev/input/event9: EV_ABS       ABS_Z                fffff9d7            
+[    2620.880838] /dev/input/event9: EV_ABS       ABS_X                ffffff66            
+[    2620.880838] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2620.910918] /dev/input/event9: EV_ABS       ABS_X                ffffff65            
+[    2620.910918] /dev/input/event9: EV_ABS       ABS_Y                00000066            
+[    2620.910918] /dev/input/event9: EV_ABS       ABS_Z                fffff9d6            
+[    2620.940822] /dev/input/event9: EV_ABS       ABS_X                ffffff68            
+[    2620.970848] /dev/input/event9: EV_ABS       ABS_X                ffffff63            
+[    2620.970848] /dev/input/event9: EV_ABS       ABS_Y                00000067            
+[    2620.970848] /dev/input/event9: EV_ABS       ABS_Z                fffff9d9            
+[    2621.000664] /dev/input/event9: EV_ABS       ABS_X                ffffff67            
+[    2621.000664] /dev/input/event9: EV_ABS       ABS_Y                00000063            
+[    2621.000664] /dev/input/event9: EV_ABS       ABS_Z                fffff9d4            
+[    2621.030869] /dev/input/event9: EV_ABS       ABS_X                ffffff68            
+[    2621.030869] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2621.060833] /dev/input/event9: EV_ABS       ABS_X                ffffff64            
+[    2621.060833] /dev/input/event9: EV_ABS       ABS_Y                00000068            
+[    2621.060833] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5            
+[    2621.090855] /dev/input/event9: EV_ABS       ABS_Y                00000067            
+[    2621.090855] /dev/input/event9: EV_ABS       ABS_Z                fffff9db            
+[    2621.120871] /dev/input/event9: EV_ABS       ABS_X                ffffff6c            
+[    2621.120871] /dev/input/event9: EV_ABS       ABS_Y                00000069            
+[    2621.120871] /dev/input/event9: EV_ABS       ABS_Z                fffff9d9            
+[    2621.150856] /dev/input/event9: EV_ABS       ABS_X                ffffff68            
+[    2621.150856] /dev/input/event9: EV_ABS       ABS_Y                00000064            
+[    2621.150856] /dev/input/event9: EV_ABS       ABS_Z                fffff9d5
+
+Log lines during the capture (root):
+
+
+
+
+
+==== The stock app at work (com.flyscale.analogpoc, 15 s, receive only) ====
+start com.flyscale.analogpoc/.main.ChannelActivity: Starting: Intent { cmp=com.flyscale.analogpoc/.main.ChannelActivity }
+devices it holds open: /dev/ashmem6a7a2ce1 /dev/binderfs /dev/ion /dev/mali0 /dev/null /dev/ttyS2 /dev/urandom
+  /dev/ttyS2: speed 9600 baud; rows 0; columns 0; line = 0; intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+at the end of the watch it holds: /dev/ashmem6a7a2ce1 /dev/binderfs/binder /dev/binderfs/hwbinder /dev/ion /dev/mali0 /dev/null /dev/ttyS2 /dev/urandom
+its TCP connections: (none)
+module replies in its log: none recognised
+
+its log (0 data-dump lines shortened to 3 samples; personal details removed):
+--------- beginning of main
+05-25 19:06:45.422 29974 29974 I Zygote  : seccomp disabled by setenforce 0
+05-25 19:06:45.445 29974 29974 E scale.analogpo: Not starting debugger since process cannot load the jdwp agent.
+05-25 19:06:45.483 29974 29974 D CompatibilityChangeReporter: Compat change id reported: ######; UID 1000; state: ENABLED
+05-25 19:06:45.515 29974 29974 V GraphicsEnvironment: ANGLE Developer option for 'com.flyscale.analogpoc' set to: 'default'
+05-25 19:06:45.515 29974 29974 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+05-25 19:06:45.515 29974 29974 D ApplicationPackageManager: hasSystemFeature:name=android.hardware.vulkan.version version=###### getOpPackageName=com.flyscale.analogpoc hasSystemFeature=false
+05-25 19:06:45.516 29974 29974 D ApplicationPackageManager: hasSystemFeature:name=android.hardware.vulkan.version version=###### getOpPackageName=com.flyscale.analogpoc hasSystemFeature=false
+05-25 19:06:45.519 29974 29974 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+05-25 19:06:45.520 29974 29974 D NetworkSecurityConfig: No Network Security Config specified, using platform default
+05-25 19:06:45.541 29974 29974 D AnalogApplication: onCreate()
+05-25 19:06:45.580 29974 29974 D ApplicationPackageManager: hasSystemFeature:name=android.software.picture_in_picture version=0 getOpPackageName=com.flyscale.analogpoc hasSystemFeature=false
+05-25 19:06:45.596 29974 29974 D ChannelActivity: onCreate()...
+05-25 19:06:45.735 29974 29974 I ChannelActivity: startService
+--------- beginning of system
+05-25 19:06:45.737 29974 29974 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.startService:1829 android.content.ContextWrapper.startService:776 android.content.ContextWrapper.startService:776 com.flyscal …
+05-25 19:06:45.740 29974 29974 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.startService:1829 android.content.ContextWrapper.startService:776 android.content.ContextWrapper.startService:776 com.flyscal …
+05-25 19:06:45.743 29974 29974 D ChannelActivity: bindVideoService
+05-25 19:06:45.744 29974 29974 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.bindService:1908 android.content.ContextWrapper.bindService:812 android.content.ContextWrapper.bindService:812 com.flyscale.a …
+05-25 19:06:45.755 29974 29974 E ScrollRulerLayout: text == 61
+05-25 19:06:45.766 29974 29974 D ChannelActivity: onResume()...
+05-25 19:06:45.767 29974 29974 D ChannelActivity: onResume()..., currentIndex == 60
+05-25 19:06:45.767 29974 29974 E ScrollRulerLayout: text == 61
+05-25 19:06:45.767 29974 29974 D ChannelActivity: 更新界面, updateChannelInfoView()..
+05-25 19:06:45.768 29974 29974 D ChannelActivity: info == TX:435.025MHz
+05-25 19:06:45.768 29974 29974 D ChannelActivity: RX:435.025MHz
+05-25 19:06:45.809 29974 29974 D serial_port: Opening serial port /dev/ttyS2 with flags 0x2
+05-25 19:06:45.809 29974 29974 D serial_port: open() fd = 68
+05-25 19:06:45.810 29974 29974 D serial_port: Configuring serial port
+05-25 19:06:45.810 29974 29974 E SerialManage: isConnect == true
+05-25 19:06:45.810 29974 29974 D SerialManage: openModule()
+05-25 19:06:45.811 29974 29974 D SerialHandle: patch == /sys/class/gpio/gpio322/value; value == 1
+05-25 19:06:45.799 29974 29974 I scale.analogpoc: type=1400 audit(0.0:3913): avc: denied { read } for name="value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:45.799 29974 29974 I scale.analogpoc: type=1400 audit(0.0:3914): avc: denied { open } for path="/sys/devices/platform/soc/soc:aon/######.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs …
+05-25 19:06:45.812 29974 29974 D BoService: startCheckTimer,delay=1
+05-25 19:06:45.799 29974 29974 I scale.analogpoc: type=1400 audit(0.0:3915): avc: denied { getattr } for path="/sys/devices/platform/soc/soc:aon/######.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sy …
+05-25 19:06:45.817 29974 29974 E ForegroundService: onCreate()...
+05-25 19:06:45.819 29974 29974 I GraphicsJNI: GraphicsJNI::isHardwareConfig qemu gles is 1.
+05-25 19:06:45.896 29974 29992 D mali_winsys: EGLint new_window_surface(egl_winsys_display *, void *, EGLSurface, EGLConfig, egl_winsys_surface **, EGLBoolean) returns 0x3000
+05-25 19:06:45.898 29974 30010 I Gralloc4: mapper 4.x is not supported
+05-25 19:06:45.899 29974 30010 W Gralloc3: mapper 3.x is not supported
+05-25 19:06:45.907 29974 30010 W Gralloc4: allocator 4.x is not supported
+05-25 19:06:45.907 29974 30010 W Gralloc3: allocator 3.x is not supported
+05-25 19:06:45.909 29974 29998 D SerialHandle: 向串口发送指令， msg == AT+DMOCONNECT
+05-25 19:06:45.919 29974 30010 I gralloc : gralloc_register_buffer id=0x1bb hnd=0xac7c3940, ref:1, share_fd=79, share_attr_fd=-1, magic=######, format=1, internal_format=1, byte_stride=1920, flags=4, usage=0xb00, size=######, width=480, height=854, internal …
+05-25 19:06:45.922 29974 30010 I gralloc : gralloc_register_buffer id=0x1bc hnd=0xac7c3c40, ref:1, share_fd=81, share_attr_fd=-1, magic=######, format=1, internal_format=1, byte_stride=1920, flags=4, usage=0xb00, size=######, width=480, height=854, internal …
+05-25 19:06:45.924 29974 30010 I gralloc : gralloc_register_buffer id=0x1bd hnd=0xac7c3d00, ref:1, share_fd=82, share_attr_fd=-1, magic=######, format=1, internal_format=1, byte_stride=1920, flags=4, usage=0xb00, size=######, width=480, height=854, internal …
+05-25 19:06:45.935 29974 29992 E scale.analogpo: Shared attribute region not available to be mapped
+05-25 19:06:45.973 29974 29974 D BatteryReceiver: action == android.intent.action.BATTERY_CHANGED
+05-25 19:06:45.973 29974 29974 D BatteryReceiver: isCharging == true, batteryLevel == 19
+05-25 19:06:45.975 29974 29974 I SystemServiceRegistry: registerService FLYSCALE_SERVICE b = android.os.BinderProxy@5df7656
+05-25 19:06:45.976 29974 29974 I SystemServiceRegistry: registerService FLYSCALE_SERVICE service = android.flyscale.IFlyscaleManager$Stub$Proxy@2b7c6d7
+05-25 19:06:45.976 29974 29974 D LightController: updateBatteryStatus()...., isCharging == 1
+05-25 19:06:45.976 29974 29974 D LightController: switchRedLed(true), isCharging == -1
+05-25 19:06:45.976 29974 29974 D FlyscaleManager: --- clearLed() ---
+05-25 19:06:45.977 29974 29974 D FlyscaleManager: switchRedLed(true)
+05-25 19:06:45.978 29974 29974 D LightController: updateLed()
+05-25 19:06:45.978 29974 29974 D ChannelActivity: onServiceConnected
+05-25 19:06:46.041 29974 29992 E scale.analogpo: Shared attribute region not available to be mapped
+05-25 19:06:46.050 29974 29992 E scale.analogpo: Shared attribute region not available to be mapped
+05-25 19:06:46.115 29974 30011 E BoService: 串口数据回调; 串口 == /dev/ttyS2--获取数据 == 
+05-25 19:06:46.115 29974 30011 E BoService: +DMOCONNECT:0
+05-25 19:06:46.115 29974 30011 D BoService: listData.length == 2
+05-25 19:06:46.115 29974 30011 D BoService: listData[0] == , length == 0
+05-25 19:06:46.116 29974 30011 D BoService: listData[1] == +DMOCONNECT:0, length == 13
+05-25 19:06:46.116 29974 30011 D BoService: 模块运行正常, 查询版本号
+05-25 19:06:46.116 29974 30011 I BoService: stopCheckTimer
+05-25 19:06:46.116 29974 30011 D BoService: initChannelInfo()...
+05-25 19:06:46.123 29974 30011 E BoService: setChannelGroup()... index == 60
+05-25 19:06:46.124 29974 30011 D BoService: setChannelGroup()... data == 1,435.025,435.025,240,240,3,1
+05-25 19:06:46.124 29974 30011 D LightController: switchGreebLed(true), isCharging == 1
+05-25 19:06:46.124 29974 30011 D LightController: --- switchGreenLedFlashing() ---, isCharging == 1
+05-25 19:06:46.124 29974 30011 D BoService: initAnalogVolume()...
+05-25 19:06:46.134 29974 29974 D BoService: msg.what == 1
+05-25 19:06:46.134 29974 29974 D CompatibilityChangeReporter: Compat change id reported: ######; UID 1000; state: ENABLED
+05-25 19:06:46.135 29974 29974 V Toast   : Toast SHOW: android.widget.Toast@4cd4792 view = null pkg: com.flyscale.analogpoc TextToast? true caller: com.flyscale.analogpoc.server.BoService$1.handleMessage:80 android.os.Handler.dispatchMessage:106 android.os.Loo …
+05-25 19:06:46.204 29974 29998 D SerialHandle: 向串口发送指令， msg == AT+DMOVERQ
+05-25 19:06:46.306 29974 29996 D SerialHandle: 向串口发送指令， msg == AT+DMOSETGROUP=1,435.025,435.025,240,240,3,1
+05-25 19:06:46.405 29974 29996 D SerialHandle: 向串口发送指令， msg == AT+DMOSETVOLUME=1
+05-25 19:06:46.410 29974 29997 E BoService: 串口数据回调; 串口 == /dev/ttyS2--获取数据 == +DMOVERQ:PB202EU05
+05-25 19:06:46.411 29974 29997 D BoService: listData.length == 1
+05-25 19:06:46.411 29974 29997 D BoService: listData[0] == +DMOVERQ:PB202EU05, length == 18
+05-25 19:06:46.411 29974 29997 D BoService: 收到版本号回调，版本号 == PB202EU05
+05-25 19:06:46.560 29974 29996 E BoService: 串口数据回调; 串口 == /dev/ttyS2--获取数据 == 
+05-25 19:06:46.560 29974 29996 E BoService: +DMOSETGROUP:0
+05-25 19:06:46.560 29974 29996 E BoService: 
+05-25 19:06:46.560 29974 29996 E BoService: +DMOSETVOLUME:0
+05-25 19:06:46.561 29974 29996 D BoService: listData.length == 4
+05-25 19:06:46.561 29974 29996 D BoService: listData[0] == , length == 0
+05-25 19:06:46.561 29974 29996 D BoService: listData[1] == +DMOSETGROUP:0, length == 14
+05-25 19:06:46.561 29974 29996 D BoService: 设置群组成功 isInRotary == false, isRotaryNext == false; isRotaryPrev == false
+05-25 19:06:46.575 29974 29996 D BoService: listData[2] == , length == 0
+05-25 19:06:46.576 29974 29996 D BoService: listData[3] == +DMOSETVOLUME:0, length == 15
+05-25 19:06:46.576 29974 29974 D ChannelActivity: updateView.getUpdateType() == 9
+05-25 19:06:46.576 29974 29996 D BoService: 音量设置成功
+05-25 19:06:46.576 29974 29974 D BoService: msg.what == 1
+05-25 19:06:46.576 29974 29974 D ChannelActivity: msg.what == 0
+05-25 19:06:46.576 29974 29974 D ChannelActivity: 更新界面, updateChannelInfoView()..
+05-25 19:06:46.576 29974 29974 D ChannelActivity: info == TX:435.025MHz
+05-25 19:06:46.576 29974 29974 D ChannelActivity: RX:435.025MHz
+05-25 19:06:46.578 29974 29974 D ChannelActivity: updateView.getUpdateType() == 10
+05-25 19:06:46.578 29974 29974 D BoService: msg.what == 1
+
+radio driver kernel messages that appeared meanwhile:
+  (none)
+
+closed: stopped
+
+
+
+==== Radio probe ====
+Serial ports and labels:
+u:object_r:console_device:s0 /dev/ttyS2
+u:object_r:device:s0         /dev/ttySE0
+Processes holding a serial port:
+  /vendor/bin/engpc  (460): /dev/ttyGS0 /dev/ttyGS1
+  skipped /dev/ttyS2: its label console_device belongs to another subsystem
+Derived sepolicy.rule lines:
+allow untrusted_app device chr_file { open read write ioctl getattr lock }
+typeattribute device mlstrustedobject
+
+Applied live (until reboot): 
+
+Sysfs nodes:
+
+
+No power-looking node found under /sys/devices/platform/*{dmr,intercom,walkie,ptt}*
+
+line settings tool: /data/adb/magisk/busybox stty
+
+--- /dev/ttySE0 ---
+before: speed 115200 baud;stty: /dev/ttySE0: Inappropriate ioctl for device
+  as-is (opened by the app, no stty): 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a 46 41 49 4c 3a 20
+   57600 baud (readback 57600), after 0x34 query: 0d 26 61 ad 66 46 f3 76 9b
+  115200 baud (readback 115200), after 0x34 query: 46 41 49 4c 3a 20 49 6e 76 61 6c 69 64 20 63 6f 6d 6d 61 6e 64 0a
+    9600 baud (readback 9600), after 0x34 query: b3 5f
+  230400 baud (readback 230400), after 0x34 query: 78 ce ce 98 e0 98 98 38 38 18 0e 9e 78 ce 0e 9e 86 9e 60 0e 38 e0 ce 9e e6 9e e6 9e 06 0e 9e 60 0e 06
+  line settings put back: yes
+/dev/ttySE0 @230400: 0 bytes in 2 s
+
+line settings: every probed port is back as it was
+
+SELinux denials during the probe:
+05-25 19:05:47.259 25362 25362 I auditd  : type=1400 audit(0.0:3002): avc: denied { write } for comm="bench-checks" name="ttyS2" dev="tmpfs" ino=9814 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:console_device:s0 tclass=chr_file permissive=1 app=com.macdmr.radio
+05-25 19:05:57.329 26352 26352 I auditd  : type=1400 audit(0.0:3012): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_combined_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.329 26352 26352 I auditd  : type=1400 audit(0.0:3013): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.339 26352 26352 I auditd  : type=1400 audit(0.0:3014): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_power_stats_default:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.339 26352 26352 I auditd  : type=1400 audit(0.0:3015): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:hal_keymint_unisoc:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:57.349 26352 26352 I auditd  : type=1400 audit(0.0:3016): avc: denied { call } for comm="service" scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:r:update_engine:s0 tclass=binder permissive=1 app=com.macdmr.radio
+05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3570): avc: denied { search } for comm="bench-checks" name="asound" dev="proc" ino=4026531977 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=dir permissive=1 app=com.macdmr.radio
+05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3571): avc: denied { read } for comm="bench-checks" name="cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3572): avc: denied { open } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:59.089 25362 25362 I auditd  : type=1400 audit(0.0:3573): avc: denied { getattr } for comm="bench-checks" path="/proc/asound/cards" dev="proc" ino=4026531980 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:proc_asound:s0 tclass=file permissive=1 app=com.macdmr.radio
+05-25 19:05:59.099 25362 25362 I auditd  : type=1400 audit(0.0:3574): avc: denied { read } for comm="bench-checks" name="snd" dev="tmpfs" ino=7376 scontext=u:r:untrusted_app:s0:c113,c256,c512,c768 tcontext=u:object_r:audio_device:s0 tclass=dir permissive=1 app=com.macdmr.radio
+05-25 19:06:03.299   830   830 I auditd  : type=1400 audit(0.0:3908): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:13.309   830   830 I auditd  : type=1400 audit(0.0:3909): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:14.309   830   830 I auditd  : type=1400 audit(0.0:3910): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:21.309   830   830 I auditd  : type=1400 audit(0.0:3911): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:34.329   830   830 I auditd  : type=1400 audit(0.0:3912): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:45.799 29974 29974 I auditd  : type=1400 audit(0.0:3913): avc: denied { read } for comm="scale.analogpoc" name="value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:45.799 29974 29974 I scale.analogpoc: type=1400 audit(0.0:3913): avc: denied { read } for name="value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:45.799 29974 29974 I auditd  : type=1400 audit(0.0:3914): avc: denied { open } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:45.799 29974 29974 I scale.analogpoc: type=1400 audit(0.0:3914): avc: denied { open } for path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:45.799 29974 29974 I auditd  : type=1400 audit(0.0:3915): avc: denied { getattr } for comm="scale.analogpoc" path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:45.799 29974 29974 I scale.analogpoc: type=1400 audit(0.0:3915): avc: denied { getattr } for path="/sys/devices/platform/soc/soc:aon/40280000.gpio/gpiochip4/gpio/gpio322/value" dev="sysfs" ino=27174 scontext=u:r:system_app:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:47.179   830   830 I auditd  : type=1400 audit(0.0:3916): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:47.179   830   830 I SSense  : type=1400 audit(0.0:3916): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:58.189   830   830 I auditd  : type=1400 audit(0.0:3917): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:06:58.189   830   830 I SSense  : type=1400 audit(0.0:3917): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:07:05.699   830   830 I auditd  : type=1400 audit(0.0:3918): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:07:05.699   830   830 I SSense  : type=1400 audit(0.0:3918): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:07:21.709   830   830 I auditd  : type=1400 audit(0.0:3920): avc: denied { read } for comm="SSense" path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+05-25 19:07:21.709   830   830 I SSense  : type=1400 audit(0.0:3920): avc: denied { read } for path="/sys/devices/platform/soc/soc:ap-ahb/20800000.dpu/display/dispc0/frame_count" dev="sysfs" ino=29554 scontext=u:r:system_server:s0 tcontext=u:object_r:sysfs:s0 tclass=file permissive=1
+
+
+
+==== SignalDeck log (personal details removed) ====
+(empty)
+
+
+
+==== Summary ====
+watched com.flyscale.analogpoc start up for 15 s
+radio module answered the version query: no
+

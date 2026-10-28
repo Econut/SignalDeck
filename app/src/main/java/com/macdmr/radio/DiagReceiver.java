@@ -20,6 +20,7 @@ import android.util.Log;
  * am broadcast -a com.macdmr.radio.DIAG --es cmd heard --es call DEST        (as if DEST was heard on the radio)
  * am broadcast -a com.macdmr.radio.DIAG --es cmd benchIgate --ez on true       (gate to RF without APRS-IS and off 144.390)
  * am broadcast -a com.macdmr.radio.DIAG --es cmd pkt --es what object|bulletin|telemetry|weather|cwid|beacon|connect|disconnect
+ * am broadcast -a com.macdmr.radio.DIAG --es cmd checks --es watch auto --el hosttime 1793000000000   (Run all checks, no screen)
  * </pre>
  * {@code inject} plays a WAV file (16-bit PCM, any rate, mono or stereo) into the receive path in real time, as if
  * the radio heard it: decoders, the parrot and the DTMF remote see it, nothing is keyed by the injection itself.
@@ -55,6 +56,7 @@ public final class DiagReceiver extends BroadcastReceiver {
                 }, "diag-scope").start();
                 break;
             }
+            case "checks": FirstRunCheck.benchRun(c.getApplicationContext(), s, i.getStringExtra("watch"), i.getBooleanExtra("trial", false), i.getLongExtra("hosttime", 0)); break;   // bench: Run all checks with no screen (--es watch auto|none|<pkg>, --ez trial, --el hosttime ms); scripts/w6/run_checks.sh
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
             case "txwav": { String nm = i.getStringExtra("name"); if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) Log.i("DiagReceiver", "txwav: " + s.diagTxWav(new java.io.File(c.getCacheDir(), "tx_" + nm + ".wav"))); break; }   // bench: transmit cache/tx_<name>.wav (low power VFO)
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Run all checks from adb, with the host's clock
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 plan item 10 (bench driver), Phase 0 gap 7 (wrong phone clock) | Run all checks can be started from adb with no screen: `am broadcast -a com.macdmr.radio.DIAG --es cmd checks [--es watch auto\|none\|<package>] [--ez trial true] [--el hosttime <ms>]` (shell only, like every bench command). `watch auto` picks the app the dialog would offer first (the profile's stock app, else the best-ranked candidate with a launcher icon). Progress, the folder and the zip go to the log tag `BenchChecks`; one run at a time. `hosttime` corrects a wrong phone clock for the folder name and the report header, and the report gets a `clock` line saying how far off the phone was (the W6 boots at its build date, five months back). Host script `scripts/w6/run_checks.sh -s <serial>` starts the app if needed, sends the command, follows the progress, and pulls the folder without the stock APK. Nothing changes for users: the clock line only appears when the bench passes the host's time. | `FirstRunCheck.java` (`benchWatch`, `benchRun`), `DiagReceiver.java` (`checks`), `DeviceReport.java` (`clockOffsetMs`, `clockNote`), `scripts/w6/run_checks.sh`, `BenchChecksTest.java` | Host: `BenchChecksTest` (watch choice, clock line), all 384 host tests pass. **Device: W6 (Unisoc, analog UHF), rooted:** `run_checks.sh -s W6202601000904` ran every check in 110 s with no taps; the watch picked `com.flyscale.analogpoc` by itself, the folder is `UNISOC_W6__20261028_052310` (host time in the phone's GMT+8 zone) instead of a May date. Not run on a phone with a profile. |
+
 ## 2026-10-26 — Firmware the catalogue does not list yet: asked once, noticed on the Device page
 
 | Backlog | Change | Files | Test |

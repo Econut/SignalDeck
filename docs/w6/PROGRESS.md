@@ -2,6 +2,21 @@
 
 Newest first. Phone: ANYSECU W6+ replacement unit, adb `-s W6202601000904` (USB). Plan: `docs/W6_DEVICE_REPORT_PLAN.md`.
 
+## 2026-10-27 16:35 CDT — Bench driver (plan item 10, gap 7)
+
+- Branch `w6/bench-driver`, stacked on `w6/phase1-baseline`.
+- `DiagReceiver checks` runs Run all checks with no screen (`--es watch auto|none|<pkg>`, `--ez trial`, `--el hosttime`);
+  progress and the result go to log tag `BenchChecks`. `scripts/w6/run_checks.sh -s <serial>` drives it and pulls the
+  folder without the APK.
+- On the W6: one command, ~110 s, no taps; `watch auto` picked `com.flyscale.analogpoc`; folder and header now carry the
+  host's time, and the report says `the phone is 155 d 10 h 22 min behind`. Report kept in
+  `reports/20261027_bench_driver/`.
+- Seen while testing: the stock-app watch runs `logcat -c`, which wipes the earlier `BenchChecks` lines (harmless for the
+  script, which waits for the last line). Since the watch now stops the stock app at the end and it is not restarted, the
+  next run sees a real start-up (`Starting: Intent …` instead of "brought to the front"), so B4 is half fixed by the
+  order of runs, not by code: the code fix stays on the list.
+- Next: the probe's port choice and the AT probe (B1, B2, B5).
+
 ## 2026-10-27 16:15 CDT — Phase 1: rooted baseline B
 
 - Worktree `SignalDeck-w6`, branch `w6/phase1-baseline` from `origin/main` `eb2797c0`. Copied the untracked
