@@ -125,7 +125,7 @@ public class ChannelEditorView extends LinearLayout {
         section(form, "Radio");
         choiceInto(form, "Power", H_POWER, new String[] { "Low power", "High power" }, ch.power, v -> ch.power = v);
         choiceInto(form, "Transmit", H_RXONLY, new String[] { "Allowed", "Receive only" }, ch.rxOnly ? 1 : 0, v -> ch.rxOnly = v == 1);
-        choiceInto(form, "Relay (repeater)", H_RELAY, new String[] { "Disconnect", "Normal" }, ch.relay == 1 ? 0 : 1, v -> ch.relay = v == 0 ? 1 : 2);
+        if (com.macdmr.radio.DeviceProfile.detect().dmr()) choiceInto(form, "Relay (repeater)", H_RELAY, new String[] { "Disconnect", "Normal" }, ch.relay == 1 ? 0 : 1, v -> ch.relay = v == 0 ? 1 : 2);
 
         digitalGroup = new LinearLayout(c); digitalGroup.setOrientation(VERTICAL); form.addView(digitalGroup);
         section(digitalGroup, "DMR");

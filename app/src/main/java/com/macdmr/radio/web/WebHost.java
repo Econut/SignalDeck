@@ -744,6 +744,7 @@ public final class WebHost {
                 if (ch == null) {
                     ch = new ChannelStore.Channel(); ChannelStore.Channel cur = svc.current();
                     if (cur != null) { ch.type = cur.type; ch.rxFreq = cur.rxFreq; ch.txFreq = cur.txFreq; }
+                    if (!svc.profile().dmr() && ch.type == ChannelStore.Channel.TYPE_DMR) ch.type = ChannelStore.Channel.TYPE_FM;   // an analog-only radio: a new channel is analog
                 }
                 JSONObject help = new JSONObject(); for (String[] h : com.macdmr.radio.ui.ChannelEditorView.helpForWeb()) help.put(h[0], h[1]);
                 return ok(new JSONObject().put("channel", channelFull(ch)).put("isNew", n <= 0).put("help", help).put("tones", toneLists()).put("nameMax", ChannelStore.NAME_MAX));
@@ -754,6 +755,7 @@ public final class WebHost {
                 if (ch == null) return WebServer.Response.error(404, "No channel " + n);
                 String err = applyChannel(ch, b);
                 if (err != null) return WebServer.Response.error(400, err);
+                if (n <= 0 && ch.isDigital() && !svc.profile().dmr()) return WebServer.Response.error(400, "This radio has no DMR: add an analog channel");
                 final ChannelStore.Channel c = ch; final boolean isNew = n <= 0;
                 onMain(() -> { svc.saveChannel(c, isNew); return null; });
                 return WebServer.Response.json(200, new JSONObject().put("ok", true).put("message", "Saved " + (c.name.isEmpty() ? "channel " + c.number : c.name)).put("number", c.number).toString());

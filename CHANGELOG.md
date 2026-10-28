@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Radios without DMR: no DMR settings when adding channels
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner: a new channel on the W6 web showed DMR settings | On a radio without DMR (the W6+), adding a channel never offers DMR. **Web editor:** a new channel became analog only after the form had chosen its DMR section, so it showed colour code, slot, talkgroups and the rest; it is analog before the form is built now, and the server's new-channel template is analog and a DMR channel is refused on save. **Relay (repeater)**, the DMR module's setting, is hidden on the phone and the web. **Nearby repeaters** (phone and web) drops DMR-only repeaters and any the radio cannot tune (outside its bands: every phone), and adds a DMR + FM repeater as its FM channel only. **Shared/CHIRP imports** leave DMR channels out, listed with the reason. Help (Radios that do less) says so. | `assets/web/editor.js`, `web/WebHost.java`, `ui/ChannelEditorView.java`, `repeaters/RepeaterService.java`, `repeaters/RepeaterPlanner.java`, `Codeplug.java`, `ui/HelpView.java`, `RepeaterPlannerNoDmrTest.java` | Host: `RepeaterPlannerNoDmrTest` + suite. Device: see the PR. |
+
 ## 2026-10-28 — ANYSECU W6+: tested for receive
 
 | Backlog | Change | Files | Test |

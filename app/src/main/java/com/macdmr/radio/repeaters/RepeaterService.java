@@ -75,6 +75,8 @@ public final class RepeaterService {
         List<Repeater> out = new ArrayList<>();
         for (Repeater r : all) {
             if (!r.hasCoords || !GeoUtil.inRadioRange(r.rxHz)) continue;
+            if (!com.macdmr.radio.DeviceProfile.inBands(r.rxHz) || (r.txHz > 0 && !com.macdmr.radio.DeviceProfile.inBands(r.txHz))) continue;   // this phone's radio cannot tune it (the W6: 400-470 MHz)
+            if (!r.fm && !com.macdmr.radio.DeviceProfile.detect().dmr()) continue;                                  // a DMR-only repeater on a radio without DMR
             r.distanceMeters = GeoUtil.haversineMeters(lat, lon, r.lat, r.lon);
             if (r.distanceMeters <= radiusKm * 1000) out.add(r);
         }
@@ -124,7 +126,7 @@ public final class RepeaterService {
 
     // ---- programming -----------------------------------------------------------------------------------
 
-    public Plan plan(Repeater r, Set<Integer> talkTgs) { return RepeaterPlanner.plan(r, talkTgs, tgNames()); }
+    public Plan plan(Repeater r, Set<Integer> talkTgs) { return RepeaterPlanner.plan(r, talkTgs, tgNames(), com.macdmr.radio.DeviceProfile.detect().dmr()); }
 
     public static String preview(Plan p) {
         StringBuilder sb = new StringBuilder();
