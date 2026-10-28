@@ -78,12 +78,12 @@ public class RadioService extends Service implements RadioEngine.Events {
     private VoskCaptions captions;
     private long zoneId;                       // 0 = all channels
     private final Scanner scanner = new Scanner(new Scanner.Host() {
-        @Override public java.util.List<ChannelStore.Channel> candidates() { if(!p8Main())return zoneChannels();java.util.List<ChannelStore.Channel> out=new java.util.ArrayList<>();for(ChannelStore.Channel c:zoneChannels())try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());out.add(c);}catch(IllegalArgumentException ignored){}return out; }
+        @Override public java.util.List<ChannelStore.Channel> candidates() { if(!p8Main())return zoneChannels();java.util.List<ChannelStore.Channel> out=new java.util.ArrayList<>();for(ChannelStore.Channel c:scanCandidates())try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());out.add(c);}catch(IllegalArgumentException ignored){}return out; }
         @Override public void tune(ChannelStore.Channel ch) { selectChannel(ch.number); }
         @Override public boolean receiving() { return p8Main()?receiving:softSq.isEnabled() ? squelchOpen : receiving; }   // with Soft SQ on the module's squelch is open and it reports a reception all the time: the soft gate is the activity signal
         @Override public boolean softGated() { return !p8Main() && softSq.isEnabled(); }
         @Override public long dwellMs() { return profile.scanDwellMs; }
-        @Override public ChannelStore.Channel priority() { int n=scanPriority();ChannelStore.Channel c=n>0?store.byNumber(n):null;if(p8Main() && c!=null)try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());}catch(IllegalArgumentException e){return null;}return c; }
+        @Override public ChannelStore.Channel priority() { int n=scanPriority();ChannelStore.Channel c=n>0?store.byNumber(n):null;if(p8Main() && c!=null){boolean included=false;for(ChannelStore.Channel member:scanCandidates())if(member.id==c.id)included=true;if(!included)return null;try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());}catch(IllegalArgumentException e){return null;}}return c; }
         @Override public void status(boolean s, boolean h, ChannelStore.Channel on) {
             if(p8Main())p8Scanning=s;
             if (voiceOn()) {
@@ -1370,17 +1370,24 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     public String toggleScan() {
-        if(p8Main()){if(!isReady())return "Connect P8 first";if(p8Scanning){scanner.stop();p8Scanning=false;pushModes();return "Scan stopped";}String error=scanner.start();p8Scanning=error==null;pushModes();return error==null?"Scanning "+zoneName():error;}
+        if(p8Main()){if(!isReady())return "Connect P8 first";if(p8Scanning){scanner.stop();p8Scanning=false;pushModes();return "Scan stopped";}if(pttDown || transmitting)return "Release PTT before scanning";if(vfo!=null)return "Turn VFO off to scan channels";String error=scanner.start();p8Scanning=error==null;pushModes();return error==null?"Scanning "+scanListName():error;}
         if (scanner.isScanning()) { scanner.stop(); return "Scan stopped"; }
         if (vfo != null) return "Turn VFO off to scan channels";
         String err = scanner.start(); pushModes();      // the scanner tunes its first channel at once, which applies the scan-time Soft SQ
         return err == null ? "Scanning " + zoneName() : err;
     }
     public String skipScanChannel() { return scanner.skipCurrent(); }
+    public long scanListId(){return getSharedPreferences("radio",MODE_PRIVATE).getLong("p8ScanList",0);}
+    public String scanListName(){ChannelStore.ScanList s=store.scanList(scanListId());return s==null?"Current zone: "+zoneName():s.name;}
+    public java.util.List<ChannelStore.Channel> scanCandidates(){long id=scanListId();return id==0?zoneChannels():store.scanChannels(id);}
+    public void setScanList(long id){scanner.stop();scanner.clearSkips();getSharedPreferences("radio",MODE_PRIVATE).edit().putLong("p8ScanList",id).apply();pushModes();}
+    /** Membership edits affect the next session, never mutate an in-flight scan snapshot. */
+    public void channelCollectionsChanged(){scanner.stop();scanner.clearSkips();if(scanListId()>0 && store.scanList(scanListId())==null)setScanList(0);pushModes();}
 
     public long zoneId() { return zoneId; }
     public String zoneName() { if (zoneId <= 0) return "ALL"; ChannelStore.Zone z = store.zone(zoneId); return z == null ? "ALL" : z.name; }
     public void setZone(long id) {
+        if(scanner.isScanning())scanner.stop();
         zoneId = id; getSharedPreferences("radio", MODE_PRIVATE).edit().putLong("zone", id).apply(); pushModes();
         // tune the channel last used in this zone (or stay, when the current channel is in it; else its first channel)
         if (pttDown || scanner.isScanning() || vfo != null) return;              // not while talking, scanning (it carries on in the new zone) or on the VFO
@@ -1640,13 +1647,18 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     public void deleteChannel(ChannelStore.Channel ch) {
+        channelCollectionsChanged();
+        int priority=scanPriority();if(priority==ch.number)setScanPriority(0);else if(priority>ch.number)setScanPriority(priority-1);
         store.delete(ch);
+        if(current!=null && current.id!=ch.id)for(ChannelStore.Channel remaining:store.all())if(remaining.id==current.id){current=remaining;break;}
         if (current != null && current.id == ch.id) { current = null; int n = store.count(); if (n > 0) selectChannel(Math.min(ch.number, n)); }
     }
 
     /** Save an edited or new channel; if it is the active one, re-program the radio. */
     public void saveChannel(ChannelStore.Channel ch, boolean isNew) {
+        channelCollectionsChanged();
         if (isNew) store.insert(ch); else store.update(ch);
+        if(isNew && zoneId>0){ChannelStore.Zone z=store.zone(zoneId);if(z!=null){z.numbers=java.util.Arrays.copyOf(z.numbers,z.numbers.length+1);z.numbers[z.numbers.length-1]=ch.number;store.saveZone(z);}}
         if (!isNew && current != null && current.id == ch.id) selectChannel(ch.number);
     }
 

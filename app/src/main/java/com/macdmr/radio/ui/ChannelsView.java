@@ -211,6 +211,9 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         TextView pb = Neo.button(c, isPrio ? "Stop using as scan priority" : "Make scan priority", "scan", Neo.VIOLET); pb.setTextSize(14);
         LayoutParams pbl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); pbl.setMargins((int) (3 * d), (int) (8 * d), (int) (3 * d), 0);
         box.addView(pb, pbl);
+        TextView zonesButton=Neo.button(c,"Zones for this channel","zone",Neo.CYAN);
+        box.addView(zonesButton,new LayoutParams(pbl));
+        zonesButton.setOnClickListener(v->{dlg.dismiss();if(svc!=null)ZonesDialog.assignChannel(c,svc,ch,this::reload);});
         final int hn = svc != null ? svc.store().channelHistoryCount(ch.number) : 0;
         TextView hb = Neo.button(c, hn > 0 ? "History (" + hn + ")" : "History", "signal", Neo.CYAN); hb.setTextSize(14);
         box.addView(hb, new LayoutParams(pbl));

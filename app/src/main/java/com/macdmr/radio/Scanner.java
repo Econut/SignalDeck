@@ -60,7 +60,7 @@ public final class Scanner {
         if (scanning) return "Already scanning";
         list = new ArrayList<>();
         for (ChannelStore.Channel ch : host.candidates()) if (!skipped.contains(ch.number) && !(ch.isDigital() && ch.txContact <= 0)) list.add(ch);
-        if (list.size() < 2) return "Nothing to scan: need at least two channels in the zone";   // (counted before the priority channel is taken out)
+        if (list.size() < 2) return "Nothing to scan: need at least two supported channels in the selected list or zone";
         scanning = true; holding = false; idx = -1; landedAt = 0; lastActivityAt = 0;
         prio = host.priority(); onPriority = false; sincePriority = 0; peeking = false; lastPeek = 0;
         if (prio != null) for (int i = 0; i < list.size(); i++) if (list.get(i).number == prio.number) { list.remove(i); break; }   // visited by look-back, not twice

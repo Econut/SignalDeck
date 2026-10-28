@@ -167,7 +167,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         LayoutParams bl = new LayoutParams(0, LayoutParams.MATCH_PARENT, 0.3f); bl.leftMargin = dp4;
         sr.addView(scan, bl); sr.addView(zone, new LayoutParams(bl));
         addView(sr, srLp);
-        scan.setOnClickListener(v -> { if (svc != null) android.widget.Toast.makeText(c, svc.toggleScan(), android.widget.Toast.LENGTH_SHORT).show(); });
+        scan.setOnClickListener(v -> pickScan());
         scan.setOnLongClickListener(v -> { if (svc != null) android.widget.Toast.makeText(c, svc.skipScanChannel(), android.widget.Toast.LENGTH_SHORT).show(); return true; });
         zone.setOnClickListener(v -> pickZone());
 
@@ -458,7 +458,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         br.addView(scanBtn, b1); br.addView(zoneBtn, b2); scanZoneRow = br;
         LayoutParams brl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); brl.setMargins(m, (int) (6 * d), m, 0);
         addView(br, brl);
-        scanBtn.setOnClickListener(v -> { if (svc != null) android.widget.Toast.makeText(c, svc.toggleScan(), android.widget.Toast.LENGTH_SHORT).show(); });
+        scanBtn.setOnClickListener(v -> pickScan());
         scanBtn.setOnLongClickListener(v -> { if (svc != null) android.widget.Toast.makeText(c, svc.skipScanChannel(), android.widget.Toast.LENGTH_SHORT).show(); return true; });
         zoneBtn.setOnClickListener(v -> pickZone());
 
@@ -525,6 +525,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     }
 
     private void pickZone() { if (svc != null) ZonesDialog.show(getContext(), svc, null); }
+    private void pickScan(){if(svc==null)return;if(com.macdmr.radio.BuildConfig.P8_OFFLINE)ScanListsDialog.show(getContext(),svc);else android.widget.Toast.makeText(getContext(),svc.toggleScan(),android.widget.Toast.LENGTH_SHORT).show();}
     public void detach() { if (svc != null) svc.removeListener(this); svc = null; }
 
     private void refreshHeadline() {

@@ -127,6 +127,8 @@ public final class ChannelStore extends SQLiteOpenHelper {
         super.onOpen(db);
         if (db.isReadOnly()) return;
         db.execSQL("CREATE TABLE IF NOT EXISTS tglists (_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, tgs TEXT)");
+        // Additive migration: never bump the legacy destructive onUpgrade for user data.
+        db.execSQL("CREATE TABLE IF NOT EXISTS scanlists (_id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, channelIds TEXT NOT NULL)");
         // nets held on a channel: tied to the channel's row id, so renumbering, zones and imports never move them
         db.execSQL("CREATE TABLE IF NOT EXISTS nets (_id INTEGER PRIMARY KEY AUTOINCREMENT, channelId INTEGER, name TEXT, days INTEGER, minute INTEGER, duration INTEGER, notes TEXT)");
         boolean hasNotes = false;
@@ -262,6 +264,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
         db.delete("channels", "_id=?", new String[] { String.valueOf(ch.id) });
         db.delete("nets", "channelId=?", new String[] { String.valueOf(ch.id) });
         db.execSQL("UPDATE channels SET number = number - 1 WHERE number > ?", new Object[] { ch.number });   // keep 1..n contiguous
+        for(ScanList list:scanLists())saveScanList(list); // prune the deleted stable ID
         for (Zone z : zones()) {   // zones hold channel numbers: drop this one and follow the renumbering
             List<Integer> l = new ArrayList<>(); boolean changed = false;
             for (int n : z.numbers) { if (n == ch.number) { changed = true; continue; } if (n > ch.number) { n--; changed = true; } l.add(n); }
@@ -459,6 +462,36 @@ public final class ChannelStore extends SQLiteOpenHelper {
     }
 
     // ---- zones ----
+    /** Independent of zones. Stable row IDs prevent a deleted/renumbered channel changing membership. */
+    public static final class ScanList { public long id; public String name=""; public long[] channelIds=new long[0]; }
+    public List<ScanList> scanLists() {
+        List<ScanList> out=new ArrayList<>();
+        try(Cursor c=getReadableDatabase().rawQuery("SELECT _id,name,channelIds FROM scanlists ORDER BY name COLLATE NOCASE",null)){
+            while(c.moveToNext()){ScanList s=new ScanList();s.id=c.getLong(0);s.name=c.getString(1);s.channelIds=parseIds(c.getString(2));out.add(s);}
+        }return out;
+    }
+    public ScanList scanList(long id){for(ScanList s:scanLists())if(s.id==id)return s;return null;}
+    public void saveScanList(ScanList s){
+        s.name=s.name==null?"":s.name.trim();
+        if(s.name.isEmpty() || s.name.length()>NAME_MAX)throw new IllegalArgumentException("Use a scan-list name of 1–32 characters");
+        for(ScanList other:scanLists())if(other.id!=s.id && other.name.equalsIgnoreCase(s.name))throw new IllegalArgumentException("That scan-list name is already used");
+        java.util.Set<Long> have=new java.util.HashSet<>();for(Channel c:all())have.add(c.id);
+        java.util.LinkedHashSet<Long> ids=new java.util.LinkedHashSet<>();for(long id:s.channelIds)if(have.contains(id))ids.add(id);
+        StringBuilder b=new StringBuilder();s.channelIds=new long[ids.size()];int i=0;for(long id:ids){if(b.length()>0)b.append(',');b.append(id);s.channelIds[i++]=id;}
+        ContentValues v=new ContentValues();v.put("name",s.name);v.put("channelIds",b.toString());
+        if(s.id>0)getWritableDatabase().update("scanlists",v,"_id=?",new String[]{String.valueOf(s.id)});
+        else {s.id=getWritableDatabase().insertOrThrow("scanlists",null,v);}
+    }
+    public void deleteScanList(long id){getWritableDatabase().delete("scanlists","_id=?",new String[]{String.valueOf(id)});}
+    public List<Channel> scanChannels(long id){
+        ScanList s=scanList(id);List<Channel> out=new ArrayList<>();if(s==null)return out;
+        java.util.Map<Long,Channel> byId=new java.util.HashMap<>();for(Channel c:all())byId.put(c.id,c);
+        for(long channelId:s.channelIds){Channel c=byId.get(channelId);if(c!=null)out.add(c);}return out;
+    }
+    private static long[] parseIds(String text){
+        java.util.LinkedHashSet<Long> ids=new java.util.LinkedHashSet<>();if(text!=null)for(String t:text.split(","))try{long n=Long.parseLong(t);if(n>0)ids.add(n);}catch(NumberFormatException ignored){}
+        long[] out=new long[ids.size()];int i=0;for(long id:ids)out[i++]=id;return out;
+    }
     public List<Zone> zones() {
         List<Zone> out = new ArrayList<>();
         try (Cursor c = getReadableDatabase().query("zones", null, null, null, null, null, "name COLLATE NOCASE")) {

@@ -32,14 +32,25 @@ import java.util.Set;
  */
 public final class ZonesDialog {
     private ZonesDialog() { }
+    public static void assignChannel(Context c,RadioService svc,ChannelStore.Channel ch,Runnable changed){
+        List<ChannelStore.Zone> zones=svc.store().zones();
+        if(zones.isEmpty()){Toast.makeText(c,"Create a named zone using Zones first",Toast.LENGTH_LONG).show();return;}
+        String[] names=new String[zones.size()];boolean[] on=new boolean[zones.size()];
+        for(int i=0;i<zones.size();i++){names[i]=zones.get(i).name;for(int n:zones.get(i).numbers)if(n==ch.number)on[i]=true;}
+        new AlertDialog.Builder(c).setTitle("Zones: "+ch.name).setMultiChoiceItems(names,on,(d,w,checked)->on[w]=checked)
+            .setPositiveButton("Save",(d,w)->{
+                for(int i=0;i<zones.size();i++){ChannelStore.Zone z=zones.get(i);List<Integer> nums=new ArrayList<>();for(int n:z.numbers)if(n!=ch.number)nums.add(n);if(on[i])nums.add(ch.number);z.numbers=new int[nums.size()];for(int j=0;j<nums.size();j++)z.numbers[j]=nums.get(j);svc.store().saveZone(z);}
+                svc.channelCollectionsChanged();Toast.makeText(c,"Zone assignments saved",Toast.LENGTH_SHORT).show();if(changed!=null)changed.run();
+            }).setNegativeButton("Cancel",null).show();
+    }
 
     /** {@code changed} runs after the selection or the zones changed (may be null). */
     public static void show(Context c, RadioService svc, Runnable changed) {
         float d = Theme.dp(c);
         LinearLayout body = Neo.sheetBody(c, "Zones");
-        body.addView(Neo.sheetHint(c, "The zone picks which channels the arrows, the scanner and the car's channel list use. Tap one to use it; ⋮ renames, refills or deletes it."));
+        body.addView(Neo.sheetHint(c, "The zone picks the channels shown in the channel list and used by the arrows. SCAN can use this zone or an independent saved scan list. Tap a zone to use it; ⋮ renames, refills or deletes it."));
         final AlertDialog[] self = new AlertDialog[1];
-        Runnable done = () -> { if (self[0] != null) self[0].dismiss(); if (changed != null) changed.run(); };
+        Runnable done = () -> { if (self[0] != null) self[0].dismiss();svc.channelCollectionsChanged(); if (changed != null) changed.run(); };
 
         body.addView(zoneRow(c, svc, null, svc.zoneId() <= 0, svc.store().count(), done, self), rowLp(d));
         for (ChannelStore.Zone z : svc.store().zones()) body.addView(zoneRow(c, svc, z, svc.zoneId() == z.id, z.numbers.length, done, self), rowLp(d));
@@ -212,7 +223,8 @@ public final class ZonesDialog {
                 .setPositiveButton("Save", (dd, w) -> {
                     List<Integer> nums = new ArrayList<>(); for (int i = 0; i < all.size(); i++) if (on[i]) nums.add(all.get(i).number);
                     z.numbers = new int[nums.size()]; for (int i = 0; i < nums.size(); i++) z.numbers[i] = nums.get(i);
-                    svc.store().saveZone(z);
+                    svc.store().saveZone(z);svc.channelCollectionsChanged();
+                    Toast.makeText(c,"Zone saved",Toast.LENGTH_SHORT).show();
                     after.run();
                 }).setNegativeButton("Cancel", null).show();
     }

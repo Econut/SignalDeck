@@ -27,6 +27,7 @@ public final class P8UiInstrumentation extends Instrumentation {
     @Override public void onStart(){
         Bundle result=new Bundle();
         try{
+            P8ChannelManagementChecks.run(getTargetContext());
             runOnMainSync(()->{
                 Context context=new ContextThemeWrapper(getTargetContext(),R.style.AppTheme);
                 List<Boolean> events=new ArrayList<>();P8PttBar bar=new P8PttBar(context);bar.setListener(events::add);
@@ -42,7 +43,7 @@ public final class P8UiInstrumentation extends Instrumentation {
                 bitmap.eraseColor(0);bar.setState(PttButton.State.TX);bar.draw(canvas);check(redPixels(bitmap)>receiveRed+100,"TX is not visibly red");check(bar.getContentDescription().toString().startsWith("Transmitting"),"TX accessibility state wrong");
                 bitmap.eraseColor(0);bar.setState(PttButton.State.RX);bar.draw(canvas);check(bar.getContentDescription().toString().startsWith("Receive"),"RX state not restored");check(redPixels(bitmap)==receiveRed,"RX did not return to cyan");check(events.isEmpty(),"Rendering invoked PTT listener");bitmap.recycle();
             });
-            result.putString("stream","PASS: hold/release, no touch-fabricated TX, cancel, focus loss, detach, red TX/cyan RX rendering. Isolated listener; no radio operations.\n");finish(Activity.RESULT_OK,result);
+            result.putString("stream","PASS: scratch SQLite channel settings, zones and scan-list persistence; cross-zone selection; deletion/renumber safety; duplicate names; hold/release, cancel, focus loss, detach, red TX/cyan RX rendering. Isolated listeners and database; no radio operations.\n");finish(Activity.RESULT_OK,result);
         }catch(Throwable error){result.putString("stream",android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result);}
     }
 }
