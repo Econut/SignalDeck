@@ -128,6 +128,41 @@ public final class DiagReceiver extends BroadcastReceiver {
                 Log.i("DiagReceiver", err == null ? "page started " + rics.length + " at " + i.getIntExtra("baud", 1200) : "page: " + err);
                 break;
             }
+            case "contact": {                                              // bench: save a contact the way the editor does
+                com.macdmr.radio.ChannelStore.Contact ct = new com.macdmr.radio.ChannelStore.Contact();
+                ct.name = i.getStringExtra("name");
+                if (ct.name == null || ct.name.isEmpty()) ct.name = "Contact";
+                ct.callsign = ct.name;
+                ct.type = 0;
+                int ric = i.getIntExtra("ric", -1);
+                if (ric >= 0) ct.rics = String.valueOf(ric);
+                s.store().insertContact(ct);
+                Log.i("DiagReceiver", "contact saved id " + ct.id + " ric " + ct.rics);
+                break;
+            }
+            case "pager": {
+                boolean hold = !i.hasExtra("hold") || i.getBooleanExtra("hold", true);
+                if (i.hasExtra("monitor")) {
+                    String raw = i.getStringExtra("freqs");
+                    java.util.List<Integer> list = new java.util.ArrayList<>();
+                    if (raw != null) for (String part : raw.split("[, ]+")) { try { list.add(Integer.parseInt(part.trim())); } catch (Exception ignored) { } }
+                    int[] hz = new int[list.size()]; for (int k = 0; k < list.size(); k++) hz[k] = list.get(k);
+                    Log.i("DiagReceiver", "pager monitor: " + s.setPagerMonitor(i.getBooleanExtra("monitor", false), hz, i.getIntExtra("baud", 1200)));
+                    break;
+                }
+                if (i.hasExtra("saveRic")) {
+                    com.macdmr.radio.ChannelStore.Contact ct = new com.macdmr.radio.ChannelStore.Contact();
+                    String name = i.getStringExtra("name");
+                    ct.name = name == null || name.isEmpty() ? "Bench Page" : name;
+                    ct.type = 0;
+                    ct.rics = String.valueOf(i.getIntExtra("saveRic", 0));
+                    s.store().insertContact(ct);
+                    Log.i("DiagReceiver", "contact saved id " + ct.id + " ric " + ct.rics);
+                    break;
+                }
+                if (i.hasExtra("on")) Log.i("DiagReceiver", "pager: " + s.setPager(i.getBooleanExtra("on", false), hold));
+                break;
+            }
             case "m17": {                                                       // bench: M17 receive on/off (--ez on); --ei tx ms: a short Codec 2 tone through the symbol engine; --ei mic ms: hold the microphone path (not the tone) for that long, at most 12 s; --es enc NAME: Codec 2 3200 encode cache/NAME.wav to cache/NAME.c2; --es dec NAME: decode cache/NAME.c2 back to cache/NAME.wav
                 if (i.hasExtra("mic")) {
                     int ms = Math.max(1000, Math.min(12000, i.getIntExtra("mic", 10000)));

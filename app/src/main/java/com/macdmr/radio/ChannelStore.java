@@ -94,7 +94,9 @@ public final class ChannelStore extends SQLiteOpenHelper {
     /** The canonical text of a RIC list: "123;456". */
     public static String ricText(int[] rics) { StringBuilder b = new StringBuilder(); for (int r : rics) { if (b.length() > 0) b.append(';'); b.append(r); } return b.toString(); }
     public static final class Message { public long id; public int peer, type; public boolean outgoing; public long ts; public String text; public int status; public int sender; }   // sender: who wrote a talkgroup text (0 = the peer)   // status 0 pending 1 sent 2 failed
-    public static final class Conversation { public int peer, type; public String name, lastText; public long lastTs; public boolean outgoing; }
+    public static final class Conversation { public int peer, type; public String name, lastText; public long lastTs; public boolean outgoing; public String transport = "dmr"; public String threadKey = ""; public int unread; public String address = ""; }
+    /** One stored page or M17 text. transport is "page" or "m17". */
+    public static final class PageRow { public long id, ts; public int hz, ric, func, baud, corrected, unread; public boolean outgoing; public String text = "", signer = "", threadKey = "", transport = "page"; }
 
     public static final class Zone { public long id; public String name; public int[] numbers = new int[0]; }
 
@@ -154,6 +156,8 @@ public final class ChannelStore extends SQLiteOpenHelper {
         // when and how each contact was heard, with the position when the transmission carried one (owner, 2026-10-25)
         db.execSQL("CREATE TABLE IF NOT EXISTS contact_heard (_id INTEGER PRIMARY KEY AUTOINCREMENT, contactId INTEGER, ts INTEGER, source TEXT, detail TEXT, lat REAL, lon REAL, dir INTEGER DEFAULT 0)");
         db.execSQL("CREATE INDEX IF NOT EXISTS contact_heard_ix ON contact_heard (contactId, ts)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS pages (_id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER, hz INTEGER, ric INTEGER, func INTEGER, baud INTEGER, text TEXT, corrected INTEGER, signer TEXT, threadKey TEXT, transport TEXT, outgoing INTEGER DEFAULT 0, unread INTEGER DEFAULT 1)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS pages_thread ON pages (threadKey, ts)");
     }
 
     /** A named talkgroup list (the module's TG lists): a set of talkgroups to drop into a channel's RX group list. */
@@ -634,6 +638,57 @@ public final class ChannelStore extends SQLiteOpenHelper {
             while (c.moveToNext()) { Conversation cv = new Conversation(); cv.peer = c.getInt(0); cv.type = c.getInt(1); cv.lastText = c.getString(2); cv.lastTs = c.getLong(3); cv.outgoing = c.getInt(4) == 1; cv.name = contactName(cv.peer, cv.type); out.add(cv); }
         }
         return out;
+    }
+
+    public long addPage(PageRow p) {
+        ContentValues v = new ContentValues();
+        v.put("ts", p.ts > 0 ? p.ts : System.currentTimeMillis()); v.put("hz", p.hz); v.put("ric", p.ric); v.put("func", p.func); v.put("baud", p.baud);
+        v.put("text", p.text == null ? "" : p.text); v.put("corrected", p.corrected); v.put("signer", p.signer == null ? "" : p.signer);
+        v.put("threadKey", p.threadKey == null ? "" : p.threadKey); v.put("transport", p.transport == null ? "page" : p.transport);
+        v.put("outgoing", p.outgoing ? 1 : 0); v.put("unread", p.outgoing ? 0 : 1);
+        long id = getWritableDatabase().insert("pages", null, v);
+        getWritableDatabase().execSQL("DELETE FROM pages WHERE _id NOT IN (SELECT _id FROM pages ORDER BY ts DESC LIMIT 2000)");
+        return id;
+    }
+    public List<PageRow> recentPages(int limit) { return pageQuery(null, limit); }
+    public List<PageRow> pagesIn(String threadKey) { return pageQuery(threadKey, 500); }
+    private List<PageRow> pageQuery(String thread, int limit) {
+        List<PageRow> out = new ArrayList<>();
+        String where = thread == null ? null : "threadKey=?";
+        String[] args = thread == null ? null : new String[] { thread };
+        try (Cursor c = getReadableDatabase().query("pages", null, where, args, null, null, "ts DESC", String.valueOf(limit))) {
+            while (c.moveToNext()) out.add(readPage(c));
+        }
+        if (thread != null) java.util.Collections.reverse(out);
+        return out;
+    }
+    public void markThreadRead(String threadKey) {
+        ContentValues v = new ContentValues(); v.put("unread", 0);
+        getWritableDatabase().update("pages", v, "threadKey=?", new String[] { threadKey });
+    }
+    /** One row per page or M17 thread, newest first. */
+    public List<Conversation> pageConversations() {
+        List<Conversation> out = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT threadKey, transport, text, ts, outgoing, signer, ric, (SELECT COUNT(*) FROM pages u WHERE u.threadKey=p.threadKey AND u.unread=1) FROM pages p WHERE ts = (SELECT MAX(ts) FROM pages WHERE threadKey=p.threadKey) ORDER BY ts DESC", null)) {
+            while (c.moveToNext()) {
+                Conversation cv = new Conversation();
+                cv.threadKey = c.getString(0); cv.transport = c.getString(1); cv.lastText = c.getString(2); cv.lastTs = c.getLong(3); cv.outgoing = c.getInt(4) == 1;
+                String signer = c.getString(5); int ric = c.getInt(6); cv.unread = c.getInt(7);
+                cv.name = "m17".equals(cv.transport) ? (signer == null || signer.isEmpty() ? "M17" : signer) : (ric < 0 ? "RIC unreadable" : ric == 0 ? cv.threadKey : ("RIC " + ric));
+                cv.address = "m17".equals(cv.transport) ? signer : String.valueOf(ric);
+                out.add(cv);
+            }
+        }
+        return out;
+    }
+    private static PageRow readPage(Cursor c) {
+        PageRow p = new PageRow();
+        p.id = c.getLong(c.getColumnIndexOrThrow("_id")); p.ts = c.getLong(c.getColumnIndexOrThrow("ts"));
+        p.hz = c.getInt(c.getColumnIndexOrThrow("hz")); p.ric = c.getInt(c.getColumnIndexOrThrow("ric")); p.func = c.getInt(c.getColumnIndexOrThrow("func"));
+        p.baud = c.getInt(c.getColumnIndexOrThrow("baud")); p.text = c.getString(c.getColumnIndexOrThrow("text")); p.corrected = c.getInt(c.getColumnIndexOrThrow("corrected"));
+        p.signer = c.getString(c.getColumnIndexOrThrow("signer")); p.threadKey = c.getString(c.getColumnIndexOrThrow("threadKey")); p.transport = c.getString(c.getColumnIndexOrThrow("transport"));
+        p.outgoing = c.getInt(c.getColumnIndexOrThrow("outgoing")) == 1; p.unread = c.getInt(c.getColumnIndexOrThrow("unread"));
+        return p;
     }
 
     private static ContentValues values(Channel ch) {

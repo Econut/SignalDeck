@@ -34,6 +34,10 @@ public final class Pocsag {
         public Page(int ric, int func, String text) {
             this.ric = ric; this.func = func & 3; this.text = text == null ? "" : text;
         }
+        /** Bits repaired by BCH while this page was decoded. Zero for a page this app built to send. */
+        public int corrected;
+        /** The address word did not check. The text is kept and the number is not guessed. */
+        public boolean ricUnreadable;
     }
 
     public static int bch(int data21) {
@@ -52,6 +56,47 @@ public final class Pocsag {
         long r = data;
         for (int i = 30; i >= 10; i--) if ((r & (1L << i)) != 0) r ^= (long) G << (i - 10);
         return (r & 0x3FF) == 0 && (Long.bitCount(cw & 0xFFFFFFFFL) % 2 == 0);
+    }
+
+    /**
+     * The codeword, or the same word with one or two bits of the BCH word repaired. The even-parity bit is checked
+     * after that repair; if it does not match, the word is uncorrectable and comes back unchanged.
+     */
+    public static int correct(int cw) {
+        if (check(cw)) return cw;
+        int body = (int) ((cw & 0xFFFFFFFFL) >>> 1);
+        int parity = cw & 1;
+        int fixed = correctBody(body);
+        if (fixed < 0 || parity != (Integer.bitCount(fixed) & 1)) return cw;
+        return (fixed << 1) | parity;
+    }
+
+    /** One unique 31-bit word within two flips whose BCH syndrome is zero, or -1. */
+    private static int correctBody(int body) {
+        if (syndrome(body) == 0) return body & 0x7FFFFFFF;
+        int one = searchFlips(body, 1, 0, 0, -1);
+        if (one == -2) return -1;
+        if (one >= 0) return one;
+        int two = searchFlips(body, 2, 0, 0, -1);
+        return two < 0 ? -1 : two;
+    }
+
+    private static int searchFlips(int body, int left, int from, int flipped, int found) {
+        if (left == 0) return (syndrome(body ^ flipped) == 0) ? oneOf(found, body ^ flipped) : found;
+        for (int i = from; i < 31 && found != -2; i++) found = searchFlips(body, left - 1, i + 1, flipped ^ (1 << i), found);
+        return found;
+    }
+
+    private static int oneOf(int found, int word) {
+        word &= 0x7FFFFFFF;
+        if (found < 0) return word;
+        return found == word ? found : -2;
+    }
+
+    private static int syndrome(int body) {
+        long r = body & 0x7FFFFFFFL;
+        for (int i = 30; i >= 10; i--) if ((r & (1L << i)) != 0) r ^= (long) G << (i - 10);
+        return (int) (r & 0x3FF);
     }
 
     public static int addressWord(int ric, int func) {
@@ -186,41 +231,76 @@ public final class Pocsag {
         Page cur = null;
         StringBuilder text = new StringBuilder();
         List<Integer> leftover = new ArrayList<>();
+        boolean textEnded = false;
         int i = 0;
+        int expect = -1;   // bit index of the next sync, one batch after the last one accepted
         while (i + 32 <= bits.length) {
             int w = wordAt(bits, i);
-            if (w != SYNC) { i++; continue; }
+            boolean continued = expect == i && syncErrors(w) <= 2;
+            boolean opening = !continued && w == SYNC && preambleBefore(bits, i);
+            if (!continued && !opening) {
+                if (expect == i) expect = -1;   // the transmission ended; look for a new preamble
+                i++;
+                continue;
+            }
             for (int k = 0; k < 16; k++) {
                 int at = i + 32 + 32 * k;
                 if (at + 32 > bits.length) break;
-                int cw = wordAt(bits, at);
-                if (!check(cw) || cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
+                int raw = wordAt(bits, at);
+                int cw = correct(raw);
+                if (cw == IDLE) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
+                if (!check(cw)) { finish(out, cur, text, leftover); cur = null; text.setLength(0); leftover.clear(); continue; }
+                int flips = Integer.bitCount(raw ^ cw);
+                if (cur != null) cur.corrected += flips;
                 int data = (int) ((cw & 0xFFFFFFFFL) >>> 11);
                 if ((data & (1 << 20)) == 0) {
                     finish(out, cur, text, leftover);
+                    cur = null; text.setLength(0); leftover.clear();
+                    if (flips > 1) continue;   // an address repaired by two bits is how noise becomes a RIC
                     int frame = k / 2;
                     int ric = ((data >> 2) & 0x3FFFF) << 3 | frame;
                     cur = new Page(ric, data & 3, "");
-                    text.setLength(0); leftover.clear();
+                    cur.corrected = flips;
+                    textEnded = false;
                 } else if (cur != null) {
                     int payload = data & 0xFFFFF;
+                    int width = cur.func == 0 ? 4 : 7;
                     for (int b = 19; b >= 0; b--) leftover.add((payload >> b) & 1);
-                    while (leftover.size() >= 7) {
+                    while (leftover.size() >= width) {
                         int v = 0;
-                        for (int b = 0; b < 7; b++) v |= leftover.remove(0) << b;
-                        if (v != 0) text.append((char) v);
+                        for (int b = 0; b < width; b++) v |= leftover.remove(0) << b;
+                        if (cur.func == 0) { if (v < 16 && "0123456789*U -)(".charAt(v) != ' ') text.append("0123456789*U -)(".charAt(v)); }
+                        else if (v == 0 || v == 4) textEnded = true;
+                        else if (!textEnded) text.append((char) v);
                     }
                 }
             }
-            i += 32 * 17;   // a message may continue in the next batch
+            expect = i + 32 * 17;   // the next sync is one batch later, page open or not
+            i = expect;
         }
         finish(out, cur, text, leftover);
         return out;
     }
 
     private static void finish(List<Page> out, Page cur, StringBuilder text, List<Integer> leftover) {
-        if (cur == null) return;
-        out.add(new Page(cur.ric, cur.func, text.toString()));
+        if (cur == null || text.length() == 0) return;
+        Page p = new Page(cur.ricUnreadable ? -1 : cur.ric, cur.func, text.toString());
+        p.corrected = cur.corrected;
+        p.ricUnreadable = cur.ricUnreadable;
+        out.add(p);
+    }
+
+    private static int syncErrors(int w) {
+        return Long.bitCount((w ^ SYNC) & 0xFFFFFFFFL);
+    }
+
+    /** The 256 bits before a sync word are the tail of the preamble: mostly alternating. */
+    private static boolean preambleBefore(int[] bits, int at) {
+        int window = 256;
+        if (at < window) return false;
+        int changes = 0;
+        for (int k = at - window; k < at - 1; k++) if ((bits[k] & 1) != (bits[k + 1] & 1)) changes++;
+        return changes >= 192;
     }
 
     private static int wordAt(int[] bits, int at) {

@@ -1,0 +1,361 @@
+/*
+ * SignalDeck - Copyright (C) 2026 IIMacGyverII
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ * Free software under the GNU General Public License v3 or later, with the additional terms in COPYRIGHT
+ * (keep this notice and the author credit, mark modified versions, no rights to the SignalDeck name or icon).
+ */
+package com.macdmr.radio.ham;
+
+import java.util.List;
+
+/**
+ * POCSAG from 8 kHz audio. Tries 512, 1200 and 2400 baud and both bit polarities, then the bit
+ * decoder in {@link Pocsag}. A sample below zero is a 1 in the normal polarity. The held-path and
+ * decision-feedback front ends feed this same slicer once they have restored the bit shape.
+ */
+public final class PocsagDecoder {
+    private PocsagDecoder() { }
+    public static final int RATE = 8000;
+    public static final int[] RATES = { 512, 1200, 2400 };
+
+    /** The baud and the pages from the polarity and phase that recovered the most text. */
+    public static final class Hit {
+        public final int baud;
+        public final List<Pocsag.Page> pages;
+        public Hit(int baud, List<Pocsag.Page> pages) { this.baud = baud; this.pages = pages; }
+    }
+
+    /** Undo a one-pole high-pass of time constant {@code tauSec}, then remove the mean. A non-positive tau leaves the audio unchanged. */
+    public static short[] restore(short[] x, double tauSec) {
+        if (x == null || tauSec <= 0) return x;
+        double coef = Math.exp(-1.0 / (RATE * tauSec));
+        double[] acc = new double[x.length];
+        double state = 0, prev = 0, sum = 0;
+        for (int i = 0; i < x.length; i++) {
+            double s = x[i];
+            state = s - coef * prev + state;
+            prev = s;
+            acc[i] = state;
+            sum += state;
+        }
+        // The unknown starting level of the inverse shows up as an offset. The preamble is balanced,
+        // so its mean is that offset. A mean over the whole clip is pulled by the long padding run.
+        double mean = sum / Math.max(1, x.length);
+        Clock pre = preamble(x);
+        if (pre != null) {
+            int from = (int) Math.max(0, pre.phase);
+            int to = (int) Math.min(x.length, pre.phase + 80 * pre.spb);
+            if (to > from + 8) {
+                double ps = 0;
+                for (int i = from; i < to; i++) ps += acc[i];
+                mean = ps / (to - from);
+            }
+        }
+        short[] y = new short[x.length];
+        for (int i = 0; i < x.length; i++) {
+            double v = acc[i] - mean;
+            if (v > 32767) v = 32767;
+            else if (v < -32767) v = -32767;
+            y[i] = (short) v;
+        }
+        return y;
+    }
+
+    /**
+     * Restore only a measured 512 baud preamble. Nearest-rate classification calls a stretched
+     * 1200 baud gap "512" (13 samples is closer to 15.6 than to 6.7) and restoration then wipes it.
+     */
+    public static Hit best(short[] audio, double tauSec) { return best(audio, tauSec, null); }
+
+    /**
+     * A measured 512 baud preamble is restored and sliced without the held-path taps
+     * (those taps turn the long zero run into another valid address). 1200 and 2400
+     * use the taps and are not restored.
+     */
+    public static Hit best(short[] audio, double tauSec, double[] taps) {
+        if (audio == null) return best(audio);
+        Clock clock = preamble(audio);
+        double expect = (double) RATE / 512.0;
+        if (tauSec > 0 && clock != null && Math.abs(clock.spb - expect) < 1.5) {
+            Hit fixed = best(restore(audio, tauSec));
+            if (fixed.baud == 512 && !fixed.pages.isEmpty()) return fixed;
+        }
+        if (taps != null && taps.length > 0) {
+            Hit held = bestHeld(audio, taps);
+            if (held != null && held.pages != null && !held.pages.isEmpty()) return held;
+        }
+        return best(audio);
+    }
+
+    public static Hit best(short[] audio) {
+        Hit best = new Hit(1200, java.util.Collections.<Pocsag.Page>emptyList());
+        int score = -1;
+        if (audio == null) return best;
+        Clock clock = preamble(audio);
+        if (clock != null) {
+            for (int pol : new int[] { 1, -1 }) {
+                Hit h = take(clock.baud, follow(audio, clock.spb, clock.phase, pol));
+                int n = score(h); if (n > score) { score = n; best = h; }
+            }
+        }
+        int[] rates = clock == null ? RATES : new int[] { clock.baud };
+        for (int baud : rates) {
+            double spb = (double) RATE / baud;
+            for (int pol : new int[] { 1, -1 }) {
+                for (int s = 0; s < 8; s++) {
+                    Hit h = take(baud, slice(audio, spb, s * spb / 8.0, pol));
+                    int n = score(h); if (n > score) { score = n; best = h; }
+                }
+            }
+        }
+        return best;
+    }
+
+    private static Hit take(int baud, int[] bits) { return new Hit(baud, Pocsag.decode(bits)); }
+    private static int score(Hit h) {
+        int n = 0;
+        for (Pocsag.Page p : h.pages) n += p.ricUnreadable ? 1 : p.text.length() * 10;
+        return n;
+    }
+
+    /** A run of alternating bits: the baud from the gap, and the middle of the first bit. */
+    static final class Clock { final int baud; final double spb, phase; Clock(int baud, double spb, double phase) { this.baud = baud; this.spb = spb; this.phase = phase; } }
+
+    /** True when the latest audio still looks like a preamble, so a scan should not step. */
+    public static boolean hearingPreamble(short[] audio) { return audio != null && preamble(audio) != null; }
+
+    /** The held-path taps, then the same slicer. Null taps leaves the audio alone. */
+    public static Hit bestHeld(short[] audio, double[] taps) {
+        if (taps == null || audio == null || audio.length < 800) return best(audio);
+        double[] x = HeldPath.signed(audio, audio.length);
+        double[] y = HeldPath.equalise(HeldPath.matched(HeldPath.resample6(x)), taps);
+        short[] back = new short[y.length / 6];
+        for (int i = 0; i < back.length; i++) {
+            double v = y[i * 6];
+            if (v > 32767) v = 32767; else if (v < -32767) v = -32767;
+            back[i] = (short) v;
+        }
+        return best(back);
+    }
+
+    static Clock preamble(short[] audio) {
+        int last = -1, crosses = 0, start = -1;
+        double sum = 0;
+        for (int i = 1; i < audio.length; i++) {
+            if ((audio[i] < 0) == (audio[i - 1] < 0)) continue;
+            if (last >= 0) {
+                int d = i - last;
+                if (d >= 2 && d <= 20) {
+                    sum += d; crosses++;
+                    if (start < 0) start = last;
+                    if (crosses >= 80) break;
+                } else { sum = 0; crosses = 0; start = -1; }
+            }
+            last = i;
+        }
+        if (crosses < 40) return null;
+        double spb = sum / crosses;
+        int baud = RATES[0]; double err = Math.abs(RATE / spb - baud);
+        for (int r : RATES) { double e = Math.abs(RATE / spb - r); if (e < err) { err = e; baud = r; } }
+        return new Clock(baud, spb, start + spb / 2.0);
+    }
+
+    /** One threshold for the whole batch: the mean of the sync word, held until the next sync. */
+    static int[] follow(short[] audio, double spb, double phase, int pol) {
+        return follow(audio, spb, phase, pol, false);
+    }
+
+    /**
+     * {@code runningMean} is the old slicer: a mean of the last 32 bits, updated every bit. A long run of zeros
+     * walks that mean and can turn the address into a different valid codeword. Kept so the regression test can
+     * show the generator's 512 baud file doing that, and the per-batch threshold not doing it.
+     */
+    static int[] follow(short[] audio, double spb, double phase, int pol, boolean runningMean) {
+        int cap = (int) (audio.length / Math.max(1.0, spb)) + 2;
+        int[] bits = new int[Math.max(1, cap)];
+        int n = 0; double pos = phase; int guard = 0;
+        int prevBit = -1; double prevPos = phase - spb;
+        double spbNow = spb;
+        double lastSync = -1, nextSync = -1;
+        Level level = new Level();
+        armRunHold(level, audio, spb);
+        while (pos >= 0 && pos < audio.length && n < bits.length) {
+            if (runningMean) level.push(sampleAt(audio, pos));
+            double here = pos;
+            int bit = decide(audio, here, pol, level);
+            bits[n++] = bit;
+            if (!runningMean && guard == 0 && prevBit >= 0 && bit != prevBit) {
+                double sa = sampleAt(audio, prevPos) - level.mean;
+                double sb = sampleAt(audio, here) - level.mean;
+                if (sa * sb < 0 && Math.min(Math.abs(sa), Math.abs(sb)) > 1000) {
+                    double zc = zeroCrossing(audio, prevPos, here, level.mean);
+                    if (!Double.isNaN(zc)) {
+                        double err = zc - (prevPos + here) / 2.0;
+                        if (Math.abs(err) < spbNow / 2.0) pos += err / 8.0;
+                    }
+                }
+            }
+            prevBit = bit; prevPos = here;
+            pos += spbNow;
+            if (nextSync >= 0 && here > nextSync + 40 * spbNow) nextSync = -1;
+            if (guard > 0) { guard--; continue; }
+            double start = here - 31 * spbNow;
+            boolean expected = nextSync >= 0 && Math.abs(start - nextSync) < 2 * spbNow;
+            if (n >= 32 && hamming(bits, n - 32) <= 2 && (expected || heardPreamble(audio, start, spbNow))) {
+                double shift = relock(audio, start, spbNow, pol);
+                double syncPos = start + shift;
+                if (lastSync >= 0) {
+                    double refined = (syncPos - lastSync) / 544.0;
+                    if (refined > spb * 0.97 && refined < spb * 1.03) spbNow = refined;
+                }
+                lastSync = syncPos;
+                nextSync = syncPos + 544 * spbNow;
+                if (!runningMean) {
+                    double sum = 0;
+                    for (int i = 0; i < 32; i++) sum += sampleAt(audio, syncPos + i * spbNow);
+                    level.mean = sum / 32.0;
+                    level.freeze = true;
+                }
+                for (int i = 0; i < 32; i++) bits[n - 32 + i] = decide(audio, syncPos + i * spbNow, pol, level);
+                pos = syncPos + 32 * spbNow;
+                guard = 32;
+                prevBit = bits[n - 1];
+                prevPos = syncPos + 31 * spbNow;
+            }
+        }
+        return java.util.Arrays.copyOf(bits, n);
+    }
+
+    /** Linear zero crossing of {@code sample − mean} between two bit centres. */
+    private static double zeroCrossing(short[] audio, double a, double b, double mean) {
+        if (b < a) { double t = a; a = b; b = t; }
+        int i = Math.max(1, (int) Math.floor(a));
+        int end = Math.min(audio.length - 1, (int) Math.ceil(b));
+        double prev = sampleAt(audio, i - 1) - mean;
+        for (int k = i; k <= end; k++) {
+            double s = audio[k] - mean;
+            if ((s < 0) != (prev < 0)) {
+                double den = prev - s;
+                if (den == 0) return k;
+                return (k - 1) + prev / den;
+            }
+            prev = s;
+        }
+        return Double.NaN;
+    }
+
+    /** Alternation at this baud in the half second before the sync word. */
+    private static boolean heardPreamble(short[] audio, double syncStart, double spb) {
+        int end = (int) Math.max(0, syncStart);
+        int begin = Math.max(0, end - RATE / 2);
+        int last = -1, run = 0, best = 0;
+        double tol = Math.max(1.5, spb * 0.25);
+        for (int i = begin + 1; i < end && i < audio.length; i++) {
+            if ((audio[i] < 0) == (audio[i - 1] < 0)) continue;
+            if (last >= 0) {
+                int d = i - last;
+                if (d >= 2 && Math.abs(d - spb) <= tol) { if (++run > best) best = run; }
+                else run = 0;
+            }
+            last = i;
+        }
+        return best >= 40;
+    }
+
+    private static double relock(short[] audio, double start, double spb, int pol) {
+        double best = 0; int bestErr = 99;
+        Level zero = new Level();
+        for (int step = -8; step <= 8; step++) {
+            double d = step * spb / 20.0;
+            int err = 0;
+            for (int i = 0; i < 32; i++) {
+                int got = decide(audio, start + d + i * spb, pol, zero);
+                int want = (Pocsag.SYNC >>> (31 - i)) & 1;
+                if (got != want) err++;
+            }
+            if (err < bestErr) { bestErr = err; best = d; }
+        }
+        return best;
+    }
+
+    private static double sampleAt(short[] audio, double pos) {
+        int k = (int) pos;
+        return k >= 0 && k < audio.length ? audio[k] : 0;
+    }
+
+    private static int hamming(int[] bits, int at) {
+        int err = 0;
+        for (int i = 0; i < 32; i++) if (bits[at + i] != ((Pocsag.SYNC >>> (31 - i)) & 1)) err++;
+        return err;
+    }
+
+    /** One bit per sample-clock step. A negative sample (after polarity) is a 1. */
+    static int[] slice(short[] audio, double spb, double phase, int pol) {
+        int n = 0;
+        for (double t = phase + spb / 2; t < audio.length; t += spb) n++;
+        int[] bits = new int[n];
+        Level level = new Level();
+        armRunHold(level, audio, spb);
+        int i = 0;
+        for (double t = phase + spb / 2; t < audio.length; t += spb) bits[i++] = decide(audio, t, pol, level);
+        return bits;
+    }
+
+    /** 512 baud only: a long run sags toward the threshold, so keep the last bit until the sample is a quarter of the eye past it. */
+    private static void armRunHold(Level level, short[] audio, double spb) {
+        if (Math.abs(spb - (double) RATE / 512.0) >= 1.5) return;
+        level.holdRuns = true;
+        level.eye = eyeOf(audio);
+    }
+
+    /** Peak-to-peak opening measured on the preamble, where the two levels alternate. */
+    private static double eyeOf(short[] audio) {
+        Clock c = preamble(audio);
+        int from = 0, to = audio.length;
+        if (c != null) {
+            from = (int) Math.max(0, c.phase);
+            to = (int) Math.min(audio.length, c.phase + 80 * c.spb);
+        }
+        double mad = 0;
+        int n = 0;
+        for (int i = from; i < to; i++) {
+            int a = Math.abs(audio[i]);
+            if (a < 500) continue;
+            mad += a;
+            n++;
+        }
+        return n < 20 ? 8000 : 2.0 * mad / n;
+    }
+
+    /** A slow baseline, about the last 32 bits. Re-centred when a sync word is found. */
+    static final class Level {
+        double mean;
+        boolean freeze;
+        boolean holdRuns;
+        double eye = 8000;
+        int prev = -1;
+        int run;
+        final double[] box = new double[32];
+        int n, at;
+        double sum;
+        void push(double v) {
+            if (freeze) return;
+            if (n == box.length) sum -= box[at]; else n++;
+            box[at] = v; sum += v; at = (at + 1) % box.length;
+            mean = n == 0 ? 0 : sum / n;
+        }
+    }
+
+    private static int decide(short[] audio, double pos, int pol, Level level) {
+        double v = pol * (sampleAt(audio, pos) - level.mean);
+        int bit = v < 0 ? 1 : 0;
+        if (level.holdRuns && level.prev >= 0 && bit != level.prev && level.run >= 3
+                && Math.abs(v) < level.eye / 4.0) {
+            bit = level.prev;
+        }
+        if (bit == level.prev) level.run++;
+        else level.run = 1;
+        level.prev = bit;
+        return bit;
+    }
+}

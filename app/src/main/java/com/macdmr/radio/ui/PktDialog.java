@@ -225,6 +225,7 @@ public final class PktDialog {
         body.addView(section("Pager"));
         LinearLayout pg = row();
         button(pg, "POCSAG page", Theme.PKT, x -> { dlg.dismiss(); if (c instanceof com.macdmr.radio.MainActivity) ((com.macdmr.radio.MainActivity) c).openPager(); });
+        button(pg, svc.pagerRunning() ? "Stop hearing pages" : "Hear pages", Theme.PKT, x -> { String e = svc.setPager(!svc.pagerRunning()); toast(e == null ? (svc.pagerRunning() ? "Listening for pages" : "Pager receive off") : e); });
         body.addView(pg);
         body.addView(hint("Send an alphanumeric page to one RIC or several in one transmission. Your pager RICs are in APRS settings. On the firmware the phone shipped with, the page says it needs the symbol engine."));
         }
