@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Device report: on a USB-bridge phone, ask the bridge first; vendor keys named as PTT candidates
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL handoff, Phase C (gap list 5 and 10) | On a phone with the Agold USB bridge the probe asks through the bridge first and, when the module answers there, does not sweep the phone's UARTs with version and AT queries (they are other devices on this phone); the "Radio probe" section says so. The PTT capture names a key layout entry Android does not know, or a keycode past Android 11's list, as a vendor key and a PTT candidate (the Atom XL's side key is `FUNC1`, keycode 289). Help (Run all checks) says so. | `FirstRunCheck.java`, `DeviceReport.java`, `ui/HelpView.java`, `PttCaptureTest.java` | Host: `PttCaptureTest.vendorKeysAreNamed` + suite 438/0. Device (Atom XL, 2026-10-28 16:11, `run_checks.sh -w none` over Wi-Fi): bridge probe answered, sweep skipped, the whole run 65 s instead of 125 s, the draft unchanged. The vendor-key note needs a key press during a capture (owner). Other phones: unchanged (the bridge property and vendor keys are absent there). |
+
 ## 2026-10-28 — Device report: report.json and scripts/report_diff.py; the bridge probe fills the draft without the watch
 
 | Backlog | Change | Files | Test |

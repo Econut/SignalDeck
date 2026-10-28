@@ -76,21 +76,26 @@ public final class FirstRunCheck {
         } else {
             File dir = DeviceReport.newestDir();
             java.util.Set<String> named = RadioProbe.namedPorts(dir == null ? "" : DeviceReport.readReport(dir), watchText, dp.supported ? dp.controlPort : null);
-            String r = RadioProbe.run(c, s -> p.step("Probe: " + s), false, named);
-            DeviceReport.append("Radio probe", r);
-            boolean answered = r.contains("answered");
-            if (!answered && dp.supported && dp.powerNode != null) {             // the stock app switches the module off when it closes
-                String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true, named);
-                DeviceReport.append("Radio probe (module power switched on first)", r2);
-                answered = r2.contains("answered"); r = r2;
-            }
-            if (!answered && AgoldUsb.bridged()) {                             // Atom XL: ask through the USB bridge, the HAL stopped meanwhile
+            String r = "";
+            boolean answered = false;
+            if (AgoldUsb.bridged()) {                                          // Atom XL: the module is behind a USB bridge, not on a UART: ask there first, the HAL stopped meanwhile
                 p.step("Probe: asking the radio through its USB bridge (USB to a computer is off for about 10 s)");
                 String b = AgoldUsb.identityProbe(c.getCacheDir(), watchPkg != null ? watchPkg : dp.stockApp.isEmpty() ? "com.agold.intercom" : dp.stockApp);
                 DeviceReport.append("Radio probe through the USB bridge", b);
                 int k = b.indexOf(AgoldUsb.MODULE_ANSWERED);
                 if (k >= 0) { answered = true; sum.append("radio module answered through the USB bridge: ").append(b.substring(k + AgoldUsb.MODULE_ANSWERED.length(), b.indexOf('\n', k)).trim()).append('\n'); }
                 if (b.contains(AgoldUsb.BRIDGE_SILENT)) sum.append("WARNING: ").append(b.substring(b.indexOf(AgoldUsb.BRIDGE_SILENT), b.indexOf('\n', b.indexOf(AgoldUsb.BRIDGE_SILENT)))).append('\n');
+            }
+            if (answered) DeviceReport.append("Radio probe", SWEEP_SKIPPED);   // no reason to send version queries to the phone's other UARTs
+            else {
+                r = RadioProbe.run(c, s -> p.step("Probe: " + s), false, named);
+                DeviceReport.append("Radio probe", r);
+                answered = r.contains("answered");
+                if (!answered && dp.supported && dp.powerNode != null) {         // the stock app switches the module off when it closes
+                    String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true, named);
+                    DeviceReport.append("Radio probe (module power switched on first)", r2);
+                    answered = r2.contains("answered"); r = r2;
+                }
             }
             if (r.contains(RadioProbe.AT_MARK))
                 sum.append("radio module answered: yes, with AT commands (SA818 class)").append(atWhere(r)).append(": SignalDeck has no engine for this module family yet\n");
@@ -289,6 +294,7 @@ public final class FirstRunCheck {
     }
 
     private static final String TRACE_FILE = "/data/local/tmp/signaldeck_sdtrace.txt";
+    static final String SWEEP_SKIPPED = "serial ports not swept: the module answered through its USB bridge (see the section before)\n";
     static final String RELEASED = "radio released before closing: ";
 
     /** The release lines of a watch, for the summary, or null when the watch did not release a USB-bridged radio. */

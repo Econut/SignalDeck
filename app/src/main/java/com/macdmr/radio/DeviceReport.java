@@ -805,9 +805,22 @@ public final class DeviceReport {
             out.append(String.format(Locale.US, "  scancode 0x%s (%d) on %s%s: ", k[1], code, k[0], name.isEmpty() ? "" : " (" + name + ")"));
             if (kl.isEmpty()) out.append("no key layout file listed for this device\n");
             else if (line.isEmpty()) out.append(kl).append(" has no line for it, so it never becomes an Android key; only getevent sees it\n");
-            else { String[] w = line.split("\\s+"); int kc = w.length > 2 ? KeyEvent.keyCodeFromString("KEYCODE_" + w[2]) : 0; out.append(kl).append(" maps it to ").append(w.length > 2 ? w[2] : line).append(kc > 0 ? " (Android keycode " + kc + ")" : "").append('\n'); }
+            else { String[] w = line.split("\\s+"); int kc = w.length > 2 ? KeyEvent.keyCodeFromString("KEYCODE_" + w[2]) : 0; out.append(kl).append(" maps it to ").append(w.length > 2 ? w[2] : line).append(kc > 0 ? " (Android keycode " + kc + ")" : "").append(vendorKeyNote(w.length > 2 ? w[2] : "", kc)).append('\n'); }
         }
         return out.toString();
+    }
+
+    /** The last keycode of Android 11's list (KEYCODE_PROFILE_SWITCH); a phone maker's own keys come after it. */
+    static final int AOSP_LAST_KEYCODE = 288;
+
+    /**
+     * A key layout name Android does not know, or a keycode past its list, is a phone maker's own key: on the Atom XL the
+     * side PTT key is FUNC1 (keycode 289), which the framework turns into the PTT broadcasts.
+     */
+    static String vendorKeyNote(String name, int keycode) {
+        if (keycode > AOSP_LAST_KEYCODE || (keycode == 0 && name.matches("[A-Z][A-Z0-9_]*")))
+            return ": a vendor key, not in Android's list (the PTT key on some phones: the Atom XL's is FUNC1, keycode 289)";
+        return "";
     }
 
     /** {device name, key layout file} of an input device in dumpsys input's Event Hub list ("  3: mtk-kpd ... Path: /dev/input/event1 ... KeyLayoutFile: ..."). */

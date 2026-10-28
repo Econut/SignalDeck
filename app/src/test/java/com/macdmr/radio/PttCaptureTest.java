@@ -12,6 +12,13 @@ import org.junit.Test;
 
 /** The PTT capture's views of getevent, on the W6's real output (2026-10-24/27). */
 public class PttCaptureTest {
+    @Test public void vendorKeysAreNamed() {
+        assertTrue(DeviceReport.vendorKeyNote("FUNC1", 0).contains("vendor key"));      // the host's KeyEvent does not know it
+        assertTrue(DeviceReport.vendorKeyNote("FUNC1", 289).contains("vendor key"));    // the Atom XL's framework does
+        assertEquals("", DeviceReport.vendorKeyNote("VOLUME_UP", 24));
+        assertEquals("", DeviceReport.vendorKeyNote("", 0));
+    }
+
     static final String PL = "add device 1: /dev/input/event14\n  name:     \"sprdphone Headset Keyboard\"\n  events:\n"
             + "    KEY (0001): KEY_VOLUMEDOWN        KEY_VOLUMEUP          KEY_MEDIA             BTN_3                \n"
             + "                BTN_4                \n  input props:\n    <none>\n"
