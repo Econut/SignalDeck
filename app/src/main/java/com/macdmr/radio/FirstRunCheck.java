@@ -65,6 +65,8 @@ public final class FirstRunCheck {
                 sum.append("its serial traffic (stock_serial.txt): ").append(proto).append('\n');
             }
             stockAnswers = stockAnswers(w);
+            String rel = releaseNote(w);
+            if (rel != null) sum.append("USB bridge: ").append(AgoldUsb.WARNING).append("\n  ").append(rel).append('\n');
         } else sum.append("stock app not watched: ").append(watchPkg == null ? "skipped (no app chosen)" : svc.isReady() ? "SignalDeck owns the radio" : "no root").append('\n');
 
         if (!svc.isReady() && !dp.stockApp.isEmpty() && RootSetup.haveRoot() && !RootSetup.run("pidof " + dp.stockApp + " || true").replaceAll("[^0-9]", "").isEmpty())
@@ -215,7 +217,9 @@ public final class FirstRunCheck {
         if (tracer != null) r.append("stopped first, so its start-up is seen: ").append(stopFully(pkg)).append('\n');   // a running app is only brought to the front
         String kBefore = RootSetup.run(KMSG);
         RootSetup.run("logcat -c");
-        p.step("The stock walkie-talkie app is open for 15 s — please do not press PTT");
+        boolean bridged = AgoldUsb.bridged();                                  // Atom XL: the radio takes the USB port while it is on
+        if (bridged) r.append("note: ").append(AgoldUsb.WARNING).append('\n');
+        p.step("The stock walkie-talkie app is open for 15 s — please do not press PTT" + (bridged ? " (USB to a computer is off meanwhile)" : ""));
         final String[] started = { "" };
         Thread sniff = null;
         if (tracer != null) {                                                   // the sniffer waits for the process, then the app is started
@@ -231,6 +235,7 @@ public final class FirstRunCheck {
             for (String dev : fds.split("\\s+")) if (dev.matches("/dev/tty\\w+"))
                 r.append("  ").append(dev).append(": ").append(RootSetup.run("stty -F " + dev + " -a 2>&1 | head -2").replace('\n', ' ')).append('\n');
         } else r.append("not running after 8 s (pid: ").append(pid).append(")\n");
+        if (bridged) r.append("USB devices and USB sound cards while the radio is on (root):\n").append(AgoldUsb.whileOn());
         Thread.sleep(7000);
         if (pid.matches("\\d+")) {                                            // again at the end: a daemon-backed app (Armor 3WT) connects only after start-up
             r.append("at the end of the watch it holds: ").append(RootSetup.run("ls -l /proc/" + pid + "/fd 2>/dev/null | grep -o '/dev/[A-Za-z0-9_/]*' | sort -u").replace('\n', ' ')).append('\n');
@@ -256,11 +261,20 @@ public final class FirstRunCheck {
             for (String l : trace.split("\n")) if (l.contains("sdtrace:") && (l.contains("attach") || l.contains("not found") || l.contains("not listed"))) r.append("  ").append(l.trim()).append('\n');
         }
         r.append("\nstart ").append(comp).append(": ").append(started[0].trim()).append('\n');
+        if (bridged) r.append(RELEASED).append(AgoldUsb.release(pkg).replace("\n", "\n  ").trim()).append('\n');   // a force-stop alone leaves the radio on and USB off
         r.append("closed: ").append(stopFully(pkg)).append('\n');
         return r.toString();
     }
 
     private static final String TRACE_FILE = "/data/local/tmp/signaldeck_sdtrace.txt";
+    static final String RELEASED = "radio released before closing: ";
+
+    /** The release lines of a watch, for the summary, or null when the watch did not release a USB-bridged radio. */
+    static String releaseNote(String watch) {
+        int a = watch == null ? -1 : watch.indexOf(RELEASED); if (a < 0) return null;
+        int end = watch.indexOf("\nclosed: ", a);
+        return watch.substring(a + RELEASED.length(), end < 0 ? watch.length() : end).trim();
+    }
     /** The last watch's raw serial trace (null without the sniffer); written redacted beside the report. */
     static volatile String lastTrace;
 

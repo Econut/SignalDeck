@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Device report: release the Atom XL's USB port after the stock-app watch
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL handoff, Phase C (gap list 1–3, `phonedmrapp/docs/atomxl/PHASE_A_FINDINGS.md`) | On a phone whose radio sits behind Agold's USB bridge (`ro.agold.extmodule.hal=yes`: Unihertz Atom XL), the radio takes the phone's only USB port while it is on, and the watch's force-stop left it on, so a computer on the cable lost the phone until a restart. The watch now ends by powering the radio off the stock app's own way (root `am broadcast agui.intercom.intent.action.STOP_DEVICE`), waits for the bridge driver's `mcu_power` to read 0 (not for `/dev/ttyACM0`, whose node outlives the power-off while the HAL has it open), then toggles the USB controller's cable mode (`cmode` 0, then 1) so the port is a USB device again; a radio still powered after 6 s is left alone and said so. While the radio is on it also lists the USB devices and USB sound card streams as root (the bridge exists only then; the report's own sections are taken before). The progress text, the watch and the summary warn about the USB loss and recommend Wi-Fi ADB. Other phones: unchanged (the property is absent). Help (Run all checks) says so. | `AgoldUsb.java`, `FirstRunCheck.java`, `ui/HelpView.java`, `AgoldUsbTest.java`, `scripts/w6/run_checks.sh` | Host: `AgoldUsbTest` + suite 425/0. Device (Atom XL, 2026-10-28, `run_checks.sh` over Wi-Fi ADB with the cable in): before, USB was gone from the watch on until a reboot; after, gone 13:58:51, back 13:59:09 by itself, report says "the radio is off after 0.0 s … USB port given back to the socket", adb over the cable answered. Not run on the Armor or the W6 (the property is absent there; host test). |
+
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
 | Backlog | Change | Files | Test |
