@@ -4,11 +4,11 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
-## 2026-10-28 — ANYSECU W6+: Soft SQ gates the speaker
+## 2026-10-28 — ANYSECU W6+: Soft SQ sets the radio's own squelch
 
 | Backlog | Change | Files | Test |
 |---|---|---|---|
-| Owner: Soft SQ does not appear to work on the W6 | On the W6 the module drives the speaker and the app plays nothing, so Soft SQ's gate (which mutes the app's playback) changed nothing you hear; and Soft SQ set the module's squelch to 0, which on this module is monitor (always open, tones ignored), so turning it on let static and every carrier through. Now a module that drives the speaker gets the gate through `ModuleEngine.setSpeakerGate`: a shut gate switches the speaker route off like volume 0 (on a worker thread, the root write never runs on the audio thread), the camcorder input keeps the audio for the decoders. A profile whose audio carries no sub-audible tones (`subaudible` false: the W6, cut below ~300 Hz) keeps the channel's own squelch and tone in the module with Soft SQ on, and Soft SQ uses its noise detector (never the CTCSS detector, which cannot hear the tone). Help (Radios that do less). | `AtModuleEngine.java`, `ModuleEngine.java`, `DeviceProfile.java`, `dsp/SoftSquelch.java`, `RadioService.java`, `ui/HelpView.java`, `AtModuleEngineTest.java` | Host suite. Device: see the PR. |
+| Owner: Soft SQ does not appear to work on the W6 | On the W6 Soft SQ did nothing useful: it set the module's squelch to 0, which on this module is monitor (always open, tones ignored), and gated only the app's playback, which on the W6 is silent (the module drives the speaker). Its noise detector cannot work on this phone either (bench, HackRF, 2026-10-28): the W6's receive audio follows the volume (static RMS 246 at media volume 8, 15,844 at 25) and passes nothing above ~3.4 kHz, where the detector listens, so it opened on plain static at squelch 0, and a voice-like signal reads like static there. So on a profile with `softSqInModule` (the W6) Soft SQ is the module's own squelch: on, it writes the Soft SQ level (1–9 to the module's 1–8) as the channel's squelch, the slider re-sends it once it rests (300 ms), the app's audio gate stays off; the intercom and web still show Soft SQ on with its level. Other radios are unchanged. Help (Radios that do less). | `DeviceProfile.java`, `RadioService.java`, `ui/HelpView.java`, `AtModuleEngineTest.java` | Host suite. Device: see the PR. |
 
 ## 2026-10-28 — ANYSECU W6+: tested for receive
 

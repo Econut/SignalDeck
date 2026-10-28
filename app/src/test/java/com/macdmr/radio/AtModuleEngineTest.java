@@ -101,8 +101,8 @@ public class AtModuleEngineTest {
         assertArrayEquals(DeviceProfile.ANYSECU_W6.muteLines, DeviceProfile.ANYSECU_W6.copy(true, false).muteLines);
     }
 
-    @Test public void softSqOnTheW6LeavesTheToneToTheModule() {
-        assertFalse(DeviceProfile.ANYSECU_W6.subaudible); assertFalse(DeviceProfile.ANYSECU_W6.copy(true, false).subaudible);   // audio cut below ~300 Hz: no CTCSS to detect
-        assertTrue(DeviceProfile.ARMOR_26_ULTRA.subaudible);
+    @Test public void softSqOnTheW6IsTheModulesSquelch() {
+        assertTrue(DeviceProfile.ANYSECU_W6.softSqInModule); assertTrue(DeviceProfile.ANYSECU_W6.copy(true, false).softSqInModule);   // its audio cannot carry a noise squelch
+        assertFalse(DeviceProfile.ARMOR_26_ULTRA.softSqInModule);
     }
 }
