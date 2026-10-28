@@ -8,7 +8,7 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 
 | Backlog | Change | Files | Test |
 |---|---|---|---|
-| Owner (W6): the Superuser toast pops up often and whenever a signal is received | Magisk shows its "granted Superuser rights" toast for every su session, and the W6 engine started one su for each change of its speaker, receive and transmit lines (every reception, every volume or key change) and, when the receive line needs root to read, every 250 ms. The engine now keeps one root shell (`RootShell`: su started once, commands fed to it with an end marker, falls back to a plain su if the shell dies twice) and closes it with the engine, so the toast shows once per take-over. | `RootShell.java`, `AtModuleEngine.java` | Host suite. Device: see the PR. |
+| Owner (W6): the Superuser toast pops up often and whenever a signal is received | Magisk shows its "granted Superuser rights" toast for every su session, and the W6 engine started one su for each change of its speaker, receive and transmit lines (every reception, every volume or key change) and, when the receive line needs root to read, every 250 ms. The engine now keeps one root shell (`RootShell`: su started once, commands fed to it with an end marker, falls back to a plain su if the shell dies twice) and closes it with the engine, so the toast shows once per take-over. | `RootShell.java`, `AtModuleEngine.java` | Host suite. Device (W6 + HackRF, 2026-10-28), Magisk toasts counted in the system log: 0 in 20 s idle; 1 across the first three receptions after start (the shell opening), 0 across three more (speaker and receive lines switching each time). |
 
 ## 2026-10-28 — ANYSECU W6+: tested for receive
 
