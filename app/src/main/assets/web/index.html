@@ -36,6 +36,7 @@
       <a href="#aprs" data-page="aprs">APRS</a>
       <a href="#sstv" data-page="sstv">SSTV</a>
       <a href="#pkt" data-page="pkt">Packet</a>
+      <a href="#pager" data-page="pager">Pager</a>
       <a href="#sat" data-page="sat">Satellites</a>
       <a href="#scope" data-page="scope">Scope</a>
       <a href="#map" data-page="map">Map</a>
@@ -407,7 +408,7 @@
             <form id="dtmfForm" class="row" style="margin-top:12px"><input id="dtmfSeq" placeholder="Digits (0-9, A-D, *, #)" maxlength="32" class="grow mono"><button class="btn primary">Send</button></form>
             <div id="dtmfSaved" class="quick" style="margin-top:10px"></div>
             <div id="dtmfLog" class="list small"></div></div>
-          <div class="panel wx-only"><span class="label">WEATHER ALERTS (SAME)</span><div id="alertList" class="list small"></div></div>
+          <div class="panel wx-only"><div class="row between wrap"><span class="label">WEATHER ALERTS (SAME)</span><span id="alertState" class="chip dim"></span></div><div id="alertList" class="list small"></div></div>
           <div class="panel"><div class="row between wrap"><span class="label">TEXT MODES</span><span id="tmStatus" class="chip dim"></span></div>
             <div class="row wrap" style="margin-top:10px"><select id="tmMode" aria-label="Listen"></select><select id="tmTx" aria-label="Send as"><option value="2">Send as PSK31</option><option value="1">Send as RTTY 45</option></select><button class="btn small-btn" id="tmClear">Clear</button></div>
             <pre id="tmText" class="term"></pre>
@@ -415,6 +416,8 @@
           <div class="panel"><div class="row between wrap"><span class="label">M17 RECEIVE</span><span id="m7State" class="chip dim"></span></div>
             <div class="row wrap" style="margin-top:10px"><button class="btn primary" id="m7On">Start M17</button></div>
             <div id="m7Now" class="m7now"></div>
+            <form id="m7Form" class="row wrap" style="margin-top:10px"><input id="m7Dest" placeholder="To (@ALL or a callsign)" class="w9" style="text-transform:uppercase"><input id="m7Text" placeholder="Text message" maxlength="200" class="grow"><button class="btn primary">Send</button></form>
+            <div id="m7Texts" class="list small"></div>
             <div id="m7List" class="list small"></div>
             <p class="muted small">M17 digital voice on the phone's current channel or VFO: the caller, who it is for and their message; press Listen on the Intercom page to hear the decoded voice. Receive only (this radio cannot transmit M17). <span id="m7Cal"></span></p></div>
           <div class="panel"><div class="row between wrap"><span class="label">FT8 OVER FM</span><span id="f8State" class="chip dim"></span></div>
@@ -435,6 +438,27 @@
         </div>
         <div class="panel"><span class="label">APRS SETTINGS</span><form id="aprsSet" class="edform" autocomplete="off"></form></div>
       </div>
+    </section>
+
+    <!-- PAGER -->
+    <section id="page-pager" class="page hidden">
+      <div class="panel">
+        <div class="row between wrap">
+          <div><span class="label">PAGER</span> <span id="pgState" class="chip dim"></span></div>
+          <button class="btn" id="pgMon" type="button">Monitor</button>
+        </div>
+        <p class="muted small" id="pgScan"></p>
+        <form id="pgForm" class="form" autocomplete="off">
+          <label>Frequency (MHz)<input id="pgMhz" inputmode="decimal"></label>
+          <label>Speed<select id="pgBaud"><option value="1200">1200</option><option value="512">512</option><option value="2400">2400</option></select></label>
+          <label class="wide">To (RIC numbers, or a contact's name or callsign)<input id="pgTo" placeholder="1001 or a contact"></label>
+          <label class="wide">Message<textarea id="pgText" rows="3" maxlength="40"></textarea></label>
+          <label class="chk"><input type="checkbox" id="pgSign" checked> Sign with my callsign</label>
+          <div class="row"><button class="btn primary">Send</button></div>
+        </form>
+        <p id="pgNote" class="muted small"></p>
+      </div>
+      <div class="panel"><div class="row between"><span class="label">PAGES</span><input id="pgRic" placeholder="Filter by RIC" class="search" inputmode="numeric"></div><div id="pgList" class="list"></div></div>
     </section>
 
     <!-- EXAM -->
@@ -468,6 +492,10 @@
           <div id="radioCard" class="satcard"></div>
           <div class="row wrap"><button class="btn" id="takeOver">Take over</button><button class="btn danger" id="handBack">Hand back</button></div>
           <p class="muted small">Take over gives the radio to SignalDeck; Hand back returns it to the stock walkie-talkie app (and this page loses the radio until you take it over again).</p>
+          <span class="label" style="display:block;margin-top:18px">RADIO MODULE</span>
+          <div id="devCard" class="satcard"></div>
+          <div class="row wrap"><button class="btn" id="devRestart" type="button">Restart the module</button><button class="btn" id="devUpdate" type="button">Check for updates</button></div>
+          <p class="muted small">Restart and installing an update each ask you to confirm. The firmware loader, Own the radio at boot and Allow unlisted images stay on the phone.</p>
           <span class="label" style="display:block;margin-top:18px">THIS CONNECTION</span>
           <div id="webCard" class="satcard"></div>
           <p class="muted small">Web access, the PIN and “Allow transmit from the web” are changed only on the phone (Device → SignalDeck Web), so a browser can never give itself more rights.</p>

@@ -1950,8 +1950,14 @@ public class RadioService extends Service implements RadioEngine.Events {
                 hopped = true;
                 Thread.sleep(3500);
             }
-            Frame setup = sym40(com.macdmr.radio.ham.Pocsag.waveform(baud));
-            if (setup == null || setup.sr != 0) { history("warn", "⚠️ This firmware did not accept the pager waveform"); return; }
+            Frame rst = sym40(new byte[] { 3 });
+            if (rst == null || rst.sr != 0) { log("page: no symbol engine"); history("warn", "⚠️ This firmware did not accept the pager waveform"); return; }
+            Frame setup = null;
+            for (int t = 0; t < 8 && (setup == null || setup.sr != 0); t++) {
+                if (t > 0) Thread.sleep(40);
+                setup = sym40(com.macdmr.radio.ham.Pocsag.waveform(baud));
+            }
+            if (setup == null || setup.sr != 0) { log("page: waveform not accepted"); history("warn", "⚠️ This firmware did not accept the pager waveform"); return; }
             byte[] packed = com.macdmr.radio.ham.Pocsag.pack(bits);
             int sent = 0;
             while (sent < packed.length) {
@@ -3384,6 +3390,12 @@ public class RadioService extends Service implements RadioEngine.Events {
         return pager;
     }
     public boolean pagerRunning() { PagerStation p = pager; return p != null && p.running(); }
+    /**
+     * Restricted mode (PR 26) hides a mode or an admin action. That branch is not merged here, so
+     * every id is allowed. Each new web route calls one of these once; the merge keeps the call.
+     */
+    public boolean modeAllowed(String id) { return true; }
+    public boolean adminAllowed(String id) { return true; }
     /** Hear pages on the current analog channel. A stub-tagged module holds the voice filter open. */
     public synchronized String setPager(boolean on) { return setPager(on, true); }
     public synchronized String setPager(boolean on, boolean hold) {

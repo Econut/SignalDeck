@@ -13,7 +13,9 @@ S.thread = null; S.contacts = []; S.conversations = [];
 async function loadConversations() {
   try {
     const j = await api('conversations'); S.conversations = j.conversations;
-    $('convList').innerHTML = j.conversations.map(c => '<div class="item click' + (S.thread && S.thread.peer === c.peer && S.thread.type === c.type ? ' cur' : '') + '" data-peer="' + c.peer + '" data-type="' + c.type + '"><div class="main"><b>' + esc(c.name || ((c.type === 1 ? 'TG ' : 'ID ') + c.peer)) + '</b>' + (c.name ? ' <span class="sub">' + (c.type === 1 ? 'TG ' : '') + c.peer + '</span>' : '') + '<div class="sub">' + (c.outgoing ? 'You: ' : '') + esc(c.lastText) + '</div></div><span class="t">' + ago(c.lastTs) + '</span></div>').join('') || '<div class="empty">No texts yet</div>';
+    const chip = c => c.transport === 'page' ? 'PAGE' : c.transport === 'm17' ? 'M17' : 'DMR';
+    const same = (a, b) => a && b && (a.transport && a.transport !== 'dmr' ? a.threadKey === b.threadKey : a.peer === b.peer && a.type === b.type);
+    $('convList').innerHTML = j.conversations.map(c => '<div class="item click' + (same(S.thread, c) ? ' cur' : '') + '" data-key="' + esc(c.transport && c.transport !== 'dmr' ? c.threadKey : (c.peer + ':' + c.type)) + '"><div class="main"><b>' + esc(c.name || ((c.type === 1 ? 'TG ' : 'ID ') + c.peer)) + '</b> <span class="chip dim">' + chip(c) + '</span>' + (c.unread ? ' <span class="chip">' + c.unread + '</span>' : '') + '<div class="sub">' + (c.outgoing ? 'You: ' : '') + esc(c.lastText) + '</div></div><span class="t">' + ago(c.lastTs) + '</span></div>').join('') || '<div class="empty">No texts yet</div>';
     $('quick').innerHTML = j.quickReplies.map(q => '<button type="button">' + esc(q) + '</button>').join('');
     loadThread();
   } catch (e) { }
@@ -21,26 +23,32 @@ async function loadConversations() {
 }
 async function loadThread() {
   const t = S.thread; if (!t) { $('thread').innerHTML = '<div class="empty">Choose a conversation on the left</div>'; return; }
-  $('threadTitle').textContent = String(t.name || t.peer);
-  $('threadSub').textContent = TYPE_NAMES[t.type] + ' · ' + t.peer;
+  $('threadTitle').textContent = String(t.name || t.peer || t.address || '');
+  const kind = t.transport === 'page' ? 'Page' : t.transport === 'm17' ? 'M17' : TYPE_NAMES[t.type] || 'DMR';
+  $('threadSub').textContent = kind + (t.transport && t.transport !== 'dmr' ? (t.address ? ' · ' + t.address : '') : ' · ' + t.peer);
+  const q = t.transport && t.transport !== 'dmr' ? 'messages?thread=' + encodeURIComponent(t.threadKey) : 'messages?peer=' + t.peer + '&type=' + t.type;
   try {
-    const j = await api('messages?peer=' + t.peer + '&type=' + t.type);
+    const j = await api(q);
     const st = m => !m.outgoing ? '' : m.status === 0 ? 'sending…' : m.status === 1 ? 'delivered' : m.status === 2 ? 'failed' : 'sent (no acknowledgement)';
     $('thread').innerHTML = j.messages.map(m => '<div class="bubble' + (m.outgoing ? ' out' : '') + '">' + (!m.outgoing && m.sender ? '<span class="from">' + esc(m.senderName || String(m.sender)) + '</span>' : '') + esc(m.text) + '<span class="meta' + (m.status === 2 ? ' fail' : '') + '">' + new Date(m.ts).toLocaleString() + (m.outgoing ? ' · ' + st(m) : '') + '</span></div>').join('') || '<div class="empty">No texts with ' + esc(t.name || t.peer) + ' yet</div>';
     $('thread').scrollTop = 1e9;
   } catch (e) { }
 }
-function openThread(peer, type, name) { S.thread = { peer, type, name }; if (location.hash !== '#messages') location.hash = 'messages'; else loadConversations(); }
+function openThread(peer, type, name) { S.thread = { peer, type, name, transport: 'dmr' }; if (location.hash !== '#messages') location.hash = 'messages'; else loadConversations(); }
 function renderSendState() {
   const ok = S.status && S.status.webTx;
   $('sendForm').querySelector('button').disabled = !ok || !S.thread;
   $('sendNote').textContent = !ok ? 'Sending needs “Allow transmit from the web” on the phone (Device → SignalDeck Web).' : !S.thread ? 'Choose a conversation, or New to text a contact.' : '';
 }
-$('convList').onclick = e => { const it = e.target.closest('.item'); if (!it) return; const c = S.conversations.find(x => x.peer === +it.dataset.peer && x.type === +it.dataset.type); if (c) openThread(c.peer, c.type, c.name); };
+$('convList').onclick = e => { const it = e.target.closest('.item'); if (!it) return; const c = S.conversations.find(x => (x.transport && x.transport !== 'dmr' ? x.threadKey : (x.peer + ':' + x.type)) === it.dataset.key); if (c) { S.thread = c; if (location.hash !== '#messages') location.hash = 'messages'; else loadConversations(); } };
 $('quick').onclick = e => { if (e.target.tagName === 'BUTTON') { $('sendText').value = e.target.textContent; $('sendText').focus(); } };
 $('sendForm').addEventListener('submit', async e => {
   e.preventDefault(); if (!S.thread) return;
-  const j = await act('messages', { peer: S.thread.peer, type: S.thread.type, text: $('sendText').value });
+  const body = { text: $('sendText').value, transport: S.thread.transport || 'dmr' };
+  if (body.transport === 'dmr') { body.peer = S.thread.peer; body.type = S.thread.type; }
+  else if (body.transport === 'page') { body.ric = parseInt(S.thread.address, 10) || 0; body.hz = S.status && S.status.channel ? S.status.channel.rxFreq : 0; body.sign = true; }
+  else { body.dest = S.thread.threadKey === 'everyone' ? '@ALL' : (S.thread.address || ''); }
+  const j = await act('messages', body);
   if (j) { $('sendText').value = ''; setTimeout(loadThread, 500); }
 });
 $('newMsg').onclick = () => { location.hash = 'contacts'; toast('Pick a contact, then Text'); };
@@ -875,6 +883,7 @@ async function loadPacket() {
     $('cwIdBtn').disabled = $('dtmfForm').querySelector('button').disabled = !t.webTx;
     $('dtmfSaved').innerHTML = (j.dtmfSaved || []).map(d => '<button type="button" data-seq="' + esc(d.code) + '">' + esc(d.name + ' · ' + d.code) + '</button>').join('');
     $('dtmfLog').innerHTML = j.dtmf.map(d => '<div class="item"><span class="t">' + hhmmss(d.ts) + '</span><div class="main mono">' + esc(d.digits) + '<div class="sub">' + esc(d.channelName || ('Channel ' + d.channel)) + '</div></div></div>').join('') || '<div class="empty">No DTMF heard yet</div>';
+    $('alertState').textContent = j.settings.wx ? 'LISTENING' : 'OFF'; $('alertState').className = 'chip ' + (j.settings.wx ? 'green' : 'dim');
     $('alertList').innerHTML = j.alerts.map(a => '<div class="item"><span class="t">' + new Date(a.ts).toLocaleString() + '</span><div class="main"><b style="color:var(--amber)">' + esc(a.event) + '</b><div class="sub">' + esc(a.summary) + '</div></div></div>').join('') || '<div class="empty">No alerts received</div>';
     renderAprsSettings(j);
   } catch (e) { }
@@ -1033,11 +1042,67 @@ async function pollM17() {
       : (j.running ? '<span class="stats">Listening for M17…</span>' : '');
     const t = ms => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     $('m7List').innerHTML = j.heard.slice().reverse().map(h => '<div class="item"><div class="main"><b class="mono">' + esc(h.src || '?') + '</b> → ' + esc(h.dst || '?') + (h.meta ? ' · “' + esc(h.meta) + '”' : '') + '</div><div class="sub">' + t(h.start) + ' · ' + ((h.end - h.start) / 1000).toFixed(1) + ' s · ' + h.frames + ' frames' + (h.frames ? ' · ' + Math.round(100 * h.good / h.frames) + ' % clean' : '') + '</div></div>').join('') || (j.running ? '<div class="empty">Nothing heard yet</div>' : '');
+    $('m7Form').querySelector('button').disabled = !j.webTx || !j.canSend;
+    $('m7Texts').innerHTML = (j.texts || []).slice().reverse().map(x => '<div class="item"><div class="main"><b>' + (x.sent ? 'Sent' : 'Heard') + '</b> ' + esc(x.src || '') + ' → ' + esc(x.dst || '') + '<div class="sub">' + esc(x.body) + '</div></div><span class="t">' + t(x.ts) + '</span></div>').join('');
     $('m7Cal').textContent = j.calibration ? 'Equalizer ' + j.calibration + '.' : '';
   } catch (e) { }
 }
 setInterval(pollM17, 1000);
 $('m7On').onclick = () => act('m17', { on: !(m7 && m7.running) }).then(pollM17);
+$('m7Form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (await act('m17/sms', { dest: $('m7Dest').value.trim(), text: $('m7Text').value })) { $('m7Text').value = ''; pollM17(); }
+});
+
+// ---- pager page ----
+async function loadPager() {
+  try {
+    const ric = $('pgRic').value.trim();
+    const j = await api('pager/pages' + (ric ? '?ric=' + encodeURIComponent(ric) : ''));
+    $('pgState').textContent = j.monitor ? 'MONITOR' : j.listening ? 'LISTENING' : 'OFF';
+    $('pgState').className = 'chip ' + (j.listening ? 'green' : 'dim');
+    $('pgMon').textContent = j.monitor ? 'Stop monitor' : 'Monitor';
+    $('pgScan').textContent = j.scan ? ('Monitor steps ' + j.scan + ', about two and a half seconds on each.') : 'Set at least two pager frequencies on the phone (Messages, long-press the scan icon).';
+    if (document.activeElement !== $('pgMhz') && !$('pgMhz').value) $('pgMhz').value = (j.hz / 1e6).toFixed(4);
+    $('pgForm').querySelector('button').disabled = !j.webTx;
+    $('pgNote').textContent = j.webTx ? '' : 'Sending needs “Allow transmit from the web” on the phone.';
+    $('pgList').innerHTML = j.pages.map(p => '<div class="item"><div class="main"><b>RIC ' + p.ric + '</b> <span class="chip dim">' + p.baud + '</span>' + (p.outgoing ? ' <span class="chip dim">SENT</span>' : '') + '<div class="sub">' + esc(p.text) + '</div></div><span class="t">' + new Date(p.ts).toLocaleString() + '<br>' + (p.hz / 1e6).toFixed(4) + '</span></div>').join('') || '<div class="empty">No pages yet</div>';
+  } catch (e) { }
+}
+setInterval(() => { if (S.page === 'pager') loadPager(); }, 2000);
+$('pgRic').addEventListener('change', loadPager);
+$('pgMon').onclick = async () => { await act('pager/monitor', { on: $('pgMon').textContent.indexOf('Stop') !== 0 }); loadPager(); };
+$('pgForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const mhz = parseFloat($('pgMhz').value);
+  if (!mhz) { toast('Enter the frequency in MHz'); return; }
+  if (await act('pager/send', { hz: Math.round(mhz * 1e6), baud: +$('pgBaud').value, to: $('pgTo').value, text: $('pgText').value, sign: $('pgSign').checked, func: 3 })) {
+    $('pgText').value = ''; setTimeout(loadPager, 800);
+  }
+});
+
+async function loadDevice() {
+  try {
+    const j = await api('device');
+    const row = (k, v) => '<div class="item"><span class="t">' + k + '</span><div class="main">' + v + '</div></div>';
+    $('devCard').innerHTML = row('Firmware', esc(j.tag || '—') + (j.factory ? ' · factory image' : (j.stock ? ' · stock ' + esc(j.stock) : '')))
+      + row('Profile', esc(j.profile || '—') + (j.profileId ? ' · ' + esc(j.profileId) + ' rev ' + j.profileRevision : ''))
+      + row('App', esc(j.version || ''))
+      + row('Battery', j.batteryC == null ? '—' : j.batteryC.toFixed(1) + ' °C')
+      + row('Processor', j.apC == null ? '—' : j.apC.toFixed(1) + ' °C')
+      + row('Own the radio at boot', j.ownAtBoot ? 'On' : 'Off')
+      + row('Wi-Fi debugging', j.wifiAdb ? 'Listening on port 5555' : (j.wifiAdbPort ? 'Port ' + esc(j.wifiAdbPort) : 'Off'));
+  } catch (e) { }
+}
+$('devRestart').onclick = async () => {
+  if (!confirm('Restart the radio module? Reception stops for a few seconds. Nothing is transmitted.')) return;
+  await act('device/restart', { confirm: true });
+};
+$('devUpdate').onclick = async () => {
+  if (!confirm('Check for a SignalDeck update?')) return;
+  const j = await act('device/update', { confirm: true });
+  if (j && j.newer && confirm('Install ' + j.latest + '? The app restarts and keeps your channels and settings.')) await act('device/update', { confirm: true, install: true });
+};
 
 // ---- FT8 over FM: state once a second, the waterfall about five times a second while running ----
 const f8 = { j: null, skew: 0, fall: null };
