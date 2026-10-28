@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Bench: which Android audio source hears the radio (W6 receive-audio test)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 engine design, test 1 (receive audio path) | New adb-only bench command `audioprobe` (`--ei ms`, `--ei hz`, `--es tag`): records a short stretch from each audio source an app may open and logs the overall level and the level of a test tone (tag `AudioProbe`). Nothing is written to the radio. `scripts/w6/fm_tone_iq.py` makes the HackRF test signal (FM, a 1 kHz tone plus CTCSS, plain Python). On the W6 the receive audio arrives on `CAMCORDER`; the results are in `docs/w6/RX_AUDIO_TEST.md` and the engine design is updated. Nothing changes for users. | `AudioSourceProbe.java`, `DiagReceiver.java` (`audioprobe`), `scripts/w6/fm_tone_iq.py`, `docs/w6/RX_AUDIO_TEST.md`, `docs/w6/ENGINE_DESIGN.md`, `AudioSourceProbeTest.java` | Host: `AudioSourceProbeTest` (level and tone measure). **Device: W6 + HackRF in the cage**: `CAMCORDER` −65 dBFS at 1 kHz with the tone 1.0–1.6 dB under the whole recording, the same with the speaker amplifier off; every other source silent or toneless. |
+
 ## 2026-10-27 — Compact intercom for small screens (layout B, the owner's pick)
 
 | Backlog | Change | Files | Test |

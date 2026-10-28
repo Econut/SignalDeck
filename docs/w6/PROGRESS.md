@@ -2,6 +2,26 @@
 
 Newest first. Phone: ANYSECU W6+ replacement unit, adb `-s W6202601000904` (USB). Plan: `docs/W6_DEVICE_REPORT_PLAN.md`.
 
+## 2026-10-27 22:10 CDT: SignalDeck drives the W6 (receive)
+
+- Owner approved the design. SignalDeck #38: `ModuleEngine` interface (on main). #40 on top: `AtModuleEngine`,
+  `Sa818Tones`, `CamcorderAudio`, the W6 profile (unverified), stock channel import.
+- On the W6 (Take over): 128 channels imported, VERQ/SETGROUP/SETVOLUME answered `:0`; HackRF tone on CH 1 (405.025,
+  62.5 Hz) → receiving shown, SignalDeck's own recording −44 dBFS pure 1 kHz (module volume 4).
+- `RSSI?` gets no answer (owner OK'd the query): no S-meter on the W6.
+- Handed back at the end: the stock app owns the radio, latest #40 build installed.
+- Next: hide DMR controls when `engine.dmr()` is false; transmit waits for the owner in the cage.
+
+## 2026-10-27 21:15 CDT: Receive-audio test (ENGINE_DESIGN test 1): passed
+
+- HackRF in the cage, 435.025 MHz, 1 kHz + 62.5 Hz CTCSS, `-x 20`; the stock app's squelch opened (tone code 240 = 62.5 Hz
+  confirmed). New bench command `audioprobe`.
+- **`CAMCORDER` carries the module's receive audio** (−65 dBFS at the stock volume 1/8, nearly pure tone, unchanged
+  with the speaker amplifier off). Raw ALSA capture around the HAL gets nothing. Details: `RX_AUDIO_TEST.md`.
+- The W6's temporary files are removed; the HackRF is idle; the stock app owns the radio.
+- Next: the engine (ModuleEngine interface PR, then AtModuleEngine with the CAMCORDER audio backend), once the owner
+  approves the design (#35). The RSSI query and the power-line recovery still wait for the owner's OK.
+
 ## 2026-10-27 20:10 CDT: Compact intercom (layout B)
 
 - Branch `w6/compact-intercom`, stacked on `w6/engine-design`. Owner picked layout B with today's button columns, and
