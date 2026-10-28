@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Data modes: decoders below the squelch, speaker quiet; the W6 keeps a squelch for data
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner: in a data mode the squelch should be fully open, Soft SQ not used and the output muted | **Passive APRS** on a voice channel now decodes below the squelch too, like the data modes (a damaged frame fails its FCS; Morse, DTMF, RTTY/PSK and SAME still wait for the squelch). **While a data mode runs** (APRS monitoring, SSTV, FT8, M17: `dataModeActive`) the received audio stays off the speaker and SignalDeck Web unless MON is on (`dataQuiet` in the speaker gate). **W6** (`dataSquelch` 1): its fully open squelch (monitor mode) measured worse for APRS (38/48 packets against 23/24 at squelch 2), so while a data mode runs its module keeps the channel's squelch, at least 1, and goes back when the mode stops (`followDataMode` from `pushModes`; FT8 and M17 now push their mode changes). Other phones keep data modes fully open. Help (APRS, Radios that do less). | `PacketEngine.java`, `RadioService.java`, `DeviceProfile.java`, `ui/HelpView.java`, `W6SoftSqTest.java` | Host suite 424/0. W6 + HackRF on 440.000 MHz: module squelch 0 → 2 when SSTV or FT8 starts and back to 0 when it stops; SSTV Robot 36 complete, FT8 both messages; passive APRS with Soft SQ on (squelch 0 for voice) 3, 5 and 6 of 6. Speaker silence during a data mode not yet confirmed by ear. |
+
 ## 2026-10-28 — ANYSECU W6+: SignalDeck plays the audio, and Soft SQ works
 
 | Backlog | Change | Files | Test |

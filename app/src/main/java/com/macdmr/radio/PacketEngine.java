@@ -802,7 +802,7 @@ public final class PacketEngine {
         if (!host.analogRx()) { fill = 0; return; }
         if (!open && wasOpen && cw != null) cw.flush();
         wasOpen = open;
-        if (!open && !data) return;
+        if (!open && !data && !passiveWanted()) return;                  // passive APRS also hears below the squelch: noise fails the FCS (Morse, DTMF, RTTY/PSK, SAME still wait for open)
         try {
             int f = host.rxFreqHz();
             boolean weatherBand = f >= 162_400_000 && f <= 162_550_000;      // NOAA carries no DTMF or APRS: save the CPU there

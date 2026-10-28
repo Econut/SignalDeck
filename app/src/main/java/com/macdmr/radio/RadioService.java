@@ -982,7 +982,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
                         : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
-                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()) && !(profile.appPlayback && pttDown));   // app playback (the W6): nothing to the speaker while keyed   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
+                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()) && !(profile.appPlayback && pttDown) && !dataQuiet());   // app playback (the W6): nothing to the speaker while keyed   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
             }
             String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -1027,7 +1027,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (open != squelchOpen && softSq.isEnabled()) { softGateHistory(open); squelchOpen = open; pushModes(); }   // pages see the gate (activity box, Soft SQ number colour)
         squelchOpen = open;
         boolean m17Channel = current != null && current.isM17();
-        if (web != null && open && !muted && !pttDown && !m17Channel) web.rxAudio(mono, n);      // an M17 channel sends decoded voice, not the raw FM
+        if (web != null && open && !muted && !pttDown && !m17Channel && !dataQuiet()) web.rxAudio(mono, n);      // an M17 channel sends decoded voice, not the raw FM
         ClipRecorder clip = this.clip;                                            // listen check: what arrived, before the speaker
         if (clip != null && (!clipOnlyHeard || rxActive()) && !clip.write(mono, n)) this.clip = null;
         int peak = 0;
@@ -1141,6 +1141,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public boolean scanHolding() { return scanner.isHolding(); }
 
     private void pushModes() {
+        followDataMode();
         updateModeWake();
         refreshControls();
         final String zn = zoneName();
@@ -1387,7 +1388,22 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Squelch byte for the module: with Soft SQ on, or on an M17 channel, the radio's squelch is held open (0). An M17 channel needs the audio below the module's one threshold; the speaker gate keeps that raw FM out and only the decoded voice is played. */
+    /** A data mode runs (APRS monitoring, SSTV, FT8, M17): its decoders get the audio below any squelch. */
+    public boolean dataModeActive() {
+        PacketEngine p = packet; com.macdmr.radio.ham.Ft8Station f = ft8; M17Station m = m17;
+        return (p != null && (p.monitoring() || p.sstvRx())) || (f != null && f.running()) || (m != null && m.running());
+    }
+    /** Data modes keep the received audio off the speaker and the web (owner, 2026-10-28); MON brings it back. */
+    private boolean dataQuiet() { return !monitorOn && dataModeActive(); }
+    private volatile boolean lastDataMode;
+    /** A data mode started or stopped: on a radio with {@link DeviceProfile#dataSquelch} the module squelch follows. */
+    private void followDataMode() {
+        boolean d = dataModeActive(); if (d == lastDataMode) return; lastDataMode = d;
+        ChannelStore.Channel c = current;
+        if (profile.dataSquelch > 0 && c != null && !c.isDigital() && !c.isM17()) worker.execute(() -> rewriteAnalogSquelch(c));
+    }
     private int hardwareSq(ChannelStore.Channel ch) {
+        if (ch != null && !ch.isDigital() && !ch.isM17() && profile.dataSquelch > 0 && dataModeActive()) return Math.max(profile.dataSquelch, ch.sq);   // the W6: never its monitor mode for data
         if (ch != null && !ch.isM17() && profile.softSqInModule && softSqFor(ch)) return Math.max(1, Math.min(8, ch.softSqLevel));   // Soft SQ is the module's squelch (1-9 to its 1-8)
         if (ch != null && !ch.isM17() && !profile.subaudible && softSqFor(ch) && ch.rxType != 0) return 1;   // no tones in the audio (the W6): the module keeps checking the channel's tone, Soft SQ gates the noise
         return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq;
@@ -3328,13 +3344,14 @@ public class RadioService extends Service implements RadioEngine.Events {
      */
     public synchronized String setM17(boolean on, boolean hold) {
         M17Station s = m17();
-        if (!on) { s.stop(); dataReceive = false; scheduleDataHold(false); return null; }
+        if (!on) { s.stop(); dataReceive = false; scheduleDataHold(false); pushModes(); return null; }
         ChannelStore.Channel c = current;
         if (c == null || c.isDigital()) return "M17 needs an analog (FM) channel or the VFO";
         String e = s.start();
         if (e != null) return e;
         dataReceive = hold;
         scheduleDataHold(hold);
+        pushModes();
         return null;
     }
 
@@ -3402,6 +3419,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         final com.macdmr.radio.ham.Ft8Station s = ft8();
         if (on) { s.start(); if (ft8Ticks == null) ft8Ticks = ft8Exec.scheduleAtFixedRate(() -> { try { s.tick(); } catch (Throwable t) { log("ft8: " + t); } }, 0, 250, java.util.concurrent.TimeUnit.MILLISECONDS); }
         else { s.stop(); if (ft8Ticks != null) { ft8Ticks.cancel(false); ft8Ticks = null; } }
+        pushModes();
     }
     /** The 4-character grid FT8 sends: the one set in FT8 settings, else the phone's location; "-" sends none. */
     public String ft8Grid() {
