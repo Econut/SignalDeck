@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Channel editor: plain messages for empty or mistyped numbers
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 handoff follow-up: the channel editor's "empty String" message | Saving with an empty or mistyped number showed Java's own text ("empty String", "For input string"); the phone editor now names the field ("Enter the receive frequency (MHz)", "\"44o.1\" is not a number: check the send frequency (MHz)", "Enter both latitude and longitude, or leave both empty"), and an empty send frequency means simplex (the receive frequency), on the phone and in SignalDeck Web (which answered "No value for txMHz"). The send-frequency help names this radio's bands (it said 136–174 and 400–480 MHz on every phone). | `ui/ChannelEditorView.java`, `web/WebHost.java`, `EditorNumberTest.java` | Host: `EditorNumberTest` + suite. Device: see the PR. |
+
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
 | Backlog | Change | Files | Test |
