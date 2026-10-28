@@ -28,6 +28,7 @@ public final class P8Receiver {
     private volatile int moduleLevel=1;private final AtomicInteger pendingVolume=new AtomicInteger(-1);
     private boolean mutedTestPlayback;private boolean mainTelemetry,radioReceiving;
     private final P8Rssi.Poll rssiPoll=new P8Rssi.Poll();private final P8AudioSpectrum audioSpectrum=new P8AudioSpectrum();
+    private final P8Rssi.Display rssiDisplay=new P8Rssi.Display();
     private long rssiQueries,rssiReplies,spectrumUpdates;
     public void enableMainTelemetry(){mainTelemetry=true;}
     private boolean normalTransmit;private volatile int timeoutMs=60000;private final P8PttEdge pttEdge=new P8PttEdge();
@@ -71,8 +72,8 @@ public final class P8Receiver {
         P8RxProtocol.Sink receiveStatus=f->{
             if(f.cmd==0x32 && mainTelemetry && rssiPoll.waiting()){
                 double dbm=rssiPoll.reply(f,SystemClock.elapsedRealtime());int raw=f.body.length==1?f.body[0]&255:-1;rssiReplies++;
-                listener.rssi(raw,dbm);
-                if(dbm==P8Rssi.UNKNOWN || rssiReplies==1 || rssiReplies%30==0)listener.status("RSSI reply raw="+raw+" dBm="+dbm+(rssiPoll.disabled()?"; polling suspended":""));
+                double displayed=rssiDisplay.reading(dbm,SystemClock.elapsedRealtime());listener.rssi(raw,displayed);
+                if(dbm==P8Rssi.UNKNOWN || rssiReplies==1 || rssiReplies%30==0)listener.status("RSSI reply raw="+raw+" dBm="+dbm+" display="+displayed+(rssiPoll.disabled()?"; polling suspended":""));
                 return;
             }
             if(f.cmd==0x36 && f.body.length==1){
@@ -80,7 +81,7 @@ public final class P8Receiver {
             if(txCapable){if(f.rw!=2 || f.sr!=0)return;try{P8ReceiveNative.acknowledgeStatus();}catch(java.io.IOException e){throw new IllegalStateException("Status ACK failed; stop",e);}}
             int s=f.body[0]&255;if(s==3 || s==4){boolean on=txStatus.status(s,SystemClock.elapsedRealtime());
                 if(s==3 && !on){try{if(readState(P8Protocol.PTT_NODE)!=1)throw new IllegalStateException("PTT not released");}catch(Exception e){throw new IllegalStateException("Unexpected TX start without confirmed GPIO release",e);}listener.status("TX start reply delayed after release; remaining in receive");}
-                if(!on)pttRequested=false;listener.transmitting(on);}else if(s==1 || s==10 || s==12){radioReceiving=true;scan.signal(SystemClock.elapsedRealtime());listener.receiving(true);}else if(s==2 || s==11 || s==13){radioReceiving=false;listener.receiving(false);}}};
+                if(!on)pttRequested=false;listener.transmitting(on);}else if(s==1 || s==10 || s==12){radioReceiving=true;if(mainTelemetry)rssiDisplay.receiving(true);scan.signal(SystemClock.elapsedRealtime());listener.receiving(true);}else if(s==2 || s==11 || s==13){radioReceiving=false;if(mainTelemetry){rssiDisplay.receiving(false);listener.rssi(-1,P8Rssi.UNKNOWN);}listener.receiving(false);}}};
         try{
             guard();P8ReceiveNative.load();nativeLoaded=true;P8ReceiveNative.open();if(mainTelemetry){listener.spectrum(audioSpectrum.clear());listener.rssi(-1,P8Rssi.UNKNOWN);}
             int size=Math.max(3200,AudioTrack.getMinBufferSize(8000,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT));
@@ -101,14 +102,14 @@ public final class P8Receiver {
                         if(microphone.getState()!=android.media.AudioRecord.STATE_INITIALIZED)throw new Exception("Microphone initialisation failed");
                         microphone.startRecording();if(microphone.getRecordingState()!=android.media.AudioRecord.RECORDSTATE_RECORDING)throw new Exception("Microphone capture failed");
                         if(!pttRequested){microphone.stop();microphone.release();microphone=null;continue;}
-                        if(mainTelemetry){rssiPoll.pause(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}
+                        if(mainTelemetry){rssiDisplay.receiving(false);rssiPoll.pause(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}
                         audio.pause();audio.flush();speaker.clear();txOwned=true;lastMicWrite=0;minMicGap=Long.MAX_VALUE;maxMicGap=0;txStatus.keyed(SystemClock.elapsedRealtime());int limit=normalTransmit?timeoutMs:(int)P8TxPolicy.MAX_KEY_MS;txDeadline=SystemClock.elapsedRealtime()+limit;
                         P8ReceiveNative.keyTimed(true,limit);listener.transmitting(true);listener.status("TX keyed; timeout "+(limit/1000)+" seconds");
                     }else {pttRequested=false;listener.status("TX blocked: channel is receive-only, digital or not yet tuned");}
                 }
                 if(txOwned){control.feed(P8ReceiveNative.readControl(),receiveStatus);int n=microphone.read(micBytes,micFill,160-micFill,android.media.AudioRecord.READ_NON_BLOCKING);if(n<0)throw new Exception("Microphone read failure");micFill+=n;if(micFill==160){if(SystemClock.elapsedRealtime()>=txDeadline-12){pttRequested=false;continue;}long sent=P8ReceiveNative.writeMicrophone(micBytes,160);if(lastMicWrite!=0){long gap=sent-lastMicWrite;minMicGap=Math.min(minMicGap,gap);maxMicGap=Math.max(maxMicGap,gap);}lastMicWrite=sent;microphoneBytes+=160;for(int i=0;i<160;i+=2)microphonePeak=Math.max(microphonePeak,Math.abs((int)(short)((micBytes[i]&255)|(micBytes[i+1]<<8))));micFill=0;}SystemClock.sleep(2);continue;}
                 P8RxProtocol.Channel ch=requested.getAndSet(null);
-                if(ch!=null){radioReceiving=false;listener.receiving(false);if(mainTelemetry){rssiPoll.tuned(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));P8RxProtocol.requireAck(control,reply,receiveStatus,ch.command());current=ch.toString();tunes++;
+                if(ch!=null){radioReceiving=false;listener.receiving(false);if(mainTelemetry){rssiDisplay.receiving(false);rssiPoll.tuned(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));P8RxProtocol.requireAck(control,reply,receiveStatus,ch.command());current=ch.toString();tunes++;
                     int index=0;for(int i=0;i<channels.length;i++)if(channels[i]==ch)index=i;
                     tunedChannel=ch;scan.tuned(index,SystemClock.elapsedRealtime());listener.tuned(ch);listener.status("TUNED (ACK) · "+current);}
                 int level=pendingVolume.getAndSet(-1);
@@ -125,8 +126,8 @@ public final class P8Receiver {
                 speaker.drain((b,o,n)->player.write(b,o,n,AudioTrack.WRITE_NON_BLOCKING));
                 long now=SystemClock.elapsedRealtime();
                 if(mainTelemetry){
-                    if(rssiPoll.timedOut(now)){listener.rssi(-1,P8Rssi.UNKNOWN);listener.status("RSSI query unanswered; polling suspended for this session");}
-                    if(rssiPoll.stale(now))listener.rssi(-1,P8Rssi.UNKNOWN);
+                    if(rssiPoll.timedOut(now)){rssiDisplay.clear();listener.rssi(-1,P8Rssi.UNKNOWN);listener.status("RSSI query unanswered; polling suspended for this session");}
+                    if(rssiDisplay.expire(now))listener.rssi(-1,P8Rssi.UNKNOWN);
                     if(rssiPoll.queryDue(now,radioReceiving || (tunedChannel!=null && (tunedChannel.squelch==0 || tunedChannel.monitor==1)),pttRequested || requested.get()!=null || tunedChannel==null)){
                         P8ReceiveNative.requestRssi();if(++rssiQueries==1)listener.status("RSSI initial read-only probe sent; awaiting P8 response");
                     }
