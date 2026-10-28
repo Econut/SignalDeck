@@ -93,7 +93,7 @@ public final class AlsaDirectAudio implements AudioBackend {
     static String command(String helper, boolean capture, DeviceProfile.DirectAudio d) {
         StringBuilder b = new StringBuilder("exec ").append(quote(helper)).append(capture ? " cap" : " play")
                 .append(" -c ").append(d.card).append(" -d ").append(capture ? d.captureDevice : d.playbackDevice)
-                .append(" -r 8000 -n 2 -p 256 -k 4");
+                .append(" -r ").append(d.rate).append(" -n 2 -p ").append(256 * (d.rate / 8000)).append(" -k 4");
         for (String c : capture ? d.rxOn : d.txOn) b.append(' ').append(quote(c));
         b.append(" --");
         for (String c : capture ? d.rxOff : d.txOff) b.append(' ').append(quote(c));
@@ -138,13 +138,16 @@ public final class AlsaDirectAudio implements AudioBackend {
             takeErrors();
             final Process p = start(true); rxProc = p; rxRunning = true; playing = true;
             final long before = rxBlocks;
+            final int f = da.rate / 8000;                                // a faster card (the Atom XL's USB card, 32 kHz) is brought down to 8 kHz here
+            final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
             rxThread = new Thread(() -> {
-                byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK];
+                byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK]; byte[] raw = f > 1 ? new byte[BLOCK * f] : buf;
                 try (InputStream in = p.getInputStream()) {
                     while (rxRunning) {
                         int got = 0;
-                        while (got < BLOCK) { int n = in.read(buf, got, BLOCK - got); if (n < 0) break; got += n; }
-                        if (got < BLOCK) break;                          // the helper ended
+                        while (got < raw.length) { int n = in.read(raw, got, raw.length - got); if (n < 0) break; got += n; }
+                        if (got < raw.length) break;                     // the helper ended
+                        if (rc != null) rc.decimate(raw, raw.length, buf);
                         rxBlocks++;
                         Sink s = sink; if (s != null) s.onPcm(buf, BLOCK);  // squelch decision first
                         Gate g = gate;
@@ -192,15 +195,17 @@ public final class AlsaDirectAudio implements AudioBackend {
             }
             final Process p = start(false); txProc = p; txRunning = true;
             final AudioRecord r = rec;
+            final int f = da.rate / 8000;
+            final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
             txThread = new Thread(() -> {
-                byte[] mono = new byte[BLOCK / 2]; byte[] st = new byte[BLOCK];
+                byte[] mono = new byte[BLOCK / 2]; byte[] st = new byte[BLOCK]; byte[] hi = new byte[BLOCK * f];
                 try (OutputStream out = p.getOutputStream()) {
                     while (txRunning) {
                         int n = feed != null ? feed.read(mono, 0, mono.length) : r.read(mono, 0, mono.length);
                         if (n <= 0) continue;
                         int o = stereo(mono, n, st);
                         Level lv = txLevel; if (lv != null) lv.peak(peak(mono, n));
-                        out.write(st, 0, o);
+                        if (rc != null) out.write(hi, 0, rc.interpolate(st, o, hi)); else out.write(st, 0, o);
                     }
                 } catch (Throwable t) { synchronized (err) { err.append(t).append('\n'); } }
             }, "sdalsa-tx");                                             // closing stdin ends the helper: it drains, then puts the controls back
@@ -226,12 +231,14 @@ public final class AlsaDirectAudio implements AudioBackend {
         Process p;
         abortPlay = false;
         synchronized (this) { takeErrors(); try { p = start(false); } catch (Throwable t) { return "playPcm: " + t; } }
+        final int f = da.rate / 8000;
+        final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
         try (OutputStream out = p.getOutputStream()) {
-            byte[] st = new byte[BLOCK];
+            byte[] st = new byte[BLOCK]; byte[] hi = new byte[BLOCK * f];
             for (int pos = 0; pos < mono.length && !abortPlay; pos += BLOCK / 4) {
                 int k = 0;
                 for (int i = pos; i < Math.min(mono.length, pos + BLOCK / 4); i++) { short v = mono[i]; st[k++] = (byte) v; st[k++] = (byte) (v >> 8); st[k++] = (byte) v; st[k++] = (byte) (v >> 8); }
-                out.write(st, 0, k);                                     // the pipe fills and the helper's playback paces it to real time
+                if (rc != null) out.write(hi, 0, rc.interpolate(st, k, hi)); else out.write(st, 0, k);   // the pipe fills and the helper's playback paces it to real time
             }
         } catch (Throwable t) { finish(p, 500); return "playPcm: " + t; }
         finish(p, abortPlay ? 500 : 3000);                               // end of input: the helper drains the last periods, then exits
