@@ -31,6 +31,24 @@ final class P8CsvDatabaseChecks {
             ChannelCsv.Parsed bad=ChannelCsv.parse(ChannelCsv.template(true));bad.rows.get(0).channel.name="First new";bad.rows.get(1).channel.name="Second new";bad.rows.get(1).zones=Arrays.asList("CLASH");int before=store.count();boolean rejected=false;
             try{ChannelCsvStore.apply(store,bad,true);}catch(IllegalArgumentException expected){rejected=true;}check(rejected && store.count()==before,"Import failure was not atomic");
             ChannelCsv.Parsed invalid=ChannelCsv.parse(csv.replace("446.106251","oops"));check(!invalid.valid(),"Invalid frequency accepted");rejected=false;try{ChannelCsvStore.apply(store,invalid,true);}catch(IllegalArgumentException expected){rejected=true;}check(rejected && store.count()==before,"Invalid rows changed database");
+            store.addHistory(original.number,"test","Keep historical text",-90,0);
+            store.getWritableDatabase().execSQL("INSERT INTO nets(channelId,name) VALUES(?,?)",new Object[]{original.id,"Old channel schedule"});
+            store.getWritableDatabase().execSQL("INSERT INTO contacts(name,number,type) VALUES('Keep contact',1234,1)");
+            String oldBook=ChannelCsv.write(ChannelCsvStore.exportRows(store,store.all()));
+            store.getWritableDatabase().execSQL("CREATE TEMP TRIGGER csv_replace_failure BEFORE INSERT ON channels WHEN NEW.name='Example DMR' BEGIN SELECT RAISE(ABORT,'intentional replacement test failure'); END");
+            ChannelCsv.Parsed replacement=ChannelCsv.parse(ChannelCsv.template(true));rejected=false;
+            try{ChannelCsvStore.apply(store,replacement,true,true);}catch(RuntimeException expected){rejected=true;}
+            check(rejected && oldBook.equals(ChannelCsv.write(ChannelCsvStore.exportRows(store,store.all()))),"Failed replacement did not restore original book");
+            check(android.database.DatabaseUtils.longForQuery(store.getReadableDatabase(),"SELECT COUNT(*) FROM nets",null)==1,"Rollback lost channel schedule");
+            store.getWritableDatabase().execSQL("DROP TRIGGER csv_replace_failure");
+            check(ChannelCsvStore.apply(store,replacement,true,true).contains("2 channels loaded"),"Replacement report incorrect");
+            check(store.count()==2 && store.byNumber(1).name.startsWith("Example FM") && store.byNumber(2).name.equals("Example DMR"),"Replacement retained old channels or wrong order");
+            check(store.byNumber(1).id!=original.id && store.activeNumber()==1,"Replacement reused identity or wrong active channel");
+            check(store.zones().size()==2 && store.scanLists().size()==1 && store.scanChannels(store.scanLists().get(0).id).size()==2,"Replacement retained old groups or lost new members");
+            check(store.contacts().size()==1 && android.database.DatabaseUtils.longForQuery(store.getReadableDatabase(),"SELECT COUNT(*) FROM history WHERE channel=0",null)==1,"Replacement lost contacts/history");
+            check(android.database.DatabaseUtils.longForQuery(store.getReadableDatabase(),"SELECT COUNT(*) FROM nets",null)==0,"Replacement retained orphaned channel schedule");
+            store.close();store=new ChannelStore(context,filename);check(store.count()==2 && store.zones().size()==2 && store.scanLists().size()==1,"Replacement did not persist");
+            rejected=false;try{ChannelCsvStore.apply(store,ChannelCsv.parse(ChannelCsv.template(false)),true,true);}catch(IllegalArgumentException expected){rejected=true;}check(rejected && store.count()==2,"Empty replacement cleared channels");
         }finally{store.close();context.deleteDatabase(filename);}
     }
 }

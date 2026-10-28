@@ -31,23 +31,27 @@ public final class ChannelCsvDialog {
             new Thread(()->{try{
                 ChannelCsv.Parsed parsed;try(InputStream in=c.getContentResolver().openInputStream(uri)){parsed=ChannelCsv.parse(readUtf8(in));}
                 if(!parsed.valid())throw new IllegalArgumentException("Nothing changed. Fix these rows and import again:\n\n"+String.join("\n",parsed.errors));
-                int duplicates=ChannelCsvStore.duplicates(svc.store(),parsed);
+                int duplicates=ChannelCsvStore.matchingNames(svc.store(),parsed);
                 activity(c).runOnUiThread(()->{progress.dismiss();preview(c,svc,parsed,duplicates,reload);});
             }catch(Exception e){activity(c).runOnUiThread(()->{progress.dismiss();error(c,e instanceof CharacterCodingException?"Use UTF-8 CSV (Excel: CSV UTF-8). The file contains invalid UTF-8.":e.getMessage());});}},"channel-csv-check").start();
         });
     }
     private static void preview(Context c,RadioService svc,ChannelCsv.Parsed parsed,int duplicates,Runnable reload){
-        String message=parsed.rows.size()+" valid rows\n"+(parsed.rows.size()-duplicates)+" new channels, "+duplicates+" matching saved names.\n\nDuplicate matching uses channel name, ignoring case. Update replaces the listed settings and zone/scan-list memberships for those channels; other channels are kept. Skip leaves matching channels completely unchanged. Missing named zones and scan lists are created.\n\nNo rows are saved until you choose Import/Update or Skip.";
+        String message=parsed.rows.size()+" valid rows\n"+(parsed.rows.size()-duplicates)+" new channels, "+duplicates+" matching saved names.\n\nUpdate matches or Skip matches keeps other channels. Names match ignoring case. Missing zones and scan lists are created.\n\nFor a fresh start, tick Replace channel book below.";
+        android.widget.CheckBox replace=new android.widget.CheckBox(c);replace.setText("Replace channel book (clear existing channels, zones and scan lists)");replace.setPadding(24,12,24,12);
         AlertDialog.Builder b=new AlertDialog.Builder(c).setTitle("Import CSV").setMessage(message).setNegativeButton("Cancel",null);
-        b.setPositiveButton(duplicates==0?"Import":"Update matches",(d,w)->apply(c,svc,parsed,true,reload));
-        if(duplicates>0)b.setNeutralButton("Skip matches",(d,w)->apply(c,svc,parsed,false,reload));b.show();
+        b.setView(replace).setPositiveButton(duplicates==0?"Import":"Update matches",(d,w)->{if(replace.isChecked())new AlertDialog.Builder(c).setTitle("Replace channel book?")
+            .setMessage("Remove SignalDeck's existing channels, zones and scan lists, then load these "+parsed.rows.size()+" channels? Channel-linked schedules are removed; history is retained without old channel associations. Other settings, contacts, messages and stock Intercom are kept. A failed import restores the old book.")
+            .setPositiveButton("Replace and import",(dd,ww)->apply(c,svc,parsed,true,true,reload)).setNegativeButton("Cancel",null).show();else apply(c,svc,parsed,true,false,reload);});
+        if(duplicates>0)b.setNeutralButton("Skip matches",(d,w)->apply(c,svc,parsed,false,false,reload));AlertDialog dialog=b.create();
+        dialog.setOnShowListener(d->replace.setOnCheckedChangeListener((button,checked)->{dialog.getButton(AlertDialog.BUTTON_POSITIVE).setText(checked?"Replace…":duplicates==0?"Import":"Update matches");if(duplicates>0)dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setEnabled(!checked);}));dialog.show();
     }
-    private static void apply(Context c,RadioService svc,ChannelCsv.Parsed parsed,boolean update,Runnable reload){
+    private static void apply(Context c,RadioService svc,ChannelCsv.Parsed parsed,boolean update,boolean replace,Runnable reload){
         String blocked=svc.beginChannelCsvImport();if(blocked!=null){Toast.makeText(c,blocked,Toast.LENGTH_LONG).show();return;}
         ProgressDialog progress=busy(c,"Saving channels…");
         new Thread(()->{boolean saved=false;String message;
-            try{message=ChannelCsvStore.apply(svc.store(),parsed,update);saved=true;}catch(Exception e){message="Nothing imported: "+e.getMessage();}
-            final boolean success=saved;final String report=message;activity(c).runOnUiThread(()->{svc.endChannelCsvImport(success);progress.dismiss();reload.run();if(success)new AlertDialog.Builder(c).setTitle("CSV saved").setMessage(report).setPositiveButton("OK",null).show();else error(c,report);});
+            try{message=ChannelCsvStore.apply(svc.store(),parsed,update,replace);saved=true;}catch(Exception e){message="Nothing imported: "+e.getMessage();}
+            final boolean success=saved;final String report=message;activity(c).runOnUiThread(()->{svc.endChannelCsvImport(success,replace);progress.dismiss();reload.run();if(success)new AlertDialog.Builder(c).setTitle("CSV saved").setMessage(report).setPositiveButton("OK",null).show();else error(c,report);});
         },"channel-csv-save").start();
     }
     public static void exportFile(Context c,RadioService svc){

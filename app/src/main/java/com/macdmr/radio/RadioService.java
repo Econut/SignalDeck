@@ -103,8 +103,17 @@ public class RadioService extends Service implements RadioEngine.Events {
         csvImporting=true;ptt(false);channelCollectionsChanged();return null;
     }
     public void endChannelCsvImport(boolean saved){
+        endChannelCsvImport(saved,false);
+    }
+    public void endChannelCsvImport(boolean saved,boolean replaced){
+        int target=-1;
+        if(saved && replaced){
+            android.content.SharedPreferences prefs=getSharedPreferences("radio",MODE_PRIVATE);android.content.SharedPreferences.Editor edit=prefs.edit().putLong("zone",0).putLong("p8ScanList",0).putInt("scanPriority",0);
+            for(String key:prefs.getAll().keySet())if(key.startsWith("zoneLast_"))edit.remove(key);edit.apply();zoneId=0;current=null;vfo=null;
+            for(ChannelStore.Channel ch:store.all()){if(p8Main())try{P8MainRadio.channel(ch,false,p8ModuleVolume(),localId());}catch(IllegalArgumentException unsupported){continue;}target=ch.number;break;}
+        }else if(saved && current!=null && current.id>0){for(ChannelStore.Channel ch:store.all())if(ch.id==current.id){target=ch.number;break;}current=null;}
         csvImporting=false;channelCollectionsChanged();
-        if(saved && current!=null && current.id>0)for(ChannelStore.Channel ch:store.all())if(ch.id==current.id){selectChannel(ch.number);break;}
+        if(target>0)selectChannel(target);else if(saved && replaced && p8Main())closeP8(true,null);
     }
     private final Runnable txWatchdog = () -> { if (pttDown) { log("TX watchdog: releasing PTT after 28 s"); ptt(false); } };
     private PacketEngine packet;
@@ -898,7 +907,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 public void status(String text){if(text.startsWith("CONTROL"))log(text);else if(text.startsWith("TUNED") || text.startsWith("Module") || text.startsWith("TX") || text.startsWith("RSSI") || text.startsWith("Spectrum")){p8Status=text;log(text);}}
                 public void rssi(int raw,double dbm){rssi0(raw,dbm);}
                 public void spectrum(float[] bands){p8Spectrum=bands.clone();final float[] copy=p8Spectrum;ui.post(()->{for(Listener l:listeners)l.onSpectrum(copy);});}
-                public void tuned(P8RxProtocol.Channel channel){ui.post(()->{ChannelStore.Channel acked=p8Tunes.remove(channel);if(acked==null || p8Closing)return;current=acked;if(acked.id>0)store.setActive(acked.number);setLink("ready");for(Listener l:listeners)l.onChannel(acked);pushModes();});}
+                public void tuned(P8RxProtocol.Channel channel){ui.post(()->{ChannelStore.Channel acked=p8Tunes.remove(channel);if(acked==null || p8Closing)return;if(acked.id>0){ChannelStore.Channel stored=store.byNumber(acked.number);if(stored==null || stored.id!=acked.id)return;}current=acked;if(acked.id>0)store.setActive(acked.number);setLink("ready");for(Listener l:listeners)l.onChannel(acked);pushModes();});}
                 public void receiving(boolean on){receiving=on;ui.post(()->{for(Listener l:listeners)l.onRx(on);});}
                 public void transmitting(boolean on){p8TxArmed=false;transmitting=on;ui.post(()->{for(Listener l:listeners)l.onTx(on);refreshControls();});}
                 public void levels(double peak,double rms,long clips,long recent){p8Meter=String.format(Locale.US,"PCM peak %.1f dBFS · RMS %.1f dBFS\nClips %d total · %d recent%s",peak,rms,clips,recent,recent>0?" · CLIPPING":"");ui.post(()->{for(Listener l:listeners)l.onAudioLevel((int)Math.max(0,Math.min(100,100+peak)));});}

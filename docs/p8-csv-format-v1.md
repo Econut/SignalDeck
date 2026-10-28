@@ -40,6 +40,14 @@ The preview shows new rows and duplicate saved names. Matching uses the trimmed 
 
 The entire file is validated first, with physical line numbers in row errors (up to 50 displayed). No invalid rows are silently imported. Saving is one SQLite transaction; a later failure rolls everything back. Import pauses scanning, blocks PTT for the save, and refreshes the active channel afterwards. It never transmits. It does not resume scanning automatically.
 
+### Fresh import (main.6a)
+
+Tick **Replace channel book** in the validated import preview, tap **Replace…**, then confirm **Replace and import**. This clears SignalDeck's channels, zones and scan lists and rebuilds them from the file in CSV row order, numbered from 1. It uses the same CSV v1 format. Empty/invalid replacements are rejected before clearing; clearing and insertion share one transaction, so failures restore the old book. Update and Skip remain available with replacement unticked.
+
+Old channel-linked schedules are removed. History text is retained with its old channel-number association cleared, preventing old history appearing under a different newly numbered channel. Contacts, messages, gain settings, buttons, firmware, calibration and stock Intercom are kept. Zone/list/priority and remembered zone-channel selections reset to ALL/no priority; the first supported imported channel is selected without transmitting. Late acknowledgements for deleted channel IDs are ignored. If no imported channel is supported by the P8 adapter, the receiver hands back to Intercom rather than retaining an old channel.
+
+Main.6a checks: 96 host tests passed; isolated on-device tests verified successful fresh replacement, persisted groups/numbering, preserved contacts/history, rejected empty input, and full rollback after a forced second-row insertion failure. Actual UI validation reached the second confirmation for the user's 35-row CSV and cancelled it; no production channel book was replaced during testing. Main-screen design unchanged.
+
 Export All, a selected zone, or a saved scan list. Each exported channel includes all its zone/list memberships, including groups outside the selected export scope. Empty groups have no channel row and are not represented by channel CSV. Contacts, messages, history, device identity and calibration are outside this format; it is not a full application/firmware backup.
 
 ## Main.6 verification
