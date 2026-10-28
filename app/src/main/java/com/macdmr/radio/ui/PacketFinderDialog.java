@@ -47,6 +47,7 @@ public final class PacketFinderDialog {
             boolean on = pf.running();
             status.setText(pf.status());
             sub.setText(on ? "Until " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(pf.endsAt())) + " · " + pf.dwellMin() + " min on each of " + pf.freqs().size() + " frequencies"
+                    : pf.freqs().isEmpty() ? "No packet frequency this radio tunes (" + svc.profile().bandsText() + "): add some in Settings"
                     : pf.freqs().size() + " frequencies, " + pf.dwellMin() + " min each, for " + pf.hours() + " h (Settings)");
             go.setText(on ? "Stop" : "Start");
             List<PacketFinder.Station> st = pf.stations();

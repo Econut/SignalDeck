@@ -33,7 +33,7 @@ public final class FormsDialog {
     public static void show(Context c, RadioService svc) {
         float d = Theme.dp(c);
         LinearLayout body = Neo.sheetBody(c, "Message forms");
-        body.addView(Neo.sheetHint(c, "The ICS-213 General Message and the ARRL Radiogram, for emergency and traffic nets: fill one in and read it on the air, or send it as APRS messages or DMR texts to another SignalDeck, which puts the parts back together into the form."));
+        body.addView(Neo.sheetHint(c, "The ICS-213 General Message and the ARRL Radiogram, for emergency and traffic nets: fill one in and read it on the air, or send it as APRS messages" + (svc.profile().dmr() ? " or DMR texts" : "") + " to another SignalDeck, which puts the parts back together into the form."));
         final AlertDialog[] self = { null };
         LinearLayout r = new LinearLayout(c); body.addView(r);
         btn(c, r, "New ICS-213", "plus", Neo.GREEN, v -> { if (self[0] != null) self[0].dismiss(); edit(c, svc, blank(Forms.ICS213)); });
@@ -112,7 +112,8 @@ public final class FormsDialog {
         final Runnable collect = () -> { for (Map.Entry<String, EditText> e : in.entrySet()) form.f.put(e.getKey(), e.getValue().getText().toString().trim()); if (Forms.RADIOGRAM.equals(form.kind)) form.f.put("CK", String.valueOf(Forms.words(form.f.get("MS")))); };
         TextView aprs = Neo.button(c, "Send by APRS", "packet", Neo.GREEN), dmr = Neo.button(c, "Send by DMR text", "messages", Neo.CYAN), save = Neo.button(c, "Save", "check", Neo.MUTED);
         TextView wl = Neo.button(c, "Send by Winlink", "mail", Neo.VIOLET);
-        for (TextView b : new TextView[] { aprs, dmr }) { b.setTextSize(14); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, (int) (48 * d), 1f); lp.setMargins((int) (3 * d), (int) (12 * d), (int) (3 * d), 0); r.addView(b, lp); }
+        boolean dmrOk = svc.profile().dmr();                                   // no DMR texts on an analog-only radio (the W6)
+        for (TextView b : dmrOk ? new TextView[] { aprs, dmr } : new TextView[] { aprs }) { b.setTextSize(14); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, (int) (48 * d), 1f); lp.setMargins((int) (3 * d), (int) (12 * d), (int) (3 * d), 0); r.addView(b, lp); }
         LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d)); wlp.topMargin = (int) (8 * d); body.addView(wl, wlp);
         LinearLayout.LayoutParams sl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (48 * d)); sl.topMargin = (int) (8 * d); body.addView(save, sl);
         dlg = Neo.showSheet(c, body);

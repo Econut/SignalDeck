@@ -137,7 +137,7 @@ public final class PacketFinder {
     public List<Integer> freqs() {
         List<Integer> l = new ArrayList<>();
         for (String p : prefs.getString("freqs", "").split("[,;\\s]+")) { try { double mhz = Double.parseDouble(p.trim()); int hz = (int) Math.round(mhz * 1e6); if (ok(hz)) l.add(hz); } catch (NumberFormatException ignored) { } }
-        if (l.isEmpty()) for (int k : DEFAULT_KHZ) l.add(k * 1000);
+        if (l.isEmpty()) for (int k : DEFAULT_KHZ) if (ok(k * 1000)) l.add(k * 1000);   // the 2 m defaults: none on a UHF-only radio (the W6)
         return l;
     }
     public String freqText() { StringBuilder b = new StringBuilder(); for (int hz : freqs()) b.append(b.length() > 0 ? ", " : "").append(String.format(Locale.US, "%.3f", hz / 1e6)); return b.toString(); }
@@ -161,6 +161,7 @@ public final class PacketFinder {
     public synchronized String start(int minutes) {
         if (running) return "The packet finder is already running";
         if (!svc.isReady()) return "Take over the radio first";
+        if (freqs().isEmpty()) return "None of the packet frequencies is one this radio tunes (" + svc.profile().bandsText() + "): add some in Settings";
         if (svc.isTransmitting()) return "Not while transmitting";
         RadioService.SatState st = svc.satState(); if (st != null && !st.waiting) return "A satellite pass is being tracked";
         if (svc.winlink().busy()) return "A Winlink session is running";
