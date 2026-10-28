@@ -20,6 +20,11 @@ public interface ModuleEngine {
     default String protocol() { return "mcu68"; }
     /** True when the module does DMR (digital channels, texts, caller info, 0x40 commands). */
     default boolean dmr() { return true; }
+    /**
+     * For a module that drives the phone's speaker itself (the W6's: {@link DeviceProfile#muteLines} set): the level that
+     * follows Android's media volume, 0 = speaker off, 1-8 the module's volume. Other modules ignore it.
+     */
+    default void setSpeakerLevel(int level) { }
 
     DeviceProfile profile();
     boolean isOpen();
