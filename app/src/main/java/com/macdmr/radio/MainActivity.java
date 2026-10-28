@@ -389,6 +389,11 @@ public class MainActivity extends AppCompatActivity {
         try { startActivityForResult(i, 79); } catch (Throwable t) { android.widget.Toast.makeText(this, "No file picker available", android.widget.Toast.LENGTH_LONG).show(); }
     }
     private java.util.function.Consumer<android.net.Uri> folderPick;
+    private java.util.function.Consumer<android.net.Uri> savePick;
+    public void createCsvDocument(String name,java.util.function.Consumer<android.net.Uri> cb){
+        savePick=cb;Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("text/csv").putExtra(Intent.EXTRA_TITLE,name);
+        try{startActivityForResult(i,80);}catch(Exception e){savePick=null;android.widget.Toast.makeText(this,"No file picker available",android.widget.Toast.LENGTH_LONG).show();}
+    }
     /** Storage Access Framework folder picker (backups made by another app or install are invisible to the File API). */
     public void pickFolder(java.util.function.Consumer<android.net.Uri> cb) {
         folderPick = cb;
@@ -397,6 +402,7 @@ public class MainActivity extends AppCompatActivity {
     }
     @Override protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if(req==80 && savePick!=null){java.util.function.Consumer<android.net.Uri> cb=savePick;savePick=null;if(res==RESULT_OK && data!=null && data.getData()!=null)cb.accept(data.getData());return;}
         if (req == 79 && docPick != null) { java.util.function.Consumer<android.net.Uri> cb = docPick; docPick = null; if (res == RESULT_OK && data != null && data.getData() != null) cb.accept(data.getData()); return; }
         if (req == 78 && folderPick != null) { java.util.function.Consumer<android.net.Uri> cb = folderPick; folderPick = null; if (res == RESULT_OK && data != null && data.getData() != null) cb.accept(data.getData()); return; }
         if (req == 77 && imagePick != null) { java.util.function.Consumer<android.net.Uri> cb = imagePick; imagePick = null; if (res == RESULT_OK && data != null && data.getData() != null) cb.accept(data.getData()); }

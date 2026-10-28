@@ -1,0 +1,3 @@
+﻿format_version,name,rx_mhz,tx_mhz,mode,bandwidth_khz,rx_tone,tx_tone,squelch,power,receive_only,zones,scan_lists,colour_code,rx_slot,tx_slot,talkgroup,contact_type,rx_groups,dmr_mode,relay,interrupt,soft_squelch,soft_squelch_level,notes
+"1","Example FM, receive only","446.106250","446.106250","FM","12.5","None","None","2","Low","true","Local","My scan","1","1","1","0","Group","","Direct","Normal","false","false","5",""
+"1","Example DMR","433.450000","433.450000","DMR","12.5","None","None","2","Low","true","Digital","My scan","1","1","1","9","Group","9","Direct","Normal","false","false","5",""

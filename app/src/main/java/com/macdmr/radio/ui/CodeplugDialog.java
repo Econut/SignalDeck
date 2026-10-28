@@ -39,7 +39,9 @@ public final class CodeplugDialog {
 
     /** Channels → Share: what to do. */
     public static void menu(final Context c, final RadioService svc, final Runnable reload) {
-        new AlertDialog.Builder(c).setTitle("Share channels").setItems(new String[] { "Share channels…", "Import from the clipboard", "Import a file (SignalDeck or CHIRP)" }, (dd, w) -> {
+        new AlertDialog.Builder(c).setTitle("Channels").setItems(new String[] { "Share channels…", "Import from the clipboard", "Import a file (SignalDeck or CHIRP)", "Import CSV", "Export CSV" }, (dd, w) -> {
+            if(w==3){ChannelCsvDialog.importFile(c,svc,reload);return;}
+            if(w==4){ChannelCsvDialog.exportFile(c,svc);return;}
             if (w == 0) share(c, svc);
             else if (w == 1) {
                 ClipboardManager cm = (ClipboardManager) c.getSystemService(Context.CLIPBOARD_SERVICE);

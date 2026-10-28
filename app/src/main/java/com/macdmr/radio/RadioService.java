@@ -96,6 +96,16 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Every MCU/audio action runs here, in order — a PTT release can never overtake its press. */
     private final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor(r -> new Thread(r, "radio-worker"));
     private volatile boolean pttDown;
+    private volatile boolean csvImporting;
+    public synchronized String beginChannelCsvImport(){
+        if(csvImporting)return "A channel import is already running";
+        if(transmitting || pttDown)return "Release PTT before importing channels";
+        csvImporting=true;ptt(false);channelCollectionsChanged();return null;
+    }
+    public void endChannelCsvImport(boolean saved){
+        csvImporting=false;channelCollectionsChanged();
+        if(saved && current!=null && current.id>0)for(ChannelStore.Channel ch:store.all())if(ch.id==current.id){selectChannel(ch.number);break;}
+    }
     private final Runnable txWatchdog = () -> { if (pttDown) { log("TX watchdog: releasing PTT after 28 s"); ptt(false); } };
     private PacketEngine packet;
 
@@ -1370,6 +1380,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     public String toggleScan() {
+        if(csvImporting)return "Channel import in progress";
         if(p8Main()){if(!isReady())return "Connect P8 first";if(p8Scanning){scanner.stop();p8Scanning=false;pushModes();return "Scan stopped";}if(pttDown || transmitting)return "Release PTT before scanning";if(vfo!=null)return "Turn VFO off to scan channels";String error=scanner.start();p8Scanning=error==null;pushModes();return error==null?"Scanning "+scanListName():error;}
         if (scanner.isScanning()) { scanner.stop(); return "Scan stopped"; }
         if (vfo != null) return "Turn VFO off to scan channels";
@@ -1455,6 +1466,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private final java.util.concurrent.atomic.AtomicInteger selectSeq = new java.util.concurrent.atomic.AtomicInteger();
     private volatile long lastChannelWrite;
     public void selectChannel(final int number) {
+        if(csvImporting)return;
         final int my = selectSeq.incrementAndGet();
         worker.execute(() -> {
             long gap = profile.minWriteGapMs;
@@ -1787,6 +1799,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void pttFromWeb(boolean down, AudioBackend.TxFeed feed) { if (down) webFeedNext = feed; ptt(down); }
 
     public void ptt(final boolean down) {
+        if(down && csvImporting)return;
         if(p8Main()){if(down && P8ButtonBindings.learning!=null)return;if(p8Receiver!=null && (!down || !txInhibited())){if(down){scanner.stop();p8Scanning=false;}p8Receiver.ptt(down);}else if(down)history("warn","P8 TX blocked: connect an analogue channel with Transmit allowed");return;}
         worker.execute(() -> {
             try {
