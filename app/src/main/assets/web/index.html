@@ -107,7 +107,7 @@
         <div class="panel">
           <div class="row between"><span class="label">CHANNELS</span><div class="row"><button class="btn small-btn" id="chVfo">VFO</button><button class="btn small-btn" id="chNew">New channel</button></div></div>
           <div class="row wrap chtools"><select id="chZone" aria-label="Zone shown in the list (the radio steps and scans in it)"></select>
-            <div class="seg" id="chFilter"><button type="button" data-f="0" class="on">All</button><button type="button" data-f="1">★ Favourites</button><button type="button" data-f="2">Analog</button><button type="button" data-f="3">DMR</button></div></div>
+            <div class="seg" id="chFilter"><button type="button" data-f="0" class="on">All</button><button type="button" data-f="1">★ Favourites</button><button type="button" data-f="2" class="dmr-only">Analog</button><button type="button" data-f="3" class="dmr-only">DMR</button></div></div>
           <input id="chSearch" placeholder="Search name, frequency or number" class="search full" style="margin-top:10px">
           <div id="chList" class="list"></div>
         </div>
@@ -356,7 +356,7 @@
           <span class="label" id="qsoTitle">LOG A CONTACT</span>
           <form id="qsoForm" class="form" autocomplete="off">
             <label>Callsign<input id="qCall" maxlength="12" style="text-transform:uppercase"></label>
-            <div class="row"><label class="grow">Frequency (MHz)<input id="qFreq" inputmode="decimal"></label><label class="grow">Mode<select id="qMode"><option>FM</option><option>DMR</option><option>SSB</option><option>CW</option><option>APRS</option><option>SSTV</option><option>DIGITAL</option></select></label></div>
+            <div class="row"><label class="grow">Frequency (MHz)<input id="qFreq" inputmode="decimal"></label><label class="grow">Mode<select id="qMode"><option>FM</option><option class="dmr-only">DMR</option><option>SSB</option><option>CW</option><option>APRS</option><option>SSTV</option><option>DIGITAL</option></select></label></div>
             <div class="row"><label class="grow">Report sent<input id="qSent" maxlength="6" placeholder="59"></label><label class="grow">Report received<input id="qRcvd" maxlength="6" placeholder="59"></label></div>
             <label>Name<input id="qName" maxlength="40"></label>
             <label>Notes<input id="qNotes" maxlength="200"></label>

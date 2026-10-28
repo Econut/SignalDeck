@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — SignalDeck Web hides the DMR parts on a radio without DMR
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner, 2026-10-27 (W6, analog-only) | `/api/status` now says what the radio can do (`radio: {dmr, messages, contacts}`, from the profile's `dmr()`, `hasMessages()`, `hasContacts()`). On a radio without DMR the web pages hide the Messages and Contacts pages (and leave them if open), the Analog/DMR filters on Channels, the channel type in the editor (a new channel is analog; an old DMR channel can still be changed) and the DMR mode in the logbook; anything marked `dmr-only` is hidden by one CSS rule. The M17 receive panel stays (it decodes from audio). Messages and Contacts come back with their profile switches once a text mode works on the phone. Help says so. | `web/WebHost.java` (`statusJson`), `assets/web/app.js` (`applyRadio`), `editor.js`, `index.html`, `app.css`, `ui/HelpView.java` | Host: all host tests pass; app.js and editor.js parse. **Device: W6**: `/api/status` reports `{dmr: false, messages: false, contacts: false}` and the served page carries the new code. The page itself was not viewed in a browser. |
+
 ## 2026-10-27 — A radio without DMR shows no DMR pages
 
 | Backlog | Change | Files | Test |
