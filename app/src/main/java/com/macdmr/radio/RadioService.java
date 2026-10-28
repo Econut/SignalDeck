@@ -1586,6 +1586,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                 org.json.JSONArray g = o.optJSONArray("groups"); if (g != null) { v.groups = new int[g.length()]; for (int i = 0; i < g.length(); i++) v.groups[i] = g.optInt(i); }
             }
         } catch (Throwable ignored) { }
+        if (!profile.dmr()) v.type = 1;                                  // an analog-only radio (the W6)
+        if (!profile.tunable(v.rxFreq)) {                                // 146.520 on a UHF-only radio: start where it can listen
+            ChannelStore.Channel ch = current;
+            long f = ch != null && profile.tunable(ch.rxFreq) ? ch.rxFreq : profile.tunable(446_000_000L) ? 446_000_000L : profile.bandsHz[0];
+            v.rxFreq = v.txFreq = (int) f;
+        }
         return v;
     }
 
