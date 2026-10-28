@@ -16,6 +16,7 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 | W6 | The SSTV page hides Go to 144.500 where the radio cannot tune it; the M17 page says the module cannot send M17 instead of pointing to firmware that does not exist for it | `ui/SstvScreen`, `ui/M17Screen` | W6: checked on the phone |
 | W6 | The VFO starts on a frequency the radio tunes (the current channel, else 446.000 MHz, instead of 146.520 on a UHF-only radio), is FM only without DMR, and hides its FM/DMR choice there (phone and web, which share the default) | `RadioService`, `ui/VfoDialog` | W6: checked on the phone |
 | W6 | SignalDeck Web's intercom hides its dBm bar on a radio without signal readings (the state chip still says when something is received) | web `index.html` | W6: web checked by script |
+| W6 | A satellite whose uplink the radio cannot tune (the cross-band ISS repeater and SO-50 on a UHF-only radio: 437 MHz down, 145.9 MHz up) is tracked listen-only: received, and push-to-talk blocked during the pass instead of a channel write the module refuses | `RadioService` | Host suites; W6: satellite list checked |
 | SignalDeck Web | The SSTV button said "Listen on 144.500" but has always listened on the current channel; it now says so | web `app.js`, `index.html` | — |
 
 ## 2026-10-27 — SignalDeck Web hides the DMR parts on a radio without DMR

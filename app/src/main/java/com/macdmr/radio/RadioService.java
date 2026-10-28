@@ -212,7 +212,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!profile.tunable(sat.downHz)) return "This radio tunes " + profile.bandsText() + ": " + sat.name + " sends on " + String.format(java.util.Locale.US, "%.3f", sat.downHz / 1e6) + " MHz";
         stopSatTrack();
         final SatState st = new SatState(); st.name = sat.name; st.aos = pass.aos; st.los = pass.los; st.maxEl = pass.maxEl; st.waiting = true;
-        st.mode = sat.mode; st.listenOnly = sat.listenOnly(); st.nominalHz = sat.downHz; satState = st; updateModeWake();
+        final boolean listenOnly = sat.listenOnly() || !profile.tunable(sat.upHz);   // a 2 m uplink on a UHF-only radio (the W6): hear it, never key
+        st.mode = sat.mode; st.listenOnly = listenOnly; st.nominalHz = sat.downHz; satState = st; updateModeWake();
         if (sat.mode != com.macdmr.radio.ham.Satellites.VOICE) modeSince = System.currentTimeMillis();
         final Thread t = new Thread(() -> {
             boolean tuned = false, started = false, natural = false;
@@ -241,7 +242,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     // 5 kHz is tolerated so the retune gap does not tear the picture.
                     boolean picture = sat.mode == com.macdmr.radio.ham.Satellites.SSTV && packet != null && packet.sstvStatus() != null && packet.sstvStatus().startsWith("receiving");
                     if (!pttDown && (!tuned || Math.abs(rx - lastRx) >= (picture ? 5000 : 2000))) {
-                        v.rxFreq = (int) (Math.round(rx / 500.0) * 500); v.txFreq = sat.listenOnly() ? v.rxFreq : (int) (Math.round(tx / 500.0) * 500);
+                        v.rxFreq = (int) (Math.round(rx / 500.0) * 500); v.txFreq = listenOnly ? v.rxFreq : (int) (Math.round(tx / 500.0) * 500);
                         applyVfo(v, false); lastRx = rx; tuned = true; lastSatRetune = System.currentTimeMillis();
                     }
                     if (tuned && !started && packet != null) {         // the pass's job: decode APRS or SSTV on the moving frequency
