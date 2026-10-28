@@ -11,7 +11,10 @@ package com.macdmr.radio.ham;
  * M17 4FSK carries much of its signal, so a plain demodulator decodes nothing. This one equalizes: a decision-feedback
  * equalizer (feed-forward taps at half-symbol spacing with cubic terms for the receiver's compression, plus the last 24
  * symbols fed back, which rebuild the missing low frequencies), calibrated per phone, with the symbol timing re-chosen
- * every 40 ms frame and the coefficients slowly adapted on frames the error correction confirms.
+ * every 40 ms frame and the coefficients slowly adapted on frames the error correction confirms. The fed-back history
+ * is corrected wherever the symbols are known: a stream frame's 8 sync symbols, and a whole frame once its error
+ * correction confirms it (re-encoded). Without that, one burst of wrong decisions fed back spreads into the next frames
+ * (ANYSECU W6+, 2026-10-27: a table fitted on one transmission lost the stream after 11-14 frames).
  * A transmission is found by its preamble (a 40 ms 2400 Hz tone, which the radio passes), then the LSF sync word.
  */
 public final class M17Receiver {
@@ -49,6 +52,10 @@ public final class M17Receiver {
     private int strong; private long preStart48 = -1, preEnd48 = -1;
 
     private enum State { IDLE, ACQUIRE, STREAM }
+    /** Frames in a row (40 ms each) without the stream sync before the call is given up: the symbol clock holds over that long (W6: 1/10 of a symbol in 4 s). */
+    static final int MAX_LOST = 6;
+    /** Feedback taps a fit on a phone's own reception keeps (the rest held at 0): fewer spread wrong decisions less (W6: 4 decoded another transmission best, 95 and 92 of 100 frames). */
+    public static final int LEARN_FEEDBACK = 4;
     static final int SEARCH = 60;                                // symbols either side of the estimated preamble end
     private State state = State.IDLE;
     private long next48;                                         // where the next frame's first sync symbol is expected
@@ -115,15 +122,20 @@ public final class M17Receiver {
     static float slice(float y) { return y >= 2 ? 3 : y >= 0 ? 1 : y >= -2 ? -1 : -3; }
 
     /** Equalize `n` symbols from p0 with the history `hist` (updated); returns the summed decision error, outputs in ys. */
-    private float run(long p0, int n, float[] hist, float[] ys, int off) {
+    private float run(long p0, int n, float[] hist, float[] ys, int off) { return run(p0, n, hist, ys, off, null); }
+    /** As above; where {@code known[k]} is non-zero that symbol, not the decision, goes into the history (the error still counts the decision). */
+    private float run(long p0, int n, float[] hist, float[] ys, int off, int[] known) {
         float err = 0;
         for (int k = 0; k < n; k++) {
             features(p0 + (long) k * SPS48, hist);
             float y = out(), d = slice(y); if (ys != null) ys[off + k] = y; err += (y - d) * (y - d);
-            System.arraycopy(hist, 0, hist, 1, FB - 1); hist[0] = d;
+            System.arraycopy(hist, 0, hist, 1, FB - 1); hist[0] = known != null && k < known.length && known[k] != 0 ? known[k] : d;
         }
         return err;
     }
+    /** A stream frame's sync symbols, for the history (the rest unknown). */
+    private static final int[] STREAM_SYNC = new int[8];
+    static { for (int i = 0; i < 8; i++) STREAM_SYNC[i] = M17.SYMBOL_MAP[(M17.SYNC_STR >> (14 - 2 * i)) & 3]; }
 
     // ---- acquisition: the LSF sync word right after the preamble -------------------------------------------
 
@@ -146,6 +158,7 @@ public final class M17Receiver {
         float[] sym = new float[192]; trackFrame(bestP, sym);
         lsf = M17.decodeLsf(sym, 8);
         frames = 0; good = 0; lost = 0; java.util.Arrays.fill(lichChunks, null); lsfFromLichSent = false;
+        learnA = new double[NCOEF][NCOEF]; learnB = new double[NCOEF]; learnFrames = 0; learnSymbols = 0;
         listener.started(lsf);
         state = State.STREAM;
     }
@@ -153,10 +166,11 @@ public final class M17Receiver {
     /** One frame at p0 with timing re-chosen among p0-2..p0+2 (48 kHz samples); returns the chosen start, symbols in sym. */
     private long chosen;
     private float[] frameFeat;                                   // the chosen frame's features, for adaptation
-    private float trackFrame(long p0, float[] sym) {
+    private float trackFrame(long p0, float[] sym) { return trackFrame(p0, sym, null); }
+    private float trackFrame(long p0, float[] sym, int[] known) {
         float best = Float.MAX_VALUE; long bp = p0; float[] bh = null, bys = null;
         for (long p = p0 - 2; p <= p0 + 2; p++) {
-            float[] h = past.clone(), ys = new float[192]; float err = run(p, 192, h, ys, 0);
+            float[] h = past.clone(), ys = new float[192]; float err = run(p, 192, h, ys, 0, known);
             if (err < best) { best = err; bp = p; bh = h; bys = ys; }
         }
         System.arraycopy(bys, 0, sym, 0, 192); System.arraycopy(bh, 0, past, 0, FB); chosen = bp;
@@ -166,18 +180,23 @@ public final class M17Receiver {
 
     private void frame() {
         long p0 = next48; float[] before = past.clone();
-        float[] sym = new float[192]; float mse = trackFrame(p0, sym);
+        float[] sym = new float[192]; float mse = trackFrame(p0, sym, STREAM_SYNC);
         int sm = 0, em = 0;
         for (int i = 0; i < 8; i++) { int s = (int) slice(sym[i]); if (s == M17.SYMBOL_MAP[(M17.SYNC_STR >> (14 - 2 * i)) & 3]) sm++; if (s == M17.EOT_SYMBOLS[i]) em++; }
         if (em >= 7 && em > sm) { end("end of transmission"); return; }
-        if (sm < 6) { if (++lost >= 2) { end("signal lost"); return; } return; }
+        if (sm < 6) { if (++lost >= MAX_LOST) { end("signal lost"); return; } return; }
         lost = 0; frames++;
         M17.Stream s = M17.decodeStream(sym, 8);
         float quality = Math.max(0, Math.min(1, 1 - mse / 0.5f));
         boolean confirmed = s.lich != null && s.lichErrors <= 2 && s.metric < -150;
-        if (confirmed) { good++; adapt(chosen, before, s); collectLich(s); }
+        if (confirmed) {
+            good++; adapt(chosen, before, s); collectLich(s);
+            int[] exact = M17.streamSymbolsFromLich(s.lich, s.fn, s.payload);       // the frame as sent: the history the next frame needs
+            if (exact != null && exact.length == 192) { learn(chosen, before, exact); for (int i = 0; i < FB; i++) past[i] = exact[191 - i]; }
+        } else java.util.Arrays.fill(past, 0f);                              // unconfirmed: feeding its decisions back spreads its errors; 0 = unknown
+
         listener.frame(s, quality);
-        if (s.last()) end("last frame");
+        if (s.last() && confirmed) end("last frame");                     // an unconfirmed frame's end bit may be a bit error
     }
 
     /** NLMS on a confirmed frame: re-encode it, then nudge the coefficients toward the exact symbols. */
@@ -208,13 +227,59 @@ public final class M17Receiver {
     private void end(String why) { listener.ended(frames, good, why); reset(null); }
     private void reset(String why) { state = State.IDLE; strong = 0; preStart48 = preEnd48 = -1; }
 
+    // ---- learning from the frames the error correction confirmed (self-calibration) ---------------------------
+
+    private double[][] learnA; private double[] learnB; private int learnFrames, learnSymbols;
+    /** Adds a confirmed frame to this call's normal equations: at the timing the receiver chose, with the history it had, and the frame as sent. */
+    private void learn(long p0, float[] hist0, int[] exact) {
+        if (learnA == null) return;
+        float[] h = hist0.clone();
+        for (int k = 0; k < 192; k++) {
+            features(p0 + (long) k * SPS48, h);
+            for (int i = 0; i < NCOEF; i++) { learnB[i] += f[i] * exact[k]; for (int j = i; j < NCOEF; j++) learnA[i][j] += f[i] * f[j]; }
+            System.arraycopy(h, 0, h, 1, FB - 1); h[0] = exact[k];
+        }
+        learnFrames++; learnSymbols += 192;
+    }
+    /** Confirmed frames the current (or the call just ended) has added. */
+    public int learnedFrames() { return learnFrames; }
+    /** A table fitted on this call's confirmed frames, the feedback taps past {@code feedback} held at 0; null with fewer than {@code minFrames}. */
+    public float[] learnedTable(int minFrames, int feedback) {
+        if (learnA == null || learnFrames < minFrames) return null;
+        double[][] A = new double[NCOEF][]; for (int i = 0; i < NCOEF; i++) A[i] = learnA[i].clone();
+        double[] c = solveNormal(A, learnB.clone(), learnSymbols, feedback); if (c == null) return null;
+        float[] out = new float[NCOEF]; for (int i = 0; i < NCOEF; i++) out[i] = (float) c[i]; return out;
+    }
+    /** Solves upper-triangle normal equations (in place): mirrored, lightly regularised, feedback taps past {@code feedback} held at 0. */
+    static double[] solveNormal(double[][] A, double[] b, int used, int feedback) {
+        for (int i = 0; i < NCOEF; i++) { A[i][i] += 1e-6 * Math.max(1, used); for (int j = 0; j < i; j++) A[i][j] = A[j][i]; }
+        int fb0 = GROUPS * (2 * L + 1);
+        for (int i = fb0 + Math.max(0, feedback); i < fb0 + FB; i++) { java.util.Arrays.fill(A[i], 0); for (int r = 0; r < NCOEF; r++) A[r][i] = 0; A[i][i] = 1; b[i] = 0; }
+        return solve(A, b);
+    }
+
+    /** How a table does on a recording: {confirmed frames, frames, link setups with a good CRC}. */
+    public static int[] score(short[] audio, float[] coef) {
+        final int[] r = new int[3];
+        M17Receiver rx = new M17Receiver(coef, new Listener() {
+            public void started(M17.Lsf l) { if (l.crcOk) r[2]++; }
+            public void frame(M17.Stream s, float q) { }
+            public void lsfFromLich(M17.Lsf l) { }
+            public void ended(int f, int g, String w) { r[0] += g; r[1] += f; }
+        });
+        rx.feed(audio, audio.length); rx.feed(new short[8000], 8000);      // a second of silence ends a call still open
+        return r;
+    }
+
     // ---- calibration (bench: a known transmission recorded through this radio) ---------------------------------
 
     /**
      * Least-squares fit of the coefficients on a recorded transmission whose symbols are known: {@code start8k} is roughly
      * where symbol 0 (the first preamble symbol) is in the recording; the exact delay is searched. Returns {coefficients..., mse}.
      */
-    public static float[] calibrate(short[] audio, int start8k, int[] symbols) {
+    public static float[] calibrate(short[] audio, int start8k, int[] symbols) { return calibrate(audio, start8k, symbols, FB); }
+    /** As above with only the first {@code feedback} feedback taps fitted; a symbol of 0 is unknown (not fitted, 0 in the history). */
+    public static float[] calibrate(short[] audio, int start8k, int[] symbols, int feedback) {
         M17Receiver r = new M17Receiver(new float[NCOEF], new Listener() {
             public void started(M17.Lsf l) { } public void frame(M17.Stream s, float q) { } public void lsfFromLich(M17.Lsf l) { } public void ended(int a, int b, String w) { } });
         int from = Math.max(0, start8k - 4000), to = Math.min(audio.length, start8k + symbols.length * 8000 / 4800 + 4000);
@@ -222,28 +287,28 @@ public final class M17Receiver {
         long base = to48(start8k - from);
         double[] best = null; double bestE = Double.MAX_VALUE;
         for (int d = -120; d <= 120; d += 2) {
-            double[] c = r.fit(base + d, symbols); if (c == null) continue;
+            double[] c = r.fit(base + d, symbols, feedback); if (c == null) continue;
             if (c[NCOEF] < bestE) { bestE = c[NCOEF]; best = c; }
         }
         float[] out = new float[NCOEF + 1]; for (int i = 0; i <= NCOEF; i++) out[i] = (float) best[i]; return out;
     }
     private void feedRaw(short[] a) { state = State.IDLE; for (short v : a) interpolate(v); }
-    private double[] fit(long p0, int[] sym) {
+    private double[] fit(long p0, int[] sym, int feedback) {
         if (p0 + (long) sym.length * SPS48 + 5 * L >= n48 || n48 - p0 > RING) return null;
         double e = 0; int cnt = 0;
         for (long i = p0 + 20 * SPS48; i < p0 + 172 * SPS48; i++) { float v = at(i); e += v * v; cnt++; }
         gain = (float) Math.sqrt(e / cnt);
         double[][] A = new double[NCOEF][NCOEF]; double[] b = new double[NCOEF]; float[] h = new float[FB];
+        int used = 0;                                                    // a symbol of 0 is unknown: not fitted, 0 in the history
         for (int k = 0; k < sym.length; k++) {
             features(p0 + (long) k * SPS48, h);
-            for (int i = 0; i < NCOEF; i++) { b[i] += f[i] * sym[k]; for (int j = i; j < NCOEF; j++) A[i][j] += f[i] * f[j]; }
+            if (sym[k] != 0) { used++; for (int i = 0; i < NCOEF; i++) { b[i] += f[i] * sym[k]; for (int j = i; j < NCOEF; j++) A[i][j] += f[i] * f[j]; } }
             System.arraycopy(h, 0, h, 1, FB - 1); h[0] = sym[k];
         }
-        for (int i = 0; i < NCOEF; i++) { A[i][i] += 1e-6 * sym.length; for (int j = 0; j < i; j++) A[i][j] = A[j][i]; }
-        double[] c = solve(A, b); if (c == null) return null;
+        double[] c = solveNormal(A, b, used, feedback); if (c == null) return null;
         double err = 0; java.util.Arrays.fill(h, 0);
-        for (int k = 0; k < sym.length; k++) { features(p0 + (long) k * SPS48, h); double y = 0; for (int i = 0; i < NCOEF; i++) y += c[i] * f[i]; err += (y - sym[k]) * (y - sym[k]); System.arraycopy(h, 0, h, 1, FB - 1); h[0] = sym[k]; }
-        double[] out = java.util.Arrays.copyOf(c, NCOEF + 1); out[NCOEF] = err / sym.length; return out;
+        for (int k = 0; k < sym.length; k++) { features(p0 + (long) k * SPS48, h); double y = 0; for (int i = 0; i < NCOEF; i++) y += c[i] * f[i]; if (sym[k] != 0) err += (y - sym[k]) * (y - sym[k]); System.arraycopy(h, 0, h, 1, FB - 1); h[0] = sym[k]; }
+        double[] out = java.util.Arrays.copyOf(c, NCOEF + 1); out[NCOEF] = err / Math.max(1, used); return out;
     }
     private static double[] solve(double[][] A, double[] b) {
         int n = b.length; double[][] M = new double[n][]; for (int i = 0; i < n; i++) { M[i] = java.util.Arrays.copyOf(A[i], n + 1); M[i][n] = b[i]; }

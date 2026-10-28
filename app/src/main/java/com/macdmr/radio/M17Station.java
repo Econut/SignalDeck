@@ -37,7 +37,8 @@ public final class M17Station {
     }
 
     private final Context ctx; private final Host host; private final String profileId;
-    private M17Receiver rx; private HeldPathReceiver held; private M17Receiver.Listener dfeEar; private HeldPathReceiver.Listener heldEar;
+    private volatile M17Receiver rx;                                     // swapped by the self-calibration thread
+    private HeldPathReceiver held; private M17Receiver.Listener dfeEar; private HeldPathReceiver.Listener heldEar;
     private String dfeNote = "";
     private Codec2 codec;
     private AudioTrack track;
@@ -49,10 +50,15 @@ public final class M17Station {
     public static volatile boolean benchDump;
     private volatile String calibration = "";
     private final HeldCal cal;
+    private final DfeCal dfeCal;
+    private float[] dfeCoef;
+    /** The decision-feedback receiver's audio: the last second always, and each call from a second before its link setup, up to 10 s (the self-calibration's check). */
+    private final short[] lastSecond = new short[8000]; private int lastPos;
+    private short[] capture; private int captureLen;
     private double[] heldTaps;
     private boolean swapping;
 
-    public M17Station(Context c, String profileId, Host h) { ctx = c.getApplicationContext(); this.profileId = profileId; host = h; cal = new HeldCal(ctx, profileId); }
+    public M17Station(Context c, String profileId, Host h) { ctx = c.getApplicationContext(); this.profileId = profileId; host = h; cal = new HeldCal(ctx, profileId); dfeCal = new DfeCal(new java.io.File(ctx.getFilesDir(), "m17"), profileId); }
 
     public boolean running() { return running; }
     /** A transmission is being decoded (the radio's own audio is held back). */
@@ -61,17 +67,23 @@ public final class M17Station {
     public synchronized List<Heard> heard() { return new ArrayList<>(heard); }
     public float quality() { return quality; }
     public String calibration() { return calibration; }
-    public void resetCalibration() { if (cal != null) cal.reset(); stopHeld(); setHeldPath(true); host.changed(); }
+    public void resetCalibration() {
+        if (cal != null) cal.reset();
+        dfeCal.reset();
+        synchronized (this) { if (running && held == null) { float[] c = shippedTable(); if (c != null) { dfeCoef = c; rx = new M17Receiver(c, dfeEar); calibration = dfeNote; } } }
+        stopHeld(); setHeldPath(true); host.changed();
+    }
     /** The fixed-tap front end is in use (the module is holding its voice filter open). */
     public boolean held() { return held != null; }
 
     public synchronized String start() {
         if (running) return null;
-        float[] coef = load("m17/eq_" + profileId + ".txt");
-        if (coef == null) { coef = load("m17/eq_ulefone-armor26ultra.txt"); calibration = "calibrated on the Ulefone Armor 26 Ultra (not on this phone: it may not decode)"; }
-        else calibration = profileId.startsWith("ulefone-armor26") ? "calibrated on this phone model" : "calibrated for this phone";
+        float[] coef = shippedTable();
         if (coef == null) return "M17 calibration missing";
         dfeNote = calibration;
+        float[] own = dfeCal.accepted();
+        if (own != null) { coef = own; calibration = "fitted on this phone from its own receptions"; }
+        dfeCoef = coef;
         try { codec = new Codec2(Codec2.MODE_3200); } catch (Throwable t) { return "Codec 2 not available: " + t.getMessage(); }
         dfeEar = new M17Receiver.Listener() {
             @Override public void started(M17.Lsf l) { begin(l); }
@@ -123,7 +135,23 @@ public final class M17Station {
         if (!running) return;
         HeldPathReceiver h = held;
         if (h != null) h.feed(mono, n);
-        else { M17Receiver r = rx; if (r != null) r.feed(mono, n); }
+        else { M17Receiver r = rx; if (r != null) { keepAudio(mono, n); r.feed(mono, n); } }
+    }
+    private void keepAudio(byte[] mono, int n) {
+        for (int i = 0; i + 1 < n; i += 2) {
+            short v = (short) ((mono[i] & 0xFF) | (mono[i + 1] << 8));
+            lastSecond[lastPos] = v; lastPos = (lastPos + 1) % lastSecond.length;
+            short[] c = capture; if (c != null && captureLen < c.length) c[captureLen++] = v;
+        }
+    }
+
+    /** The table shipped for this phone model (sets the calibration line), else the Armor's with a warning. */
+    private float[] shippedTable() {
+        float[] coef = load("m17/eq_" + profileId + ".txt");
+        if (coef == null) { coef = load("m17/eq_ulefone-armor26ultra.txt"); calibration = "calibrated on the Ulefone Armor 26 Ultra (not on this phone: it may not decode)"; }
+        else calibration = profileId.startsWith("ulefone-armor26") ? "calibrated on this phone model" : "calibrated for this phone";
+        dfeNote = calibration;
+        return coef;
     }
 
     private float[] load(String asset) {
@@ -150,6 +178,11 @@ public final class M17Station {
         host.heard(h.src); host.changed();
     }
     private void begin(M17.Lsf l) {
+        if (held == null) {                                               // the decision-feedback receiver: record this call for the self-calibration
+            short[] c = new short[8000 * 10]; int k = 0;
+            for (int i = 0; i < lastSecond.length; i++) c[k++] = lastSecond[(lastPos + i) % lastSecond.length];
+            capture = c; captureLen = k;
+        }
         Heard h = new Heard(System.currentTimeMillis());
         if (l.crcOk) fill(h, l);
         current = h;
@@ -186,6 +219,24 @@ public final class M17Station {
                 calibration = cal.line().isEmpty() ? calibration : cal.line();
                 if (kept) { swapping = true; stopHeld(); setHeldPath(true); swapping = false; }
             } catch (Throwable t) { Log.w("M17Station", "fit: " + t); }
+        }
+        M17Receiver r = rx;
+        if (hr == null && r != null && capture != null) {
+            final float[] learned = r.learnedTable(DfeCal.MIN_FRAMES, M17Receiver.LEARN_FEEDBACK), live = dfeCoef;
+            final int learnedN = r.learnedFrames(); final short[] audio = java.util.Arrays.copyOf(capture, captureLen);
+            final String src = h != null ? h.src : ""; final int dbm = host.meter();
+            capture = null;
+            new Thread(() -> {
+                try {
+                    boolean kept = dfeCal.onCall(learned, learnedN, audio, src, dbm, live);
+                    synchronized (M17Station.this) {
+                        if (!dfeCal.line().isEmpty()) calibration = dfeCal.line();
+                        float[] own = kept ? dfeCal.accepted() : null;
+                        if (own != null && running && held == null) { dfeCoef = own; rx = new M17Receiver(own, dfeEar); }
+                    }
+                    host.changed();
+                } catch (Throwable t) { Log.w("M17Station", "dfe fit: " + t); }
+            }, "m17-selfcal").start();
         }
         if (h != null) {
             h.end = System.currentTimeMillis();
