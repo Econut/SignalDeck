@@ -30,7 +30,9 @@ async function openEditor(number) {
 }
 
 function renderEditor() {
-  const c = ED.ch, digital = c.type === 0, m17 = c.type === 2;
+  const c = ED.ch;
+  if (S.dmr === false && ED.isNew && c.type === 0) c.type = 1;                  // an analog-only radio: a new channel is analog (before the form is built)
+  const digital = c.type === 0, m17 = c.type === 2;
   $('edTitle').textContent = ED.vfo ? 'VFO' : ED.isNew ? 'NEW CHANNEL' : 'EDIT CHANNEL';
   $('edSub').textContent = ED.vfo ? (ED.vfoActive ? 'ON' : 'OFF') : ED.isNew ? '' : 'CHANNEL ' + c.number;
   $('edEmpty').classList.add('hidden'); $('edForm').classList.remove('hidden');
@@ -44,13 +46,12 @@ function renderEditor() {
   let h = '';
   h += '<div class="sect">' + (ED.vfo ? 'FREQUENCY' : 'CHANNEL') + '</div>';
   if (!ED.vfo) h += field('name', 'Channel name', txt('fName', (c.name || '').slice(0, ED.nameMax), 'maxlength="' + ED.nameMax + '"') + '<div class="count" id="fNameCount"></div>');
-  if (S.dmr === false && ED.isNew) c.type = 1;                                  // an analog-only radio: a new channel is analog
   if (S.dmr !== false || c.type !== 1) h += field('type', 'Channel type', sel('fType', [[0, 'Digital'], [1, 'Analog'], [2, 'M17']], c.type));   // no choice there (an old DMR channel can still be changed)
   h += field('rx', 'Receive frequency (MHz)', txt('fRx', mhzIn(c.rxFreq), 'inputmode="decimal"'));
   h += field('tx', 'Send frequency (MHz)', txt('fTx', mhzIn(c.txFreq), 'inputmode="decimal"'));
   h += field('power', 'Power', sel('fPower', [[0, 'Low power'], [1, 'High power']], c.power));
   h += field('rxOnly', 'Transmit', sel('fRxOnly', [[0, 'Allowed'], [1, 'Receive only']], c.rxOnly ? 1 : 0));
-  h += field('relay', 'Relay (repeater)', sel('fRelay', [[1, 'Disconnect'], [2, 'Normal']], c.relay === 1 ? 1 : 2));
+  if (S.dmr !== false) h += field('relay', 'Relay (repeater)', sel('fRelay', [[1, 'Disconnect'], [2, 'Normal']], c.relay === 1 ? 1 : 2));   // the DMR module's setting
   if (digital) {
     h += '<div class="sect">DIGITAL (DMR)</div>';
     h += field('cc', 'Color code', sel('fCc', range(0, 15), c.cc));
@@ -113,7 +114,7 @@ function renderEditor() {
 function collect(keepOnly) {
   const v = id => { const e = $(id); return e ? e.value : undefined; };
   const o = { number: ED.isNew ? 0 : ED.ch.number, name: v('fName'), type: $('fType') ? +v('fType') : ED.ch.type, txMHz: parseFloat(v('fTx')), rxMHz: parseFloat(v('fRx')),
-    power: +v('fPower'), relay: +v('fRelay'), rxOnly: v('fRxOnly') === '1', lat: v('fLat'), lon: v('fLon') };
+    power: +v('fPower'), relay: $('fRelay') ? +v('fRelay') : (ED.ch.relay || 2), rxOnly: v('fRxOnly') === '1', lat: v('fLat'), lon: v('fLon') };
   if ($('fNotes')) o.notes = v('fNotes');
   if ($('fCc')) Object.assign(o, { cc: +v('fCc'), mode: +v('fMode'), slot: +v('fSlot'), contactType: +v('fCtype'), txContact: v('fCall'), groups: v('fGroups'), encryptSw: +v('fEnc'), interrupt: +v('fInt') });
   if ($('fKey') && v('fKey')) o.encryptKey = v('fKey');
