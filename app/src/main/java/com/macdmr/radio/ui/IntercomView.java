@@ -46,6 +46,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     private TextView bigNum, smeterText, p8ChannelName;
     private FrameLayout p8MenuSlot;
     private boolean p8Layout(){return neo && com.macdmr.radio.BuildConfig.P8_OFFLINE;}
+    private int contentInsetDp(){return p8Layout()?8:16;}
     private TextView[] readLabel;
     private SMeterView smeter;
     private String zoneName = "ALL";
@@ -254,7 +255,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         FrameLayout.LayoutParams tbl = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM);
         tbl.leftMargin = tbl.rightMargin = dp8; tbl.bottomMargin = (int) (22 * d);
         panel.addView(transcriptionBox, tbl); transcriptionBox.setVisibility(GONE);
-        LayoutParams pl = neo ? new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f) : new LayoutParams(LayoutParams.MATCH_PARENT, (int) (250 * d)); pl.leftMargin = pl.rightMargin = neo ? (int) (16 * d) : dp10; pl.topMargin = dp8;   // classic: the module's fixed 250 dp (its circuit board is a surface: no resizing)
+        LayoutParams pl = neo ? new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f) : new LayoutParams(LayoutParams.MATCH_PARENT, (int) (250 * d)); pl.leftMargin = pl.rightMargin = neo ? Theme.dp(c,contentInsetDp()) : dp10; pl.topMargin = dp8;   // classic: the module's fixed 250 dp (its circuit board is a surface: no resizing)
         if (neo) board.setFrame(0xFF07121D, Neo.LINE, 1, 14, Neo.GROUND);   // the card fill as it looks over the page
         addView(panel, pl);
 
@@ -286,8 +287,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             LayoutParams first=new LayoutParams(0,(int)(40*d),1);first.rightMargin=(int)(4*d);shortcuts.addView(softSq,first);
             LayoutParams second=new LayoutParams(0,(int)(40*d),1);second.rightMargin=(int)(4*d);shortcuts.addView(vfo,second);
             p8MenuSlot=new FrameLayout(c);shortcuts.addView(p8MenuSlot,new LayoutParams(0,(int)(40*d),1));
-            LayoutParams shortLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(40*d));shortLp.setMargins((int)(16*d),(int)(4*d),(int)(16*d),0);addView(shortcuts,shortLp);
-            LayoutParams talkLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(56*d));talkLp.setMargins((int)(16*d),(int)(4*d),(int)(16*d),(int)(4*d));addView(bottom,talkLp);
+            LayoutParams shortLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(40*d));shortLp.setMargins(Theme.dp(c,contentInsetDp()),(int)(4*d),Theme.dp(c,contentInsetDp()),0);addView(shortcuts,shortLp);
+            LayoutParams talkLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(56*d));talkLp.setMargins(Theme.dp(c,contentInsetDp()),(int)(4*d),Theme.dp(c,contentInsetDp()),(int)(4*d));addView(bottom,talkLp);
         }
         else if (neo) addView(bottom, btl);
         else {
@@ -371,7 +372,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
 
     /** The new look's top half: header, channel strip, readout, S-meter, SCAN/ZONE, Soft SQ slider. */
     private void buildNeoTop(final Context c, final float d) {
-        final int m = (int) (16 * d);
+        final int m = Theme.dp(c,contentInsetDp());
         neoHeader = Neo.header(c, p8Layout()?"P8 RX":"", "Zone · ALL");
         title = Neo.headerTitle(neoHeader);
         ImageView logo = new ImageView(c); logo.setImageDrawable(new Neo.IconDrawable("radio", Neo.CYAN));
@@ -400,7 +401,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         if(!p8Layout())mid.addView(chipRow);
         FrameLayout.LayoutParams middle=new FrameLayout.LayoutParams(p8Layout()?FrameLayout.LayoutParams.MATCH_PARENT:FrameLayout.LayoutParams.WRAP_CONTENT,FrameLayout.LayoutParams.WRAP_CONTENT,Gravity.CENTER);
         if(p8Layout())middle.leftMargin=middle.rightMargin=(int)(44*d);strip.addView(mid,middle);
-        LayoutParams sl = new LayoutParams(LayoutParams.MATCH_PARENT,p8Layout()?(int)(50*d):LayoutParams.WRAP_CONTENT);sl.topMargin=(int)(6*d);if(p8Layout())sl.leftMargin=sl.rightMargin=(int)(8*d);addView(strip,sl);
+        LayoutParams sl = new LayoutParams(LayoutParams.MATCH_PARENT,p8Layout()?(int)(50*d):LayoutParams.WRAP_CONTENT);sl.topMargin=(int)(6*d);if(p8Layout())sl.leftMargin=sl.rightMargin=m;addView(strip,sl);
         if(p8Layout()){LayoutParams chips=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(24*d));chips.topMargin=(int)(4*d);addView(chipRow,chips);}
         prev.setOnClickListener(v -> { if (svc != null) new Thread(() -> svc.stepChannel(-1)).start(); });
         next.setOnClickListener(v -> { if (svc != null) new Thread(() -> svc.stepChannel(1)).start(); });
