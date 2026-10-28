@@ -1473,7 +1473,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             softSq.onRetune();
             squelchOpen = !softSq.isEnabled();                     // with Soft SQ on, stay muted until the detector opens (no burst of static after a retune)
             ui.post(() -> { for (Listener l : listeners) l.onChannel(ch); });
-            if (fromStore && voiceOn() && !scanner.isScanning()) sayChannel(channelWords(ch));   // while scanning only a stop is announced (see the scanner status)
+            if (fromStore && voiceOn() && !scanner.isScanning() && !quietRewrite) sayChannel(channelWords(ch));   // while scanning only a stop is announced (see the scanner status)
             pushModes();
             describeLocation(ch);
             updateNotification();
@@ -3236,8 +3236,11 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void rxAfterSym() {
         ChannelStore.Channel c = current;
         if (c == null) return;
+        quietRewrite = true;                                   // the same channel again: no spoken announcement
         try { log("rx after sym: channel " + c.number + " rewritten " + applyChannelNow(c, c != vfo)); } catch (Throwable t) { log("rx after sym: " + t); }
+        finally { quietRewrite = false; }
     }
+    private volatile boolean quietRewrite;
 
     /** Re-send the voice-filter hold after a channel, VFO or tone write. Those writes put the filter back. */
     private void scheduleDataHold(boolean apply) {
