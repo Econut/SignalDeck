@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Packet finder: Use my channels
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 handoff follow-up: the packet finder needs UHF frequencies entered by hand on the W6 | There is no standard set of 70 cm packet frequencies to ship, so the finder's Settings get **Use my channels**: it fills the list with the frequencies of your own analog channels this radio tunes (each once, at most 20). On a radio the 2 m defaults miss (the W6) the empty-list line points to it. Help (Packet finder → Settings). | `PacketFinder.java`, `ui/PacketFinderDialog.java`, `ui/HelpView.java` | Host suite. Device: see the PR. |
+
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
 | Backlog | Change | Files | Test |
