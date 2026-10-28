@@ -740,7 +740,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         store = new ChannelStore(this);
         zoneId = getSharedPreferences("radio", MODE_PRIVATE).getLong("zone", 0);
         if (coverage().enabled()) { coverage.resume(); startForegroundTyped(true); }
-        engine = new RadioEngine(profile, this);
+        engine = "sa818".equals(profile.protocol) ? new AtModuleEngine(profile, this) : new RadioEngine(profile, this);   // the W6's AT module, else the DMR module
         packet = new PacketEngine(packetHost);
         packet.applySettings();
         com.macdmr.radio.car.RadioCallService.register(this);
@@ -847,6 +847,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (!VendorSerial.load(this, profile.serialLib)) log("tty (stty fallback): " + RootSetup.ensureTty(profile));
                     if (RootSetup.stockAppEnabled(profile)) { log("stock app paused (its icon disappears while this app owns the radio; Device → Release brings it back): " + RootSetup.stockApp(profile, false)); pausedStock = true; Thread.sleep(1500); }
                 }
+                final boolean sa818 = "sa818".equals(profile.protocol);                      // the W6: no DMR, its own channel table
+                if (sa818 && store.count() == 0) {
+                    StringBuilder err = new StringBuilder();
+                    int n = store.importFromFlyscale(this, profile.stockApp, err);
+                    log(n >= 0 ? "imported " + n + " channels from the stock app" + (err.length() > 0 ? " (" + err + ")" : "") : "stock import failed: " + err);
+                }
                 final boolean quickChat = "com.chamsion.quickchat".equals(profile.stockApp);      // Xplore 1: a Room database, no module side tables
                 if (quickChat && store.count() == 0) {
                     StringBuilder err = new StringBuilder();
@@ -854,12 +860,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                     log(n >= 0 ? "imported " + n + " channels from QuickChat" + (err.length() > 0 ? " (" + err + ")" : "") : "QuickChat import failed: " + err);
                     if (n >= 0) getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("tgListsImported", true).apply();
                 }
-                if (!quickChat && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) {     // seed our DMR ID from the stock app's setting
+                if (!sa818 && !quickChat && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) {     // seed our DMR ID from the stock app's setting
                     String xml = RootSetup.run("cat /data/data/" + profile.stockApp + "/shared_prefs/com.pri.prizeinterphone.data.person.xml");
                     java.util.regex.Matcher m = java.util.regex.Pattern.compile("name=\"pref_person_device_id\" value=\"([0-9]+)\"").matcher(xml);
                     if (m.find()) { setLocalIdQuiet(Integer.parseInt(m.group(1))); log("DMR ID from the stock app: " + m.group(1)); }
                 }
-                if (!quickChat && store.count() == 0) {
+                if (!sa818 && !quickChat && store.count() == 0) {
                     StringBuilder err = new StringBuilder();
                     int n = store.importFromStock(this, profile.stockApp, "default_uhf", err);
                     log(n >= 0 ? "imported " + n + " channels from the stock app" : "stock import failed: " + err);
@@ -869,7 +875,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     int k = store.purgeGarbledPacketHistory(); log("removed " + k + " garbled packet lines from the history");
                     getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("garbledPktPurged", true).apply();
                 }
-                if (!quickChat && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("tgListsImported", false)) {   // installs imported before TG lists were read
+                if (!sa818 && !quickChat && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("tgListsImported", false)) {   // installs imported before TG lists were read
                     StringBuilder err = new StringBuilder();
                     int k = store.repairModuleTgLists(this, profile.stockApp, "default_uhf", err);
                     log(k >= 0 ? "module TG lists imported; " + k + " channels got their list" : "TG list import failed: " + err);
@@ -969,7 +975,8 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void startRxAudio() {
         try {
             if (audio == null) {
-                audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud) : vendorOrDirectAudio();
+                audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
+                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio() : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
                 audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()));   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
             }

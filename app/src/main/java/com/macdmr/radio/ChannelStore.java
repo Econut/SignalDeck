@@ -787,6 +787,45 @@ public final class ChannelStore extends SQLiteOpenHelper {
      * WAL, so the -wal/-shm files are copied too.
      * @return channels imported, or -1 (err says why)
      */
+    /**
+     * The W6's stock app (com.flyscale.analogpoc): table CHANNEL_INFO in channel_list_detial.db, one row per channel with
+     * strings GBW (0 = 12.5 kHz, 1 = 25 kHz), TFV / RFV (MHz), RXCXCSS / TXCXCSS (the module's tone codes, Sa818Tones),
+     * SQ (0–8) and POWER (0 low, 1 high). All analog. Returns the number imported, or -1.
+     */
+    public int importFromFlyscale(Context ctx, String stockPackage, StringBuilder err) {
+        SQLiteDatabase sdb = copyRoom(ctx, stockPackage, new String[] { "channel_list_detial.db" }, "fs_channels.db");
+        if (sdb == null) { err.append("stock channels not readable: ").append(RootSetup.run("ls /data/data/" + stockPackage + "/databases/ 2>&1 | head -8")); return -1; }
+        int n = 0;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try (Cursor c = sdb.query("CHANNEL_INFO", null, null, null, null, null, "CHANNEL_ID")) {
+            db.delete("channels", null, null);
+            while (c.moveToNext()) {
+                Channel ch = flyscaleChannel(coli(c, "CHANNEL_ID", n), col(c, "GBW", "1"), col(c, "TFV", ""), col(c, "RFV", ""), col(c, "TXCXCSS", "0"), col(c, "RXCXCSS", "0"), col(c, "SQ", "3"), col(c, "POWER", "1"));
+                if (ch == null) continue;
+                ch.number = ++n; ch.active = n == 1;
+                db.insert("channels", null, values(ch));
+            }
+            db.setTransactionSuccessful();
+        } catch (Throwable t) { err.append("channels: ").append(t.getMessage()); n = -1; }
+        finally { db.endTransaction(); sdb.close(); }
+        return n;
+    }
+
+    /** One stock W6 channel row as a SignalDeck analog channel, or null when its frequencies do not parse. */
+    static Channel flyscaleChannel(int id, String gbw, String tfv, String rfv, String txCss, String rxCss, String sq, String power) {
+        try {
+            Channel ch = new Channel();
+            ch.type = Channel.TYPE_FM; ch.name = "CH " + (id + 1);
+            ch.txFreq = (int) Math.round(Double.parseDouble(tfv.trim()) * 1e6); ch.rxFreq = (int) Math.round(Double.parseDouble(rfv.trim()) * 1e6);
+            ch.band = "0".equals(gbw.trim()) ? 0 : 1; ch.power = "0".equals(power.trim()) ? 0 : 1;
+            ch.sq = Math.max(0, Math.min(8, Integer.parseInt(sq.trim())));
+            int[] tx = Sa818Tones.fromModule(Integer.parseInt(txCss.trim())), rx = Sa818Tones.fromModule(Integer.parseInt(rxCss.trim()));
+            ch.txType = tx[0]; ch.txSubCode = tx[1]; ch.rxType = rx[0]; ch.rxSubCode = rx[1];
+            return ch;
+        } catch (RuntimeException e) { return null; }
+    }
+
     public int importFromQuickChat(Context ctx, String stockPackage, StringBuilder err) {
         SQLiteDatabase sdb = copyRoom(ctx, stockPackage, new String[] { "channel_database", "channel.db" }, "qc_channels.db");
         if (sdb == null) { err.append("QuickChat channels not readable: ").append(RootSetup.run("ls /data/data/" + stockPackage + "/databases/ 2>&1 | head -8")); return -1; }
