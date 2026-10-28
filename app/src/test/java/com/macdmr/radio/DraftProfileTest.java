@@ -41,6 +41,7 @@ public class DraftProfileTest {
         assertEquals("USB Audio card 1, 32000 Hz, 2 channels (no SignalDeck backend for it yet)", d.get("audio").value);
         assertTrue(d.get("powerNode").value.startsWith("/sys/bus/platform/drivers/mcu/mcu_power"));
         assertTrue(d.get("powerNode").evidence.endsWith("read it as off"));
+        assertTrue(d.get("usb").evidence.contains("behind the bridge"));
         assertEquals(DraftProfile.UNKNOWN, d.get("pttKey").confidence);              // nobody pressed during that capture
         String acts = d.get("pttActions").value;
         assertTrue(acts.contains("android.intent.action.PTT.down") && acts.contains("android.intent.action.PTT.up"));
@@ -63,6 +64,22 @@ public class DraftProfileTest {
         assertNull(d.get("usb"));                                                        // no USB bridge: no USB note, no transport line
         assertNull(d.get("transport"));
         assertEquals(DraftProfile.UNKNOWN, d.get("powerNode").confidence);            // gpio322 came from the stock app's code by hand: a gap the draft names
+    }
+
+    @Test public void withoutTheWatchTheBridgeProbeFillsTheDraft() {
+        String report = "==== Radio probe through the USB bridge ====\n/dev/ttyACM0: after 10 tenths of a second\n"
+                + "the module answered through the bridge: DMR006.U4A.V067 (bridge 20201016161541)\n"
+                + AgoldUsb.PORT_LINE + "/dev/ttyACM0 u:object_r:ttyACM_device:s0 held by /vendor/bin/hw/vendor.mediatek.hardware.aguiextmodule@1.0-service (stopped for the probe)\n"
+                + "-- /proc/asound/card1/stream0\nPlayback:\n    Format: S16_LE\n    Channels: 2\n    Rates: 32000\nclean-up: radio off, HAL running\n";
+        Map<String, DraftProfile.Field> d = draft(report);
+        assertTrue(d.get("protocol").evidence.startsWith("SignalDeck's own probe through the bridge"));
+        assertEquals("/dev/ttyACM0 (USB serial to a bridge MCU)", d.get("controlPort").value);
+        assertEquals("vendor HAL vendor.mediatek.hardware.aguiextmodule@1.0 (the stock app calls it over HwBinder)", d.get("transport").value);
+        assertEquals("USB Audio card 1, 32000 Hz, 2 channels (no SignalDeck backend for it yet)", d.get("audio").value);
+        assertEquals("the probe through the bridge powered it this way", d.get("powerNode").evidence);
+        assertTrue(d.get("sepolicy").value.contains("ttyACM_device"));
+        assertEquals(DraftProfile.LOW, d.get("sepolicy").confidence);
+        assertNotNull(d.get("usb"));
     }
 
     @Test public void broadcastsDropPropertyNames() {

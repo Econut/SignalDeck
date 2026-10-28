@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Device report: report.json and scripts/report_diff.py; the bridge probe fills the draft without the watch
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 plan item 9 / baseline B13; Atom XL handoff done-criterion 1–2 | Run all checks writes **`report.json`** beside `report.txt` (in the zip too): schema 1, SignalDeck version, time, phone (manufacturer, model, device, Android, build), every section with its size, the draft profile field by field (value, confidence, evidence) and the summary lines, all from the finished, redacted report. **`scripts/report_diff.py <old> <new>`** (standard library) compares two of them: phone, draft and summary changes count (exit 1), section sizes are listed only. The probe through the USB bridge also records the bridge port, its label and the USB sound card streams, so the draft is complete on a run without the stock-app watch. | `ReportJson.java`, `FirstRunCheck.java`, `AgoldUsb.java`, `DraftProfile.java`, `scripts/report_diff.py`, `ReportJsonTest.java`, `DraftProfileTest.java` | Host: `ReportJsonTest`, `DraftProfileTest` (no-watch draft) + suite. Device (Atom XL, 2026-10-28, `run_checks.sh` over Wi-Fi): a run without the watch and one with it, diffed: the draft fields equal except the stock app's confidence (watched or not). |
+
 ## 2026-10-28 — Device report: ask the Atom XL's radio through its USB bridge
 
 | Backlog | Change | Files | Test |

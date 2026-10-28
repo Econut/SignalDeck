@@ -106,6 +106,9 @@ final class AgoldUsb {
                 + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; fi; "
                 + "if [ -e " + BRIDGE_PORT + " ]; then echo \"port: after $((i*5)) tenths of a second\"; sleep 2; $S -F " + BRIDGE_PORT + " 115200 raw -echo 2>&1; "
                 + "Q=" + q1.getAbsolutePath() + "; N=bridge; " + ask + "Q=" + q2.getAbsolutePath() + "; N=module; " + ask
+                // what the draft profile needs, while the bridge is up: its port and label, the radio's USB sound card
+                + "echo \"" + PORT_LINE + BRIDGE_PORT + " $(ls -Z " + BRIDGE_PORT + " | cut -d' ' -f1) held by /vendor/bin/hw/vendor.mediatek.hardware." + HAL_SERVICE + "@1.0-service (stopped for the probe)\"; "
+                + "for s in /proc/asound/card[1-9]/stream*; do [ -f $s ] && { echo \"-- $s\"; cat $s; }; done; "
                 + "else echo 'port: none after 10 s'; fi; "
                 + "echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; "
                 + "for u in /sys/class/udc/*; do d=$(readlink -f $u); d=${d%/udc/*}; [ -f $d/cmode ] && { echo 0 > $d/cmode; sleep 1; echo 1 > $d/cmode; }; done; "
@@ -119,13 +122,14 @@ final class AgoldUsb {
     /** The probe's raw lines in words: each reply decoded and its checksum checked. */
     static String describe(String out) {
         StringBuilder r = new StringBuilder();
-        String port = null, bridge = null, module = null, after = null;
+        String port = null, bridge = null, module = null, after = null; StringBuilder extra = new StringBuilder();
         for (String l : out.split("\n")) {
             String t = l.trim();
             if (t.startsWith("port: ")) port = t.substring(6);
             else if (t.startsWith("bridge: ")) bridge = t.substring(8);
             else if (t.startsWith("module: ")) module = t.substring(8);
             else if (t.startsWith("after: ")) after = t.substring(7).replace("power on = 0", "off").replace("power on = 1", "STILL ON");
+            else if (t.startsWith(PORT_LINE) || t.startsWith("-- /proc/asound/") || t.matches("(Playback|Capture):|(Format|Channels|Rates): .*")) extra.append(l).append('\n');
         }
         r.append(BRIDGE_PORT).append(": ").append(port == null ? "?" : port).append('\n');
         r.append(reply("bridge version (route 00, cmd 0x01)", bridge, 0x00, 0x01));
@@ -133,6 +137,7 @@ final class AgoldUsb {
         String b = text(bridge, 0x00, 0x01), m = text(module, 0x01, 0x34);
         if (m != null) r.append(MODULE_ANSWERED).append(m).append(b != null ? " (bridge " + b + ")" : "").append('\n');
         if (b == null) r.append(BRIDGE_SILENT).append(": the stock app updates the bridge's firmware when that happens at its start-up; restart the phone before opening it\n");
+        r.append(extra);
         r.append("clean-up: radio ").append(after == null ? "?" : after).append('\n');
         return r.toString();
     }

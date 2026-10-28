@@ -68,7 +68,9 @@ final class DraftProfile {
         Matcher held = Pattern.compile("skipped (/dev/tty(?:ACM|USB)\\d+): in use by (\\S+)").matcher(probe);
         String stockTty = first(watch, "devices it holds open:[^\\n]*?(/dev/tty(?:S|MT|HS|ACM|USB)\\d+)", 1);
         String stockBaud = stockTty == null ? null : first(watch, Pattern.quote("  " + stockTty + ": speed ") + "(\\d+) baud", 1);
+        String bridgeProbe = section(r, "Radio probe through the USB bridge");
         String[] bridge = AgoldUsb.port(watch);
+        if (bridge == null) bridge = AgoldUsb.port(bridgeProbe);                      // a run without the watch: the probe saw it
         if (bridge != null) {
             String holder = bridge[2].split("\\s+")[0];
             f.add(new Field("controlPort", bridge[0] + " (USB serial to a bridge MCU)", HIGH, "listed while the radio was on, held by " + bridge[2]));
@@ -91,14 +93,14 @@ final class DraftProfile {
         }
 
         // audio
-        Matcher usbAudio = Pattern.compile("-- /proc/asound/card(\\d+)/stream\\d+[\\s\\S]*?Channels: (\\d+)[\\s\\S]*?Rates: (\\d+)").matcher(watch);
+        Matcher usbAudio = Pattern.compile("-- /proc/asound/card(\\d+)/stream\\d+[\\s\\S]*?Channels: (\\d+)[\\s\\S]*?Rates: (\\d+)").matcher(watch + "\n" + bridgeProbe);
         if (usbAudio.find()) f.add(new Field("audio", "USB Audio card " + usbAudio.group(1) + ", " + usbAudio.group(3) + " Hz, " + usbAudio.group(2) + " channels (no SignalDeck backend for it yet)", HIGH, "its stream while the radio was on"));
         else if (r.contains("PrizeTinyService")) f.add(new Field("audio", "TINY_SERVICE", MEDIUM, "PrizeTinyService is a binder service"));
         else f.add(new Field("audio", "unknown", UNKNOWN, "see Sound card streams and mixer, Audio clues"));
 
         // power
-        if (bridged) f.add(new Field("powerNode", "/sys/bus/platform/drivers/mcu/mcu_power, through the HAL's startMcu/stopMcu (release: STOP_DEVICE, then the USB controller's cmode 0 and 1)", MEDIUM,
-                "the release at the end of the watch" + (watch.contains("mcu_power = 0") ? " read it as off" : "")));
+        if (bridged || bridge != null) f.add(new Field("powerNode", "/sys/bus/platform/drivers/mcu/mcu_power, through the HAL's startMcu/stopMcu (release: STOP_DEVICE, then the USB controller's cmode 0 and 1)", MEDIUM,
+                watch.contains("mcu_power = 0") ? "the release at the end of the watch read it as off" : "the probe through the bridge powered it this way"));
         else f.add(new Field("powerNode", "unknown", UNKNOWN, "not found by the report"));
 
         // PTT key and broadcasts
@@ -117,12 +119,12 @@ final class DraftProfile {
         String label = bridge != null ? bridge[1].replaceAll("^u:object_r:|:s0$", "")
                 : port.startsWith("/dev/") ? first(probe, "u:object_r:([A-Za-z0-9_]+):s0 +" + Pattern.quote(port) + "\\b", 1) : null;
         if (label != null) f.add(new Field("sepolicy", "allow untrusted_app " + label + " chr_file { open read write ioctl getattr lock }; typeattribute " + label + " mlstrustedobject",
-                bridged ? LOW : MEDIUM, bridged ? "the port's label; reaching it also needs the HAL stopped, or hwservice rules for the HAL route" : "the port's label"));
+                bridged || bridge != null ? LOW : MEDIUM, bridged || bridge != null ? "the port's label; reaching it also needs the HAL stopped, or hwservice rules for the HAL route" : "the port's label"));
         else f.add(new Field("sepolicy", "unknown", UNKNOWN, "the control port's label was not listed"));
 
         String lib = first(libs, "(?m)^\\s*(/\\S+\\.so)", 1);
         f.add(lib != null ? new Field("serialLib", lib, MEDIUM, "serial-looking system library") : new Field("serialLib", "none", LOW, "no serial-looking system library"));
-        if (bridged) f.add(new Field("usb", "the radio takes the phone's only USB port while it is on", HIGH, "measured by the watch: release needed on exit"));
+        if (bridged || bridge != null) f.add(new Field("usb", "the radio takes the phone's only USB port while it is on", HIGH, "the radio is a USB device behind the bridge: release needed on exit"));
         return f;
     }
 
