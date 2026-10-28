@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — M17 receive: the radio's own sound held back while M17 is decoded, on every phone where SignalDeck plays it
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner: on the M17 receive page only the decoded voice should come through, on every phone | One rule (`RadioService.rawHeld`) now decides when the radio's own receive audio is held back: on an M17 channel, as before, and also while PKT → M17 receive is decoding a transmission on an ordinary FM channel or the VFO, which was described in help but never wired. It applies to the speaker, SignalDeck Web's audio and the spectrum alike. Every audio backend SignalDeck plays itself goes through the same gate (TinyService on Ulefone, UART PCM on Blackview, the direct sound card on GSI builds). A new backend capability `appPlaysRadio()` is false on the W6+'s camcorder route, where the module drives the speaker and no app gate can silence it; there the M17 page says the buzz stays audible under the decoded voice, and the help says so too. A hardware mute for the W6+ is left to that phone's own work. | `AudioBackend`, `CamcorderAudio`, `RadioService`, `ui/M17Screen`, `ui/HelpView`, `RawHoldTest` | Host: `RawHoldTest` (the hold rule, the camcorder capability, the interface default). Device: pending (Armor, M17 transmission on an FM channel from the hotspot) |
+
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
 | Backlog | Change | Files | Test |

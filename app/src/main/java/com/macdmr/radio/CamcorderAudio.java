@@ -32,6 +32,7 @@ public final class CamcorderAudio implements AudioBackend {
 
     @Override public void setSink(Sink s) { sink = s; }
     @Override public void setGate(Gate g) { }           // the module's own speaker path: the gate does not apply
+    @Override public boolean appPlaysRadio() { return false; }
 
     /** Mono 16-bit samples, times {@link #GAIN} and clipped, to the stereo (L == R) little-endian frames the sink takes. */
     static int toStereo(short[] mono, int n, byte[] out) { return toStereo(mono, n, out, GAIN); }
