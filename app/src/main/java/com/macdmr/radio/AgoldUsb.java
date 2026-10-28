@@ -76,12 +76,12 @@ final class AgoldUsb {
         return r.append("USB port given back to the socket (").append(dir).append("/cmode 0, then 1)\n").toString();
     }
 
-    static final String USB_PATH = "/sys/bus/platform/drivers/mcu/usb_path", HAL_SERVICE = "aguiextmodule";
+    static final String USB_PATH = "/sys/bus/platform/drivers/mcu/usb_path", RSTMCU = "/sys/bus/platform/drivers/mcu/rstmcu", HAL_SERVICE = "aguiextmodule";
 
     /**
      * Ask the bridge and the module who they are, with nobody else on the line (Atom XL, measured by hand 2026-10-28):
      * stop the HAL, switch the USB port to host ({@link #USB_PATH} 1: {@link #MCU_POWER} alone powers the bridge
-     * without it), power the bridge, wait for {@link #BRIDGE_PORT}, send the stock app's own two version queries (route
+     * without it), power the bridge and release its reset ({@link #RSTMCU} 0, as the HAL does), wait for {@link #BRIDGE_PORT}, send the stock app's own two version queries (route
      * 00 cmd 01, route 01 cmd 0x34), then power off, give the port back to the socket and start the HAL again, in one
      * root script so the clean-up runs whatever happened. Nothing tunes, keys or changes a setting. Only while the radio
      * is off and the stock app is not running. The stock app updates the bridge's firmware when the bridge does not
@@ -96,10 +96,15 @@ final class AgoldUsb {
             try (java.io.FileOutputStream o = new java.io.FileOutputStream(q2)) { o.write(AgoldFrames.request(0x01, 0x34, 0x01)); }
         } catch (java.io.IOException e) { return "not run: " + e + "\n"; }
         String ask = "rm -f $R; ( timeout 3 cat " + BRIDGE_PORT + " > $R ) & sleep 0.3; cat $Q > " + BRIDGE_PORT + "; wait; echo \"$N: $(od -An -tx1 $R | tr -d '\\n')\"; ";
+        // the HAL's own start-up (traced): usb_path 1, mcu_power 1, 0.75 s, rstmcu 0 (after a fresh boot the bridge sits in
+        // reset and never enumerates without it); when the controller refuses device -> host, go through "none" and retry
+        String powerUp = "echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; sleep 0.75; echo 0 > " + RSTMCU + "; ";
         String out = RootSetup.run("S=stty; [ -x /data/adb/magisk/busybox ] && S='/data/adb/magisk/busybox stty'; R=/data/local/tmp/signaldeck_agold_reply; "
-                + "stop " + HAL_SERVICE + "; sleep 1; echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; "
-                + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; "
-                + "if [ -e " + BRIDGE_PORT + " ]; then echo \"port: after $((i*5)) tenths of a second\"; sleep 2; $S -F " + BRIDGE_PORT + " raw -echo 2>&1; "
+                + "stop " + HAL_SERVICE + "; sleep 1; " + powerUp
+                + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 6 ]; do sleep 0.5; i=$((i+1)); done; "
+                + "if [ ! -e " + BRIDGE_PORT + " ]; then echo 'retry: through none'; echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; " + powerUp
+                + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; fi; "
+                + "if [ -e " + BRIDGE_PORT + " ]; then echo \"port: after $((i*5)) tenths of a second\"; sleep 2; $S -F " + BRIDGE_PORT + " 115200 raw -echo 2>&1; "
                 + "Q=" + q1.getAbsolutePath() + "; N=bridge; " + ask + "Q=" + q2.getAbsolutePath() + "; N=module; " + ask
                 + "else echo 'port: none after 10 s'; fi; "
                 + "echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; "
