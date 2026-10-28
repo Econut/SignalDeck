@@ -8,7 +8,7 @@
 
 ---
 
-**SignalDeck** is an Android app for phones with a built-in walkie-talkie radio module (VHF/UHF, analog FM, DMR and M17). It drives the module directly, without the phone's stock walkie-talkie app, and turns the phone into a full ham radio station: voice, packet, digital modes, satellites, e-mail by radio, and the whole radio in a web browser.
+**SignalDeck** is an Android app for phones with a built-in walkie-talkie radio module (VHF/UHF, analog FM, DMR and M17; analog-only radios too). It drives the module directly, without the phone's stock walkie-talkie app, and turns the phone into a full ham radio station: voice, packet, digital modes, satellites, e-mail by radio, and the whole radio in a web browser.
 
 > [!WARNING]
 > **Public beta, for testing — bugs are expected.** SignalDeck needs a **rooted phone (Magisk)** and takes direct control of its radio module. It is provided as is, without warranty (GPL v3); the author is not responsible for any damage to your phone, its radio or your data. Transmitting legally (licence, frequencies, power) is your responsibility.
@@ -50,7 +50,7 @@ The screenshots use demo data: made-up callsigns (unallocated `Q` prefixes, `DEM
 ### Talk and listen
 - **Analog FM, DMR and M17 channels:** group and private calls, RX group lists, CTCSS and DCS, receive-only channels, high and low power, color codes and timeslots; an M17 channel has a destination and a channel access number.
 - **The intercom page:** channel and frequency display, live S-meter, a real audio spectrum, the history of receptions and captions, and the talk key with the SOFT SQ / TXT / VFO / REC / MON / PKT keys around it. Two looks (new and classic). The side PTT key works, or any key you teach it.
-- **Channels:** full editor, favourites, notes, zones, a scanner with a scan list, VFO for any frequency, Nearby Repeaters and repeaters on the map.
+- **Channels:** full editor, select several channels at once (delete, star, add to or take out of a zone), favourites, notes, zones, a scanner with a scan list, VFO for any frequency, Nearby Repeaters and repeaters on the map.
 - **Soft SQ** (a software squelch for weak signals), **REC** (recordings per channel), **MON** (squelch held open).
 - **Live captions** of received speech (Vosk on the phone, or Google Cloud), with keyword alerts; **voice announcements** of channel and caller.
 - **DMR extras:** text messages with quick replies and talkgroup threads, Last heard with RadioID names and callsigns, talkgroups picked from your contacts, and **DMR roaming** (switches to the nearer repeater of your network as you travel). With SignalDeck's module firmware, MON on a DMR channel hears every call on the frequency, whatever its talkgroup or colour code, and shows the colour code and slot.
@@ -107,6 +107,7 @@ These are limits of the radio module, measured on the reference phone. SignalDec
 | **Ulefone Armor 26 Ultra** (walkie-talkie model) | Tested — the reference phone. Custom ROMs and GSIs work too: SignalDeck takes the radio audio straight from the sound card when the vendor audio service is missing. |
 | **Blackview Xplore 1** | **Profile in testing** ([analysis](docs/multi-device-xplore1-findings.md)): same radio-module protocol, audio over a second serial port. A tester has receive, channel import and CTCSS working; transmit stays blocked until the profile is verified. Owners: please run **Device → Run all checks** and send the zip. |
 | **Ulefone Armor 20WT** | **Profile written, untested** (from an owner's device report and its stock app): the Armor 26 Ultra's radio family on another serial port. SignalDeck does not take over or transmit by itself until it is tested. Owners: please run **Device → Run all checks** and send the zip. |
+| **ANYSECU W6+** (UHF analog) | **Tested for receive** (2026-10-28): an analog-only UHF radio (400–470 MHz, no DMR) with its own module, driven by SignalDeck's second radio engine. Takes over, imports the stock app's channels, tones and squelch; receive, recording, captions, APRS, SSTV, FT8 and M17 work. No S-meter (the module gives no signal readings). DMR screens are hidden. **Transmit is not enabled yet** (waiting for an on-air test). |
 | Other DMR phones (Oukitel WP61, UNIWA P2 Plus…) | No profile yet — the app starts in discovery mode and offers **Run all checks**. See [docs/DEVICE_SUPPORT_REQUEST.md](docs/DEVICE_SUPPORT_REQUEST.md). |
 
 **Root (Magisk) is required:** Android's SELinux policy only lets the stock app open the radio's serial port. SignalDeck applies the rules it needs with Magisk (Device → *Keep access after reboot* makes them permanent as a small Magisk module). The stock walkie-talkie app is turned off while SignalDeck owns the radio, and turned back on when you hand the radio back.
