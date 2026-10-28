@@ -82,7 +82,11 @@ public class AtModuleEngineTest {
     @Test public void receiveAudioFramesAreStereo() {
         short[] m = { 0x0102, (short) 0xFFFE };
         byte[] out = new byte[8];
-        assertEquals(8, CamcorderAudio.toStereo(m, 2, out));
+        assertEquals(8, CamcorderAudio.toStereo(m, 2, out, 1));
         assertArrayEquals(new byte[] { 0x02, 0x01, 0x02, 0x01, (byte) 0xFE, (byte) 0xFF, (byte) 0xFE, (byte) 0xFF }, out);
+        CamcorderAudio.toStereo(new short[] { 100, 5000, -5000 }, 3, new byte[12], 12);
+        byte[] g = new byte[12]; CamcorderAudio.toStereo(new short[] { 100, 5000, -5000 }, 3, g);   // the fixed gain, clipped at full scale
+        java.nio.ShortBuffer sb = java.nio.ByteBuffer.wrap(g).order(java.nio.ByteOrder.LITTLE_ENDIAN).asShortBuffer();
+        assertEquals(1200, sb.get(0)); assertEquals(1200, sb.get(1)); assertEquals(32767, sb.get(2)); assertEquals(-32768, sb.get(4));
     }
 }
