@@ -63,7 +63,7 @@
             <button class="arrow" id="chUp" aria-label="Next channel">›</button>
           </div>
           <div class="freqrow"><span id="freq" class="mono freq">---.----</span><span id="chType" class="chip"></span><span id="tone" class="chip dim"></span></div>
-          <div class="smeter"><div class="smeter-fill" id="smeterFill"></div><span id="smeterText" class="mono">— dBm</span></div>
+          <div class="smeter rssi-only"><div class="smeter-fill" id="smeterFill"></div><span id="smeterText" class="mono">— dBm</span></div>
           <div class="state"><span id="rxtx" class="badge">IDLE</span><span id="caller" class="caller"></span><div class="vu" aria-hidden="true"><div id="vuFill"></div></div></div>
           <canvas id="specCv" class="spec" aria-label="Spectrum of the received audio" title="Spectrum of what is received: low notes left, high right (200 Hz – 3.6 kHz)"></canvas>
           <div class="controls">
@@ -105,10 +105,11 @@
     <section id="page-channels" class="page hidden">
       <div class="grid-side wide">
         <div class="panel">
-          <div class="row between"><span class="label">CHANNELS</span><div class="row"><button class="btn small-btn" id="chVfo">VFO</button><button class="btn small-btn" id="chNew">New channel</button></div></div>
+          <div class="row between"><span class="label">CHANNELS</span><div class="row"><button class="btn small-btn" id="chSelect" title="Tick several channels to delete them, star them or put them in a zone">Select</button><button class="btn small-btn" id="chVfo">VFO</button><button class="btn small-btn" id="chNew">New channel</button></div></div>
           <div class="row wrap chtools"><select id="chZone" aria-label="Zone shown in the list (the radio steps and scans in it)"></select>
-            <div class="seg" id="chFilter"><button type="button" data-f="0" class="on">All</button><button type="button" data-f="1">★ Favourites</button><button type="button" data-f="2">Analog</button><button type="button" data-f="3">DMR</button></div></div>
+            <div class="seg" id="chFilter"><button type="button" data-f="0" class="on">All</button><button type="button" data-f="1">★ Favourites</button><button type="button" data-f="2" class="dmr-only">Analog</button><button type="button" data-f="3" class="dmr-only">DMR</button></div></div>
           <input id="chSearch" placeholder="Search name, frequency or number" class="search full" style="margin-top:10px">
+          <div id="chSelBar" class="sel-bar hidden"><span id="chSelCount" class="mono">0 selected</span><div class="row wrap"><button class="btn small-btn" id="chSelAll">All</button><button class="btn small-btn" id="chSelStar">Star</button><select id="chSelZoneTo" aria-label="Zone to add the selected channels to"></select><button class="btn small-btn" id="chSelZone">Add to zone</button><button class="btn small-btn" id="chSelOut" title="Take the selected channels out of the zone shown">Out of zone</button><button class="btn small-btn danger" id="chSelDel">Delete</button><button class="btn small-btn" id="chSelDone">Done</button></div></div>
           <div id="chList" class="list"></div>
         </div>
         <div class="panel" id="edPanel">
@@ -135,7 +136,7 @@
       <div class="panel" id="formsPanel">
         <div class="row between wrap"><span class="label">MESSAGE FORMS · ICS-213 AND RADIOGRAM</span><div class="row"><button class="btn small-btn" id="fmNew213">New ICS-213</button><button class="btn small-btn" id="fmNewRg">New radiogram</button></div></div>
         <form id="fmEdit" class="sched-form hidden" autocomplete="off"><div id="fmFields" class="fm-fields"></div>
-          <div class="row wrap" style="grid-column:1/-1"><select id="fmVia" aria-label="Send by"><option value="save">Save only</option><option value="aprs">Send by APRS to a callsign</option><option value="dmr">Send by DMR text to a contact</option><option value="winlink">Send by Winlink (outbox)</option></select><input id="fmTo" placeholder="Callsign" style="text-transform:uppercase" maxlength="12"><select id="fmContact" class="hidden" aria-label="Contact"></select><button class="btn small-btn" type="submit">Go</button><button class="btn small-btn" type="button" id="fmCancel">Cancel</button></div></form>
+          <div class="row wrap" style="grid-column:1/-1"><select id="fmVia" aria-label="Send by"><option value="save">Save only</option><option value="aprs">Send by APRS to a callsign</option><option value="dmr" class="dmr-only">Send by DMR text to a contact</option><option value="winlink">Send by Winlink (outbox)</option></select><input id="fmTo" placeholder="Callsign" style="text-transform:uppercase" maxlength="12"><select id="fmContact" class="hidden" aria-label="Contact"></select><button class="btn small-btn" type="submit">Go</button><button class="btn small-btn" type="button" id="fmCancel">Cancel</button></div></form>
         <div id="fmView" class="hidden"><pre id="fmText" class="dec-out" style="font-size:16px"></pre><div class="row"><button class="btn small-btn" id="fmReply" type="button">Reply</button><button class="btn small-btn danger" id="fmDel" type="button">Delete</button><button class="btn small-btn" id="fmClose" type="button">Close</button></div></div>
         <div id="fmList" class="list small"></div>
       </div>
@@ -211,7 +212,7 @@
       <div class="panel">
         <div class="row between wrap">
           <div><span class="label">APRS</span> <span id="aprsState" class="chip"></span></div>
-          <div class="row"><button class="btn" id="aprsToggle">Monitor 144.390</button><button class="btn" id="beaconBtn">Send beacon</button></div>
+          <div class="row"><button class="btn aprs144-only" id="aprsToggle">Monitor 144.390</button><button class="btn" id="beaconBtn">Send beacon</button></div>
         </div>
         <div class="stats"><div><b id="aprsCount">0</b><span>PACKETS</span></div><div><b id="stationCount">0</b><span>STATIONS</span></div><div><b id="forYou">0</b><span>FOR YOU</span></div></div>
       </div>
@@ -232,7 +233,7 @@
         <div class="panel">
           <div class="row between"><span class="label">SSTV</span><span id="sstvState" class="chip"></span></div>
           <div class="sstvbox"><img id="sstvLive" alt="Live SSTV picture" class="hidden"><div id="sstvEmpty" class="muted">No picture yet</div></div>
-          <div class="row"><button class="btn" id="sstvToggle">Listen on 144.500</button></div>
+          <div class="row"><button class="btn" id="sstvToggle">Listen on this channel</button></div>
           <span class="label" style="display:block;margin-top:18px">SEND A PICTURE</span>
           <form id="sstvSend" class="row wrap" style="margin-top:10px">
             <input type="file" id="sstvFile" accept="image/png,image/jpeg,image/webp" class="grow">
@@ -254,7 +255,7 @@
 
     <!-- SATELLITES -->
     <section id="page-scope" class="page hidden">
-      <div class="panel">
+      <div class="panel rssi-only">
         <div class="row between wrap"><span class="label">BAND SCOPE</span><div class="row"><select id="scPreset" aria-label="Band"></select><span id="scCustom" class="row hidden"><input id="scFrom" inputmode="decimal" placeholder="from MHz" style="width:92px"><input id="scTo" inputmode="decimal" placeholder="to MHz" style="width:92px"><input id="scStep" inputmode="decimal" placeholder="step kHz" style="width:76px"></span><button class="btn small-btn" id="scStart">Start</button><button class="btn small-btn" id="scClear">Clear peaks</button></div></div>
         <p class="muted small" id="scSub">Receive only: the radio sweeps the band step by step (about a second a step: its signal reading needs 0.7 s after each retune) and comes back to your channel when it stops. Pick a band or a custom range; click the graph to pick a frequency.</p>
         <canvas id="scCv" class="scope-cv" aria-label="Band scope: signal strength across the band and a waterfall of the recent sweeps"></canvas>
@@ -356,7 +357,7 @@
           <span class="label" id="qsoTitle">LOG A CONTACT</span>
           <form id="qsoForm" class="form" autocomplete="off">
             <label>Callsign<input id="qCall" maxlength="12" style="text-transform:uppercase"></label>
-            <div class="row"><label class="grow">Frequency (MHz)<input id="qFreq" inputmode="decimal"></label><label class="grow">Mode<select id="qMode"><option>FM</option><option>DMR</option><option>SSB</option><option>CW</option><option>APRS</option><option>SSTV</option><option>DIGITAL</option></select></label></div>
+            <div class="row"><label class="grow">Frequency (MHz)<input id="qFreq" inputmode="decimal"></label><label class="grow">Mode<select id="qMode"><option>FM</option><option class="dmr-only">DMR</option><option>SSB</option><option>CW</option><option>APRS</option><option>SSTV</option><option>DIGITAL</option></select></label></div>
             <div class="row"><label class="grow">Report sent<input id="qSent" maxlength="6" placeholder="59"></label><label class="grow">Report received<input id="qRcvd" maxlength="6" placeholder="59"></label></div>
             <label>Name<input id="qName" maxlength="40"></label>
             <label>Notes<input id="qNotes" maxlength="200"></label>
@@ -406,7 +407,7 @@
             <form id="dtmfForm" class="row" style="margin-top:12px"><input id="dtmfSeq" placeholder="Digits (0-9, A-D, *, #)" maxlength="32" class="grow mono"><button class="btn primary">Send</button></form>
             <div id="dtmfSaved" class="quick" style="margin-top:10px"></div>
             <div id="dtmfLog" class="list small"></div></div>
-          <div class="panel"><span class="label">WEATHER ALERTS (SAME)</span><div id="alertList" class="list small"></div></div>
+          <div class="panel wx-only"><span class="label">WEATHER ALERTS (SAME)</span><div id="alertList" class="list small"></div></div>
           <div class="panel"><div class="row between wrap"><span class="label">TEXT MODES</span><span id="tmStatus" class="chip dim"></span></div>
             <div class="row wrap" style="margin-top:10px"><select id="tmMode" aria-label="Listen"></select><select id="tmTx" aria-label="Send as"><option value="2">Send as PSK31</option><option value="1">Send as RTTY 45</option></select><button class="btn small-btn" id="tmClear">Clear</button></div>
             <pre id="tmText" class="term"></pre>
@@ -450,7 +451,7 @@
         <p class="muted small">Start something at a set time, once or every week; when the time is up the radio goes back to what it was doing. A satellite pass being tracked comes first.</p>
         <div id="schedList" class="list small"></div>
         <form id="schedForm" class="sched-form hidden">
-          <label>What <select id="sfAction"><option value="listen">Listen to a channel</option><option value="scan">Scan the zone</option><option value="aprs">APRS monitoring (144.390)</option><option value="sstv">SSTV receive</option><option value="beacon">Send an APRS beacon</option><option value="winlink">Check Winlink mail (radio gateway)</option><option value="winlinknet">Check Winlink mail (internet)</option><option value="finder">Packet finder (listen for BBSs, nodes, gateways)</option></select></label>
+          <label>What <select id="sfAction"><option value="listen">Listen to a channel</option><option value="scan">Scan the zone</option><option value="aprs" class="aprs144-only">APRS monitoring (144.390)</option><option value="sstv">SSTV receive</option><option value="beacon">Send an APRS beacon</option><option value="winlink">Check Winlink mail (radio gateway)</option><option value="winlinknet">Check Winlink mail (internet)</option><option value="finder">Packet finder (listen for BBSs, nodes, gateways)</option></select></label>
           <label id="sfChWrap">Channel <select id="sfChannel"></select></label>
           <label id="sfRecWrap" class="chk"><input type="checkbox" id="sfRecord"> Record it</label>
           <div class="sf-days" id="sfDays"></div>

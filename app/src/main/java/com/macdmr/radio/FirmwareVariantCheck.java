@@ -210,6 +210,8 @@ public final class FirmwareVariantCheck {
                 p.getString("fwVariantSha", ""), p.getBoolean("fwVariantFileNew", false), p.getBoolean("fwVariantOpened:" + key, false));
     }
 
+    private static void clear(SharedPreferences p) { p.edit().remove("fwVariantKey").remove("fwVariantUrl").remove("fwVariantWhy").remove("fwVariantPkg").remove("fwVariantSha").remove("fwVariantFileNew").apply(); }
+
     /** The user opened the issue form for this variant (the notice then says it is waiting for the catalogue). */
     public static void markOpened(Context c, String key) { c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("fwVariantOpened:" + key, true).apply(); }
 
@@ -221,6 +223,7 @@ public final class FirmwareVariantCheck {
         DeviceProfile dp = svc.profile();
         if (!dp.supported || !svc.isReady() || svc.stockFirmware().isEmpty()) return null;
         SharedPreferences p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        if (!dp.firmwareCatalogued()) { clear(p); return null; }                         // nothing could be submitted (and a stored finding goes)
         long now = System.currentTimeMillis();
         if (now - p.getLong("fwCatalogCheckedAt", 0) > 24L * 3600_000) {
             com.macdmr.radio.fw.FirmwareCatalog.fetch(c);
@@ -238,7 +241,7 @@ public final class FirmwareVariantCheck {
                 stockAppVersion(c, dp.stockApp), sha);
         Known k = known(body);
         String why = missing(f, k);
-        if (why == null) { p.edit().remove("fwVariantKey").remove("fwVariantUrl").remove("fwVariantWhy").remove("fwVariantPkg").remove("fwVariantSha").remove("fwVariantFileNew").apply(); return null; }
+        if (why == null) { clear(p); return null; }
         String ver; try { ver = c.getPackageManager().getPackageInfo(c.getPackageName(), 0).versionName; } catch (Throwable t) { ver = ""; }
         String url = issueUrl(f, why, ver);
         p.edit().putString("fwVariantKey", f.key()).putString("fwVariantUrl", url).putString("fwVariantWhy", why).putString("fwVariantPkg", f.stockPkg)

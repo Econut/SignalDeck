@@ -68,7 +68,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         profileText.setOnClickListener(v -> profileDialog());
         firmwareText = Neo.text(c, "", 0xFF9FB4C8, 13, Neo.mono(c)); firmwareText.setPadding(0, (int) (3 * d), 0, 0);
         tc.addView(firmwareText);
-        firmwareText.setOnClickListener(v -> { if (host != null) host.openFirmware(); });
+        firmwareText.setOnClickListener(v -> { if (host != null && com.macdmr.radio.DeviceProfile.detect().dmr()) host.openFirmware(); });   // the loader speaks the DMR module's YModem path only
         variantText = Neo.text(c, "", Neo.AMBER_LIGHT, 13, Neo.ui(c)); variantText.setPadding(0, (int) (5 * d), 0, 0); variantText.setVisibility(GONE);
         tc.addView(variantText);
         variantText.setOnClickListener(v -> { com.macdmr.radio.FirmwareVariantCheck.Finding f = com.macdmr.radio.FirmwareVariantCheck.finding(getContext()); if (f != null) offerVariant(getContext(), f, this::refresh); });
@@ -123,10 +123,12 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         addRow(set, Neo.switchRow(c, "voice", Neo.VIOLET, "Voice announcements", "Channel changes, caller names, keyword alerts", voiceSw));
         addRow(set, rogerRow(c));
         addRow(set, Neo.switchRow(c, "intercom", Neo.CYAN, "New intercom look", "Off: the classic intercom page", styleSw));
+        addRow(set, layoutRow(c));
         addRow(set, Neo.switchRow(c, "diag", Neo.CYAN, "Animated panel when quiet", "Falling lines on an idle channel (uses a little battery)", animSw));
         addRow(set, Neo.switchRow(c, "signal", Neo.VIOLET, "Coverage logging", "Records signal and key-ups with GPS for the coverage maps (Map → Coverage)", covSw));
         roamSw = sw();
-        addRow(set, Neo.switchRow(c, "repeaters", Neo.GREEN, "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup", roamSw));
+        if (com.macdmr.radio.DeviceProfile.detect().dmr())                       // talkgroups: DMR only
+            addRow(set, Neo.switchRow(c, "repeaters", Neo.GREEN, "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup", roamSw));
         roamSw.setOnChange(on -> { if (svc != null) { svc.setRoaming(on); android.widget.Toast.makeText(c, on ? "DMR roaming is on: it checks every 30 s while you move" : "DMR roaming is off", android.widget.Toast.LENGTH_SHORT).show(); } });
         addRow(set, Neo.switchRow(c, "ptt", Neo.AMBER, "Car microphone in Android Auto", "Talk uses the car's microphone through its hands-free link", carMicSw));
         carMicSw.setOnChange(on -> { if (svc != null) svc.setCarMic(on); });
@@ -185,6 +187,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         TextView setId = Neo.button(c, "Change", null, Neo.CYAN); setId.setMinHeight((int) (40 * d));
         idRow.addView(setId, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         id.addView(idRow);
+        if (!com.macdmr.radio.DeviceProfile.detect().dmr()) id.setVisibility(GONE);    // no digital channels to send it on
         setId.setOnClickListener(v -> {
             final EditText e = new EditText(c); e.setInputType(InputType.TYPE_CLASS_NUMBER); e.setText(svc != null ? String.valueOf(svc.localId()) : "");
             new android.app.AlertDialog.Builder(c).setTitle("Your DMR ID").setMessage("The radio sends this as the caller ID on digital channels.").setView(e)
@@ -210,7 +213,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         LinearLayout diag = Neo.tile(c, "diag", Neo.AMBER, "Diagnostics", "Live protocol log");
         LinearLayout widget = Neo.tile(c, "widget", Neo.VIOLET, "Home widget", "Channel, scan and Talk");
         LinearLayout sos = Neo.tile(c, "alert", Neo.RED, "Emergency", "Send your position");
-        LinearLayout[] tiles = { backup, restore, reimport, radioIdTile, report, upd, help, diag, widget, sos };
+        java.util.List<LinearLayout> tl = new java.util.ArrayList<>(java.util.Arrays.asList(backup, restore, reimport, radioIdTile, report, upd, help, diag, widget, sos));
+        if (!com.macdmr.radio.DeviceProfile.detect().dmr()) tl.remove(radioIdTile);   // names for DMR IDs: nothing to look up without DMR
+        if (tl.size() % 2 == 1) tl.add(null);
+        LinearLayout[] tiles = tl.toArray(new LinearLayout[0]);
         for (int i = 0; i < tiles.length; i += 2) {
             LinearLayout r = new LinearLayout(c); r.setBaselineAligned(false);
             LayoutParams l1 = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f); l1.setMargins(0, 0, (int) (4 * d), (int) (8 * d));
@@ -229,7 +235,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         widget.setOnClickListener(v -> widgetSheet());
         sos.setOnClickListener(v -> EmergencyDialog.show(c, svc));
 
-        TextView foot = Neo.text(c, "Backups are the five CSV files (Contacts, TG_Lists, Channels, Zones, DTMF) the DMRModHooks module and the OpenGD77 CPS fork use, in Download/DMR/DMR_Backups.\n\nSignalDeck " + com.macdmr.radio.BuildConfig.VERSION_NAME + ", the standalone edition of DMRModHooks.", Neo.DIM, 12.5f, Neo.uiMedium(c));
+        TextView foot = Neo.text(c, (com.macdmr.radio.DeviceProfile.detect().dmr()
+                ? "Backups are the five CSV files (Contacts, TG_Lists, Channels, Zones, DTMF) the DMRModHooks module and the OpenGD77 CPS fork use, in Download/DMR/DMR_Backups."
+                : "Backups are CSV files (Channels, Zones, DTMF and the others, in the layout the OpenGD77 CPS fork reads) in Download/DMR/DMR_Backups.")
+                + "\n\nSignalDeck " + com.macdmr.radio.BuildConfig.VERSION_NAME + ", the standalone edition of DMRModHooks.", Neo.DIM, 12.5f, Neo.uiMedium(c));
         foot.setLineSpacing(0, 1.1f); foot.setPadding((int) (2 * d), (int) (8 * d), (int) (2 * d), 0);
         body.addView(foot);
     }
@@ -575,7 +584,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         final Context c = getContext(); if (svc == null) return;
         if (!svc.isReady()) { locked("Take over the radio first (Device page)."); return; }
         new android.app.AlertDialog.Builder(c).setTitle("Second radio test")
-                .setMessage("You need any other FM radio (a cheap handheld is fine) and about five minutes.\n\n1. On the Intercom page, choose an analog (FM) channel nobody uses, on a frequency the other radio can transmit on: VHF or UHF both work (this phone tunes 136–174 and 400–480 MHz). Licence-free examples: PMR446 channel 1, 446.00625 MHz (Europe); FRS channel 1, 462.5625 MHz (USA); or a ham simplex frequency if you are licensed.\n2. Set the other radio to the same frequency, no tone, low power, a few metres from this phone.\n3. Tap Start, then do what each step asks: SignalDeck measures everything itself.\n\nThis phone only listens: nothing is transmitted from it. The tone squelch part uses a temporary copy of the channel; your channel is not changed.")
+                .setMessage("You need any other FM radio (a cheap handheld is fine) and about five minutes.\n\n1. On the Intercom page, choose an analog (FM) channel nobody uses, on a frequency the other radio can transmit on: VHF or UHF both work (this phone tunes " + com.macdmr.radio.DeviceProfile.detect().bandsText() + "). Licence-free examples: PMR446 channel 1, 446.00625 MHz (Europe); FRS channel 1, 462.5625 MHz (USA); or a ham simplex frequency if you are licensed.\n2. Set the other radio to the same frequency, no tone, low power, a few metres from this phone.\n3. Tap Start, then do what each step asks: SignalDeck measures everything itself.\n\nThis phone only listens: nothing is transmitted from it. The tone squelch part uses a temporary copy of the channel; your channel is not changed.")
                 .setPositiveButton("Start", (dd, w) -> runSecondRadioTest()).setNegativeButton("Later", null).show();
     }
     private void runSecondRadioTest() {
@@ -692,6 +701,24 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         }).start();
     }
 
+    /** Intercom layout: Automatic (compact below 700 dp of screen height), Regular, or Compact. The page and the tab bar follow it. */
+    private LinearLayout layoutRow(final Context c) {
+        final String[] keys = { "auto", "regular", "compact" };
+        final int hdp = c.getResources().getConfiguration().screenHeightDp;
+        final String[] names = { "Automatic (" + (IntercomView.compactFor(hdp, "auto") ? "compact" : "regular") + " on this phone, " + hdp + " dp tall)", "Regular", "Compact" };
+        String cur = IntercomView.layoutPref(c); int sel = 0; for (int i = 0; i < keys.length; i++) if (keys[i].equals(cur)) sel = i;
+        final LinearLayout row = Neo.switchRow(c, "intercom", Neo.CYAN, "Intercom layout", names[sel], null);
+        final int pick = sel;
+        row.setOnClickListener(v -> new android.app.AlertDialog.Builder(c).setTitle("Intercom layout")
+                .setSingleChoiceItems(names, pick, (dd, w) -> {
+                    dd.dismiss();
+                    if (keys[w].equals(IntercomView.layoutPref(c))) return;
+                    IntercomView.setLayoutPref(c, keys[w]);
+                    if (c instanceof android.app.Activity) ((android.app.Activity) c).recreate();   // the tab bar is sized when the screen is built
+                }).setNegativeButton("Cancel", null).show());
+        return row;
+    }
+
     private void checks(boolean firstLaunch) {
         final Context c = getContext(); if (svc == null) return;
         final com.macdmr.radio.DeviceProfile dp = svc.profile();
@@ -700,8 +727,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                 + "One run of the checks tells us what we need to make it work. It takes about two minutes.\n\n" : "")
                 + "What happens:\n• a device report (phone, ports, radio module, the stock walkie-talkie app; only reads)\n"
                 + "• 10 s to press the side PTT key a few times\n"
-                + "• with root, the stock walkie-talkie app is opened for 15 s so we can see how it starts the radio (do not press PTT then), and closed again\n"
-                + "• with Magisk root, the radio probe (asks the module for its version on the serial ports; switches the module on if it does not answer"
+                + "• with root, the stock walkie-talkie app is closed, then opened for 15 s so we can see how it starts the radio and what it sends to it (do not press PTT then), and closed again\n"
+                + "• with Magisk root, the radio probe (asks the module who it is on the serial ports the walkie-talkie app uses: the DMR version query and the SA818 AT handshake; switches the module on if it does not answer"
                 + (dp.supported ? "" : ", only on phones with a profile") + ")\n"
                 + (canTrial ? "• optionally a 30-second trial: SignalDeck takes the radio (receive only, nothing is transmitted), records what the module and the audio do, then gives it back to " + dp.stockApp + "\n" : "")
                 + (dp.supported && !dp.stockApp.isEmpty() ? "\n" + dp.stockApp + " is closed for the checks; open it again afterwards as usual.\n" : "")
@@ -778,7 +805,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                 final java.io.File zip = com.macdmr.radio.FirstRunCheck.run(c, s, trial, watchPkg, t -> post(() -> pd.setMessage(t + "…")));
                 c.getSharedPreferences("radio", Context.MODE_PRIVATE).edit().putLong("supportChecks", System.currentTimeMillis()).apply();
                 final java.io.File dir = com.macdmr.radio.DeviceReport.newestDir();
-                String rep = dir == null ? "" : com.macdmr.radio.DeviceReport.cat(new java.io.File(dir, "report.txt").getAbsolutePath());
+                String rep = dir == null ? "" : com.macdmr.radio.DeviceReport.readReport(dir);
                 int k = rep.lastIndexOf("==== Summary ====");
                 final String summary = k >= 0 ? rep.substring(k + 17).trim() : "";
                 post(() -> {
@@ -793,7 +820,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
 
     private void shareReport() {
         new android.app.AlertDialog.Builder(getContext()).setTitle("Share the device report")
-                .setMessage("The report holds phone model and build facts, serial-port and radio-module node names, the walkie-talkie app's package details, library and framework file names, running radio processes, and (with root) SELinux labels and short radio-related log excerpts with message text removed and long numbers masked. After Run all checks it also holds SignalDeck's own log (packet, position, message and caller lines removed; callsigns and IDs masked) and, after the trial, a 5-second raw copy of what the radio received (rx_audio_raw.bin: whatever the channel carried). No accounts, contacts, messages, location or identifiers such as IMEI.\n\nThe copied stock walkie-talkie APK is the manufacturer's software: include it if you are comfortable posting it, or share without it (we can ask for it privately).")
+                .setMessage("The report holds phone model and build facts, serial-port and radio-module node names, the walkie-talkie app's package details, library and framework file names, running radio processes, and (with root) SELinux labels and short radio-related log excerpts with message text removed and long numbers masked. After Run all checks it also holds SignalDeck's own log (packet, position, message and caller lines removed; callsigns and IDs masked), the bytes the stock app exchanged with the radio module while it started (stock_serial.txt: commands, channel frequencies and the module's answers; radio IDs blanked) and, after the trial, a 5-second raw copy of what the radio received (rx_audio_raw.bin: whatever the channel carried). No accounts, contacts, messages, location or identifiers such as IMEI.\n\nThe copied stock walkie-talkie APK is the manufacturer's software: include it if you are comfortable posting it, or share without it (we can ask for it privately).")
                 .setPositiveButton("Share all", (dd, w) -> askStation(true)).setNeutralButton("Without the APK", (dd, w) -> askStation(false)).setNegativeButton("Cancel", null).show();
     }
 
@@ -984,7 +1011,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         if (svc == null) return;
         Context c = getContext(); float d = Theme.dp(c);
         Neo.headerSubtitle(header).setText(svc.profile().name.toUpperCase(java.util.Locale.US));
-        profileText.setText(svc.profile().controlPort + " · " + svc.profile().baud + " · " + (svc.profile().audio == com.macdmr.radio.DeviceProfile.Audio.TINY_SERVICE ? "vendor audio" : "UART PCM"));
+        profileText.setText(svc.profile().controlPort + " · " + svc.profile().baud + " · " + (svc.profile().audio == com.macdmr.radio.DeviceProfile.Audio.TINY_SERVICE ? "vendor audio" : svc.profile().audio == com.macdmr.radio.DeviceProfile.Audio.CAMCORDER ? "camcorder input" : "UART PCM") + ("sa818".equals(svc.profile().protocol) ? " · analog AT module" : ""));
         com.macdmr.radio.ProfileRegistry.Selection ps = com.macdmr.radio.ProfileRegistry.selection();
         if (ps.profile.supported || !ps.advisories.isEmpty()) profileText.append(" · r" + ps.profile.revision + ("updated".equals(ps.source) ? " updated" : ""));
         for (com.macdmr.radio.ProfileRegistry.Advisory a : ps.advisories) if (!a.overridden) { profileText.append(" · ⚠ advisory"); break; }
@@ -994,7 +1021,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         firmwareText.setText(fwStock.isEmpty() ? "Module firmware" : com.macdmr.radio.Firmware.line(fwStock, fwNow));
         firmwareText.setVisibility(VISIBLE);
         firmwareText.setTextColor(com.macdmr.radio.Firmware.differs(fwStock, fwNow) ? Neo.AMBER_LIGHT : 0xFF9FB4C8);
-        com.macdmr.radio.FirmwareVariantCheck.Finding vf = svc.profile().supported ? com.macdmr.radio.FirmwareVariantCheck.finding(c) : null;
+        com.macdmr.radio.FirmwareVariantCheck.Finding vf = svc.profile().supported && svc.profile().firmwareCatalogued() ? com.macdmr.radio.FirmwareVariantCheck.finding(c) : null;
         variantText.setVisibility(vf == null ? GONE : VISIBLE);
         if (vf != null) variantText.setText("\u26A0 Firmware not in the catalogue yet \u00B7 " + (vf.opened ? "sent to GitHub, waiting for the catalogue" : "tap to submit it"));
         boolean ready = "ready".equals(l), unsupported = "unsupported".equals(l), bad = "no root".equals(l) || unsupported;

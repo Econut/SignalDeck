@@ -114,7 +114,7 @@ public final class BandScopeScreen extends ModeScreen {
     /** From, to and step of your own; checked against what the radio can tune before it is used. */
     private void customRange() {
         LinearLayout b = Neo.sheetBody(c, "Custom range");
-        b.addView(Neo.sheetHint(c, "Any range inside 136–174 or 400–480 MHz (the radio tunes nothing else), up to " + BandScope.MAX_STEPS + " steps. Each step takes about a second, so a narrow range with a fine step comes round quickly; a wide one takes minutes."));
+        b.addView(Neo.sheetHint(c, "Any range inside " + com.macdmr.radio.DeviceProfile.detect().bandsText() + " (the radio tunes nothing else), up to " + BandScope.MAX_STEPS + " steps. Each step takes about a second, so a narrow range with a fine step comes round quickly; a wide one takes minutes."));
         int[] r = range();
         final android.widget.EditText from = field(b, "From (MHz)", String.format(Locale.US, "%.4f", (custom() ? r[0] : prefs().getInt("customFrom", 446_000_000)) / 1e6));
         final android.widget.EditText to = field(b, "To (MHz)", String.format(Locale.US, "%.4f", (custom() ? r[1] : prefs().getInt("customTo", 446_200_000)) / 1e6));

@@ -10,6 +10,7 @@ import android.content.IntentFilter;
 import android.os.BatteryManager;
 import android.os.PowerManager;
 
+import com.macdmr.radio.ModuleEngine;
 import com.macdmr.radio.RadioEngine;
 import com.macdmr.radio.RadioService;
 import com.macdmr.radio.RootSetup;
@@ -119,7 +120,7 @@ public final class FirmwareSession {
 
     /** @return the tag, or null when the transfer itself failed (the UI was already told) */
     private static String send(RadioService svc, ImageTable.Row row, byte[] image, Ui ui, AtomicBoolean halt) {
-        RadioEngine engine = svc.engine();
+        ModuleEngine engine = svc.engine();
         AtomicInteger retries = new AtomicInteger();
         long t0 = System.currentTimeMillis();
         boolean diverted = false;

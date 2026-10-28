@@ -59,7 +59,8 @@ public final class VfoDialog {
 
         // mode
         LinearLayout modeRow = pillRow(); modePills.add(pill(modeRow, "FM analog", v.type == 1, x -> { v.type = 1; select(modePills, 0); sections(); }));
-        modePills.add(pill(modeRow, "DMR digital", v.type == 0, x -> { v.type = 0; select(modePills, 1); sections(); })); body.addView(modeRow);
+        modePills.add(pill(modeRow, "DMR digital", v.type == 0, x -> { v.type = 0; select(modePills, 1); sections(); }));
+        if (svc.profile().dmr()) body.addView(modeRow);                     // an analog-only radio: FM is the only mode
 
         // frequencies
         rx = freqField(body, "Receive MHz", v.rxFreq); tx = freqField(body, "Transmit MHz", v.txFreq);
@@ -122,7 +123,7 @@ public final class VfoDialog {
         try {
             v.rxFreq = (int) Math.round(Double.parseDouble(rx.getText().toString().trim()) * 1e6);
             v.txFreq = (int) Math.round(Double.parseDouble(tx.getText().toString().trim()) * 1e6);
-            if (!com.macdmr.radio.ChannelStore.inBand(v.rxFreq) || !com.macdmr.radio.ChannelStore.inBand(v.txFreq)) throw new IllegalArgumentException("Frequencies must be within 136–174 or 400–480 MHz");
+            if (!com.macdmr.radio.ChannelStore.inBand(v.rxFreq) || !com.macdmr.radio.ChannelStore.inBand(v.txFreq)) throw new IllegalArgumentException("Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText());
             if (v.rxFreq < 300_000_000) v.band = 1;
             if (v.isDigital()) {
                 String cn = call.getText().toString().trim();

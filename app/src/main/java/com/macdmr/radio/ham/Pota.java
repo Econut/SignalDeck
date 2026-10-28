@@ -31,7 +31,7 @@ public final class Pota {
 
     public static final class Spot {
         public String program, call, mode, ref, name, where, comment; public long freqHz, time; public double lat, lon;
-        public boolean workable() { return (freqHz >= 136_000_000L && freqHz <= 174_000_000L || freqHz >= 400_000_000L && freqHz <= 480_000_000L) && (mode == null || mode.isEmpty() || mode.equalsIgnoreCase("FM")); }
+        public boolean workable() { return com.macdmr.radio.DeviceProfile.inBands(freqHz) && (mode == null || mode.isEmpty() || mode.equalsIgnoreCase("FM")); }
     }
     public static final class Park { public String ref, name; public double lat, lon, km; }
 

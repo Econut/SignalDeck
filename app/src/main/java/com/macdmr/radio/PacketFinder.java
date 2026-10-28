@@ -137,13 +137,13 @@ public final class PacketFinder {
     public List<Integer> freqs() {
         List<Integer> l = new ArrayList<>();
         for (String p : prefs.getString("freqs", "").split("[,;\\s]+")) { try { double mhz = Double.parseDouble(p.trim()); int hz = (int) Math.round(mhz * 1e6); if (ok(hz)) l.add(hz); } catch (NumberFormatException ignored) { } }
-        if (l.isEmpty()) for (int k : DEFAULT_KHZ) l.add(k * 1000);
+        if (l.isEmpty()) for (int k : DEFAULT_KHZ) if (ok(k * 1000)) l.add(k * 1000);   // the 2 m defaults: none on a UHF-only radio (the W6)
         return l;
     }
     public String freqText() { StringBuilder b = new StringBuilder(); for (int hz : freqs()) b.append(b.length() > 0 ? ", " : "").append(String.format(Locale.US, "%.3f", hz / 1e6)); return b.toString(); }
     public int dwellMin() { return prefs.getInt("dwell", 3); }
     public int hours() { return prefs.getInt("hours", 2); }
-    static boolean ok(int hz) { return (hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000); }
+    static boolean ok(int hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }
 
     /** Save the frequency list (MHz, commas), minutes per frequency and hours; returns an error text or null. */
     public String setSettings(String freqsMhz, int dwell, int hrs) {
@@ -152,7 +152,7 @@ public final class PacketFinder {
             if (p.trim().isEmpty()) continue;
             try { int hz = (int) Math.round(Double.parseDouble(p.trim()) * 1e6); if (ok(hz)) good.append(good.length() > 0 ? "," : "").append(p.trim()); else bad.add(p.trim()); } catch (NumberFormatException e) { bad.add(p.trim()); }
         }
-        if (!bad.isEmpty()) return "Not a frequency the radio can tune (136–174 or 400–480 MHz): " + String.join(", ", bad);
+        if (!bad.isEmpty()) return "Not a frequency the radio can tune (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + "): " + String.join(", ", bad);
         prefs.edit().putString("freqs", good.toString()).putInt("dwell", Math.max(1, Math.min(30, dwell))).putInt("hours", Math.max(1, Math.min(24, hrs))).apply();
         return null;
     }
@@ -161,6 +161,7 @@ public final class PacketFinder {
     public synchronized String start(int minutes) {
         if (running) return "The packet finder is already running";
         if (!svc.isReady()) return "Take over the radio first";
+        if (freqs().isEmpty()) return "None of the packet frequencies is one this radio tunes (" + svc.profile().bandsText() + "): add some in Settings";
         if (svc.isTransmitting()) return "Not while transmitting";
         RadioService.SatState st = svc.satState(); if (st != null && !st.waiting) return "A satellite pass is being tracked";
         if (svc.winlink().busy()) return "A Winlink session is running";

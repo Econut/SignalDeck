@@ -1,0 +1,52 @@
+/vendor/etc/init/hw/init.sl8541e_1h10.rc
+/vendor/etc/init/hw/init.sl8541e_1h10_32b.rc
+/vendor/etc/init/hw/init.sl8541e_2h10_32b.rc
+/vendor/etc/init/hw/init.sl8541e_3h10_32b.rc
+/vendor/etc/init/hw/init.sp9832e_1h10_go.rc
+==
+    chmod 0666 /sys/class/misc/flyscale_misc/spk_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_en
+    chmod 0666 /sys/class/misc/flyscale_misc/mic_en
+    chmod 0666 /sys/class/misc/flyscale_misc/hf_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_spk_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_ptt
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_pwd
+    chmod 0666 /sys/class/misc/flyscale_misc/audio_pa_m6_en
+    chmod 0666 /sys/class/misc/flyscale_misc/m6_id
+    chmod 0666 /sys/class/misc/flyscale_misc/m6_ptt
+    chmod 0666 /sys/class/misc/flyscale_misc/rfid_pwr
+    chmod 0666 /sys/kernel/dmr_state/dmr_state
+    chmod 0666 /sys/class/misc/flyscale_misc/spk_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_en
+    chmod 0666 /sys/class/misc/flyscale_misc/mic_en
+    chmod 0666 /sys/class/misc/flyscale_misc/hf_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_spk_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_ptt
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_pwd
+    chmod 0666 /sys/class/misc/flyscale_misc/audio_pa_m6_en
+    chmod 0666 /sys/class/misc/flyscale_misc/m6_id
+    chmod 0666 /sys/class/misc/flyscale_misc/m6_ptt
+    chmod 0666 /sys/class/misc/flyscale_misc/rfid_pwr
+    chmod 0666 /sys/kernel/dmr_state/dmr_state
+    chmod 0666 /sys/class/misc/flyscale_misc/spk_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_en
+    chmod 0666 /sys/class/misc/flyscale_misc/mic_en
+    chmod 0666 /sys/class/misc/flyscale_misc/hf_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_spk_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_ptt
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_pwd
+    chmod 0666 /sys/class/misc/flyscale_misc/audio_pa_m6_en
+    chmod 0666 /sys/class/misc/flyscale_misc/m6_id
+    chmod 0666 /sys/class/misc/flyscale_misc/m6_ptt
+    chmod 0666 /sys/class/misc/flyscale_misc/rfid_pwr
+    chmod 0666 /sys/kernel/dmr_state/dmr_state
+    chmod 0666 /sys/class/misc/flyscale_misc/spk_en
+    chmod 0666 /sys/class/misc/flyscale_misc/dmr_en
+    chmod 0666 /sys/class/misc/flyscale_misc/mic_en
+    chmod 0666 /sys/class/misc/flyscale_misc/hf_en
+== ueventd
+/dev/ttySE0             0666     system      system
+/dev/ttyS2              0666     system      system
+/dev/ttyS3              0660     system      system
+/dev/ttyS4              0660     system      system
+/dev/ttyS0              0660     system      system

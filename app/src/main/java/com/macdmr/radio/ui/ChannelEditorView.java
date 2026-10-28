@@ -59,7 +59,7 @@ public class ChannelEditorView extends LinearLayout {
     private static final String H_M17 = "Who this channel calls. @ALL is everyone. A callsign calls that station. Pick from contacts uses a contact that has a callsign. Your own callsign, the one you transmit from, is the station callsign in APRS settings.";
     private static final String H_CAN = "Channel access number, 0 to 15. Radios only hear each other when this matches. 0 is the usual choice.";
     private static final String H_TX = "The frequency you transmit on, in MHz. On a simplex channel it is the same as the receive frequency; on a repeater channel it is the repeater's input (for example +5 MHz on UHF GMRS, or ±0.6 MHz on 2 m). This radio covers 136–174 and 400–480 MHz.";
-    private static final String H_RX = "The frequency you listen on, in MHz. On a repeater channel it is the repeater's output. This radio tunes 136–174 and 400–480 MHz; other frequencies (220 MHz, for example) cannot be saved.";
+    private static final String H_RX = "The frequency you listen on, in MHz. On a repeater channel it is the repeater's output. This radio tunes " + com.macdmr.radio.DeviceProfile.detect().bandsText() + "; other frequencies (220 MHz, for example) cannot be saved.";
     private static final String H_POS = "Optional position of the station or repeater this channel reaches. With it the intercom shows the place name and its distance and bearing from you. Use my position fills in the phone's last known location.";
     private static final String H_RXONLY = "Receive only: this channel never transmits. Talk, the side key, the voice keyer, beacons, replies and every other transmission are refused while you are on it (a listening post, a channel you are not licensed for, a frequency that should stay quiet). NOAA weather, marine and railroad channels are always receive only, whatever this says.";
     private static final String H_POWER = "Transmit power. High reaches further and uses more battery; Low is enough for nearby radios. Some services limit power (FRS, for example).";
@@ -88,6 +88,7 @@ public class ChannelEditorView extends LinearLayout {
     public ChannelEditorView(Context c, ChannelStore.Channel channel, boolean isNew, Done done) {
         super(c);
         this.ch = channel; this.isNew = isNew; this.done = done;
+        if (isNew && !com.macdmr.radio.DeviceProfile.detect().dmr()) ch.type = ChannelStore.Channel.TYPE_FM;   // an analog-only radio: a new channel is analog (the type row is hidden)
         setOrientation(VERTICAL); setBackground(Neo.page(c));   // overlay: covers the channel list
         setClickable(true);
         float d = Theme.dp(c);
@@ -114,7 +115,8 @@ public class ChannelEditorView extends LinearLayout {
         section(form, "Channel");
         name = textInto(form, "Channel name", H_NAME, ch.name, InputType.TYPE_CLASS_TEXT);
         nameCounter(name);
-        choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog", "M17" }, ch.type, v -> { ch.type = v; refreshGroups(); });
+        if (com.macdmr.radio.DeviceProfile.detect().dmr() || ch.type != com.macdmr.radio.ChannelStore.Channel.TYPE_FM)   // an analog-only radio: every channel is analog (an old DMR channel can still be changed)
+            choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog", "M17" }, ch.type, v -> { ch.type = v; refreshGroups(); });
         // receive first: repeater lists give the output (what you hear) and the offset
         rx = textInto(form, "Receive frequency (MHz)", H_RX, ch.rxFreq > 0 ? String.format(Locale.US, "%.5f", ch.rxFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         tx = textInto(form, "Send frequency (MHz)", H_TX, ch.txFreq > 0 ? String.format(Locale.US, "%.5f", ch.txFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -487,7 +489,7 @@ public class ChannelEditorView extends LinearLayout {
             ch.notes = notes.getText().toString().trim();
             ch.txFreq = (int) Math.round(Double.parseDouble(tx.getText().toString().trim()) * 1e6);
             ch.rxFreq = (int) Math.round(Double.parseDouble(rx.getText().toString().trim()) * 1e6);
-            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) throw new IllegalArgumentException("Frequencies must be 136–174 or 400–480 MHz");
+            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) throw new IllegalArgumentException("Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText());
             if (ch.rxFreq < 300_000_000) ch.band = 1;                                  // VHF must be wide on this radio
             String la = lat.getText().toString().trim(), lo = lon.getText().toString().trim();
             if (la.isEmpty() && lo.isEmpty()) { ch.lat = 0; ch.lon = 0; }

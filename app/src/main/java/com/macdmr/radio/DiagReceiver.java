@@ -20,6 +20,7 @@ import android.util.Log;
  * am broadcast -a com.macdmr.radio.DIAG --es cmd heard --es call DEST        (as if DEST was heard on the radio)
  * am broadcast -a com.macdmr.radio.DIAG --es cmd benchIgate --ez on true       (gate to RF without APRS-IS and off 144.390)
  * am broadcast -a com.macdmr.radio.DIAG --es cmd pkt --es what object|bulletin|telemetry|weather|cwid|beacon|connect|disconnect
+ * am broadcast -a com.macdmr.radio.DIAG --es cmd checks --es watch auto --el hosttime 1793000000000   (Run all checks, no screen)
  * </pre>
  * {@code inject} plays a WAV file (16-bit PCM, any rate, mono or stereo) into the receive path in real time, as if
  * the radio heard it: decoders, the parrot and the DTMF remote see it, nothing is keyed by the injection itself.
@@ -36,7 +37,7 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "isline": if (s.packet() != null) s.packet().diagServerLine(i.getStringExtra("line")); break;
             case "heard": if (s.packet() != null) s.packet().diagHeard(i.getStringExtra("call")); break;
             case "vfo": {                                                       // bench: the VFO on --ei hz (wide; low power unless --ei power 1; nothing is keyed)
-                int hz = i.getIntExtra("hz", 0); if (hz < 136_000_000 || hz > 480_000_000) { Log.w("DiagReceiver", "vfo: bad hz " + hz); break; }
+                int hz = i.getIntExtra("hz", 0); if (!com.macdmr.radio.DeviceProfile.inBands(hz)) { Log.w("DiagReceiver", "vfo: bad hz " + hz); break; }
                 s.diagVfo(hz, i.getIntExtra("power", 0) == 1 ? 1 : 0); break;
             }
             case "scope": {                                                     // bench: --ei from --ei to --ei step --ei settle (ms) --ei sweeps N: log N sweeps, then stop
@@ -55,6 +56,9 @@ public final class DiagReceiver extends BroadcastReceiver {
                 }, "diag-scope").start();
                 break;
             }
+            case "checks": FirstRunCheck.benchRun(c.getApplicationContext(), s, i.getStringExtra("watch"), i.getBooleanExtra("trial", false), i.getLongExtra("hosttime", 0)); break;   // bench: Run all checks with no screen (--es watch auto|none|<pkg>, --ez trial, --el hosttime ms); scripts/w6/run_checks.sh
+            case "audioprobe": { final int ms = i.getIntExtra("ms", 2000); final double hz = i.getIntExtra("hz", 1000); final String tag = String.valueOf(i.getStringExtra("tag"));   // bench: does the receive audio reach Android's recorder? one line per source to the log
+                new Thread(() -> { for (String l : AudioSourceProbe.run(ms, hz).split("\n")) Log.i("AudioProbe", tag + " " + l); Log.i("AudioProbe", tag + " done"); }, "audioprobe").start(); break; }
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
             case "txwav": { String nm = i.getStringExtra("name"); if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) Log.i("DiagReceiver", "txwav: " + s.diagTxWav(new java.io.File(c.getCacheDir(), "tx_" + nm + ".wav"))); break; }   // bench: transmit cache/tx_<name>.wav (low power VFO)
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel

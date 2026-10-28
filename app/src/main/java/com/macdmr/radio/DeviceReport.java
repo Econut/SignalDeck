@@ -54,15 +54,32 @@ public final class DeviceReport {
     /** Packages the last report took for the stock walkie-talkie app (the first-run check watches the first one). */
     public static volatile List<String> lastCandidates = new ArrayList<>();
 
+    /**
+     * Bench (adb {@code checks --el hosttime}): the host's clock minus the phone's. A phone whose clock is wrong (the W6 boots
+     * at its build date) would otherwise name its folders months off and sort them wrongly. 0 = trust the phone.
+     */
+    public static volatile long clockOffsetMs;
+    static long now() { return System.currentTimeMillis() + clockOffsetMs; }
+
+    /** One line about the phone's clock when the host's differs by two minutes or more, else null. */
+    static String clockNote(long phoneMs, long offsetMs) {
+        if (Math.abs(offsetMs) < 120_000L) return null;
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US); f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+        long d = Math.abs(offsetMs) / 86_400_000L, h = Math.abs(offsetMs) / 3600_000L % 24, m = Math.abs(offsetMs) / 60_000L % 60;
+        return "phone " + f.format(new Date(phoneMs)) + " UTC, host " + f.format(new Date(phoneMs + offsetMs)) + " UTC: the phone is "
+                + (d > 0 ? d + " d " : "") + (d > 0 || h > 0 ? h + " h " : "") + m + " min " + (offsetMs > 0 ? "behind" : "ahead") + " (folder and header use the host's time)";
+    }
+
     public static File generate(Context c, Progress p) throws Exception {
         String tag = (Build.MANUFACTURER + "_" + Build.MODEL).replaceAll("[^A-Za-z0-9._-]+", "_");
-        File dir = new File(reportRoot(), tag + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date()));
+        File dir = new File(reportRoot(), tag + "_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date(now())));
         if (!dir.mkdirs() && !dir.isDirectory()) throw new Exception("cannot create " + dir);
         StringBuilder r = new StringBuilder();
         boolean root = suPresent() && RootSetup.haveRoot();
 
         p.step("Phone");
-        h(r, "SignalDeck device report " + BuildConfig.VERSION_NAME + "  " + new Date());
+        h(r, "SignalDeck device report " + BuildConfig.VERSION_NAME + "  " + new Date(now()));
+        String clock = clockNote(System.currentTimeMillis(), clockOffsetMs); if (clock != null) kv(r, "clock", clock);
         kv(r, "manufacturer", Build.MANUFACTURER); kv(r, "brand", Build.BRAND); kv(r, "model", Build.MODEL); kv(r, "device", Build.DEVICE); kv(r, "product", Build.PRODUCT);
         kv(r, "board", Build.BOARD); kv(r, "hardware", Build.HARDWARE); kv(r, "fingerprint", Build.FINGERPRINT); kv(r, "display", Build.DISPLAY);
         kv(r, "android", Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ", security patch " + Build.VERSION.SECURITY_PATCH + ")");
@@ -209,7 +226,7 @@ public final class DeviceReport {
     /** The report folder a follow-up step (listen check) should add to: the newest one if it was made today, else a new report. */
     public static File currentOrNew(Context c) {
         File d = newestDir();
-        if (d != null && System.currentTimeMillis() - createdAt(d) < 12 * 3600_000L) return d;
+        if (d != null && now() - createdAt(d) < 12 * 3600_000L) return d;
         try { generate(c, s -> { }); } catch (Throwable ignored) { }
         return newestDir();
     }
@@ -217,20 +234,25 @@ public final class DeviceReport {
     /**
      * Strings from the stock app's code and native libraries that tell how it drives the radio: every /sys and /dev path,
      * audio-system parameters ("pdt_play=off"), serial speeds, and log texts about PTT, receive, transmit, power and PCM
-     * (QuickChat's "setPttLaunch" / "setPttReceive" told us that ptt_control 0 keys its transmitter). Only short ASCII
-     * strings from the code, never resources or user data.
+     * (QuickChat's "setPttLaunch" / "setPttReceive" told us that ptt_control 0 keys its transmitter), and the radio module's
+     * command names ("AT+DMOSETGROUP=": the W6's SA818-class module). Native libraries of every ABI are read: the W6 is a
+     * 32-bit phone whose app ships only lib/armeabi-v7a. Only short ASCII strings from the code, never resources or user data.
      */
     public static String apkClues(File apk) {
-        java.util.TreeSet<String> paths = new java.util.TreeSet<>(), params = new java.util.TreeSet<>(), bauds = new java.util.TreeSet<>(), logs = new java.util.TreeSet<>();
+        java.util.TreeSet<String> paths = new java.util.TreeSet<>(), params = new java.util.TreeSet<>(), bauds = new java.util.TreeSet<>(), logs = new java.util.TreeSet<>(),
+                cmds = new java.util.TreeSet<>(), libs = new java.util.TreeSet<>();
         Pattern pPath = Pattern.compile("/(sys|dev|proc)/[A-Za-z0-9_./-]{2,80}"), pParam = Pattern.compile("\\b[a-z][a-z0-9_]{2,30}=(on|off|1|0|true|false)\\b"),
                 pBaud = Pattern.compile("\\bB(9600|19200|38400|57600|115200|230400|460800|921600)\\b"),
-                pLog = Pattern.compile("[ -~]{0,50}(?i:ptt|pcm|serial ?port|intercom|interphone|walkie|dmr)[ -~]{0,50}"),
+                // a keyword that starts a word or a camelCase part ("isPttButton", "PTT key"), not one inside a word ("onInterceptTouchEvent")
+                pLog = Pattern.compile("[ -~]{0,50}((?<![A-Za-z])(?i:ptt|pcm|dmr)|(?<=[a-z])(?:Ptt|PTT|Pcm|PCM|Dmr|DMR)|(?i:serial ?port|intercom|interphone|walkie))[ -~]{0,50}"),
+                pCmd = Pattern.compile("\\bAT\\+[A-Z][A-Z0-9]{2,20}[=?]?"),
                 pFramework = Pattern.compile("(?i).*(activity|intent|content|receiver|launcher|shortcut|broadcast|permission|fragment|view|layout|leanback|androidx|java|kotlin).*");
         try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(apk)) {
             java.util.Enumeration<? extends ZipEntry> en = z.entries();
             while (en.hasMoreElements()) {
                 ZipEntry e = en.nextElement(); String n = e.getName();
-                boolean dex = n.matches("classes\\d*\\.dex"), so = n.startsWith("lib/arm64") && n.endsWith(".so");
+                boolean dex = n.matches("classes\\d*\\.dex"), so = n.startsWith("lib/") && n.endsWith(".so");
+                if (so) libs.add(n);
                 if ((!dex && !so) || e.getSize() > 40_000_000) continue;
                 byte[] b; try (InputStream in = z.getInputStream(e)) { java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] t = new byte[65536]; int k; while ((k = in.read(t)) > 0) bo.write(t, 0, k); b = bo.toByteArray(); }
                 // split into printable runs, as `strings` would
@@ -244,6 +266,7 @@ public final class DeviceReport {
                         java.util.regex.Matcher m = pPath.matcher(s); while (m.find()) paths.add(m.group());
                         m = pParam.matcher(s); while (m.find()) params.add(m.group());
                         m = pBaud.matcher(s); while (m.find()) bauds.add(m.group());
+                        m = pCmd.matcher(s); while (m.find() && cmds.size() < 60) cmds.add(m.group());
                         if (dex && s.length() <= 100 && logs.size() < 120 && !s.contains("/") && (s.contains(" ") || s.contains(":") || s.contains(","))
                                 && pLog.matcher(s).matches() && !pFramework.matcher(s).matches()) logs.add(s.trim());           // log-like texts, not framework names
                     }
@@ -255,8 +278,17 @@ public final class DeviceReport {
         out.append("  paths: ").append(paths.isEmpty() ? "-" : String.join("  ", paths)).append('\n');
         out.append("  audio/system parameters: ").append(params.isEmpty() ? "-" : String.join("  ", params)).append('\n');
         out.append("  serial speeds: ").append(bauds.isEmpty() ? "-" : String.join(" ", bauds)).append('\n');
+        out.append("  native libraries: ").append(libs.isEmpty() ? "-" : String.join("  ", libs)).append('\n');
+        out.append("  module commands: ").append(cmds.isEmpty() ? "-" : String.join("  ", cmds)).append('\n');
+        String fam = commandFamily(cmds); if (fam != null) out.append("  protocol hint from its code: ").append(fam).append('\n');
         out.append("  log texts about the radio:\n"); for (String s : logs) out.append("    ").append(mask(s)).append('\n');
         return out.toString();
+    }
+
+    /** The module family the command names in an app's code point to, or null. */
+    static String commandFamily(java.util.Collection<String> cmds) {
+        int dmo = 0; for (String c : cmds) if (c.startsWith("AT+DMO")) dmo++;
+        return dmo >= 2 ? "SA818-class AT commands (" + dmo + " AT+DMO… names)" : null;
     }
 
     /** Bytes read from each device-tree property (pin-name lists run to a few hundred). */
@@ -426,20 +458,71 @@ public final class DeviceReport {
         try { if (Build.VERSION.SDK_INT >= 33) c.registerReceiver(br, f, Context.RECEIVER_EXPORTED); else c.registerReceiver(br, f); } catch (Throwable ignored) { }
         keyCapture = e -> keys.append(String.format(Locale.US, "  key %s code=%d scan=%d device=%d flags=0x%x\n", e.getAction() == KeyEvent.ACTION_DOWN ? "DOWN" : "UP  ", e.getKeyCode(), e.getScanCode(), e.getDeviceId(), e.getFlags()));
         boolean root = suPresent() && RootSetup.haveRoot();
-        String events = "", logs = "";
+        String events = "", logs = "", devices = "";
         try {
             if (root) {
                 RootSetup.run("logcat -c");
-                events = RootSetup.run("timeout " + seconds + " getevent -lt 2>&1 | grep -v 'SYN_REPORT' | head -200");
+                devices = keyDevices(RootSetup.run("getevent -pl 2>&1 | head -400"));
+                events = keyEvents(RootSetup.run("timeout " + seconds + " getevent -lt 2>&1 | grep -v 'SYN_REPORT' | head -6000"));
                 logs = redact(RootSetup.run("logcat -d 2>/dev/null | grep -iE 'ptt|intercom|interphone|walkie|KeyEvent|keycode' | head -80"));
             } else Thread.sleep(seconds * 1000L);
         } catch (Throwable ignored) { }
         keyCapture = null;
         try { c.unregisterReceiver(br); } catch (Throwable ignored) { }
         String layouts = root ? keyLayouts(rawKeys(events)) : "";
-        return "Activity key events and known PTT broadcasts:\n" + (keys.length() == 0 ? "  (none reached the app)\n" : keys) + "\nInput events (root getevent):\n" + (events.isEmpty() ? "  (n/a)\n" : events + "\n")
+        return "Activity key events and known PTT broadcasts:\n" + (keys.length() == 0 ? "  (none reached the app)\n" : keys)
+                + (devices.isEmpty() ? "" : "\nInput devices with keys (root getevent -pl; a side key is often on its own device):\n" + devices)
+                + "\nInput events (root getevent; keys and switches only):\n" + (events.isEmpty() ? "  (n/a)\n" : events + "\n")
                 + (layouts.isEmpty() ? "" : "\nWhat the key layouts make of those keys (root):\n" + layouts)
                 + "\nLog lines during the capture (root):\n" + (logs.isEmpty() ? "  (n/a)\n" : logs + "\n");
+    }
+
+    /**
+     * The key and switch events of a getevent -lt capture, with the device list it starts with; motion and sensor events
+     * (EV_ABS, EV_REL, EV_MSC: the W6's accelerometer sent about 1000 lines in 10 s and buried any key) are counted per
+     * device instead of listed. At most 300 lines.
+     */
+    static String keyEvents(String raw) {
+        StringBuilder out = new StringBuilder();
+        java.util.Map<String, Integer> dropped = new java.util.TreeMap<>();
+        java.util.Map<String, String> names = new java.util.HashMap<>();
+        String lastDev = null; int lines = 0;
+        for (String l : (raw == null ? "" : raw).split("\n")) {
+            String t = l.trim(); if (t.isEmpty()) continue;
+            java.util.regex.Matcher add = Pattern.compile("^add device \\d+: (/dev/input/\\S+)").matcher(t);
+            if (add.find()) { lastDev = add.group(1); continue; }
+            java.util.regex.Matcher nm = Pattern.compile("^name:\\s+\"(.*)\"").matcher(t);
+            if (nm.find() && lastDev != null) { names.put(lastDev, nm.group(1)); continue; }
+            java.util.regex.Matcher ev = Pattern.compile("(/dev/input/\\S+): (EV_[A-Z]+)").matcher(t);
+            if (!ev.find()) continue;
+            if (ev.group(2).equals("EV_KEY") || ev.group(2).equals("EV_SW")) { if (lines++ < 300) out.append("  ").append(t).append(names.containsKey(ev.group(1)) ? "   (" + names.get(ev.group(1)) + ")" : "").append('\n'); }
+            else dropped.merge(ev.group(1), 1, Integer::sum);
+        }
+        if (lines == 0) out.append("  no key or switch events\n");
+        if (lines > 300) out.append("  … ").append(lines - 300).append(" more key events\n");
+        for (java.util.Map.Entry<String, Integer> e : dropped.entrySet())
+            out.append("  (").append(e.getValue()).append(" motion/sensor events from ").append(e.getKey()).append(names.containsKey(e.getKey()) ? " " + names.get(e.getKey()) : "").append(" left out)\n");
+        return out.toString();
+    }
+
+    /** From getevent -pl: each input device that reports keys, with its key names ("event12 hook_dmr: KEY_F2 KEY_F3"). */
+    static String keyDevices(String pl) {
+        StringBuilder out = new StringBuilder();
+        String dev = null, name = ""; java.util.List<String> keys = null; boolean inKeys = false;
+        for (String l : ((pl == null ? "" : pl) + "\nadd device 0: /dev/null").split("\n")) {
+            java.util.regex.Matcher add = Pattern.compile("^add device \\d+: /dev/input/(\\S+)|^add device \\d+: (/dev/null)").matcher(l.trim());
+            if (add.find()) {
+                if (dev != null && keys != null && !keys.isEmpty()) out.append("  ").append(dev).append(" ").append(name).append(": ").append(String.join(" ", keys.subList(0, Math.min(40, keys.size())))).append(keys.size() > 40 ? " …" : "").append('\n');
+                dev = add.group(1); name = ""; keys = new java.util.ArrayList<>(); inKeys = false; continue;
+            }
+            String t = l.trim();
+            java.util.regex.Matcher nm = Pattern.compile("^name:\\s+\"(.*)\"").matcher(t);
+            if (nm.find()) { name = nm.group(1); continue; }
+            if (t.startsWith("KEY (0001):")) { inKeys = true; t = t.substring(11); }
+            else if (t.matches("^[A-Z]{2,4}\\s+\\([0-9a-f]{4}\\):.*") || t.startsWith("input props") || t.startsWith("events:")) { inKeys = false; continue; }
+            if (inKeys && keys != null) for (String k : t.split("\\s+")) if (k.matches("(KEY|BTN)_[A-Z0-9_]+|[0-9a-f]{4}")) keys.add(k);
+        }
+        return out.length() == 0 ? "  (none)\n" : out.toString();
     }
 
     /** JNI entry points of a native library, by scanning for "Java_" symbol names: tells us the Java class the vendor's serial opener binds to. */
@@ -757,6 +840,10 @@ public final class DeviceReport {
     }
     private static void kv(StringBuilder r, String k, String v) { r.append(String.format(Locale.US, "  %-28s %s\n", k, v == null ? "" : v.trim())); }
     private static boolean suPresent() { for (String p : new String[] { "/system/bin/su", "/system/xbin/su", "/sbin/su", "/data/adb/magisk", "/debug_ramdisk/su" }) if (new File(p).exists()) return true; return false; }
+    /** A report folder's whole report.txt ({@link #cat} stops at 200 lines; the summary and the clue lines sit far below that). */
+    public static String readReport(File dir) {
+        try { return new String(java.nio.file.Files.readAllBytes(new File(dir, "report.txt").toPath()), java.nio.charset.StandardCharsets.UTF_8); } catch (Throwable t) { return ""; }
+    }
     public static String cat(String path) { try (BufferedReader b = new BufferedReader(new InputStreamReader(new FileInputStream(path)))) { StringBuilder s = new StringBuilder(); String l; int n = 0; while ((l = b.readLine()) != null && n++ < 200) s.append(l).append('\n'); return s.toString(); } catch (Throwable t) { return ""; } }
     static String ls(String dir, Pattern filter) { File[] fs = dir == null ? null : new File(dir).listFiles(); if (fs == null) return "(not readable)"; StringBuilder s = new StringBuilder(); for (File f : fs) if (filter == null || filter.matcher(f.getName()).find()) s.append(f.getName()).append(' '); return s.length() == 0 ? "-" : s.toString(); }
     static String getprop(String k) { return exec("getprop " + k).trim(); }

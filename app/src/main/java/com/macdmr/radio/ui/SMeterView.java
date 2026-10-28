@@ -37,10 +37,14 @@ public class SMeterView extends View {
         return "S9+" + (dbm + 93);
     }
 
-    @Override protected void onMeasure(int w, int h) { setMeasuredDimension(MeasureSpec.getSize(w), Theme.dp(getContext(), 34)); }
+    private boolean compact;
+    /** Compact intercom: a 12 dp bar with no S-unit scale under it (the reading beside it says the value). */
+    public void setCompact(boolean on) { if (on == compact) return; compact = on; requestLayout(); invalidate(); }
+
+    @Override protected void onMeasure(int w, int h) { setMeasuredDimension(MeasureSpec.getSize(w), Theme.dp(getContext(), compact ? 12 : 34)); }
 
     @Override protected void onDraw(Canvas c) {
-        float d = Theme.dp(getContext()), w = getWidth(), gap = 3 * d, sw = (w - gap * (SEGS - 1)) / SEGS, top = 2 * d, bot = 18 * d;
+        float d = Theme.dp(getContext()), w = getWidth(), gap = (compact ? 2 : 3) * d, sw = (w - gap * (SEGS - 1)) / SEGS, top = 2 * d, bot = (compact ? 10 : 18) * d;
         // S1..S9 over the first 16 segments (3 dB each), S9..S9+40 over the last 8 (5 dB each)
         int lit = dbm == -999 ? 0 : Math.max(0, Math.min(SEGS, Math.round(dbm <= -93 ? (dbm - LOW) / 3f : 16 + (dbm + 93) / 5f)));
         for (int i = 0; i < SEGS; i++) {
@@ -52,6 +56,7 @@ public class SMeterView extends View {
             r.set(x, top, x + sw, bot);
             c.drawRoundRect(r, 2 * d, 2 * d, seg);
         }
+        if (compact) return;
         String[] labels = { "S1", "S3", "S5", "S7", "S9", "+20", "+40" };
         float[] at = { 0, 4 / 24f, 8 / 24f, 12 / 24f, 16 / 24f, 20 / 24f, 1f };
         float y = bot + 13 * d;

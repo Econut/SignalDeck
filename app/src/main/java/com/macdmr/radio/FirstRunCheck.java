@@ -45,15 +45,25 @@ public final class FirstRunCheck {
                 DeviceReport.append("Clues in " + watchPkg + "'s code", note);
             } catch (Throwable t) { DeviceReport.append("Clues in " + watchPkg + "'s code", String.valueOf(t)); }
         }
+        { File d = DeviceReport.newestDir(); String hint = codeHint(d == null ? "" : DeviceReport.readReport(d));
+          if (hint != null) sum.append("the stock app's code names ").append(hint).append('\n'); }   // works without root
 
         p.step("Press and release the side PTT key a few times now (10 s)");
         DeviceReport.append("PTT key capture", DeviceReport.captureKeys(c, 10));
 
         String stockAnswers = null;                                              // module replies found in the stock app's own log
+        String watchText = "";
         if (watchPkg != null && !svc.isReady() && RootSetup.haveRoot()) {
-            String w = watchStockApp(watchPkg, p);
+            lastTrace = null;
+            String w = watchStockApp(c, watchPkg, p); watchText = w;
             DeviceReport.append("The stock app at work (" + watchPkg + ", 15 s, receive only)", w);
             sum.append("watched ").append(watchPkg).append(" start up for 15 s\n");
+            File dir = DeviceReport.newestDir();
+            if (lastTrace != null && dir != null) {                              // the whole sniff beside report.txt (radio IDs blanked)
+                try (java.io.FileOutputStream o = new java.io.FileOutputStream(new File(dir, "stock_serial.txt"))) { o.write(SerialTrace.redact(lastTrace).getBytes("UTF-8")); } catch (Throwable ignored) { }
+                String proto = SerialTrace.family(SerialTrace.data(lastTrace));
+                sum.append("its serial traffic (stock_serial.txt): ").append(proto).append('\n');
+            }
             stockAnswers = stockAnswers(w);
         } else sum.append("stock app not watched: ").append(watchPkg == null ? "skipped (no app chosen)" : svc.isReady() ? "SignalDeck owns the radio" : "no root").append('\n');
 
@@ -62,15 +72,20 @@ public final class FirstRunCheck {
         if (svc.isReady()) {
             sum.append("radio probe skipped: SignalDeck owns the radio (Hand back first to probe the ports)\n");
         } else {
-            String r = RadioProbe.run(c, s -> p.step("Probe: " + s), false);
+            File dir = DeviceReport.newestDir();
+            java.util.Set<String> named = RadioProbe.namedPorts(dir == null ? "" : DeviceReport.readReport(dir), watchText, dp.supported ? dp.controlPort : null);
+            String r = RadioProbe.run(c, s -> p.step("Probe: " + s), false, named);
             DeviceReport.append("Radio probe", r);
             boolean answered = r.contains("answered");
             if (!answered && dp.supported && dp.powerNode != null) {             // the stock app switches the module off when it closes
-                String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true);
+                String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true, named);
                 DeviceReport.append("Radio probe (module power switched on first)", r2);
-                answered = r2.contains("answered");
+                answered = r2.contains("answered"); r = r2;
             }
-            sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');
+            if (r.contains(RadioProbe.AT_MARK))
+                sum.append("radio module answered: yes, with AT commands (SA818 class)").append(atWhere(r)).append(": SignalDeck has no engine for this module family yet\n");
+            else sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');
+            if (!named.isEmpty()) sum.append("ports probed: only those the stock app or the profile name (").append(String.join(" ", named)).append(")\n");
             if (!answered && stockAnswers != null)
                 sum.append("  but ").append(stockAnswers).append(": the module works; SignalDeck's probe did not reach the port it is on\n");
         }
@@ -121,6 +136,54 @@ public final class FirstRunCheck {
         return r.toString();
     }
 
+    /**
+     * Bench (adb {@code checks --es watch …}): which app the 15 s watch opens, as the Run all checks dialog would offer it.
+     * "none" skips the watch, a package name is taken as given, "auto" (or nothing) takes the profile's stock app, else
+     * the best-ranked candidate with a launcher icon, else none.
+     */
+    static String benchWatch(String arg, String profileApp, java.util.List<RadioAppFinder.App> ranked) {
+        if ("none".equals(arg)) return null;
+        if (arg != null && !arg.isEmpty() && !"auto".equals(arg)) return arg;
+        if (profileApp != null && !profileApp.isEmpty()) return profileApp;
+        for (RadioAppFinder.App a : ranked) if (a.launcher) return a.pkg;
+        return null;
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean benchBusy = new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Bench (adb): Run all checks with no screen, as {@code DiagReceiver checks}. Progress, the folder and the zip go to the
+     * log under the tag "BenchChecks" ("done <folder> <zip>" or "failed …" ends a run), which scripts/w6/run_checks.sh waits for.
+     */
+    static void benchRun(Context c, RadioService svc, String watchArg, boolean trial, long hostTime) {
+        if (!benchBusy.compareAndSet(false, true)) { android.util.Log.w("BenchChecks", "busy: a run is in progress"); return; }
+        if (hostTime > 0) DeviceReport.clockOffsetMs = hostTime - System.currentTimeMillis();
+        new Thread(() -> {
+            try {
+                String watch = benchWatch(watchArg, svc.profile().supported ? svc.profile().stockApp : "",
+                        "none".equals(watchArg) || svc.isReady() || !RootSetup.haveRoot() ? new java.util.ArrayList<>() : RadioAppFinder.rank(c));
+                android.util.Log.i("BenchChecks", "start watch=" + watch + " trial=" + trial + " clockOffsetMs=" + DeviceReport.clockOffsetMs);
+                File zip = run(c, svc, trial, watch, t -> android.util.Log.i("BenchChecks", "step " + t));
+                c.getSharedPreferences("radio", Context.MODE_PRIVATE).edit().putLong("supportChecks", System.currentTimeMillis()).apply();
+                File dir = DeviceReport.newestDir();
+                android.util.Log.i("BenchChecks", "done " + (dir == null ? "-" : dir.getAbsolutePath()) + " " + zip.getAbsolutePath());
+            } catch (Throwable t) { android.util.Log.w("BenchChecks", "failed " + t); }
+            finally { benchBusy.set(false); }
+        }, "bench-checks").start();
+    }
+
+    /** The first "protocol hint from its code:" in a report, or null. */
+    static String codeHint(String report) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?m)^  protocol hint from its code: (.+)$").matcher(report == null ? "" : report);
+        return m.find() ? m.group(1).trim() : null;
+    }
+
+    /** " on /dev/ttyS2 at 9600 baud" from the probe's AT line, or "". */
+    static String atWhere(String probe) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(RadioProbe.AT_MARK) + "( on \\S+ at \\d+ baud)").matcher(probe);
+        return m.find() ? m.group(1) : "";
+    }
+
     static final String STOCK_ANSWERS = "module replies in its log: ", NONE_RECOGNISED = "none recognised";
 
     /** The module-replies line of a stock-app watch, or null when it found none. */
@@ -138,15 +201,28 @@ public final class FirstRunCheck {
      * its own log lines (QuickChat logs every step: "setPttReceive", "initPcmSerialPort", its PCM packets), which serial
      * ports it opens and the line settings it gives them, and the radio driver's kernel messages. Then close it. Nobody
      * presses PTT meanwhile (the progress text says so): this only listens.
+     * <p>With the sdtrace helper, the app is stopped first and started under it, so the report sees its start-up from the
+     * first system call: the serial port it opens, the line settings, and every byte both ways (the W6's app sent
+     * AT+DMOCONNECT, AT+DMOVERQ, AT+DMOSETGROUP, AT+DMOSETVOLUME, each ending in a bare \r). The whole trace is kept in
+     * {@link #lastTrace}; the caller writes it beside the report.
      */
-    static String watchStockApp(String pkg, Progress p) throws InterruptedException {
+    static String watchStockApp(Context c, String pkg, Progress p) throws InterruptedException {
         StringBuilder r = new StringBuilder();
         String comp = RootSetup.run("cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER " + pkg + " | tail -1").trim();
         if (!comp.contains("/")) return "no launcher activity found for " + pkg + " (" + comp + ")\n";
+        String tracer = null;
+        try { tracer = AlsaDirectAudio.install(c, "sdtrace"); } catch (Throwable t) { r.append("serial sniff not available: ").append(t.getMessage()).append('\n'); }
+        if (tracer != null) r.append("stopped first, so its start-up is seen: ").append(stopFully(pkg)).append('\n');   // a running app is only brought to the front
         String kBefore = RootSetup.run(KMSG);
         RootSetup.run("logcat -c");
         p.step("The stock walkie-talkie app is open for 15 s — please do not press PTT");
-        r.append("start ").append(comp).append(": ").append(RootSetup.run("am start -n " + comp + " 2>&1 | tail -1")).append('\n');
+        final String[] started = { "" };
+        Thread sniff = null;
+        if (tracer != null) {                                                   // the sniffer waits for the process, then the app is started
+            final String cmd = AlsaDirectAudio.quote(tracer) + " -n " + pkg + " -t 15000 -w 10000 > " + TRACE_FILE + " 2>&1 & sleep 0.3; am start -n " + comp + " 2>&1 | tail -1; wait";
+            sniff = new Thread(() -> started[0] = RootSetup.run(cmd), "sdtrace");
+            sniff.start();
+        } else started[0] = RootSetup.run("am start -n " + comp + " 2>&1 | tail -1");
         Thread.sleep(8000);
         String pid = RootSetup.run("pidof " + pkg + " || true").trim().split("\\s+")[0];
         if (pid.matches("\\d+")) {
@@ -172,9 +248,21 @@ public final class FirstRunCheck {
         r.append("\nits log (").append(hexLines).append(" data-dump lines shortened to 3 samples; personal details removed):\n").append(DeviceReport.redact(kept.toString()));
         String kAfter = RootSetup.run(KMSG);
         r.append("\nradio driver kernel messages that appeared meanwhile:\n").append(newLines(kBefore, kAfter));
-        r.append("\nclosed: ").append(stopFully(pkg)).append('\n');
+        if (sniff != null) {
+            sniff.join(15000);
+            String trace = RootSetup.run("cat " + TRACE_FILE + " 2>&1; rm -f " + TRACE_FILE);
+            lastTrace = trace;
+            r.append("\nits serial traffic from its first call (sdtrace; every byte in stock_serial.txt, radio IDs blanked):\n").append(SerialTrace.summary(trace));
+            for (String l : trace.split("\n")) if (l.contains("sdtrace:") && (l.contains("attach") || l.contains("not found") || l.contains("not listed"))) r.append("  ").append(l.trim()).append('\n');
+        }
+        r.append("\nstart ").append(comp).append(": ").append(started[0].trim()).append('\n');
+        r.append("closed: ").append(stopFully(pkg)).append('\n');
         return r.toString();
     }
+
+    private static final String TRACE_FILE = "/data/local/tmp/signaldeck_sdtrace.txt";
+    /** The last watch's raw serial trace (null without the sniffer); written redacted beside the report. */
+    static volatile String lastTrace;
 
     /**
      * Force-stop an app and make sure it stays stopped: QuickChat restarts itself (its service), and the probe found it

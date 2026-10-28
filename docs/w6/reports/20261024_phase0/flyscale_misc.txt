@@ -1,0 +1,29 @@
+total 0
+drwxr-xr-x  3 root root u:object_r:sysfs:s0     0 2026-06-27 11:19 .
+drwxr-xr-x 41 root root u:object_r:sysfs:s0     0 2026-06-27 11:14 ..
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 af_en
+-r--r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 dev
+-rw-rw-rw-  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:09 dmr_en
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 dmr_mic_en
+-rw-rw-rw-  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:09 dmr_ptt
+-rw-rw-rw-  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:09 dmr_pwd
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 m6_dmr_en
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 m6_mic_en
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 m6_spk_en
+-rw-rw-rw-  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:09 mic_en
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 nr_en
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 nr_pwr
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 poc_spk_en
+drwxr-xr-x  2 root root u:object_r:sysfs:s0     0 2026-06-27 11:19 power
+-rw-rw-rw-  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:09 spk_en
+lrwxrwxrwx  1 root root u:object_r:sysfs:s0     0 2026-06-27 11:19 subsystem -> ../../../../class/misc
+-rw-r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 uevent
+-r--r--r--  1 root root u:object_r:sysfs:s0  4096 2026-06-27 11:19 waiting_for_supplier
+ 11:20:36 up 1 min,  0 users,  load average: 7.79, 2.20, 0.75
+
+dmr_en=0
+ 11:28:24 up 7 min,  0 users,  load average: 6.43, 5.52, 2.85
+dmr_pwd=0
+ 11:28:24 up 7 min,  0 users,  load average: 6.43, 5.52, 2.85
+dmr_ptt=0
+ 11:28:25 up 7 min,  0 users,  load average: 6.43, 5.52, 2.85

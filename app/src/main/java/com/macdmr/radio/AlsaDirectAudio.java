@@ -62,18 +62,21 @@ public final class AlsaDirectAudio implements AudioBackend {
     }
 
     /** The helper for this phone's ABI, copied from the APK's assets into files/bin (again whenever it changed). */
-    static String install(Context c) throws Exception {
+    static String install(Context c) throws Exception { return install(c, "sdalsa"); }
+
+    /** A native helper shipped as assets/NAME/ABI/NAME (sdalsa, the report's sdtrace), installed the same way. */
+    static String install(Context c, String name) throws Exception {
         String abi = null;
         for (String a : Build.SUPPORTED_ABIS) if (a.equals("arm64-v8a") || a.equals("armeabi-v7a")) { abi = a; break; }
-        if (abi == null) throw new IllegalStateException("no sdalsa helper for " + Arrays.toString(Build.SUPPORTED_ABIS));
+        if (abi == null) throw new IllegalStateException("no " + name + " helper for " + Arrays.toString(Build.SUPPORTED_ABIS));
         byte[] want;
-        try (InputStream in = c.getAssets().open("sdalsa/" + abi + "/sdalsa")) { want = readAll(in); }
+        try (InputStream in = c.getAssets().open(name + "/" + abi + "/" + name)) { want = readAll(in); }
         File dir = new File(c.getFilesDir(), "bin"); if (!dir.isDirectory() && !dir.mkdirs()) throw new IllegalStateException("cannot create " + dir);
-        File f = new File(dir, "sdalsa");
+        File f = new File(dir, name);
         boolean same = false;
         if (f.length() == want.length) try (InputStream in = new java.io.FileInputStream(f)) { same = Arrays.equals(readAll(in), want); }
         if (!same) {
-            File tmp = new File(dir, "sdalsa.tmp");
+            File tmp = new File(dir, name + ".tmp");
             try (OutputStream o = new FileOutputStream(tmp)) { o.write(want); }
             if (!tmp.renameTo(f)) throw new IllegalStateException("cannot install " + f);
         }

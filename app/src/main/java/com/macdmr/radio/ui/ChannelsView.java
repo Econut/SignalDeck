@@ -34,7 +34,8 @@ import java.util.Map;
  * chips (All / Favourites / Analog / DMR), and card rows — channel number tile, name, frequency in MHz,
  * mode badge, the one detail that matters (colour code and slot, tone, repeater shift), a star that toggles
  * the Favourites zone, and a glowing frame plus ON AIR on the active channel. Tap a row for Use / Edit /
- * Star / Delete.
+ * Star / Delete. Long-press a row (or "Select several" on its sheet) to select channels: then taps tick rows, and a bar
+ * deletes them, stars them, adds them to a zone or takes them out of the open one.
  */
 public class ChannelsView extends LinearLayout implements RadioService.Listener {
     public interface Host { void openEditor(ChannelStore.Channel ch, boolean isNew); }
@@ -51,6 +52,11 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
     private Map<Integer, Object[]> heard = new java.util.HashMap<>();   // channel number → newest thing heard on it
     private int filter = 0;              // 0 all, 1 favourites, 2 analog, 3 DMR
     private int activeNumber = -1;
+    // selecting several channels: the ticked numbers, and the bar that replaces the header meanwhile
+    private final java.util.LinkedHashSet<Integer> picked = new java.util.LinkedHashSet<>();
+    private boolean selecting;
+    private LinearLayout selBar;
+    private TextView selCount, selOut;
 
     public ChannelsView(Context c) {
         super(c);
@@ -70,6 +76,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         shareBtn.setOnClickListener(v -> { if (svc != null) CodeplugDialog.menu(c, svc, this::reload); });
         Neo.addAction(header, shareBtn); Neo.addAction(header, mapBtn); Neo.addAction(header, nearby); Neo.addAction(header, zone); Neo.addAction(header, add);
         addView(header);
+        buildSelBar(c, d);
 
         // search field with a line icon
         LinearLayout sf = new LinearLayout(c); sf.setGravity(Gravity.CENTER_VERTICAL);
@@ -99,6 +106,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             t.setOnClickListener(v -> { filter = k; styleChips(); filter(); });
             LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT, (int) (36 * d)); lp.rightMargin = (int) (8 * d);
             cr.addView(t, lp); chips[i] = t;
+            if (i >= 2 && !com.macdmr.radio.DeviceProfile.detect().dmr()) t.setVisibility(GONE);   // an analog-only radio: every channel is analog
         }
         hs.addView(cr); addView(hs);
         styleChips();
@@ -106,7 +114,8 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         list = new ListView(c); list.setAdapter(adapter); list.setDivider(null); list.setDividerHeight(0);
         list.setSelector(new android.graphics.drawable.ColorDrawable(0)); list.setClipToPadding(false);
         list.setPadding((int) (12 * d), (int) (2 * d), (int) (12 * d), (int) (12 * d));
-        list.setOnItemClickListener((p, v, pos, id) -> showRowMenu(shown.get(pos)));
+        list.setOnItemClickListener((p, v, pos, id) -> { if (selecting) toggle(shown.get(pos).number); else showRowMenu(shown.get(pos)); });
+        list.setOnItemLongClickListener((p, v, pos, id) -> { if (!selecting) setSelecting(true); toggle(shown.get(pos).number); return true; });
         addView(list, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
     }
 
@@ -118,6 +127,87 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             if (on) { g.setColor(Neo.CYAN); g.setStroke(Theme.dp(c, 1), Neo.CYAN); } else { g.setColor(Neo.PANEL_SOLID); g.setStroke(Theme.dp(c, 1), 0xFF22364A); }
             chips[i].setBackground(g); chips[i].setTextColor(on ? 0xFF04121A : 0xFF9FB4C8);
         }
+    }
+
+    /** The bar shown while selecting: close, count, All on top; Star, Zone, Out of zone, Delete under it. */
+    private void buildSelBar(Context c, float d) {
+        selBar = new LinearLayout(c); selBar.setOrientation(VERTICAL); selBar.setVisibility(GONE);
+        selBar.setBackground(Neo.card(c, Neo.alpha(Neo.CYAN, 0x88), 14)); selBar.setPadding((int) (8 * d), (int) (6 * d), (int) (8 * d), (int) (8 * d));
+        LinearLayout top = new LinearLayout(c); top.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView close = Neo.iconButton(c, "close", Neo.CYAN, "Stop selecting"); close.setOnClickListener(v -> setSelecting(false));
+        top.addView(close, new LayoutParams((int) (40 * d), (int) (40 * d)));
+        selCount = Neo.text(c, "", Neo.TEXT, 17, Neo.ui(c)); selCount.setPadding((int) (8 * d), 0, 0, 0);
+        top.addView(selCount, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        TextView allBtn = Neo.button(c, "All", "check", Neo.CYAN); allBtn.setTextSize(13);
+        allBtn.setOnClickListener(v -> { boolean every = !shown.isEmpty(); for (ChannelStore.Channel ch : shown) if (!picked.contains(ch.number)) every = false;
+            if (every) for (ChannelStore.Channel ch : shown) picked.remove(ch.number); else for (ChannelStore.Channel ch : shown) picked.add(ch.number); selChanged(); });
+        top.addView(allBtn);
+        selBar.addView(top);
+        LinearLayout acts = new LinearLayout(c); acts.setBaselineAligned(false);
+        String[] names = { "Star", "Zone", "Out of zone", "Delete" }; int[] accents = { Neo.AMBER, Neo.CYAN, Neo.VIOLET, Neo.RED };
+        for (int i = 0; i < 4; i++) {
+            final int k = i;
+            TextView b = Neo.button(c, names[i], null, accents[i]); b.setTextSize(12.5f); b.setSingleLine(true); b.setPadding((int) (4 * d), (int) (6 * d), (int) (4 * d), (int) (6 * d));
+            LayoutParams lp = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); lp.setMargins((int) (3 * d), (int) (6 * d), (int) (3 * d), 0);
+            acts.addView(b, lp);
+            if (k == 2) selOut = b;
+            b.setOnClickListener(v -> { if (picked.isEmpty()) { android.widget.Toast.makeText(c, "Tick some channels first", android.widget.Toast.LENGTH_SHORT).show(); return; }
+                if (k == 0) starPicked(); else if (k == 1) zonePicked(); else if (k == 2) unzonePicked(); else deletePicked(); });
+        }
+        selBar.addView(acts);
+        LayoutParams sl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); sl.setMargins((int) (12 * d), (int) (8 * d), (int) (12 * d), 0);
+        addView(selBar, sl);
+    }
+
+    private void setSelecting(boolean on) {
+        selecting = on; picked.clear();
+        header.setVisibility(on ? GONE : VISIBLE); selBar.setVisibility(on ? VISIBLE : GONE);
+        selChanged();
+    }
+    private void toggle(int number) { if (!picked.remove(number)) picked.add(number); selChanged(); }
+    private void selChanged() {
+        selCount.setText(picked.size() + " selected");
+        if (selOut != null) selOut.setVisibility(svc != null && svc.zoneId() > 0 ? VISIBLE : GONE);    // only when a zone is open
+        adapter.notifyDataSetChanged();
+    }
+    private java.util.List<Integer> pickedList() { return new java.util.ArrayList<>(picked); }
+    private void done(String msg) { android.widget.Toast.makeText(getContext(), msg, android.widget.Toast.LENGTH_LONG).show(); setSelecting(false); reload(); }
+
+    /** Star them all, or unstar them all when every one is already a favourite. */
+    private void starPicked() {
+        if (svc == null) return;
+        boolean allFav = true; for (int n : picked) if (!favs.contains(n)) allFav = false;
+        done(svc.favouriteChannels(pickedList(), !allFav));
+    }
+    /** Add them to an existing zone (★ Favourites has its own Star) or to a new one. */
+    private void zonePicked() {
+        if (svc == null) return;
+        final Context c = getContext();
+        final java.util.List<ChannelStore.Zone> zs = new java.util.ArrayList<>(); for (ChannelStore.Zone z : svc.store().zones()) if (!ChannelStore.FAV_ZONE.equals(z.name)) zs.add(z);
+        String[] items = new String[zs.size() + 1];
+        for (int i = 0; i < zs.size(); i++) items[i] = zs.get(i).name + "  (" + zs.get(i).numbers.length + ")";
+        items[zs.size()] = "New zone…";
+        new android.app.AlertDialog.Builder(c).setTitle("Add " + picked.size() + (picked.size() == 1 ? " channel" : " channels") + " to")
+                .setItems(items, (dd, w) -> {
+                    if (w < zs.size()) { done(svc.addChannelsToZone(zs.get(w).id, null, pickedList())); return; }
+                    final EditText name = new EditText(c); name.setHint("Zone name"); name.setSingleLine(true);
+                    new android.app.AlertDialog.Builder(c).setTitle("New zone").setView(name)
+                            .setPositiveButton("Create", (d2, w2) -> done(svc.addChannelsToZone(0, name.getText().toString(), pickedList())))
+                            .setNegativeButton("Cancel", null).show();
+                }).setNegativeButton("Cancel", null).show();
+    }
+    private void unzonePicked() {
+        if (svc == null || svc.zoneId() <= 0) return;
+        final long zid = svc.zoneId();
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Take " + picked.size() + (picked.size() == 1 ? " channel" : " channels") + " out of zone " + svc.zoneName() + "?")
+                .setMessage("The channels themselves stay; only this zone's list changes.")
+                .setPositiveButton("Take out", (dd, w) -> done(svc.removeChannelsFromZone(zid, pickedList()))).setNegativeButton("Cancel", null).show();
+    }
+    private void deletePicked() {
+        if (svc == null) return;
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Delete " + picked.size() + (picked.size() == 1 ? " channel" : " channels") + "?")
+                .setMessage("They are removed from every zone, and the channels after them move up. This cannot be undone (a backup can bring them back).")
+                .setPositiveButton("Delete", (dd, w) -> done(svc.deleteChannels(pickedList()))).setNegativeButton("Cancel", null).show();
     }
 
     public void setHost(Host h) { host = h; }
@@ -215,6 +305,9 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         TextView hb = Neo.button(c, hn > 0 ? "History (" + hn + ")" : "History", "signal", Neo.CYAN); hb.setTextSize(14);
         box.addView(hb, new LayoutParams(pbl));
         hb.setOnClickListener(v -> { dlg.dismiss(); if (svc != null) ChannelHistoryDialog.show(c, svc, ch); });
+        TextView sb = Neo.button(c, "Select several", "check", Neo.CYAN); sb.setTextSize(14);
+        box.addView(sb, new LayoutParams(pbl));
+        sb.setOnClickListener(v -> { dlg.dismiss(); setSelecting(true); toggle(ch.number); });
         pb.setOnClickListener(v -> {
             dlg.dismiss(); if (svc == null) return;
             svc.setScanPriority(isPrio ? 0 : ch.number);
@@ -289,8 +382,11 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             }
             row = v.findViewWithTag("row");
             final ChannelStore.Channel ch = shown.get(i);
-            boolean active = ch.number == activeNumber, fav = favs.contains(ch.number);
-            if (active) {
+            boolean active = ch.number == activeNumber, fav = favs.contains(ch.number), tick = selecting && picked.contains(ch.number);
+            if (tick) {
+                android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(); g.setColor(0x3319D3FF); g.setCornerRadius(14 * d); g.setStroke((int) (2 * d), Neo.CYAN_LIGHT);
+                row.setBackground(g);
+            } else if (active) {
                 android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT, new int[] { 0x2919D3FF, 0x0819D3FF });
                 g.setCornerRadius(14 * d); g.setStroke((int) (1.5f * d), Neo.CYAN); row.setBackground(g);
             } else {
@@ -309,8 +405,13 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             Object[] lh = heard.get(ch.number);                                   // when the channel was last heard (owner, 2026-10-25: the colour code and tone chip came off the card; the editor has the detail and the history)
             if (lh != null) { TextView ht = Neo.text(c, "heard " + heardWhen((Long) lh[0]), Neo.DIM, 11.5f, Neo.uiMedium(c)); ht.setSingleLine(true); ht.setEllipsize(android.text.TextUtils.TruncateAt.END); LayoutParams hl = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); hl.leftMargin = (int) (6 * d); badges.addView(ht, hl); }
             ImageView star = row.findViewWithTag("star");
-            star.setImageDrawable(new Neo.IconDrawable("star", fav ? Neo.AMBER : Neo.OFF, fav));
-            star.setOnClickListener(x -> toggleFavourite(ch, !fav));
+            if (selecting) {                                                    // a tick box: the whole row toggles
+                star.setImageDrawable(new Neo.IconDrawable(tick ? "check" : "M5 5h14v14H5z", tick ? Neo.CYAN_LIGHT : Neo.MUTED));   // an empty box when not ticked star.setContentDescription(tick ? "Selected" : "Not selected");
+                star.setOnClickListener(x -> toggle(ch.number));
+            } else {
+                star.setImageDrawable(new Neo.IconDrawable("star", fav ? Neo.AMBER : Neo.OFF, fav)); star.setContentDescription("Favourite");
+                star.setOnClickListener(x -> toggleFavourite(ch, !fav));
+            }
             return v;
         }
     }

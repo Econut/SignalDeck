@@ -44,7 +44,8 @@ function renderEditor() {
   let h = '';
   h += '<div class="sect">' + (ED.vfo ? 'FREQUENCY' : 'CHANNEL') + '</div>';
   if (!ED.vfo) h += field('name', 'Channel name', txt('fName', (c.name || '').slice(0, ED.nameMax), 'maxlength="' + ED.nameMax + '"') + '<div class="count" id="fNameCount"></div>');
-  h += field('type', 'Channel type', sel('fType', [[0, 'Digital'], [1, 'Analog'], [2, 'M17']], c.type));
+  if (S.dmr === false && ED.isNew) c.type = 1;                                  // an analog-only radio: a new channel is analog
+  if (S.dmr !== false || c.type !== 1) h += field('type', 'Channel type', sel('fType', [[0, 'Digital'], [1, 'Analog'], [2, 'M17']], c.type));   // no choice there (an old DMR channel can still be changed)
   h += field('rx', 'Receive frequency (MHz)', txt('fRx', mhzIn(c.rxFreq), 'inputmode="decimal"'));
   h += field('tx', 'Send frequency (MHz)', txt('fTx', mhzIn(c.txFreq), 'inputmode="decimal"'));
   h += field('power', 'Power', sel('fPower', [[0, 'Low power'], [1, 'High power']], c.power));
@@ -94,7 +95,7 @@ function renderEditor() {
   const nm = $('fName'); if (nm) { const cnt = () => { $('fNameCount').textContent = nm.value.length + ' / ' + ED.nameMax; $('fNameCount').classList.toggle('full', nm.value.length >= ED.nameMax); }; nm.oninput = cnt; cnt(); }
 
   // a change of type redraws the form (keeping what was typed); a tone type change refills its tone list
-  $('fType').onchange = () => { Object.assign(ED.ch, collect(true)); ED.ch.type = +$('fType').value; renderEditor(); };
+  if ($('fType')) $('fType').onchange = () => { Object.assign(ED.ch, collect(true)); ED.ch.type = +$('fType').value; renderEditor(); };
   const toneSwap = (typeId, codeId) => { const t = $(typeId); if (t) t.onchange = () => { $(codeId).innerHTML = opt(toneVals(+t.value), 0); }; };
   toneSwap('fTxType', 'fTxCode'); toneSwap('fRxType', 'fRxCode');
   $('edCancel').onclick = closeEditor;
@@ -111,7 +112,7 @@ function renderEditor() {
 /** The form's values; keepOnly = just remember them in ED.ch (for a redraw after a type change). */
 function collect(keepOnly) {
   const v = id => { const e = $(id); return e ? e.value : undefined; };
-  const o = { number: ED.isNew ? 0 : ED.ch.number, name: v('fName'), type: +v('fType'), txMHz: parseFloat(v('fTx')), rxMHz: parseFloat(v('fRx')),
+  const o = { number: ED.isNew ? 0 : ED.ch.number, name: v('fName'), type: $('fType') ? +v('fType') : ED.ch.type, txMHz: parseFloat(v('fTx')), rxMHz: parseFloat(v('fRx')),
     power: +v('fPower'), relay: +v('fRelay'), rxOnly: v('fRxOnly') === '1', lat: v('fLat'), lon: v('fLon') };
   if ($('fNotes')) o.notes = v('fNotes');
   if ($('fCc')) Object.assign(o, { cc: +v('fCc'), mode: +v('fMode'), slot: +v('fSlot'), contactType: +v('fCtype'), txContact: v('fCall'), groups: v('fGroups'), encryptSw: +v('fEnc'), interrupt: +v('fInt') });

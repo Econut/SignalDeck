@@ -79,19 +79,22 @@ public class MainActivity extends AppCompatActivity {
         LinearLayout nav = new LinearLayout(this); nav.setBackgroundColor(com.macdmr.radio.ui.Neo.BAR);
         View navLine = new View(this); navLine.setBackgroundColor(com.macdmr.radio.ui.Neo.alpha(com.macdmr.radio.ui.Neo.CYAN, 0x29));
         root.addView(navLine, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Math.max(1, Theme.dp(this, 1))));
+        final boolean small = com.macdmr.radio.ui.IntercomView.compactScreen(this);   // the same rule as the intercom page: about 52 dp instead of 66
         for (int i = 0; i < 5; i++) {
             final int idx = i;
             LinearLayout tab = new LinearLayout(this); tab.setOrientation(LinearLayout.VERTICAL); tab.setGravity(Gravity.CENTER);
-            tab.setPadding(0, Theme.dp(this, 8), 0, Theme.dp(this, 6)); tab.setContentDescription(tabNames[i]);
+            tab.setPadding(0, Theme.dp(this, small ? 5 : 8), 0, Theme.dp(this, small ? 3 : 6)); tab.setContentDescription(tabNames[i]);
             android.widget.ImageView e = new android.widget.ImageView(this);
-            TextView t = com.macdmr.radio.ui.Neo.text(this, tabNames[i].toUpperCase(java.util.Locale.US), 0xFF71879D, 11.5f, com.macdmr.radio.ui.Neo.ui(this)); t.setGravity(Gravity.CENTER); t.setLetterSpacing(0.08f); t.setSingleLine(true);
-            LinearLayout.LayoutParams el = new LinearLayout.LayoutParams(Theme.dp(this, 24), Theme.dp(this, 24)); el.bottomMargin = Theme.dp(this, 4);
+            TextView t = com.macdmr.radio.ui.Neo.text(this, tabNames[i].toUpperCase(java.util.Locale.US), 0xFF71879D, small ? 10f : 11.5f, com.macdmr.radio.ui.Neo.ui(this)); t.setGravity(Gravity.CENTER); t.setLetterSpacing(0.08f); t.setSingleLine(true);
+            LinearLayout.LayoutParams el = new LinearLayout.LayoutParams(Theme.dp(this, small ? 20 : 24), Theme.dp(this, small ? 20 : 24)); el.bottomMargin = Theme.dp(this, small ? 2 : 4);
             tab.addView(e, el); tab.addView(t);
-            View ind = new View(this); LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Theme.dp(this, 3)); il.setMargins(Theme.dp(this, 14), Theme.dp(this, 6), Theme.dp(this, 14), 0);
+            View ind = new View(this); LinearLayout.LayoutParams il = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Theme.dp(this, 3)); il.setMargins(Theme.dp(this, 14), Theme.dp(this, small ? 3 : 6), Theme.dp(this, 14), 0);
             tab.addView(ind, il);
             tab.setOnClickListener(v -> show(idx));
             tabs[i] = t; tabIcon[i] = e; tabInd[i] = ind; tabCell[i] = tab;
             nav.addView(tab, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            com.macdmr.radio.DeviceProfile prof = com.macdmr.radio.DeviceProfile.detect();
+            if ((i == 2 && !prof.hasContacts()) || (i == 3 && !prof.hasMessages())) tab.setVisibility(View.GONE);   // nothing to show there on this radio (yet)
         }
         modeBar = buildModeBar();
         root.addView(modeBar, 1);                                  // under the page, over the tab bar: a running mode, tap to open its page

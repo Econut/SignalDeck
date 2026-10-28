@@ -99,7 +99,7 @@ public final class NetFinder {
         }
         return 0;
     }
-    public static boolean inRange(long hz) { return (hz >= 136_000_000L && hz <= 174_000_000L) || (hz >= 400_000_000L && hz <= 480_000_000L); }
+    public static boolean inRange(long hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }
 
     /** "3148", "DMR 3141", "TG 31665", "D 98006 Y11689" → the first whole number (talkgroups are 1–7 digits). */
     public static int parseTalkgroup(String s) {

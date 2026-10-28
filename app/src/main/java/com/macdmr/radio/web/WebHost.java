@@ -272,7 +272,7 @@ public final class WebHost {
             ch.type = asked == ChannelStore.Channel.TYPE_M17 ? ChannelStore.Channel.TYPE_M17 : asked == 0 ? 0 : 1;
             ch.txFreq = (int) Math.round(b.getDouble("txMHz") * 1e6);
             ch.rxFreq = (int) Math.round(b.getDouble("rxMHz") * 1e6);
-            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be 136–174 or 400–480 MHz";
+            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText();
             ch.power = b.optInt("power", ch.power) == 1 ? 1 : 0;
             ch.relay = b.optInt("relay", ch.relay) == 1 ? 1 : 2;
             if (b.has("notes")) ch.notes = b.optString("notes", "").trim();
@@ -367,6 +367,11 @@ public final class WebHost {
     private JSONObject statusJson() throws Exception {
         JSONObject o = new JSONObject();
         o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current()));
+        com.macdmr.radio.DeviceProfile prof = svc.profile();                  // what this radio can do: the pages hide what it cannot (an analog-only radio has no DMR)
+        JSONArray bands = new JSONArray(); for (long hz : prof.bandsHz) bands.put(hz);
+        o.put("radio", new JSONObject().put("dmr", prof.dmr()).put("messages", prof.hasMessages()).put("contacts", prof.hasContacts())
+                .put("rssi", prof.rssi).put("bands", bands).put("bandsText", prof.bandsText()).put("symbolEngine", prof.symbolEngine())
+                .put("aprs144", prof.tunable(com.macdmr.radio.PacketEngine.APRS_FREQ_HZ)).put("weather", prof.tunable(162_400_000L)));
         o.put("transmitting", svc.isTransmitting()).put("firmwareLoad", svc.firmwareLoading()).put("hearing", svc.hearing()).put("rssi", svc.lastRssi()).put("caller", svc.currentCaller());
         o.put("softSq", svc.softSqOn()).put("softSqLevel", svc.softSqLevel()).put("monitor", svc.monitorOn()).put("promiscuous", svc.promiscuousOn()).put("record", svc.recordOn())
                 .put("scanning", svc.scanning()).put("vfo", svc.vfoActive()).put("zone", svc.zoneName()).put("zoneId", svc.zoneId())
@@ -472,7 +477,7 @@ public final class WebHost {
     private java.util.List<Setting> settings() {
         java.util.List<Setting> l = new java.util.ArrayList<>();
         android.content.SharedPreferences rp = svc.getSharedPreferences("radio", Context.MODE_PRIVATE);
-        l.add(new Setting("dmrId", "Identity", "Your DMR ID", "What other radios see when you talk on DMR channels", "int", null, svc::localId, b -> {
+        if (svc.profile().dmr()) l.add(new Setting("dmrId", "Identity", "Your DMR ID", "What other radios see when you talk on DMR channels", "int", null, svc::localId, b -> {
             int v = b.getInt("value"); if (v < 1 || v > 0xFFFFFF) throw new IllegalArgumentException("A DMR ID is 1 to 16777215"); svc.setLocalId(v); }));
         l.add(new Setting("ownAtBoot", "Radio", "Own the radio at boot", "Otherwise the stock app is restored after a reboot", "bool", null, svc::ownAtBoot, b -> svc.setOwnAtBoot(b.getBoolean("value"))));
         l.add(new Setting("hwPtt", "Radio", "Side PTT key", "The phone's hardware push-to-talk button transmits", "bool", null, svc::hwPtt, b -> svc.setHwPtt(b.getBoolean("value"))));
@@ -484,7 +489,7 @@ public final class WebHost {
         l.add(new Setting("keywords", "Radio", "Keyword alerts", "Words in live captions that raise an alert, separated by commas", "text", null, svc::keywords, b -> svc.setKeywords(b.getString("value"))));
         l.add(new Setting("logHeard", "Logbook", "Log stations heard", "DMR callers and APRS stations go into the logbook as Heard", "bool", null, svc::logHeard, b -> svc.setLogHeard(b.getBoolean("value"))));
         l.add(new Setting("lookupOnline", "Logbook", "Look up names online", "RadioID / callsign lookups for callers and stations", "bool", null, svc::lookupOnline, b -> svc.setLookupOnline(b.getBoolean("value"))));
-        l.add(new Setting("roaming", "Radio", "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup (needs repeater channels with a location)", "bool", null, svc::roaming, b -> svc.setRoaming(b.getBoolean("value"))));
+        if (svc.profile().dmr()) l.add(new Setting("roaming", "Radio", "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup (needs repeater channels with a location)", "bool", null, svc::roaming, b -> svc.setRoaming(b.getBoolean("value"))));
         l.add(new Setting("coverage", "Coverage", "Coverage logging", "Records signal and key-ups with GPS for the coverage maps", "bool", null, () -> svc.coverage().enabled(), b -> svc.setCoverageLogging(b.getBoolean("value"))));
         l.add(new Setting("covInCar", "Coverage", "Log coverage in the car", "Coverage logging while Android Auto is connected", "bool", null, svc::coverageInCar, b -> svc.setCoverageInCar(b.getBoolean("value"))));
         l.add(new Setting("carMic", "Car", "Car microphone in Android Auto", "Talk uses the car's microphone through its hands-free link", "bool", null, svc::carMic, b -> svc.setCarMic(b.getBoolean("value"))));
@@ -774,6 +779,21 @@ public final class WebHost {
                 return ok(String.format(java.util.Locale.US, "VFO %.4f MHz", v.rxFreq / 1e6));
             }
             case "/api/vfo/exit": if (!post) break; onMain(() -> { svc.exitVfo(); return null; }); return ok("Back to the channel");
+            case "/api/channels/bulk": if (!post) break; {                    // the channel list's selection: {action: delete | zone | unzone | star | unstar, numbers[], zoneId, zoneName}
+                JSONArray ns = b.optJSONArray("numbers"); java.util.List<Integer> nums = new java.util.ArrayList<>();
+                if (ns != null) for (int i = 0; i < ns.length(); i++) nums.add(ns.optInt(i, 0));
+                if (nums.isEmpty()) return WebServer.Response.error(400, "Select at least one channel");
+                final String action = b.optString("action", ""); final long zid = b.optLong("zoneId", 0); final String zname = b.optString("zoneName", "");
+                String msg;
+                switch (action) {
+                    case "delete": msg = onMain(() -> svc.deleteChannels(nums)); break;
+                    case "zone": msg = onMain(() -> svc.addChannelsToZone(zid, zname, nums)); break;
+                    case "unzone": msg = onMain(() -> svc.removeChannelsFromZone(zid, nums)); break;
+                    case "star": case "unstar": msg = onMain(() -> svc.favouriteChannels(nums, action.equals("star"))); break;
+                    default: return WebServer.Response.error(400, "Unknown action " + action);
+                }
+                return ok(msg);
+            }
             case "/api/channel/delete": if (!post) break; {
                 ChannelStore.Channel ch = svc.store().byNumber(b.optInt("number", 0));
                 if (ch == null) return WebServer.Response.error(404, "No such channel");
@@ -789,6 +809,7 @@ public final class WebHost {
                 long now = System.currentTimeMillis();
                 JSONArray a = new JSONArray();
                 for (com.macdmr.radio.ham.Satellites.Sat s : com.macdmr.radio.ham.Satellites.all(svc)) {
+                    if (!com.macdmr.radio.DeviceProfile.inBands(s.downHz)) continue;                 // a downlink this radio cannot tune (the W6: UHF only)
                     JSONObject o = new JSONObject().put("key", s.key).put("name", s.name).put("about", s.about).put("downHz", s.downHz).put("upHz", s.upHz)
                             .put("toneHz", s.toneHz).put("mode", s.mode).put("listenOnly", s.listenOnly());
                     String an = com.macdmr.radio.ham.FmSats.amsatName(s); if (an != null && !(s.catalog == com.macdmr.radio.ham.Satellites.ISS_CATALOG && s.mode == com.macdmr.radio.ham.Satellites.APRS)) o.put("amsat", an);
@@ -996,7 +1017,7 @@ public final class WebHost {
                         case "cleargateways": w.clearGateways(); return ok("Removed");
                         case "tuneconnect": {
                             String call = b.optString("call"); int hz = b.optInt("hz");
-                            if (!((hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000))) return WebServer.Response.error(400, "Bad frequency");
+                            if (!com.macdmr.radio.DeviceProfile.inBands(hz)) return WebServer.Response.error(400, "Bad frequency");
                             onMain(() -> { ChannelStore.Channel ch = new ChannelStore.Channel(); ch.type = 1; ch.rxFreq = ch.txFreq = hz; ch.band = 1; ch.power = 1; ch.sq = 2; ch.name = call; svc.applyVfo(ch, true); w.setGateway(call, ""); return null; });
                             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> w.connectRadio(call, ""), 4500);
                             return ok("Tuning " + String.format(java.util.Locale.US, "%.4f MHz", hz / 1e6) + ", connecting in a few seconds");

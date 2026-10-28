@@ -99,7 +99,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
     public static final class Zone { public long id; public String name; public int[] numbers = new int[0]; }
 
     /** The radio's two bands: 136–174 and 400–480 MHz. */
-    public static boolean inBand(int hz) { return (hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000); }
+    public static boolean inBand(int hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }   // the phone's radio (the W6 tunes 400-470 MHz only)
 
     public ChannelStore(Context c) { super(c, "radio.db", null, 5); }
     /** A separate database file (the backup self-test restores into a scratch copy). */
@@ -473,6 +473,21 @@ public final class ChannelStore extends SQLiteOpenHelper {
         return z.id = getWritableDatabase().insert("zones", null, v);
     }
     public void deleteZone(long id) { getWritableDatabase().delete("zones", "_id=?", new String[] { String.valueOf(id) }); }
+
+    /** A zone's channel numbers with {@code add} joined in: sorted, each number once. */
+    static int[] withNumbers(int[] zone, java.util.Collection<Integer> add) {
+        java.util.TreeSet<Integer> s = new java.util.TreeSet<>(); for (int n : zone) s.add(n); for (Integer n : add) if (n != null && n > 0) s.add(n);
+        int[] out = new int[s.size()]; int i = 0; for (int n : s) out[i++] = n; return out;
+    }
+    /** A zone's channel numbers without {@code remove}, in their order. */
+    static int[] withoutNumbers(int[] zone, java.util.Collection<Integer> remove) {
+        java.util.List<Integer> l = new ArrayList<>(); for (int n : zone) if (!remove.contains(n)) l.add(n);
+        int[] out = new int[l.size()]; for (int i = 0; i < out.length; i++) out[i] = l.get(i); return out;
+    }
+    /** The order to delete several channels in: highest number first, each once, so deleting one never renumbers one still to go. */
+    static List<Integer> deleteOrder(java.util.Collection<Integer> numbers) {
+        List<Integer> l = new ArrayList<>(new java.util.TreeSet<>(numbers)); java.util.Collections.reverse(l); return l;
+    }
     private static int[] parseInts(String s) {
         List<Integer> l = new ArrayList<>();
         if (s != null) for (String t : s.split("[,;\\- ]")) { t = t.trim(); if (!t.isEmpty()) try { l.add(Integer.parseInt(t)); } catch (NumberFormatException ignored) { } }
@@ -787,6 +802,45 @@ public final class ChannelStore extends SQLiteOpenHelper {
      * WAL, so the -wal/-shm files are copied too.
      * @return channels imported, or -1 (err says why)
      */
+    /**
+     * The W6's stock app (com.flyscale.analogpoc): table CHANNEL_INFO in channel_list_detial.db, one row per channel with
+     * strings GBW (0 = 12.5 kHz, 1 = 25 kHz), TFV / RFV (MHz), RXCXCSS / TXCXCSS (the module's tone codes, Sa818Tones),
+     * SQ (0–8) and POWER (0 low, 1 high). All analog. Returns the number imported, or -1.
+     */
+    public int importFromFlyscale(Context ctx, String stockPackage, StringBuilder err) {
+        SQLiteDatabase sdb = copyRoom(ctx, stockPackage, new String[] { "channel_list_detial.db" }, "fs_channels.db");
+        if (sdb == null) { err.append("stock channels not readable: ").append(RootSetup.run("ls /data/data/" + stockPackage + "/databases/ 2>&1 | head -8")); return -1; }
+        int n = 0;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try (Cursor c = sdb.query("CHANNEL_INFO", null, null, null, null, null, "CHANNEL_ID")) {
+            db.delete("channels", null, null);
+            while (c.moveToNext()) {
+                Channel ch = flyscaleChannel(coli(c, "CHANNEL_ID", n), col(c, "GBW", "1"), col(c, "TFV", ""), col(c, "RFV", ""), col(c, "TXCXCSS", "0"), col(c, "RXCXCSS", "0"), col(c, "SQ", "3"), col(c, "POWER", "1"));
+                if (ch == null) continue;
+                ch.number = ++n; ch.active = n == 1;
+                db.insert("channels", null, values(ch));
+            }
+            db.setTransactionSuccessful();
+        } catch (Throwable t) { err.append("channels: ").append(t.getMessage()); n = -1; }
+        finally { db.endTransaction(); sdb.close(); }
+        return n;
+    }
+
+    /** One stock W6 channel row as a SignalDeck analog channel, or null when its frequencies do not parse. */
+    static Channel flyscaleChannel(int id, String gbw, String tfv, String rfv, String txCss, String rxCss, String sq, String power) {
+        try {
+            Channel ch = new Channel();
+            ch.type = Channel.TYPE_FM; ch.name = "CH " + (id + 1);
+            ch.txFreq = (int) Math.round(Double.parseDouble(tfv.trim()) * 1e6); ch.rxFreq = (int) Math.round(Double.parseDouble(rfv.trim()) * 1e6);
+            ch.band = "0".equals(gbw.trim()) ? 0 : 1; ch.power = "0".equals(power.trim()) ? 0 : 1;
+            ch.sq = Math.max(0, Math.min(8, Integer.parseInt(sq.trim())));
+            int[] tx = Sa818Tones.fromModule(Integer.parseInt(txCss.trim())), rx = Sa818Tones.fromModule(Integer.parseInt(rxCss.trim()));
+            ch.txType = tx[0]; ch.txSubCode = tx[1]; ch.rxType = rx[0]; ch.rxSubCode = rx[1];
+            return ch;
+        } catch (RuntimeException e) { return null; }
+    }
+
     public int importFromQuickChat(Context ctx, String stockPackage, StringBuilder err) {
         SQLiteDatabase sdb = copyRoom(ctx, stockPackage, new String[] { "channel_database", "channel.db" }, "qc_channels.db");
         if (sdb == null) { err.append("QuickChat channels not readable: ").append(RootSetup.run("ls /data/data/" + stockPackage + "/databases/ 2>&1 | head -8")); return -1; }

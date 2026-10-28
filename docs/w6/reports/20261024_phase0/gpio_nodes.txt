@@ -1,0 +1,55 @@
+gpio exports:
+export
+gpio179
+gpio181
+gpio183
+gpio187
+gpio188
+gpio189
+gpio212
+gpio215
+gpio222
+gpio223
+gpio237
+gpio247
+gpio249
+gpio285
+gpio322
+gpiochip144
+gpiochip160
+gpiochip416
+gpiochip440
+gpiochip464
+gpiochip488
+unexport
+
+gpio179 dir=cat: /sys/class/gpio/gpio179/direction: No such file or directory value=0 label=cat: /sys/class/gpio/gpio179/label: No such file or directory
+gpio181 dir=cat: /sys/class/gpio/gpio181/direction: No such file or directory value=1 label=cat: /sys/class/gpio/gpio181/label: No such file or directory
+gpio183 dir=cat: /sys/class/gpio/gpio183/direction: No such file or directory value=0 label=cat: /sys/class/gpio/gpio183/label: No such file or directory
+gpio188 dir=cat: /sys/class/gpio/gpio188/direction: No such file or directory value=0 label=cat: /sys/class/gpio/gpio188/label: No such file or directory
+gpio189 dir=cat: /sys/class/gpio/gpio189/direction: No such file or directory value=0 label=cat: /sys/class/gpio/gpio189/label: No such file or directory
+gpio212 dir=cat: /sys/class/gpio/gpio212/direction: No such file or directory value=1 label=cat: /sys/class/gpio/gpio212/label: No such file or directory
+gpio222 dir=cat: /sys/class/gpio/gpio222/direction: No such file or directory value=0 label=cat: /sys/class/gpio/gpio222/label: No such file or directory
+gpio223 dir=cat: /sys/class/gpio/gpio223/direction: No such file or directory value=0 label=cat: /sys/class/gpio/gpio223/label: No such file or directory
+gpio249 dir=cat: /sys/class/gpio/gpio249/direction: No such file or directory value=0 label=cat: /sys/class/gpio/gpio249/label: No such file or directory
+gpio322 dir=cat: /sys/class/gpio/gpio322/direction: No such file or directory value=1 label=cat: /sys/class/gpio/gpio322/label: No such file or directory
+
+/sys/kernel/dmr_state:
+total 0
+drwxr-xr-x  2 root root    0 2026-06-27 11:23 .
+drwxr-xr-x 22 root root    0 1970-01-01 08:00 ..
+-rw-rw-rw-  1 root root 4096 2026-06-27 11:20 dmr_state
+
+/sys/kernel/ext_pa_en:
+total 0
+drwxr-xr-x  2 root root    0 2026-06-27 11:23 .
+drwxr-xr-x 22 root root    0 1970-01-01 08:00 ..
+-rw-rw-rw-  1 root root 4096 2026-06-27 11:20 ext_pa_en
+
+/sys/kernel/m6_pa_en:
+total 0
+drwxr-xr-x  2 root root    0 2026-06-27 11:23 .
+drwxr-xr-x 22 root root    0 1970-01-01 08:00 ..
+-rw-rw-rw-  1 root root 4096 2026-06-27 11:20 m6_pa_en
+dmr_state=0
+ 11:23:45 up 2 min,  0 users,  load average: 7.19, 3.69, 1.46

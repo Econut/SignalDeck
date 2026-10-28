@@ -1,0 +1,12 @@
+SIGNALDECK DEVICE REPORT — SUMMARY
+
+phone: UNISOC W6+ · Android 12 · W6+_V1.0_UHF_JG_FT13_R_202605251847
+SignalDeck: 1.0.0-beta.19 · up 5 min since the phone booted
+profile: UNISOC W6+ (not supported yet) (unknown revision 0, not verified yet)
+radio: not owned (stopped)
+receive audio: none · 0 bytes so far
+
+radio commands (sent / answered / refused / slow > 1 s / average / slowest answer):
+signal readings: 0, of them 0 the module's "no reading" value
+
+The raw sections follow in report.txt (newest checks at the end).
