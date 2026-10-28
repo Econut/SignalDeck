@@ -99,6 +99,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
             t.setOnClickListener(v -> { filter = k; styleChips(); filter(); });
             LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT, (int) (36 * d)); lp.rightMargin = (int) (8 * d);
             cr.addView(t, lp); chips[i] = t;
+            if (i >= 2 && !com.macdmr.radio.DeviceProfile.detect().dmr()) t.setVisibility(GONE);   // an analog-only radio: every channel is analog
         }
         hs.addView(cr); addView(hs);
         styleChips();

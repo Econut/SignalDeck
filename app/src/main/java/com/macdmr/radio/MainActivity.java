@@ -93,6 +93,8 @@ public class MainActivity extends AppCompatActivity {
             tab.setOnClickListener(v -> show(idx));
             tabs[i] = t; tabIcon[i] = e; tabInd[i] = ind; tabCell[i] = tab;
             nav.addView(tab, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            com.macdmr.radio.DeviceProfile prof = com.macdmr.radio.DeviceProfile.detect();
+            if ((i == 2 && !prof.hasContacts()) || (i == 3 && !prof.hasMessages())) tab.setVisibility(View.GONE);   // nothing to show there on this radio (yet)
         }
         modeBar = buildModeBar();
         root.addView(modeBar, 1);                                  // under the page, over the tab bar: a running mode, tap to open its page
