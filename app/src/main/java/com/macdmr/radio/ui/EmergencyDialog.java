@@ -13,6 +13,7 @@ import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.MotionEvent;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -54,10 +55,11 @@ public final class EmergencyDialog {
         msg.setBackground(Neo.rowCard(c)); msg.setPadding((int) (12 * d), (int) (10 * d), (int) (12 * d), (int) (10 * d));
         box.addView(msg);
 
-        box.addView(Neo.sheetSection(c, "DMR text goes to"));
+        View toTitle = Neo.sheetSection(c, "DMR text goes to"); box.addView(toTitle);
         final TextView to = Neo.label(c, recipient(p), Neo.TEXT, 16, true);
         to.setBackground(Neo.rowCard(c)); to.setPadding((int) (12 * d), (int) (12 * d), (int) (12 * d), (int) (12 * d));
         box.addView(to);
+        if (!svc.profile().dmr()) { toTitle.setVisibility(View.GONE); to.setVisibility(View.GONE); }   // analog-only radio: the emergency always goes out as APRS
         to.setOnClickListener(v -> {
             final List<ChannelStore.Contact> all = svc.store().contacts();
             if (all.isEmpty()) { Toast.makeText(c, "Add a contact or talkgroup first (Contacts page)", Toast.LENGTH_LONG).show(); return; }

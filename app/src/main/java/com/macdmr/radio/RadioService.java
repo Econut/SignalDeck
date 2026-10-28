@@ -209,9 +209,11 @@ public class RadioService extends Service implements RadioEngine.Events {
     public String trackSat(final com.macdmr.radio.ham.Satellites.Sat sat, final com.macdmr.radio.ham.Sgp4 el, final com.macdmr.radio.ham.SatTrack.Pass pass) {
         final android.location.Location me = lastKnownLocation();
         if (me == null) return "No position fix: turn on location";
+        if (!profile.tunable(sat.downHz)) return "This radio tunes " + profile.bandsText() + ": " + sat.name + " sends on " + String.format(java.util.Locale.US, "%.3f", sat.downHz / 1e6) + " MHz";
         stopSatTrack();
         final SatState st = new SatState(); st.name = sat.name; st.aos = pass.aos; st.los = pass.los; st.maxEl = pass.maxEl; st.waiting = true;
-        st.mode = sat.mode; st.listenOnly = sat.listenOnly(); st.nominalHz = sat.downHz; satState = st; updateModeWake();
+        final boolean listenOnly = sat.listenOnly() || !profile.tunable(sat.upHz);   // a 2 m uplink on a UHF-only radio (the W6): hear it, never key
+        st.mode = sat.mode; st.listenOnly = listenOnly; st.nominalHz = sat.downHz; satState = st; updateModeWake();
         if (sat.mode != com.macdmr.radio.ham.Satellites.VOICE) modeSince = System.currentTimeMillis();
         final Thread t = new Thread(() -> {
             boolean tuned = false, started = false, natural = false;
@@ -240,7 +242,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     // 5 kHz is tolerated so the retune gap does not tear the picture.
                     boolean picture = sat.mode == com.macdmr.radio.ham.Satellites.SSTV && packet != null && packet.sstvStatus() != null && packet.sstvStatus().startsWith("receiving");
                     if (!pttDown && (!tuned || Math.abs(rx - lastRx) >= (picture ? 5000 : 2000))) {
-                        v.rxFreq = (int) (Math.round(rx / 500.0) * 500); v.txFreq = sat.listenOnly() ? v.rxFreq : (int) (Math.round(tx / 500.0) * 500);
+                        v.rxFreq = (int) (Math.round(rx / 500.0) * 500); v.txFreq = listenOnly ? v.rxFreq : (int) (Math.round(tx / 500.0) * 500);
                         applyVfo(v, false); lastRx = rx; tuned = true; lastSatRetune = System.currentTimeMillis();
                     }
                     if (tuned && !started && packet != null) {         // the pass's job: decode APRS or SSTV on the moving frequency
@@ -465,6 +467,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public String sstvMonitor(boolean on, boolean park) {
         if (packet == null) return "not ready";
         if (on) {
+            if (park && !profile.tunable(PacketEngine.SSTV_FREQ_HZ)) return "This radio tunes " + profile.bandsText() + ", not 144.500 MHz: use Receive here";
             if (park) {
                 ChannelStore.Channel a = new ChannelStore.Channel();
                 a.type = 1; a.rxFreq = a.txFreq = PacketEngine.SSTV_FREQ_HZ; a.band = 1; a.power = 1; a.name = "SSTV 144.500"; dataModeSquelch(a);
@@ -712,6 +715,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** APRS monitoring on another frequency (the ISS digipeater on 145.825). */
     public String aprsMonitorAt(boolean on, int hz, String name) {
         if (packet == null) return "not ready";
+        if (on && !profile.tunable(hz)) return "This radio tunes " + profile.bandsText() + ", not " + String.format(java.util.Locale.US, "%.3f", hz / 1e6) + " MHz";
         if (on) {
             aprsMonitorHz = hz;
             ChannelStore.Channel a = new ChannelStore.Channel();
@@ -1439,7 +1443,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private synchronized boolean applyChannelNow(ChannelStore.Channel ch, boolean fromStore) {
         if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) {         // the module refuses these and stays where it is: never show them as tuned
             ChannelStore.Channel on = current;
-            history("warn", "⚠ " + ch.name + " (" + ch.freqText(ch.rxFreq) + (ch.txFreq != ch.rxFreq ? " / " + ch.freqText(ch.txFreq) : "") + " MHz) is outside what this radio can tune (136–174 and 400–480 MHz)"
+            history("warn", "⚠ " + ch.name + " (" + ch.freqText(ch.rxFreq) + (ch.txFreq != ch.rxFreq ? " / " + ch.freqText(ch.txFreq) : "") + " MHz) is outside what this radio can tune (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + ")"
                     + (on != null ? "; still on " + on.name + ", " + on.freqText(on.rxFreq) + " MHz" : ""));
             if (!fromStore && vfo == ch) vfo = on != null && on.number == 0 ? on : null;
             return false;
@@ -1588,6 +1592,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                 org.json.JSONArray g = o.optJSONArray("groups"); if (g != null) { v.groups = new int[g.length()]; for (int i = 0; i < g.length(); i++) v.groups[i] = g.optInt(i); }
             }
         } catch (Throwable ignored) { }
+        if (!profile.dmr()) v.type = 1;                                  // an analog-only radio (the W6)
+        if (!profile.tunable(v.rxFreq)) {                                // 146.520 on a UHF-only radio: start where it can listen
+            ChannelStore.Channel ch = current;
+            long f = ch != null && profile.tunable(ch.rxFreq) ? ch.rxFreq : profile.tunable(446_000_000L) ? 446_000_000L : profile.bandsHz[0];
+            v.rxFreq = v.txFreq = (int) f;
+        }
         return v;
     }
 
@@ -1643,7 +1653,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         ChannelStore.Channel v = vfoCopy(vfo);
         int hz = delta * vfoStepHz();
         v.rxFreq += hz; v.txFreq += hz;
-        if (v.rxFreq > 174_000_000 && v.rxFreq < 400_000_000) { v.rxFreq = delta > 0 ? 400_000_000 : 174_000_000; v.txFreq = v.rxFreq; }   // jump the gap the radio cannot tune
+        long next = profile.nextTunable(v.rxFreq, delta);                                                                                  // jump a gap the radio cannot tune
+        if (next > 0 && next != v.rxFreq) { v.rxFreq = (int) next; v.txFreq = v.rxFreq; }
         if (!ChannelStore.inBand(v.rxFreq) || !ChannelStore.inBand(v.txFreq)) return;                                                     // at an end, or a repeater offset would leave the band
         v.name = "";
         applyVfo(v);
@@ -1795,7 +1806,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public String sendPage(int baud, int hz, int[] rics, int func, String text, boolean sign) {
         if (rics == null || rics.length == 0) return "Add at least one RIC";
         if (text == null || text.trim().isEmpty()) return "Write the message";
-        if (!ChannelStore.inBand(hz)) return "Frequency must be 136–174 or 400–480 MHz";
+        if (!ChannelStore.inBand(hz)) return "Frequency must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText();
         if (firmwareBusy) return "Radio busy, loading firmware";
         if (!isReady()) return "Radio not ready";
         if (txInhibited()) return "Transmit is off on this channel";

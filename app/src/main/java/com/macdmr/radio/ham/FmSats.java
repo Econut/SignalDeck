@@ -96,7 +96,7 @@ public final class FmSats {
     }
 
     private static String norm(String s) { return s.toUpperCase(Locale.US).replaceAll("[^A-Z0-9]", ""); }
-    private static boolean inBand(long hz) { return (hz >= 136_000_000L && hz <= 174_000_000L) || (hz >= 400_000_000L && hz <= 480_000_000L); }
+    private static boolean inBand(long hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }
 
     /** For each AMSAT name: its SatNOGS satellite (by name or alias) and the FM voice transmitter this radio can work. */
     static List<Entry> pick(List<String> names, JSONArray sats, JSONArray txs) throws Exception {

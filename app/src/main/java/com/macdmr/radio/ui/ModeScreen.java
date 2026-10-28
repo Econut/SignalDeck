@@ -81,12 +81,14 @@ public abstract class ModeScreen extends LinearLayout implements RadioService.Li
         top.addView(timeText);
         strip.addView(top);
         LinearLayout mid = new LinearLayout(c); mid.setGravity(Gravity.CENTER_VERTICAL); mid.setPadding(0, dp(6), 0, 0);
-        freqText = Neo.text(c, "", Neo.TEXT, 26, Neo.display(c)); freqText.setSingleLine(true);
+        boolean narrow = c.getResources().getConfiguration().screenWidthDp > 0 && c.getResources().getConfiguration().screenWidthDp < 360;   // the W6+: 320 dp
+        freqText = Neo.text(c, "", Neo.TEXT, narrow ? 22 : 26, Neo.display(c)); freqText.setSingleLine(true);
         mid.addView(freqText, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
         LinearLayout sig = new LinearLayout(c); sig.setOrientation(VERTICAL); sig.setGravity(Gravity.END);
         signal = new SignalBar(c);
-        sig.addView(signal, new LayoutParams(dp(120), dp(14)));
-        signalText = Neo.text(c, "no signal", Neo.DIM, 12, Neo.mono(c)); signalText.setGravity(Gravity.END); signalText.setPadding(0, dp(3), 0, 0);
+        sig.addView(signal, new LayoutParams(dp(narrow ? 84 : 120), dp(14)));
+        if (svc != null && !svc.profile().rssi) signal.setVisibility(GONE);   // no signal readings (the W6): the text says receiving or quiet
+        signalText = Neo.text(c, svc != null && !svc.profile().rssi ? "quiet" : "no signal", Neo.DIM, 12, Neo.mono(c)); signalText.setGravity(Gravity.END); signalText.setPadding(0, dp(3), 0, 0);
         sig.addView(signalText);
         mid.addView(sig);
         strip.addView(mid);
@@ -164,7 +166,8 @@ public abstract class ModeScreen extends LinearLayout implements RadioService.Li
             set(signalText, "tunes at " + new java.text.SimpleDateFormat("HH:mm", java.util.Locale.US).format(new java.util.Date(waitingUntil())));
             if (signal.getVisibility() != GONE) signal.setVisibility(GONE);      // nothing to measure yet: the radio is still on your channel
         } else if (waiting) {                                 // the pass began: back to the live radio
-            signal.setVisibility(VISIBLE); set(signalText, "no signal");
+            boolean rs = svc == null || svc.profile().rssi;
+            if (rs) signal.setVisibility(VISIBLE); set(signalText, rs ? "no signal" : rx ? "receiving" : "quiet");
             waiting = false; color(freqText, Neo.TEXT); showState();
             com.macdmr.radio.ChannelStore.Channel ch = svc.current(); if (ch != null) freqText.setText(freqSpan(ch.rxFreq));
         }
@@ -192,9 +195,13 @@ public abstract class ModeScreen extends LinearLayout implements RadioService.Li
         if (ch == null || waiting || liveHz() > 0) return;
         freqText.setText(freqSpan(ch.rxFreq));
     }
-    @Override public void onRx(boolean receiving) { rx = receiving; showState(); if (!receiving && !waiting) { signal.set(-999); signalText.setText("no signal"); } }
+    @Override public void onRx(boolean receiving) {
+        rx = receiving; showState();
+        if (svc != null && !svc.profile().rssi) { if (!waiting) signalText.setText(receiving ? "receiving" : "quiet"); return; }
+        if (!receiving && !waiting) { signal.set(-999); signalText.setText("no signal"); }
+    }
     @Override public void onTx(boolean transmitting) { tx = transmitting; showState(); }
-    @Override public void onRssi(int dbm) { if (waiting) return; signal.set(dbm); signalText.setText(dbm <= -999 ? "no signal" : SMeterView.sUnits(dbm) + "  " + dbm + " dBm"); }
+    @Override public void onRssi(int dbm) { if (waiting || (svc != null && !svc.profile().rssi)) return; signal.set(dbm); signalText.setText(dbm <= -999 ? "no signal" : SMeterView.sUnits(dbm) + "  " + dbm + " dBm"); }
     @Override public void onAudioLevel(int amplitude) { }
     @Override public void onHistory(String line) { }
     @Override public void onCaller(String text) { }

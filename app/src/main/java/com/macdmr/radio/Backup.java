@@ -459,6 +459,6 @@ public final class Backup {
             db.setTransactionSuccessful();
         } finally { db.endTransaction(); }
         return out.size() + " channels, " + cts.size() + " contacts, " + zs.size() + " zones" + (extras.size() > 1 ? ", " + extraNotes + " channel notes, " + extraNets + " nets, " + extraContacts + " contact identities" : "") + " restored from " + dir.getName()
-                + (outOfBand.isEmpty() ? "" : "\n" + outOfBand.size() + " skipped: outside what this radio can tune (136–174 and 400–480 MHz): " + String.join(", ", outOfBand.subList(0, Math.min(5, outOfBand.size()))) + (outOfBand.size() > 5 ? " …" : ""));
+                + (outOfBand.isEmpty() ? "" : "\n" + outOfBand.size() + " skipped: outside what this radio can tune (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + "): " + String.join(", ", outOfBand.subList(0, Math.min(5, outOfBand.size()))) + (outOfBand.size() > 5 ? " …" : ""));
     }
 }

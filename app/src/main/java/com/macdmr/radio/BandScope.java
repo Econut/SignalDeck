@@ -85,16 +85,23 @@ public final class BandScope {
 
     /** Steps between {@code from} and {@code to} inclusive, and whether the range is one the radio can tune. Pure. */
     public static int steps(int from, int to, int step) { return step <= 0 || to < from ? 0 : (to - from) / step + 1; }
-    public static boolean tunable(int hz) { return (hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000); }
+    public static boolean tunable(int hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }
     /** Raw RSSI byte to dBm, as the module reports it (0 = no reading). */
     public static float dbm(int raw) { return raw > 0 && raw < 200 ? -(120f - raw / 2f) : Float.NaN; }   // 200+ (above -20 dBm) is the module's "no reading"
+
+    /** Whether {@code from} and {@code to} lie in the same band of the profile. */
+    static boolean oneBand(com.macdmr.radio.DeviceProfile dp, long from, long to) {
+        for (int i = 0; i + 1 < dp.bandsHz.length; i += 2) if (from >= dp.bandsHz[i] && to <= dp.bandsHz[i + 1]) return true;
+        return false;
+    }
 
     /** Why a range cannot be swept, or null. Pure. */
     public static String problem(int from, int to, int step) {
         if (from <= 0 || to <= 0 || step <= 0) return "Enter the frequencies in MHz and the step in kHz";
         if (step < 2_500) return "Use a step of at least 2.5 kHz";
         if (to <= from) return "The end must be above the start";
-        if (!tunable(from) || !tunable(to) || (from <= 174_000_000 && to >= 400_000_000)) return "The radio tunes 136–174 and 400–480 MHz: keep the range inside one of them";
+        com.macdmr.radio.DeviceProfile dp = com.macdmr.radio.DeviceProfile.detect();
+        if (!tunable(from) || !tunable(to) || !oneBand(dp, from, to)) return "The radio tunes " + dp.bandsText() + ": keep the range inside one of them";
         int n = steps(from, to, step);
         if (n < 2) return "Choose a range with at least two steps";
         if (n > MAX_STEPS) return n + " steps is too many (up to " + MAX_STEPS + "): use a larger step";

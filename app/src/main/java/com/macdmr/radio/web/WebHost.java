@@ -272,7 +272,7 @@ public final class WebHost {
             ch.type = asked == ChannelStore.Channel.TYPE_M17 ? ChannelStore.Channel.TYPE_M17 : asked == 0 ? 0 : 1;
             ch.txFreq = (int) Math.round(b.getDouble("txMHz") * 1e6);
             ch.rxFreq = (int) Math.round(b.getDouble("rxMHz") * 1e6);
-            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be 136–174 or 400–480 MHz";
+            if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText();
             ch.power = b.optInt("power", ch.power) == 1 ? 1 : 0;
             ch.relay = b.optInt("relay", ch.relay) == 1 ? 1 : 2;
             if (b.has("notes")) ch.notes = b.optString("notes", "").trim();
@@ -368,7 +368,10 @@ public final class WebHost {
         JSONObject o = new JSONObject();
         o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current()));
         com.macdmr.radio.DeviceProfile prof = svc.profile();                  // what this radio can do: the pages hide what it cannot (an analog-only radio has no DMR)
-        o.put("radio", new JSONObject().put("dmr", prof.dmr()).put("messages", prof.hasMessages()).put("contacts", prof.hasContacts()));
+        JSONArray bands = new JSONArray(); for (long hz : prof.bandsHz) bands.put(hz);
+        o.put("radio", new JSONObject().put("dmr", prof.dmr()).put("messages", prof.hasMessages()).put("contacts", prof.hasContacts())
+                .put("rssi", prof.rssi).put("bands", bands).put("bandsText", prof.bandsText()).put("symbolEngine", prof.symbolEngine())
+                .put("aprs144", prof.tunable(com.macdmr.radio.PacketEngine.APRS_FREQ_HZ)).put("weather", prof.tunable(162_400_000L)));
         o.put("transmitting", svc.isTransmitting()).put("firmwareLoad", svc.firmwareLoading()).put("hearing", svc.hearing()).put("rssi", svc.lastRssi()).put("caller", svc.currentCaller());
         o.put("softSq", svc.softSqOn()).put("softSqLevel", svc.softSqLevel()).put("monitor", svc.monitorOn()).put("promiscuous", svc.promiscuousOn()).put("record", svc.recordOn())
                 .put("scanning", svc.scanning()).put("vfo", svc.vfoActive()).put("zone", svc.zoneName()).put("zoneId", svc.zoneId())
@@ -791,6 +794,7 @@ public final class WebHost {
                 long now = System.currentTimeMillis();
                 JSONArray a = new JSONArray();
                 for (com.macdmr.radio.ham.Satellites.Sat s : com.macdmr.radio.ham.Satellites.all(svc)) {
+                    if (!com.macdmr.radio.DeviceProfile.inBands(s.downHz)) continue;                 // a downlink this radio cannot tune (the W6: UHF only)
                     JSONObject o = new JSONObject().put("key", s.key).put("name", s.name).put("about", s.about).put("downHz", s.downHz).put("upHz", s.upHz)
                             .put("toneHz", s.toneHz).put("mode", s.mode).put("listenOnly", s.listenOnly());
                     String an = com.macdmr.radio.ham.FmSats.amsatName(s); if (an != null && !(s.catalog == com.macdmr.radio.ham.Satellites.ISS_CATALOG && s.mode == com.macdmr.radio.ham.Satellites.APRS)) o.put("amsat", an);
@@ -998,7 +1002,7 @@ public final class WebHost {
                         case "cleargateways": w.clearGateways(); return ok("Removed");
                         case "tuneconnect": {
                             String call = b.optString("call"); int hz = b.optInt("hz");
-                            if (!((hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000))) return WebServer.Response.error(400, "Bad frequency");
+                            if (!com.macdmr.radio.DeviceProfile.inBands(hz)) return WebServer.Response.error(400, "Bad frequency");
                             onMain(() -> { ChannelStore.Channel ch = new ChannelStore.Channel(); ch.type = 1; ch.rxFreq = ch.txFreq = hz; ch.band = 1; ch.power = 1; ch.sq = 2; ch.name = call; svc.applyVfo(ch, true); w.setGateway(call, ""); return null; });
                             new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> w.connectRadio(call, ""), 4500);
                             return ok("Tuning " + String.format(java.util.Locale.US, "%.4f MHz", hz / 1e6) + ", connecting in a few seconds");

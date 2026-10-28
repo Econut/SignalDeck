@@ -99,7 +99,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
     public static final class Zone { public long id; public String name; public int[] numbers = new int[0]; }
 
     /** The radio's two bands: 136–174 and 400–480 MHz. */
-    public static boolean inBand(int hz) { return (hz >= 136_000_000 && hz <= 174_000_000) || (hz >= 400_000_000 && hz <= 480_000_000); }
+    public static boolean inBand(int hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }   // the phone's radio (the W6 tunes 400-470 MHz only)
 
     public ChannelStore(Context c) { super(c, "radio.db", null, 5); }
     /** A separate database file (the backup self-test restores into a scratch copy). */

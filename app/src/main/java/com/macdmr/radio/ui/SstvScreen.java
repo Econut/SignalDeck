@@ -140,7 +140,10 @@ public final class SstvScreen extends ModeScreen {
             if (switchBtn.getVisibility() != GONE) { switchBtn.setVisibility(GONE); sendBtn.setVisibility(GONE); }    // an ISS downlink: receive only
         } else {
             setSubtitle(parked() ? "Receiving on 144.500 MHz" : "Receiving on this channel");
-            if (switchBtn.getVisibility() != VISIBLE) { switchBtn.setVisibility(VISIBLE); sendBtn.setVisibility(VISIBLE); }
+            boolean can144 = svc.profile().tunable(PacketEngine.SSTV_FREQ_HZ) || parked();   // the W6 tunes UHF only: no 144.500
+            int sv = can144 ? VISIBLE : GONE;
+            if (switchBtn.getVisibility() != sv) switchBtn.setVisibility(sv);
+            if (sendBtn.getVisibility() != VISIBLE) sendBtn.setVisibility(VISIBLE);
             String sw = parked() ? "Use this channel" : "Go to 144.500";
             if (!sw.contentEquals(switchBtn.getText())) { switchBtn.setText(sw); Neo.fit(switchBtn); }
         }
