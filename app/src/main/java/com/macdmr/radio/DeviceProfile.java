@@ -81,6 +81,8 @@ public final class DeviceProfile {
     public static final class DirectAudio {
         public final int card, captureDevice, playbackDevice;
         public final String[] rxOn, rxOff, txOn, txOff;
+        /** The card's rate: 8000 (the phone's codec, as the app uses it) or a multiple of it (the Atom XL's USB card: 32000), converted in the app. */
+        public int rate = 8000;
         public DirectAudio(int card, int captureDevice, int playbackDevice, String[] rxOn, String[] rxOff, String[] txOn, String[] txOff) {
             this.card = card; this.captureDevice = captureDevice; this.playbackDevice = playbackDevice;
             this.rxOn = rxOn; this.rxOff = rxOff; this.txOn = txOn; this.txOff = txOff;
@@ -89,12 +91,14 @@ public final class DeviceProfile {
         static boolean safeControl(String c) { return c != null && c.matches("[A-Za-z0-9 _.,-]{1,80}=[A-Za-z0-9 _.,-]{1,40}"); }
         boolean valid() {
             if (card < 0 || card > 31 || captureDevice < 0 || captureDevice > 63 || playbackDevice < 0 || playbackDevice > 63) return false;
+            if (rate < 8000 || rate > 48000 || rate % 8000 != 0) return false;
             for (String[] l : new String[][] { rxOn, rxOff, txOn, txOff }) { if (l == null) return false; for (String c : l) if (!safeControl(c)) return false; }
             return true;
         }
         static DirectAudio fromJson(org.json.JSONObject o) throws org.json.JSONException {
             DirectAudio d = new DirectAudio(o.getInt("card"), o.getInt("captureDevice"), o.getInt("playbackDevice"),
                     strings(o.optJSONArray("rxOn")), strings(o.optJSONArray("rxOff")), strings(o.optJSONArray("txOn")), strings(o.optJSONArray("txOff")));
+            d.rate = o.optInt("rate", 8000);
             if (!d.valid()) throw new org.json.JSONException("directAudio: bad device number or control");
             return d;
         }

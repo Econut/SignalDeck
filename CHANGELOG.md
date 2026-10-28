@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Direct audio: cards faster than 8 kHz (the Atom XL's USB card)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL handoff, Phase D (`phonedmrapp/docs/atomxl/TRANSPORT_DESIGN.md` §5) | `DeviceProfile.DirectAudio` gets a `rate` (default 8000, so every existing recipe is unchanged; the profile list may set it, multiples of 8000 up to 48000). `AlsaDirectAudio` runs `sdalsa` at that rate and converts to and from the app's 8 kHz in `RateConverter`: a windowed-sinc low-pass at 3.4 kHz before keeping every n-th frame on receive, after zero-stuffing on transmit and for played clips. Nothing uses a faster rate yet: the Atom XL profile does (next PR). No user-facing change, so no help change. | `RateConverter.java`, `AlsaDirectAudio.java`, `DeviceProfile.java`, `RateConverterTest.java` | Host: `RateConverterTest` (1 kHz within ±0.5 dB both ways, 7 kHz > 40 dB down before decimation, block-wise = one call, factor 1 untouched, the Armor's `sdalsa` line unchanged, a 44.1 kHz recipe refused) + suite 443/0. Device: `sdalsa cap -c 1 -d 0 -r 32000 -n 2` read the Atom XL's USB card (494 080 bytes in 3.9 s, 2026-10-28 16:06); the backend on the phone comes with the profile. |
+
 ## 2026-10-28 — Device report: on a USB-bridge phone, ask the bridge first; vendor keys named as PTT candidates
 
 | Backlog | Change | Files | Test |
