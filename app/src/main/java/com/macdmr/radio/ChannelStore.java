@@ -473,6 +473,21 @@ public final class ChannelStore extends SQLiteOpenHelper {
         return z.id = getWritableDatabase().insert("zones", null, v);
     }
     public void deleteZone(long id) { getWritableDatabase().delete("zones", "_id=?", new String[] { String.valueOf(id) }); }
+
+    /** A zone's channel numbers with {@code add} joined in: sorted, each number once. */
+    static int[] withNumbers(int[] zone, java.util.Collection<Integer> add) {
+        java.util.TreeSet<Integer> s = new java.util.TreeSet<>(); for (int n : zone) s.add(n); for (Integer n : add) if (n != null && n > 0) s.add(n);
+        int[] out = new int[s.size()]; int i = 0; for (int n : s) out[i++] = n; return out;
+    }
+    /** A zone's channel numbers without {@code remove}, in their order. */
+    static int[] withoutNumbers(int[] zone, java.util.Collection<Integer> remove) {
+        java.util.List<Integer> l = new ArrayList<>(); for (int n : zone) if (!remove.contains(n)) l.add(n);
+        int[] out = new int[l.size()]; for (int i = 0; i < out.length; i++) out[i] = l.get(i); return out;
+    }
+    /** The order to delete several channels in: highest number first, each once, so deleting one never renumbers one still to go. */
+    static List<Integer> deleteOrder(java.util.Collection<Integer> numbers) {
+        List<Integer> l = new ArrayList<>(new java.util.TreeSet<>(numbers)); java.util.Collections.reverse(l); return l;
+    }
     private static int[] parseInts(String s) {
         List<Integer> l = new ArrayList<>();
         if (s != null) for (String t : s.split("[,;\\- ]")) { t = t.trim(); if (!t.isEmpty()) try { l.add(Integer.parseInt(t)); } catch (NumberFormatException ignored) { } }
