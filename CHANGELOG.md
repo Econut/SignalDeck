@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Coverage logging says what it records on a radio without signal readings
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 handoff follow-up: coverage logging records key-ups only on the W6 | On a radio without RSSI (the W6+) the Device switch reads "Records your key-ups with GPS …; this radio gives no signal readings, so nothing is logged as heard", the Map's coverage sheet adds that only key-ups are recorded and the Heard layer stays empty, and Help (Coverage → Turn it on) says so. Nothing changes on the Armor. | `ui/DeviceView.java`, `ui/MapDialog.java`, `ui/HelpView.java` | Host suite. Device: see the PR. |
+
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
 | Backlog | Change | Files | Test |

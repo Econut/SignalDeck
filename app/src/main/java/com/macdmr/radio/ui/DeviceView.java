@@ -125,7 +125,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         addRow(set, Neo.switchRow(c, "intercom", Neo.CYAN, "New intercom look", "Off: the classic intercom page", styleSw));
         addRow(set, layoutRow(c));
         addRow(set, Neo.switchRow(c, "diag", Neo.CYAN, "Animated panel when quiet", "Falling lines on an idle channel (uses a little battery)", animSw));
-        addRow(set, Neo.switchRow(c, "signal", Neo.VIOLET, "Coverage logging", "Records signal and key-ups with GPS for the coverage maps (Map → Coverage)", covSw));
+        addRow(set, Neo.switchRow(c, "signal", Neo.VIOLET, "Coverage logging", com.macdmr.radio.DeviceProfile.detect().rssi ? "Records signal and key-ups with GPS for the coverage maps (Map → Coverage)"
+                : "Records your key-ups with GPS for the coverage map (Map → Coverage); this radio gives no signal readings, so nothing is logged as heard", covSw));
         roamSw = sw();
         if (com.macdmr.radio.DeviceProfile.detect().dmr())                       // talkgroups: DMR only
             addRow(set, Neo.switchRow(c, "repeaters", Neo.GREEN, "DMR roaming", "While you travel, switch to the nearest repeater in this zone with the same talkgroup", roamSw));
