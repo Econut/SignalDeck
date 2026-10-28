@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Intercom: the spectrum bars stay below the activity box
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Optional follow-up offered to the owner (W6: the tallest bars reached behind the activity box) | The intercom tells the panel where the activity box ends after each layout (`CircuitBoardView.barCeilingPx`); the bars keep their full height (62.5 dp) where there is room and are limited to the space between the box and the panel floor where there is not (at least 8 dp). Closing the box gives them the whole panel again. | `CircuitBoardView.java`, `ui/IntercomView.java` | Host suite. Device: see the PR. |
+
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
 | Backlog | Change | Files | Test |

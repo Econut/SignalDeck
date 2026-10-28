@@ -141,7 +141,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
 
     /** The activity box's cross: empty its list and hide it; it comes back on the next reception or transmission (Last heard keeps everything). */
     private ImageView restoreBox;
-    private void closePanel() { panelClosed = true; history.clear(); renderHistory(); infoPanel.setVisibility(GONE); restoreBox.setVisibility(VISIBLE); }
+    private void closePanel() { panelClosed = true; history.clear(); renderHistory(); infoPanel.setVisibility(GONE); restoreBox.setVisibility(VISIBLE); board.barCeilingPx = 0; }
     /** The small button left behind: bring the box back now, with this channel's recent events. */
     private void restorePanel() {
         if (!panelClosed) return;
@@ -281,6 +281,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         FrameLayout.LayoutParams ipl = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
         ipl.topMargin = ipl.leftMargin = ipl.rightMargin = dp8;
         panel.addView(infoPanel, ipl);
+        infoPanel.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> board.barCeilingPx = v.getVisibility() == VISIBLE ? b : 0);   // the spectrum bars stay below the activity box
         restoreBox = Neo.iconButton(c, "txt", Neo.CYAN, "Show the activity box"); int rp = (int) (9 * d); restoreBox.setPadding(rp, rp, rp, rp);
         restoreBox.setOnClickListener(v -> restorePanel()); restoreBox.setVisibility(GONE);
         FrameLayout.LayoutParams rbl = new FrameLayout.LayoutParams((int) (38 * d), (int) (38 * d), Gravity.TOP | Gravity.END); rbl.topMargin = rbl.rightMargin = dp8;

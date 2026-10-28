@@ -42,6 +42,8 @@ public class CircuitBoardView extends FrameLayout {
     public volatile float[] spectrum;
     /** Captions visible: draw the VU bars as a thin strip so the transcription box can sit low without being drawn through. */
     public volatile boolean barsCompact = false;
+    /** The lowest edge of what sits over the panel at the top (the activity box), in view pixels; 0 = nothing. The bars stay below it. */
+    public volatile float barCeilingPx;
     public volatile boolean isReceiving = false;
     /** Animate the drops on a quiet channel too (on by default). */
     public volatile boolean animateIdle = true;
@@ -168,7 +170,9 @@ public class CircuitBoardView extends FrameLayout {
         // the bars stand on the panel's floor (inside the border) and grow up to 62.5 dp (14 dp with captions on); the module
         // anchored them 22.5 dp below the panel's bottom edge, so the lower part of every bar and all small bars were cut off
         float floor = h - borderDp * dp - 4 * dp;
-        float barZone = (barsCompact ? 14 : 62.5f) * dp, margin = 14 * dp, barW = (w - margin * 2) / NUM_BARS, gap = barW * 0.18f;
+        float barZone = (barsCompact ? 14 : 62.5f) * dp, ceil = barCeilingPx;
+        if (ceil > 0) barZone = Math.max(8 * dp, Math.min(barZone, floor - ceil - 4 * dp));   // a short panel (the W6): below the activity box, not behind it
+        float margin = 14 * dp, barW = (w - margin * 2) / NUM_BARS, gap = barW * 0.18f;
         for (int i = 0; i < NUM_BARS; i++) {
             float bh = Math.max(3 * dp, barHeights[i] * barZone);
             float x1 = margin + i * barW + gap, x2 = x1 + barW - gap * 2;
