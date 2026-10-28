@@ -190,9 +190,13 @@ public final class DeviceProfile {
             new String[] {
                     "allow untrusted_app console_device chr_file { open read write ioctl getattr lock }",
                     "typeattribute console_device mlstrustedobject" },
-            null, true, false);
+            null, true, true);
     static {
-        ANYSECU_W6.id = "anysecu-w6plus"; ANYSECU_W6.revision = 1; ANYSECU_W6.protocol = "sa818";
+        ANYSECU_W6.id = "anysecu-w6plus"; ANYSECU_W6.revision = 2; ANYSECU_W6.protocol = "sa818";
+        // Revision 2 (2026-10-28): tested for receive on the owner's W6+ (take-over, 128 channels, tones, APRS, SSTV, FT8,
+        // M17 from a HackRF), so it takes the radio over like a supported phone. Transmit has not been keyed on the air yet:
+        // it stays off until the owner confirms it in the cage, then the next revision clears txBlocked.
+        ANYSECU_W6.txBlocked = true;
         ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false;
         ANYSECU_W6.rxDetectNode = "/sys/class/gpio/gpio189/value";
         // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)

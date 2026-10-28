@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — ANYSECU W6+: tested for receive
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 handoff (owner: mark the W6 compatible once merged) | The W6+ profile (revision 2) is marked tested: SignalDeck takes the radio over by itself, at start and at boot when chosen, like a supported phone. Transmit stays off (`txBlocked`) until it has been keyed and confirmed on the air in the cage; the next revision clears it. Help (Untested profiles) says so. | `DeviceProfile.java`, `ui/HelpView.java` | Host suite. Device: receive verified on the W6 by the W6 agent (128 stock channels, tones, APRS 6/6, SSTV Robot 36, FT8, M17 98/100 and 92/100); merged build smoke-tested on the W6 2026-10-27. Transmit not keyed. |
+
 ## 2026-10-27 — Device report: the side-key capture names the key devices and drops the sensor flood
 
 | Backlog | Change | Files | Test |
