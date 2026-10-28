@@ -74,6 +74,11 @@ public final class DeviceProfile {
     public double[] softSqThresholds; public double softSqCloseCap;
     /** The module volume held while {@link #appPlayback} is on (the camcorder gain is calibrated at 4 of 8 on the W6). */
     public int fixedModuleVolume = 4;
+    /**
+     * The module squelch data modes use: 0 = fully open (the default). The W6 measured worse at 0 (its monitor mode: passive
+     * APRS 38 of 48 packets against 23 of 24 at squelch 2, HackRF 2026-10-28), so there data modes keep at least this.
+     */
+    public int dataSquelch;
     /** sa818: the module's receive line, a GPIO input that reads 1 while the squelch is open (null = none). */
     public String rxDetectNode;
     /** sa818: {node, value} written in order when reception starts / ends and when the transmitter keys / unkeys (the stock app's audio and PTT lines). */
@@ -214,7 +219,7 @@ public final class DeviceProfile {
         // Revision 2 (2026-10-28): tested for receive on the owner's W6+ (take-over, 128 channels, tones, APRS, SSTV, FT8,
         // M17 from a HackRF), so it takes the radio over like a supported phone.
         // Revision 3 (2026-10-28): transmit confirmed on the air by the owner in the cage, so txBlocked is cleared.
-        ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false; ANYSECU_W6.appPlayback = true; ANYSECU_W6.subaudible = false;
+        ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false; ANYSECU_W6.appPlayback = true; ANYSECU_W6.subaudible = false; ANYSECU_W6.dataSquelch = 1;
         // Soft SQ thresholds measured on the W6 at module volume 4 (HackRF, 2026-10-28, scratchpad sqsim.py): static 12.8-27.6;
         // TTS speech at HackRF gain 7 (barely readable) ~11, gain 9 ~4.4, gain 11 and up <= 3.5. Level 1 passes the barely
         // readable, levels 7-9 only clean signals, static never opens.
@@ -304,7 +309,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -325,7 +330,7 @@ public final class DeviceProfile {
             for (int i = 0; i < bands.length(); i++) p.bandsHz[i] = bands.getLong(i);
             for (int i = 0; i < bands.length(); i += 2) if (p.bandsHz[i] >= p.bandsHz[i + 1]) throw new org.json.JSONException("bandsHz: low below high");
         }
-        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false); p.appPlayback = o.optBoolean("appPlayback", false); p.subaudible = o.optBoolean("subaudible", true);
+        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false); p.appPlayback = o.optBoolean("appPlayback", false); p.subaudible = o.optBoolean("subaudible", true); p.dataSquelch = Math.max(0, Math.min(8, o.optInt("dataSquelch", 0)));
         org.json.JSONArray sst = o.optJSONArray("softSqThresholds");
         if (sst != null && sst.length() == 9) { p.softSqThresholds = new double[9]; for (int i = 0; i < 9; i++) p.softSqThresholds[i] = sst.optDouble(i, 0); p.softSqCloseCap = o.optDouble("softSqCloseCap", 0); } p.fixedModuleVolume = Math.max(1, Math.min(8, o.optInt("fixedModuleVolume", 4)));
         p.rxLinesOn = pairs(o.optJSONArray("rxLinesOn")); p.rxLinesOff = pairs(o.optJSONArray("rxLinesOff")); p.muteLines = pairs(o.optJSONArray("muteLines"));

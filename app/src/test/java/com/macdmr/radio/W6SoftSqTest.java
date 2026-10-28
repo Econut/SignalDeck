@@ -24,6 +24,11 @@ public class W6SoftSqTest {
         assertEquals(null, DeviceProfile.ARMOR_26_ULTRA.softSqThresholds);
     }
 
+    @Test public void dataModesNeverUseTheW6MonitorMode() {
+        assertEquals(1, DeviceProfile.ANYSECU_W6.dataSquelch); assertEquals(1, DeviceProfile.ANYSECU_W6.copy(true, false).dataSquelch);
+        assertEquals(0, DeviceProfile.ARMOR_26_ULTRA.dataSquelch);   // the Armor's data modes keep the squelch fully open
+    }
+
     @Test public void withoutToneDetectionACtcssChannelUsesTheNoiseDetector() {
         SoftSquelch s = new SoftSquelch(); s.toneDetect = false;
         s.configure(true, 5, 1, 1);                                      // a CTCSS channel
