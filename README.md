@@ -8,7 +8,7 @@
 
 ---
 
-**SignalDeck** is an Android app for phones with a built-in walkie-talkie radio module (VHF/UHF, analog FM and DMR). It drives the module directly, without the phone's stock walkie-talkie app, and turns the phone into a full ham radio station: voice, packet, digital modes, satellites, e-mail by radio, and the whole radio in a web browser.
+**SignalDeck** is an Android app for phones with a built-in walkie-talkie radio module (VHF/UHF, analog FM, DMR and M17). It drives the module directly, without the phone's stock walkie-talkie app, and turns the phone into a full ham radio station: voice, packet, digital modes, satellites, e-mail by radio, and the whole radio in a web browser.
 
 > [!WARNING]
 > **Public beta, for testing — bugs are expected.** SignalDeck needs a **rooted phone (Magisk)** and takes direct control of its radio module. It is provided as is, without warranty (GPL v3); the author is not responsible for any damage to your phone, its radio or your data. Transmitting legally (licence, frequencies, power) is your responsibility.
@@ -48,12 +48,13 @@ The screenshots use demo data: made-up callsigns (unallocated `Q` prefixes, `DEM
 ## What it does
 
 ### Talk and listen
-- **Analog FM and DMR:** group and private calls, RX group lists, CTCSS and DCS, receive-only channels, high and low power, color codes and timeslots.
+- **Analog FM, DMR and M17 channels:** group and private calls, RX group lists, CTCSS and DCS, receive-only channels, high and low power, color codes and timeslots; an M17 channel has a destination and a channel access number.
 - **The intercom page:** channel and frequency display, live S-meter, a real audio spectrum, the history of receptions and captions, and the talk key with the SOFT SQ / TXT / VFO / REC / MON / PKT keys around it. Two looks (new and classic). The side PTT key works, or any key you teach it.
 - **Channels:** full editor, favourites, notes, zones, a scanner with a scan list, VFO for any frequency, Nearby Repeaters and repeaters on the map.
 - **Soft SQ** (a software squelch for weak signals), **REC** (recordings per channel), **MON** (squelch held open).
 - **Live captions** of received speech (Vosk on the phone, or Google Cloud), with keyword alerts; **voice announcements** of channel and caller.
-- **DMR extras:** text messages with quick replies and talkgroup threads, Last heard with RadioID names and callsigns, and **DMR roaming** (switches to the nearer repeater of your network as you travel).
+- **DMR extras:** text messages with quick replies and talkgroup threads, Last heard with RadioID names and callsigns, talkgroups picked from your contacts, and **DMR roaming** (switches to the nearer repeater of your network as you travel). With SignalDeck's module firmware, MON on a DMR channel hears every call on the frequency, whatever its talkgroup or colour code, and shows the colour code and slot.
+- **Contacts:** DMR IDs and talkgroups, callsigns, pager RICs, notes, a home location and the last position heard over APRS.
 - **Emergency** (sends your position) and an optional roger beep.
 
 ### Digital modes and packet (the PKT key)
@@ -63,10 +64,11 @@ The screenshots use demo data: made-up callsigns (unallocated `Q` prefixes, `DEM
 - **Winlink e-mail** through a radio gateway or over the internet, with the gateway list from winlink.org (nearest first), scheduled mail checks and forms by Winlink.
 - **Packet terminal** (connected mode) and the **Packet finder**, which listens across packet frequencies and lists the BBSs, nodes and Winlink gateways it hears.
 - **FT8 over FM:** the WSJT-X mode on an FM channel, with a waterfall and automatic contacts logged in the Logbook. It talks to other FM FT8 stations; normal FT8 on SSB cannot be received with this radio.
-- **M17 digital voice, receive only:** plays M17 stations and shows the caller and text (calibrated for the Ulefone Armor 26 Ultra so far).
-- **SSTV:** receive (Robot, Martin, Scottie and PD, plus a continuous Robot 36 decoder that picks up pictures halfway) and send; a gallery with share, delete and **Combine** (several receptions of the same picture into a cleaner one).
+- **M17 digital voice:** receive on any firmware (an equaliser calibrated per phone model, which then refines itself from clean calls), with the caller and text shown; long calls stay one listing. **Transmit** (voice from the microphone) needs SignalDeck's module firmware, which sends M17 through the radio's own modulator. Checked against an MMDVM hotspot.
+- **POCSAG pages:** compose and send to one or more pagers (512, 1200 or 2400 baud) with SignalDeck's module firmware.
+- **SSTV:** receive (Robot, Martin, Scottie and PD, plus a continuous Robot 36 decoder that picks up pictures halfway) and send, including the long modes (Robot 36, Martin, Scottie, PD 90) with a cool-down and heat guard; a gallery with share, delete and **Combine** (several receptions of the same picture into a cleaner one).
 - **Decode a recording:** finds SSTV pictures and APRS packets in any audio file.
-- **RTTY and PSK31**, **DTMF** decode and send (with remote control by DTMF), **Morse** decode and send with a trainer, a **voice keyer**, a **simplex repeater (parrot)** and an **ID timer**.
+- **RTTY and PSK31** (with SignalDeck's module firmware, RTTY, FT8 and the Morse ID go out through the module's own tone generator, without the audio path's filters), **DTMF** decode and send (with remote control by DTMF), **Morse** decode and send with a trainer, a **voice keyer**, a **simplex repeater (parrot)** and an **ID timer**.
 - **Weather:** NOAA weather radio with SAME alert decoding.
 
 ### Satellites and propagation
@@ -84,7 +86,8 @@ The screenshots use demo data: made-up callsigns (unallocated `Q` prefixes, `DEM
 - **SignalDeck Web:** the whole radio in a browser on your Wi-Fi, protected by a PIN (https on port 8443 for sharing and the microphone): intercom, channels, messages, APRS, SSTV, packet and Winlink, FT8, M17, satellites, band scope, map, logbook, recordings, and the phone's battery and signal. Transmitting from the web stays off until you allow it.
 - **Android Auto** (the radio on the car's screen, including talk), a home-screen **widget**, and a notification with controls.
 - **Backups**, channel sharing (Android share sheet, CHIRP CSV) and boot persistence.
-- **Support tools:** Radio audio check, second radio test, device reports, and a watchdog that restarts a radio module that stops taking commands.
+- **Support tools:** Radio audio check, second radio test, device reports (**Run all checks**, also driven from adb), and a watchdog that restarts a radio module that stops taking commands.
+- **Module firmware page** (Device): shows the radio module's firmware, keeps a verified backup of the factory image taken from the stock app, and loads images from the project's signed catalogue, with every safety check shown before a load and the factory image restored when anything does not match. Experimental, and only for the listed phones.
 
 ## What the hardware cannot do
 
@@ -92,8 +95,8 @@ These are limits of the radio module, measured on the reference phone. SignalDec
 
 - **Frequencies:** the module only tunes 136–174 MHz and 400–480 MHz (no 220 MHz, no out-of-band receive).
 - **FM only on analog:** no SSB or CW receive, so no normal FT8 or weak-signal satellite work.
-- **30-second transmissions:** the module's firmware ends every transmission after 30 s, so data modes are built to fit (SSTV sends Robot 24 Color, Robot 12 BW and Robot 8 BW, for example).
-- **No M17 or POCSAG transmit** that other radios could decode: the transmit audio path filters and limits the signal. M17 receive works with an equalizer calibrated per phone.
+- **Transmission length:** SignalDeck ends voice transmissions at about 28 s and allows up to 118 s only for long SSTV pictures, with a cool-down between long ones (a 2-minute key warms the phone by about 11 °C).
+- **M17 and POCSAG transmit need SignalDeck's module firmware:** the stock transmit audio path filters and limits the signal too much for other radios to decode. With the module firmware these modes go through the radio's own modulator instead. M17 receive works on stock firmware with the per-phone equaliser.
 - **DCS codes cannot be read from the audio** (the module handles DCS squelch itself); CTCSS tones can be identified.
 - **DMR:** the module admits group calls only for the 32 talkgroups in a channel's RX list.
 
@@ -101,7 +104,7 @@ These are limits of the radio module, measured on the reference phone. SignalDec
 
 | Phone | Status |
 |---|---|
-| **Ulefone Armor 26 Ultra** (walkie-talkie model) | Tested — the reference phone. |
+| **Ulefone Armor 26 Ultra** (walkie-talkie model) | Tested — the reference phone. Custom ROMs and GSIs work too: SignalDeck takes the radio audio straight from the sound card when the vendor audio service is missing. |
 | **Blackview Xplore 1** | **Profile in testing** ([analysis](docs/multi-device-xplore1-findings.md)): same radio-module protocol, audio over a second serial port. A tester has receive, channel import and CTCSS working; transmit stays blocked until the profile is verified. Owners: please run **Device → Run all checks** and send the zip. |
 | **Ulefone Armor 20WT** | **Profile written, untested** (from an owner's device report and its stock app): the Armor 26 Ultra's radio family on another serial port. SignalDeck does not take over or transmit by itself until it is tested. Owners: please run **Device → Run all checks** and send the zip. |
 | Other DMR phones (Oukitel WP61, UNIWA P2 Plus…) | No profile yet — the app starts in discovery mode and offers **Run all checks**. See [docs/DEVICE_SUPPORT_REQUEST.md](docs/DEVICE_SUPPORT_REQUEST.md). |
@@ -125,7 +128,7 @@ The device profile list in [`profiles/`](profiles/README.md) is signed separatel
 
 ## History
 
-SignalDeck began on 2026-10-17 inside [phonedmrapp](https://github.com/IIMacGyverII/phonedmrapp), the research project and **DMRModHooks** LSPosed module for the Ulefone Armor 26 Ultra, and moved here with its full history. Beta builds 1.0.0-beta.1 to beta.11 were published there; the changes of every build since are in [CHANGELOG.md](CHANGELOG.md).
+SignalDeck began on 2026-10-17 inside [phonedmrapp](https://github.com/IIMacGyverII/phonedmrapp), the research project and **DMRModHooks** LSPosed module for the Ulefone Armor 26 Ultra, and moved here with its full history. Beta builds 1.0.0-beta.1 to beta.11 were published there, and later betas here (beta.20 on 2026-10-27); the changes of every build are in [CHANGELOG.md](CHANGELOG.md). The research behind the radio work (the module firmware, M17, POCSAG and the bench methods) is documented in phonedmrapp.
 
 ## License
 
