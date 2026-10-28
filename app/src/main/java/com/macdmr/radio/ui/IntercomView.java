@@ -286,8 +286,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             LayoutParams first=new LayoutParams(0,(int)(40*d),1);first.rightMargin=(int)(4*d);shortcuts.addView(softSq,first);
             LayoutParams second=new LayoutParams(0,(int)(40*d),1);second.rightMargin=(int)(4*d);shortcuts.addView(vfo,second);
             p8MenuSlot=new FrameLayout(c);shortcuts.addView(p8MenuSlot,new LayoutParams(0,(int)(40*d),1));
-            LayoutParams shortLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(40*d));shortLp.setMargins((int)(8*d),(int)(4*d),(int)(8*d),0);addView(shortcuts,shortLp);
-            LayoutParams talkLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(56*d));talkLp.setMargins((int)(8*d),(int)(4*d),(int)(8*d),(int)(4*d));addView(bottom,talkLp);
+            LayoutParams shortLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(40*d));shortLp.setMargins((int)(16*d),(int)(4*d),(int)(16*d),0);addView(shortcuts,shortLp);
+            LayoutParams talkLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(56*d));talkLp.setMargins((int)(16*d),(int)(4*d),(int)(16*d),(int)(4*d));addView(bottom,talkLp);
         }
         else if (neo) addView(bottom, btl);
         else {
