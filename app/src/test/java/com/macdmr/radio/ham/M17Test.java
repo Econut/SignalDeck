@@ -110,4 +110,63 @@ public class M17Test {
         assertEquals("four transmissions found, LSF decoded", 4, starts);
         assertTrue("exact " + exact, exact >= 290);
     }
+
+    static JSONObject metaW6() throws Exception { return new JSONObject(new String(M17Test.class.getResourceAsStream("/m17/m17_rx_w6.json").readAllBytes(), "UTF-8")); }
+    static int exactPayloads(List<byte[]> got, JSONObject part) throws Exception {
+        JSONArray pays = part.getJSONArray("payloads");
+        java.util.Set<String> want = new java.util.HashSet<>(); for (int k = 0; k < pays.length(); k++) want.add(pays.getString(k));
+        int n = 0; for (byte[] p : got) { StringBuilder h = new StringBuilder(); for (byte x : p) h.append(String.format("%02x", x)); if (want.remove(h.toString())) n++; }
+        return n;
+    }
+
+    /**
+     * ANYSECU W6+ (SA818-class module, receive cut below ~300 Hz, steeper than the Armor's): a table fitted on one HackRF
+     * transmission with the short feedback (M17Receiver.LEARN_FEEDBACK) decodes the other. Before the history corrections
+     * (known sync, confirmed frames re-encoded, unconfirmed frames not fed back) the receiver lost the stream after 2-14 frames.
+     * M17_W6_OUT writes the fitted table (the shipped assets/m17/eq_anysecu-w6plus.txt).
+     */
+    @Test public void decodesTheW6AfterCalibration() throws Exception {
+        short[] audio = wav(M17Test.class.getResourceAsStream("/m17/m17_rx_w6.wav"));
+        JSONArray parts = metaW6().getJSONArray("parts");
+        float[] cal = M17Receiver.calibrate(audio, parts.getJSONObject(0).getInt("start8k"), symbols(parts.getJSONObject(0)), M17Receiver.LEARN_FEEDBACK);
+        System.out.printf("W6 fit MSE %.3f%n", cal[M17Receiver.NCOEF]);
+        String out = System.getenv("M17_W6_OUT");
+        if (out != null) { StringBuilder sb = new StringBuilder(); for (int i = 0; i < M17Receiver.NCOEF; i++) sb.append(cal[i]).append('\n'); java.nio.file.Files.write(java.nio.file.Paths.get(out), sb.toString().getBytes("UTF-8")); }
+        final List<byte[]> payloads = new ArrayList<>(); final List<String> events = new ArrayList<>();
+        M17Receiver rx = new M17Receiver(java.util.Arrays.copyOf(cal, M17Receiver.NCOEF), new M17Receiver.Listener() {
+            public void started(M17.Lsf l) { events.add("start " + l.src() + " " + l.crcOk); }
+            public void frame(M17.Stream s, float q) { payloads.add(s.payload); }
+            public void lsfFromLich(M17.Lsf l) { }
+            public void ended(int f, int g, String why) { events.add("end " + f + " " + g + " " + why); }
+        });
+        rx.feed(audio, audio.length); rx.feed(new short[8000], 8000);
+        int exact = exactPayloads(payloads, parts.getJSONObject(1));
+        System.out.println(events + "\nW6: exact payloads in the other transmission: " + exact + " of 100");
+        assertEquals(2, events.stream().filter(e -> e.equals("start N0CALL true")).count());
+        assertTrue("exact " + exact, exact >= 85);
+    }
+
+    /** Self-calibration on the W6: the table learned from one call's confirmed frames alone decodes the other call. */
+    @Test public void learnsATableFromConfirmedFrames() throws Exception {
+        short[] audio = wav(M17Test.class.getResourceAsStream("/m17/m17_rx_w6.wav"));
+        JSONArray parts = metaW6().getJSONArray("parts");
+        float[] seed = java.util.Arrays.copyOf(M17Receiver.calibrate(audio, parts.getJSONObject(0).getInt("start8k"), symbols(parts.getJSONObject(0)), M17Receiver.LEARN_FEEDBACK), M17Receiver.NCOEF);
+        final M17Receiver[] holder = new M17Receiver[1]; final List<float[]> learned = new ArrayList<>(); final List<Integer> counts = new ArrayList<>();
+        holder[0] = new M17Receiver(seed, new M17Receiver.Listener() {
+            public void started(M17.Lsf l) { }
+            public void frame(M17.Stream s, float q) { }
+            public void lsfFromLich(M17.Lsf l) { }
+            public void ended(int f, int g, String why) { counts.add(holder[0].learnedFrames()); learned.add(holder[0].learnedTable(20, M17Receiver.LEARN_FEEDBACK)); }
+        });
+        holder[0].feed(audio, audio.length); holder[0].feed(new short[8000], 8000);
+        System.out.println("confirmed frames learned per call: " + counts);
+        assertEquals(2, learned.size());
+        assertNotNull(learned.get(1));
+        short[] first = java.util.Arrays.copyOfRange(audio, 0, parts.getJSONObject(1).getInt("start8k") - 4000);
+        int[] withLearned = M17Receiver.score(first, learned.get(1)), withSeed = M17Receiver.score(first, seed);
+        System.out.println("first call: learned table " + java.util.Arrays.toString(withLearned) + ", seed " + java.util.Arrays.toString(withSeed));
+        assertEquals(1, withLearned[2]);
+        assertTrue("learned " + withLearned[0], withLearned[0] >= 85);
+        assertNull("fewer than 20 confirmed frames: no table", new M17Receiver(seed, null).learnedTable(20, 4));
+    }
 }

@@ -4,6 +4,14 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — M17 receive: a steadier decision-feedback receiver, its own self-calibration, and the W6's calibration
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| M17 receive (stock firmware path) | The decision-feedback receiver corrects the history it feeds back where the symbols are known: each stream frame's sync word, and a whole frame once its error correction confirms it (re-encoded); a frame it rejects is not fed back; six frames without sync (240 ms) end a call, not two; the end bit counts only on a confirmed frame. On the W6 a table fitted on one transmission had lost the stream after 2-14 frames; now 99 of 100 payloads exact on another. The Armor test recording: 300 of 300 (299 before) | `ham/M17Receiver` | `M17Test` (Armor 300/300, W6 99/100 on the transmission not fitted) |
+| M17 self-calibration | The receiver learns from the frames it confirms in a call; with 20 or more the fitted table (4 feedback taps) waits for a later call, decoded with both tables, and is kept only when it finds the link setup there, confirms at least as many frames and the call is from another station or 6 dB weaker (the held path's rule). Stored per profile in the app's files; long-press the M17 note resets it. It refines a calibration; it cannot make one (a phone whose table decodes nothing confirms no frames) | `DfeCal` (new), `M17Station`, `ham/M17Receiver`, `ui/HelpView` | `DfeCalTest`; `M17Test.learnsATableFromConfirmedFrames` (a table learned from one W6 call's 95 confirmed frames decodes the other at 94, the bench table 93); W6 on-air check in the PR |
+| W6 (analog-only module) | M17 calibration for the ANYSECU W6+ (`assets/m17/eq_anysecu-w6plus.txt`), fitted on a HackRF transmission received by the W6 (test recording `m17_rx_w6.wav`); before it the W6 used the Armor's table and found nothing | assets, test resources | `M17Test.decodesTheW6AfterCalibration` |
+
 ## 2026-10-26 — Firmware the catalogue does not list yet: asked once, noticed on the Device page
 
 | Backlog | Change | Files | Test |
