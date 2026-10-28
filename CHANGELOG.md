@@ -15,6 +15,7 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 | W6 | The status card of the mode pages (APRS, SSTV, FT8, M17 and the others) fits a 320 dp screen (the frequency was cut off by the signal bars: smaller frequency and bars under 360 dp wide) and, without signal readings, hides the bars and says receiving or quiet | `ui/ModeScreen` | W6: checked on the FT8 page |
 | W6 | The SSTV page hides Go to 144.500 where the radio cannot tune it; the M17 page says the module cannot send M17 instead of pointing to firmware that does not exist for it | `ui/SstvScreen`, `ui/M17Screen` | W6: checked on the phone |
 | W6 | The VFO starts on a frequency the radio tunes (the current channel, else 446.000 MHz, instead of 146.520 on a UHF-only radio), is FM only without DMR, and hides its FM/DMR choice there (phone and web, which share the default) | `RadioService`, `ui/VfoDialog` | W6: checked on the phone |
+| W6 | SignalDeck Web's intercom hides its dBm bar on a radio without signal readings (the state chip still says when something is received) | web `index.html` | W6: web checked by script |
 | SignalDeck Web | The SSTV button said "Listen on 144.500" but has always listened on the current channel; it now says so | web `app.js`, `index.html` | — |
 
 ## 2026-10-27 — SignalDeck Web hides the DMR parts on a radio without DMR
