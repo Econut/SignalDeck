@@ -29,6 +29,7 @@ public final class P8UiInstrumentation extends Instrumentation {
         try{
             P8ChannelManagementChecks.run(getTargetContext());
             P8CsvDatabaseChecks.run(getTargetContext());
+            P8ScanChecks.run(this);
             runOnMainSync(()->{
                 Context context=new ContextThemeWrapper(getTargetContext(),R.style.AppTheme);
                 List<Boolean> events=new ArrayList<>();P8PttBar bar=new P8PttBar(context);bar.setListener(events::add);

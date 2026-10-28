@@ -19,14 +19,22 @@ public final class ScanListsDialog {
     public static void show(Context c,RadioService svc){
         if(svc.scanning()){Toast.makeText(c,svc.toggleScan(),Toast.LENGTH_SHORT).show();return;}
         List<ChannelStore.ScanList> lists=svc.store().scanLists();
-        String[] items=new String[lists.size()+2];
+        String[] items=new String[lists.size()+3];
         items[0]="Current zone: "+svc.zoneName()+(svc.scanListId()==0?" ✓":"");
         for(int i=0;i<lists.size();i++){ChannelStore.ScanList s=lists.get(i);items[i+1]=s.name+" ("+svc.store().scanChannels(s.id).size()+")"+(svc.scanListId()==s.id?" ✓":"");}
-        items[items.length-1]="Manage scan lists…";
+        items[items.length-2]="Scan speed: "+com.macdmr.radio.P8ScanTiming.label(svc.p8ScanDwell());items[items.length-1]="Manage scan lists…";
         new AlertDialog.Builder(c).setTitle("Choose scan list").setItems(items,(d,w)->{
             if(w==items.length-1){manage(c,svc);return;}
+            if(w==items.length-2){speed(c,svc);return;}
             svc.setScanList(w==0?0:lists.get(w-1).id);
             Toast.makeText(c,svc.toggleScan(),Toast.LENGTH_LONG).show();
+        }).setNegativeButton("Cancel",null).show();
+    }
+    private static void speed(Context c,RadioService svc){
+        int[] values=com.macdmr.radio.P8ScanTiming.OPTIONS;String[] labels=new String[values.length];int selected=0;
+        for(int i=0;i<values.length;i++){labels[i]=com.macdmr.radio.P8ScanTiming.label(values[i]);if(values[i]==svc.p8ScanDwell())selected=i;}
+        new AlertDialog.Builder(c).setTitle("FM scan speed (after tune ACK)").setSingleChoiceItems(labels,selected,(d,w)->{
+            svc.setP8ScanDwell(values[w]);Toast.makeText(c,"Saved: "+labels[w]+". DMR keeps 1.5 s; signal hold is unchanged.",Toast.LENGTH_LONG).show();d.dismiss();
         }).setNegativeButton("Cancel",null).show();
     }
     public static void manage(Context c,RadioService svc){

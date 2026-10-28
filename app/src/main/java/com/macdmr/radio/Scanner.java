@@ -29,6 +29,8 @@ public final class Scanner {
         void status(boolean scanning, boolean holding, ChannelStore.Channel on);
         /** Listening time per channel (the phone's profile). */
         default long dwellMs() { return DWELL_MS; }
+        default long dwellMs(ChannelStore.Channel ch){return dwellMs();}
+        default boolean waitForTuneAck(){return false;}
     }
 
     static final long DWELL_MS = 1500, DWELL_SOFT_MS = 2000, HANG_MS = 2500, SETTLE_MS = 700, TICK_MS = 150;
@@ -36,6 +38,7 @@ public final class Scanner {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Host host;
     private volatile boolean scanning, holding;
+    private boolean awaitingTune;
     private List<ChannelStore.Channel> list = new ArrayList<>();
     private int idx = -1;
     /** Visit the priority channel after this many other channels. */
@@ -55,13 +58,16 @@ public final class Scanner {
 
     public boolean isScanning() { return scanning; }
     public boolean isHolding() { return holding; }
+    /** P8 calls this only after a validated module channel acknowledgement, on the main looper. */
+    public void acknowledged(int number){if(scanning && awaitingTune && here()!=null && here().number==number){landedAt=android.os.SystemClock.elapsedRealtime();awaitingTune=false;}}
+    private void tune(ChannelStore.Channel ch){awaitingTune=host.waitForTuneAck();landedAt=android.os.SystemClock.elapsedRealtime();host.tune(ch);}
 
     public synchronized String start() {
         if (scanning) return "Already scanning";
         list = new ArrayList<>();
         for (ChannelStore.Channel ch : host.candidates()) if (!skipped.contains(ch.number) && !(ch.isDigital() && ch.txContact <= 0)) list.add(ch);
         if (list.size() < 2) return "Nothing to scan: need at least two supported channels in the selected list or zone";
-        scanning = true; holding = false; idx = -1; landedAt = 0; lastActivityAt = 0;
+        scanning = true; holding = false;awaitingTune=false; idx = -1; landedAt = 0; lastActivityAt = 0;
         prio = host.priority(); onPriority = false; sincePriority = 0; peeking = false; lastPeek = 0;
         if (prio != null) for (int i = 0; i < list.size(); i++) if (list.get(i).number == prio.number) { list.remove(i); break; }   // visited by look-back, not twice
         handler.removeCallbacks(tick); handler.post(tick);
@@ -70,7 +76,7 @@ public final class Scanner {
 
     public synchronized void stop() {
         if (!scanning) return;
-        scanning = false; holding = false;
+        scanning = false; holding = false;awaitingTune=false;
         handler.removeCallbacks(tick);
         host.status(false, false, null);
     }
@@ -93,7 +99,8 @@ public final class Scanner {
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (!scanning) return;
-            long now = System.currentTimeMillis();
+            if(awaitingTune){handler.postDelayed(this,TICK_MS);return;}
+            long now = android.os.SystemClock.elapsedRealtime();
             boolean rx = host.receiving();
             if ((idx >= 0 || onPriority) && now - landedAt > SETTLE_MS && rx) {              // activity on this channel: hold
                 lastActivityAt = now;
@@ -101,10 +108,10 @@ public final class Scanner {
             }
             if (holding && !onPriority && prio != null && now - Math.max(lastPeek, landedAt) > PRIORITY_PEEK_MS) {   // busy channel: still look at the priority one
                 lastPeek = now; peeking = true; onPriority = true; holding = false; lastActivityAt = 0;
-                landedAt = now; host.tune(prio); host.status(true, false, prio);
+                tune(prio); host.status(true, false, prio);
             } else if (holding) {
                 if (!rx && now - lastActivityAt > HANG_MS) { holding = false; step(); }
-            } else if ((idx < 0 && !onPriority) || now - landedAt > (host.softGated() ? Math.max(DWELL_SOFT_MS, host.dwellMs()) : host.dwellMs())) step();
+            } else if ((idx < 0 && !onPriority) || now - landedAt > (host.softGated() ? Math.max(DWELL_SOFT_MS, host.dwellMs(here())) : host.dwellMs(here()))) step();
             handler.postDelayed(this, TICK_MS);
         }
     };
@@ -113,21 +120,19 @@ public final class Scanner {
         if (list.isEmpty()) { stop(); return; }
         if (peeking) {                                      // priority quiet: back to the channel we were holding on
             peeking = false; onPriority = false;
-            ChannelStore.Channel back = list.get(idx); landedAt = System.currentTimeMillis();
-            host.tune(back); host.status(true, false, back);
+            ChannelStore.Channel back = list.get(idx);
+            tune(back); host.status(true, false, back);
             return;
         }
         if (prio != null && !onPriority && sincePriority >= PRIORITY_EVERY) {   // look back at the priority channel
             onPriority = true; sincePriority = 0;
-            landedAt = System.currentTimeMillis();
-            host.tune(prio); host.status(true, false, prio);
+            tune(prio); host.status(true, false, prio);
             return;
         }
         onPriority = false; sincePriority++;
         idx = (idx + 1) % list.size();
         ChannelStore.Channel ch = list.get(idx);
-        landedAt = System.currentTimeMillis();
-        host.tune(ch);
+        tune(ch);
         host.status(true, false, ch);
     }
 }

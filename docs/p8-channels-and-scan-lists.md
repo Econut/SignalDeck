@@ -23,3 +23,13 @@ Scan lists use stable channel row IDs, independent of zone membership and displa
 - Intercom was restored cleanly before installation and remains available. No P8 RF transmission, firmware or calibration changes were performed. Live RF scan hold/resume across multiple populated channels remains the next functional check; the current user database has one channel.
 
 APK SHA-256: `226e677a7b381f7df80cfd7e9556e9b85572a2f748b6a7740c870e3a9fcd3d87`.
+
+## Main.6b: selectable P8 scan timing
+
+SCAN → Scan speed offers Standard (1.5 s), Balanced (1.0 s) and Fast trial (0.8 s). Standard remains the default; invalid stored settings fall back to Standard. The setting persists across restart. DMR retains 1.5 s. Main-screen design is unchanged.
+
+For P8, dwell starts only after the matching tune acknowledgement. The existing 700 ms settle, 2.5 s receive hang and activity hold remain intact. Relative timing uses the monotonic clock. Other hardware profiles retain their existing behaviour.
+
+Validation: 99 focused host tests passed, release build passed, and isolated on-device tests covered acknowledgement waiting, wrong/late acknowledgements, settle time, activity hold, resume and stop. Balanced persisted through an app restart. Live receive-only testing across all 16 PMR channels measured complete quiet cycles of 19.500, 19.104 and 19.527 seconds (median hop 1.201 s including retuning). Channel 9 reception produced RX-start, valid RSSI and received PCM FFT; RX ended at 17:49:53.868 and scanning resumed at 17:49:56.475, preserving the hang. Audible quality awaits explicit user confirmation. Weak/short-signal performance and Fast trial remain unverified. The completed scan was stopped; no P8 RF transmission occurred.
+
+Installed APK: version 139, 1.0.0-beta.20-p8-main.6b. SHA-256: 7909ef99a2cf310f614dc6f2d2089971200893e90928dd7fe14c9c6305a7d10d.

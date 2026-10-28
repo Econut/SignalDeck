@@ -83,6 +83,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         @Override public boolean receiving() { return p8Main()?receiving:softSq.isEnabled() ? squelchOpen : receiving; }   // with Soft SQ on the module's squelch is open and it reports a reception all the time: the soft gate is the activity signal
         @Override public boolean softGated() { return !p8Main() && softSq.isEnabled(); }
         @Override public long dwellMs() { return profile.scanDwellMs; }
+        @Override public long dwellMs(ChannelStore.Channel ch){return p8Main()?P8ScanTiming.dwell(p8ScanDwell(),ch!=null && ch.isDigital()):profile.scanDwellMs;}
+        @Override public boolean waitForTuneAck(){return p8Main();}
         @Override public ChannelStore.Channel priority() { int n=scanPriority();ChannelStore.Channel c=n>0?store.byNumber(n):null;if(p8Main() && c!=null){boolean included=false;for(ChannelStore.Channel member:scanCandidates())if(member.id==c.id)included=true;if(!included)return null;try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());}catch(IllegalArgumentException e){return null;}}return c; }
         @Override public void status(boolean s, boolean h, ChannelStore.Channel on) {
             if(p8Main())p8Scanning=s;
@@ -907,7 +909,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 public void status(String text){if(text.startsWith("CONTROL"))log(text);else if(text.startsWith("TUNED") || text.startsWith("Module") || text.startsWith("TX") || text.startsWith("RSSI") || text.startsWith("Spectrum")){p8Status=text;log(text);}}
                 public void rssi(int raw,double dbm){rssi0(raw,dbm);}
                 public void spectrum(float[] bands){p8Spectrum=bands.clone();final float[] copy=p8Spectrum;ui.post(()->{for(Listener l:listeners)l.onSpectrum(copy);});}
-                public void tuned(P8RxProtocol.Channel channel){ui.post(()->{ChannelStore.Channel acked=p8Tunes.remove(channel);if(acked==null || p8Closing)return;if(acked.id>0){ChannelStore.Channel stored=store.byNumber(acked.number);if(stored==null || stored.id!=acked.id)return;}current=acked;if(acked.id>0)store.setActive(acked.number);setLink("ready");for(Listener l:listeners)l.onChannel(acked);pushModes();});}
+                public void tuned(P8RxProtocol.Channel channel){ui.post(()->{ChannelStore.Channel acked=p8Tunes.remove(channel);if(acked==null || p8Closing)return;if(acked.id>0){ChannelStore.Channel stored=store.byNumber(acked.number);if(stored==null || stored.id!=acked.id)return;}current=acked;scanner.acknowledged(acked.number);if(acked.id>0)store.setActive(acked.number);setLink("ready");for(Listener l:listeners)l.onChannel(acked);pushModes();});}
                 public void receiving(boolean on){receiving=on;ui.post(()->{for(Listener l:listeners)l.onRx(on);});}
                 public void transmitting(boolean on){p8TxArmed=false;transmitting=on;ui.post(()->{for(Listener l:listeners)l.onTx(on);refreshControls();});}
                 public void levels(double peak,double rms,long clips,long recent){p8Meter=String.format(Locale.US,"PCM peak %.1f dBFS · RMS %.1f dBFS\nClips %d total · %d recent%s",peak,rms,clips,recent,recent>0?" · CLIPPING":"");ui.post(()->{for(Listener l:listeners)l.onAudioLevel((int)Math.max(0,Math.min(100,100+peak)));});}
@@ -1398,6 +1400,8 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     public String skipScanChannel() { return scanner.skipCurrent(); }
     public long scanListId(){return getSharedPreferences("radio",MODE_PRIVATE).getLong("p8ScanList",0);}
+    public int p8ScanDwell(){return P8ScanTiming.saved(getSharedPreferences("radio",MODE_PRIVATE).getInt("p8ScanDwellMs",P8ScanTiming.STANDARD));}
+    public void setP8ScanDwell(int ms){scanner.stop();getSharedPreferences("radio",MODE_PRIVATE).edit().putInt("p8ScanDwellMs",P8ScanTiming.saved(ms)).apply();log("P8 scan speed saved: "+P8ScanTiming.label(ms));pushModes();}
     public String scanListName(){ChannelStore.ScanList s=store.scanList(scanListId());return s==null?"Current zone: "+zoneName():s.name;}
     public java.util.List<ChannelStore.Channel> scanCandidates(){long id=scanListId();return id==0?zoneChannels():store.scanChannels(id);}
     public void setScanList(long id){scanner.stop();scanner.clearSkips();getSharedPreferences("radio",MODE_PRIVATE).edit().putLong("p8ScanList",id).apply();pushModes();}
