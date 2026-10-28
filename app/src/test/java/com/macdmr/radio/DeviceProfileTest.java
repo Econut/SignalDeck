@@ -22,6 +22,22 @@ public class DeviceProfileTest {
         assertEquals("ulefone-armor20wt", p.id);
     }
 
+    @Test public void atomXlIsTheAgoldBridgeProfile() {
+        DeviceProfile p = DeviceProfile.detectBuiltIn("unihertz atom_xl atom_xl", false, false);
+        assertSame(DeviceProfile.ATOM_XL, p);
+        assertEquals("agold", p.protocol);
+        assertEquals("/dev/ttyACM0", p.controlPort);
+        assertFalse("transmit stays off until the owner's on-air test", p.verified);
+        assertTrue(p.dmr());
+        assertFalse("the symbol engine is the Armor firmware's", p.symbolEngine());
+        assertEquals(32000, p.directAudio.rate);
+        assertTrue(p.directAudio.valid());
+        assertTrue(p.power().node().endsWith("/mcu_power"));
+        DeviceProfile c = p.copy(true, false);
+        assertEquals("agold", c.protocol);
+        assertEquals(32000, c.directAudio.rate);
+    }
+
     @Test public void otherPhonesUnchanged() {
         assertSame(DeviceProfile.ARMOR_26_ULTRA, DeviceProfile.detectBuiltIn("ulefone armor 26 ultra armor_26_ultra", true, false));
         assertSame(DeviceProfile.ARMOR_26_ULTRA, DeviceProfile.detectBuiltIn("some phone x", true, false));

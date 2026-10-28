@@ -88,7 +88,7 @@ public class AgoldEnvelopeTest {
         Frame got = null;
         while (off < buf.length) {
             int used = env.tryDecode(buf, off, buf.length - off, out);
-            if (used > 0) { got = out[0]; break; }
+            if (used > 0) { if (out[0] != null) { got = out[0]; break; } off += used; continue; }   // zero padding is consumed without a frame
             if (used == 0) fail("asked for more bytes on a complete buffer");
             off++;
         }
@@ -132,6 +132,37 @@ public class AgoldEnvelopeTest {
         assertEquals(0, out[0].sr);
         assertArrayEquals(new byte[] { 4, 5 }, out[0].body);
         assertEquals(java.util.Arrays.asList("envelope cmd=0x26 unlisted", "envelope cmd=0x3B unlisted"), lines);
+    }
+
+    @Test public void routeTwoAudioReportsAreLoggedNotDelivered() {
+        // captured on the Atom XL 2026-10-28: the bridge's audio stream opened, then closed (as padded 20-byte reads)
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        AgoldEnvelope env = new AgoldEnvelope();
+        env.setLog(lines::add);
+        Frame[] out = new Frame[1];
+        byte[] on = hex("7e 96 69 02 67 00 00 01 01 fc 97 81"), off = hex("7e 96 69 02 66 00 00 01 01 fc 98 81");
+        assertEquals(on.length, env.tryDecode(on, 0, on.length, out));
+        assertNull(out[0]);
+        assertEquals(off.length, env.tryDecode(off, 0, off.length, out));
+        assertNull(out[0]);
+        env.tryDecode(on, 0, on.length, out);
+        assertEquals(java.util.Arrays.asList("envelope route 02 cmd=0x67 len=1 (audio stream opened)", "envelope route 02 cmd=0x66 len=1 (audio stream closed)"), lines);
+    }
+
+    @Test public void zeroPaddingIsSkippedSilently() {
+        // a 12-byte RSSI reply padded to the bridge's 20-byte packet, then the next frame
+        byte[] rssi = hex("7e 96 69 01 32 00 00 01 1b fd b2 81"), pad = new byte[8];
+        byte[] all = new byte[rssi.length + pad.length + rssi.length];
+        System.arraycopy(rssi, 0, all, 0, rssi.length); System.arraycopy(rssi, 0, all, rssi.length + pad.length, rssi.length);
+        AgoldEnvelope env = new AgoldEnvelope();
+        Frame[] out = new Frame[1];
+        int off = env.tryDecode(all, 0, all.length, out);
+        assertEquals(12, off);
+        assertEquals(0x32, out[0].cmd);
+        assertEquals(8, env.tryDecode(all, off, all.length - off, out));
+        assertNull(out[0]);
+        assertEquals(12, env.tryDecode(all, 20, all.length - 20, out));
+        assertEquals(0x1B, out[0].body[0] & 0xFF);
     }
 
     @Test public void armorCodecMatchesFrame() {

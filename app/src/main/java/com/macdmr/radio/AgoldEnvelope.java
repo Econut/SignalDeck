@@ -17,13 +17,19 @@ import java.util.function.Consumer;
  * checksum(2, BE) | 81}. Route 01 is the module. The result of a set command is the body's one byte, not a header
  * field, and only on a reply ({@code rw} 00). A module push keeps that byte in the body. A command that is
  * not in either table is still delivered: one reply byte is the result, anything else is data. Each such
- * command is logged once. Route 00 is the bridge itself and never becomes a module frame.
+ * command is logged once. Route 00 is the bridge itself and never becomes a module frame. Route 02 is the bridge's
+ * USB audio report ({@code 67 01} when the host opens the radio's capture stream, {@code 66 01} when it closes it,
+ * measured on the Atom XL 2026-10-28): logged once, never a module frame. Receptions are not reported on the port at
+ * all on V067 (no 0x36 push); they come from the bridge driver's {@code /dev/stmcu} ({@link AgoldUsb#STMCU}). The
+ * bridge pads short USB packets with zero bytes, which are skipped.
  */
 public final class AgoldEnvelope implements FrameCodec {
     /** Module replies whose body is the data (version, RSSI, caller, text, read-back, the symbol engine). */
     private static final int[] DATA = { 0x24, 0x25, 0x2B, 0x2D, 0x32, 0x34, 0x40 };
     /** Module replies whose one body byte is the result. */
     private static final int[] SET = { 0x22, 0x23, 0x2E, 0x30, 0x31, 0x36 };
+    /** Route 02: the bridge's audio stream opened / closed by the host. */
+    static final int AUDIO_ON = 0x67, AUDIO_OFF = 0x66;
 
     private BridgeListener bridge;
     private Consumer<String> log;
@@ -41,6 +47,7 @@ public final class AgoldEnvelope implements FrameCodec {
     @Override public int tryDecode(byte[] b, int off, int avail, Frame[] out) {
         out[0] = null;
         if (avail < 1) return 0;
+        if (b[off] == 0) { int z = 1; while (z < avail && b[off + z] == 0) z++; return z; }   // USB packet padding
         if ((b[off] & 0xFF) != 0x7E) return -1;
         if (avail < 3) return 0;
         if ((b[off + 1] & 0xFF) != 0x96 || (b[off + 2] & 0xFF) != 0x69) return -1;
@@ -60,6 +67,7 @@ public final class AgoldEnvelope implements FrameCodec {
             if (bridge != null) bridge.onBridge(cmd, body);
             return total;
         }
+        if (route == 2) { audioReport(cmd, body); return total; }
         if (route != 1) return total;
         out[0] = moduleFrame(cmd, rw, body);
         return total;
@@ -75,6 +83,13 @@ public final class AgoldEnvelope implements FrameCodec {
         if (logged.add(cmd) && log != null) log.accept(String.format(Locale.US, "envelope cmd=0x%02X unlisted", cmd));
         if (reply && body.length == 1) return new Frame(cmd, rw, body[0] & 0xFF, new byte[0]);
         return new Frame(cmd, rw, 0, body);
+    }
+
+    /** A route 02 report: logged once per command, never a module frame. */
+    private void audioReport(int cmd, byte[] body) {
+        if (!logged.add(0x200 | cmd) || log == null) return;
+        String what = cmd == AUDIO_ON ? " (audio stream opened)" : cmd == AUDIO_OFF ? " (audio stream closed)" : "";
+        log.accept(String.format(Locale.US, "envelope route 02 cmd=0x%02X len=%d%s", cmd, body.length, what));
     }
 
     private static boolean listed(int[] cmds, int cmd) {

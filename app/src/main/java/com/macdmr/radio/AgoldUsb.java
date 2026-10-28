@@ -77,6 +77,113 @@ final class AgoldUsb {
     }
 
     static final String USB_PATH = "/sys/bus/platform/drivers/mcu/usb_path", RSTMCU = "/sys/bus/platform/drivers/mcu/rstmcu", HAL_SERVICE = "aguiextmodule";
+    /**
+     * The bridge driver's event node (agui_device, mode 0666). The HAL's detectAudioinState keeps it open and reads one
+     * byte at a time; each read blocks until the radio's audio line changes: 0 = a reception started, 1 = it ended
+     * (measured on the Atom XL 2026-10-28 with DMR calls from a HackRF). The sysfs call_in node is not reliable.
+     */
+    static final String STMCU = "/dev/stmcu";
+
+    /** The engine's 0x36 status code for a {@link #STMCU} byte: 1 RECEIVE_START, 2 RECEIVE_STOP, -1 for anything else. */
+    static int receiveStatus(int b) { return b == 0 ? 1 : b == 1 ? 2 : -1; }
+
+    /** The bridge's PTT line: active low (0 keys, 1 idle), as the HAL's startPtt / stopPtt write it. */
+    static final String HANDLE_PTT = "/sys/bus/platform/drivers/mcu/handle_ptt";
+
+    private static final String STTY = "S=stty; [ -x /data/adb/magisk/busybox ] && S='/data/adb/magisk/busybox stty'; ";
+    /**
+     * The HAL's own start-up (traced 2026-10-28): usb_path 1, mcu_power 1, 0.75 s, rstmcu 0 (after a fresh boot the bridge
+     * sits in reset and never enumerates without it), then the port within 3 s; when the controller refuses device ->
+     * host it goes through "none" (power off, usb_path 0) and tries once more for 10 s. Leaves $i set.
+     */
+    private static final String ONE_POWER_UP = "echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; sleep 0.75; echo 0 > " + RSTMCU + "; ";
+    static final String POWER_UP = ONE_POWER_UP
+            + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 6 ]; do sleep 0.5; i=$((i+1)); done; "
+            + "if [ ! -e " + BRIDGE_PORT + " ]; then echo 'retry: through none'; echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; " + ONE_POWER_UP
+            + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; fi; ";
+    /** Radio off, USB port back to the socket (cable mode 0, then 1), the HAL running again. */
+    static final String POWER_DOWN = "echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; "
+            + "for u in /sys/class/udc/*; do d=$(readlink -f $u); d=${d%/udc/*}; [ -f $d/cmode ] && { echo 0 > $d/cmode; sleep 1; echo 1 > $d/cmode; }; done; "
+            + "start " + HAL_SERVICE + "; ";
+
+    /**
+     * Take the radio for SignalDeck (design §4, Atom XL): stop the HAL (init does not restart a stopped hal-class
+     * service), switch off a bridge that is still powered (the stock app was paused under it, or SignalDeck itself was
+     * killed while it owned the radio), power it up the HAL's way, then let the app open the port: mode 0666 (the node is
+     * made again at every power-up) and 115200 raw, PTT line idle. Throws when no port appears; the radio is then off and
+     * the HAL back.
+     */
+    static String bridgeUp() throws java.io.IOException {
+        String out = RootSetup.run(STTY + "stop " + HAL_SERVICE + "; sleep 0.5; "
+                + "case \"$(cat " + MCU_POWER + ")\" in *'= 1'*) echo 'was powered: off first'; echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5;; esac; "
+                + POWER_UP
+                + "if [ -e " + BRIDGE_PORT + " ]; then sleep 2; chmod 0666 " + BRIDGE_PORT + "; $S -F " + BRIDGE_PORT + " 115200 raw -echo 2>&1; echo 1 > " + HANDLE_PTT + "; "
+                + "echo \"port: after $((i*5)) tenths of a second\"; else echo 'port: none'; " + POWER_DOWN + "fi");
+        if (!out.contains("port: after")) throw new java.io.IOException("the radio's USB bridge did not appear (" + out.replace('\n', ' ').trim() + "); the radio is off again");
+        return "bridge up: " + out.replace('\n', ' ').trim();
+    }
+
+    /** Radio off, the USB port back to the socket and the HAL running again (SignalDeck's Exit, and the start of a hand-back). */
+    static String bridgeDown() {
+        String out = RootSetup.run("echo 1 > " + HANDLE_PTT + " 2>/dev/null; " + POWER_DOWN + "sleep 0.5; "
+                + "echo \"radio $(cat " + MCU_POWER + "), HAL $(pidof vendor.mediatek.hardware." + HAL_SERVICE + "@1.0-service >/dev/null && echo running || echo NOT running)\"");
+        return "bridge down: " + out.replace("power on = 0", "off").replace("power on = 1", "STILL ON").replace('\n', ' ').trim();
+    }
+
+    /**
+     * Hand the radio back to the stock app: {@link #bridgeDown}, then ask the bridge for its version once more
+     * ({@link #identityProbe}) and enable the stock app only when it answered. The stock app reflashes the bridge when its
+     * version query goes unanswered at start-up, so a silent bridge keeps it paused and the user is told to restart the
+     * phone first (a restart leaves a working stock app). Returns what happened.
+     */
+    static String giveBack(DeviceProfile p, java.io.File dir) {
+        StringBuilder r = new StringBuilder(bridgeDown()).append('\n');
+        String probe = identityProbe(dir, p.stockApp);
+        r.append(probe);
+        if (bridgeAnswered(probe)) r.append("stock app: ").append(RootSetup.stockApp(p, true)).append('\n');
+        else r.append(GIVE_BACK_HELD).append('\n');
+        return r.toString();
+    }
+
+    /**
+     * Agold's App block (system_server's AppblockController, on when ro.agui.appblock=on): an app without its own entry is
+     * force-stopped a few minutes after the screen goes off (appclear_time, default 300 s), and its start at boot and by
+     * other apps is blocked, which cuts SignalDeck off while it owns the radio (the 15:51 force-stop, 2026-10-28). Returns
+     * what is still on for {@code pkg} ("background cleanup, boot blocker, start blocker"), or null when nothing is.
+     */
+    static String appBlockProblem(String prop, String enabled, String listJson, String pkg) {
+        if (!"on".equals(prop == null ? "" : prop.trim())) return null;
+        String en = enabled == null ? "" : enabled.trim();
+        if (en.equals("0")) return null;                                     // switched off for the whole phone
+        boolean clean = true, boot = true, start = true;                     // its defaults for an app without an entry
+        try {
+            org.json.JSONObject o = new org.json.JSONObject(listJson == null || listJson.trim().isEmpty() || listJson.trim().equals("null") ? "{}" : listJson.trim()).optJSONObject(pkg);
+            if (o != null) { clean = o.optBoolean("clean", true); boot = o.optBoolean("blockboot", true); start = o.optBoolean("blockstart", true); }
+        } catch (org.json.JSONException ignored) { }
+        StringBuilder b = new StringBuilder();
+        if (clean) b.append("background cleanup");
+        if (boot) b.append(b.length() > 0 ? ", " : "").append("boot blocker");
+        if (start) b.append(b.length() > 0 ? ", " : "").append("start blocker");
+        return b.length() == 0 ? null : b.toString();
+    }
+
+    /** {@link #appBlockProblem} for this phone (root). */
+    static String appBlockProblem(String pkg) {
+        String[] v = RootSetup.run("echo \"$(getprop ro.agui.appblock)|$(settings get system appblock_enabled)|$(settings get system appblock_list)\"").split("\\|", 3);
+        return v.length < 3 ? null : appBlockProblem(v[0], v[1], v[2], pkg);
+    }
+
+    /** Agold's App block page for {@code pkg} (not exported: started as root). */
+    static String openAppBlock(String pkg) {
+        return RootSetup.run("am start -n com.agui.appblock/.AppBlockActivity --es package_name " + pkg + " 2>&1 | tail -1");
+    }
+
+    static final String GIVE_BACK_HELD = "the stock app stays paused: restart the phone, then open it (it would otherwise update the bridge's firmware)";
+
+    /** True when an {@link #identityProbe} result shows the bridge's version reply. */
+    static boolean bridgeAnswered(String probe) {
+        return probe != null && !probe.startsWith("not run") && probe.contains("bridge version (route 00, cmd 0x01): \"") && !probe.contains(BRIDGE_SILENT);
+    }
 
     /**
      * Ask the bridge and the module who they are, with nobody else on the line (Atom XL, measured by hand 2026-10-28):
@@ -96,23 +203,15 @@ final class AgoldUsb {
             try (java.io.FileOutputStream o = new java.io.FileOutputStream(q2)) { o.write(AgoldFrames.request(0x01, 0x34, 0x01)); }
         } catch (java.io.IOException e) { return "not run: " + e + "\n"; }
         String ask = "rm -f $R; ( timeout 3 cat " + BRIDGE_PORT + " > $R ) & sleep 0.3; cat $Q > " + BRIDGE_PORT + "; wait; echo \"$N: $(od -An -tx1 $R | tr -d '\\n')\"; ";
-        // the HAL's own start-up (traced): usb_path 1, mcu_power 1, 0.75 s, rstmcu 0 (after a fresh boot the bridge sits in
-        // reset and never enumerates without it); when the controller refuses device -> host, go through "none" and retry
-        String powerUp = "echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; sleep 0.75; echo 0 > " + RSTMCU + "; ";
-        String out = RootSetup.run("S=stty; [ -x /data/adb/magisk/busybox ] && S='/data/adb/magisk/busybox stty'; R=/data/local/tmp/signaldeck_agold_reply; "
-                + "stop " + HAL_SERVICE + "; sleep 1; " + powerUp
-                + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 6 ]; do sleep 0.5; i=$((i+1)); done; "
-                + "if [ ! -e " + BRIDGE_PORT + " ]; then echo 'retry: through none'; echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; " + powerUp
-                + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; fi; "
+        String out = RootSetup.run(STTY + "R=/data/local/tmp/signaldeck_agold_reply; "
+                + "stop " + HAL_SERVICE + "; sleep 1; " + POWER_UP
                 + "if [ -e " + BRIDGE_PORT + " ]; then echo \"port: after $((i*5)) tenths of a second\"; sleep 2; $S -F " + BRIDGE_PORT + " 115200 raw -echo 2>&1; "
                 + "Q=" + q1.getAbsolutePath() + "; N=bridge; " + ask + "Q=" + q2.getAbsolutePath() + "; N=module; " + ask
                 // what the draft profile needs, while the bridge is up: its port and label, the radio's USB sound card
                 + "echo \"" + PORT_LINE + BRIDGE_PORT + " $(ls -Z " + BRIDGE_PORT + " | cut -d' ' -f1) held by /vendor/bin/hw/vendor.mediatek.hardware." + HAL_SERVICE + "@1.0-service (stopped for the probe)\"; "
                 + "for s in /proc/asound/card[1-9]/stream*; do [ -f $s ] && { echo \"-- $s\"; cat $s; }; done; "
                 + "else echo 'port: none after 10 s'; fi; "
-                + "echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; "
-                + "for u in /sys/class/udc/*; do d=$(readlink -f $u); d=${d%/udc/*}; [ -f $d/cmode ] && { echo 0 > $d/cmode; sleep 1; echo 1 > $d/cmode; }; done; "
-                + "start " + HAL_SERVICE + "; sleep 1; rm -f $R; echo \"after: $(cat " + MCU_POWER + "), HAL $(pidof vendor.mediatek.hardware." + HAL_SERVICE + "@1.0-service >/dev/null && echo running || echo NOT running)\"");
+                + POWER_DOWN + "sleep 1; rm -f $R; echo \"after: $(cat " + MCU_POWER + "), HAL $(pidof vendor.mediatek.hardware." + HAL_SERVICE + "@1.0-service >/dev/null && echo running || echo NOT running)\"");
         q1.delete(); q2.delete();
         return describe(out);
     }

@@ -164,8 +164,56 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
     public DeviceProfile profile() { return profile; }
     public boolean isOpen() { return port.isOpen(); }
 
-    public void open() throws IOException { port.open(profile.serialLib != null && VendorSerial.isLoaded() ? profile.baud : 0); }
-    public void close() { port.close(); }
+    /** True on a phone whose module sits behind the Agold USB bridge (Atom XL): power, PTT and the port go through {@link AgoldUsb}. */
+    private boolean agold() { return "agold".equals(profile.protocol); }
+
+    public void open() throws IOException {
+        if (agold()) ev.log(AgoldUsb.bridgeUp());          // the port exists only while the bridge is powered
+        port.open(profile.serialLib != null && VendorSerial.isLoaded() ? profile.baud : 0);
+        if (agold()) startReceiveWatch();
+    }
+
+    // ---- Agold: receptions come from the bridge driver's /dev/stmcu, not from the port ----
+    private volatile Thread rxWatch;
+    private volatile java.io.Closeable rxSource;
+
+    /** One reader on {@link AgoldUsb#STMCU}: the app's own file when policy allows it, else a root cat; each byte is an edge. */
+    private void startReceiveWatch() {
+        stopReceiveWatch();
+        Thread t = new Thread(() -> {
+            java.io.InputStream in = null; Process p = null;
+            try {
+                try { in = new java.io.FileInputStream(AgoldUsb.STMCU); }
+                catch (IOException e) {
+                    p = new ProcessBuilder("su", "--mount-master", "--context", "u:r:magisk:s0", "-c", "exec cat " + AgoldUsb.STMCU).start();
+                    in = p.getInputStream();
+                    ev.log("reception line: " + AgoldUsb.STMCU + " through root (" + e.getMessage() + ")");
+                }
+                final java.io.InputStream src = in; final Process proc = p;
+                rxSource = () -> { try { src.close(); } finally { if (proc != null) proc.destroy(); } };
+                int b;
+                while (rxWatch == Thread.currentThread() && (b = in.read()) >= 0) {
+                    int code = AgoldUsb.receiveStatus(b);
+                    if (code > 0) { ev.log("reception line: " + statusName(code)); ev.status(code, statusName(code)); } else ev.log(String.format(Locale.US, "reception line: byte 0x%02X", b));
+                }
+            } catch (IOException e) {
+                if (rxWatch == Thread.currentThread()) ev.log("reception line: " + e.getMessage());
+            } finally {
+                try { if (in != null) in.close(); } catch (IOException ignored) { }
+                if (p != null) p.destroy();
+            }
+        }, "agold-rx-watch");
+        t.setDaemon(true);
+        rxWatch = t;
+        t.start();
+    }
+
+    private void stopReceiveWatch() {
+        rxWatch = null;
+        java.io.Closeable c = rxSource; rxSource = null;
+        if (c != null) try { c.close(); } catch (IOException ignored) { }
+    }
+    public void close() { stopReceiveWatch(); port.close(); }
 
     /** Pause framing so a firmware load can use the same port. Ordinary commands are held until {@link #stopDivert}. */
     public void startDivert() { rawHold = true; firstUnansweredAt = 0; port.startDivert(); }
@@ -180,13 +228,17 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
     /** pwd 0→1; the module then prints its banner ("…BF AA <GBK text>\r\n") within ~1 s and accepts commands. */
     /** @return true if the module was off and has just been switched on (caller must {@link #waitBooted}). */
     public boolean powerOn() throws IOException {
+        if (agold()) { ev.log("module powered with the USB bridge (" + power.read() + ")"); return false; }   // open() powered it; the module sends no banner
         if (profile.lineSetup != null) for (String[] l : profile.lineSetup) { SysfsGpio.write(l[0], l[1]); ev.log("line " + l[0].substring(l[0].lastIndexOf('/') + 1) + " -> " + l[1]); }
         if (!power.isOn()) { bootLatch = new java.util.concurrent.CountDownLatch(1); power.set(true); ev.log("module power -> on (" + power.read() + ")"); return true; }
         ev.log("module already powered (" + power.read() + ")");
         return false;
     }
 
-    public void powerOff() throws IOException { power.set(false); ev.log("module power -> off (" + power.read() + ")"); }
+    public void powerOff() throws IOException {
+        if (agold()) { stopReceiveWatch(); port.close(); ev.log(AgoldUsb.bridgeDown()); return; }      // off, the USB port back to the socket, the HAL running
+        power.set(false); ev.log("module power -> off (" + power.read() + ")");
+    }
 
     /**
      * A real restart of the module: the power line off, and the profile's other supply lines too (the Xplore 1's stock app
@@ -194,6 +246,10 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
      * line cannot be read back, so a module that is already on is never restarted by {@link #powerOn}.
      */
     public void powerCycle() throws IOException {
+        if (agold()) {                                     // the port goes with the bridge's power: close, power-cycle, reopen
+            stopReceiveWatch(); port.close(); ev.log(AgoldUsb.bridgeUp()); port.open(0); startReceiveWatch();
+            firstUnansweredAt = 0; bootLatch.countDown(); ev.log("module power-cycled with the USB bridge"); return;
+        }
         power.set(false);
         if (profile.lineSetup != null) for (int i = profile.lineSetup.length - 1; i >= 0; i--) { String[] l = profile.lineSetup[i]; SysfsGpio.write(l[0], "0"); }
         try { Thread.sleep(1000); } catch (InterruptedException ignored) { }
@@ -278,7 +334,14 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
     public void fetchSms() throws IOException { send(Frame.request(CMD_FETCH_SMS, (byte) 1)); }
 
     /** PTT: launch=1 keys the transmitter, 2 releases (enum 1/2 again — 0 is NAKed and the TX keeps running; firmware caps a keyed TX at 30 s). */
-    public void ptt(boolean down) throws IOException { send(Frame.request(CMD_LAUNCH, (byte) (down ? 1 : 2))); }
+    public void ptt(boolean down) throws IOException {
+        if (agold()) {                                     // the HAL's startPtt / stopPtt: the bridge's PTT line, active low; no 0x26
+            SysfsGpio.write(AgoldUsb.HANDLE_PTT, down ? "0" : "1");
+            RootSetup.run("setprop vendor.agui.extmodule.start " + (down ? 1 : 0));
+            return;
+        }
+        send(Frame.request(CMD_LAUNCH, (byte) (down ? 1 : 2)));
+    }
 
     /**
      * Analog channel, 19-byte body (little-endian ints): rxFreq, txFreq, band, power, sq, rxType, rxSubCode,

@@ -220,6 +220,32 @@ public final class DeviceProfile {
     }
 
     /** Any other phone: nothing is touched until a device report has been made and a profile written. */
+    /**
+     * Unihertz Atom XL (Agold): the module sits behind a USB bridge MCU on the phone's only USB controller, so the
+     * command port {@code /dev/ttyACM0} and the radio's USB sound card exist only while the bridge is powered, and a
+     * computer on the cable loses the phone meanwhile. SignalDeck stops the vendor HAL and powers the bridge itself
+     * ({@link AgoldUsb#bridgeUp}); Exit and Hand back power it off and give the USB port back. Measured on the bench
+     * Atom XL 2026-10-28 (docs/atomxl in phonedmrapp); unverified until the owner's on-air test, so transmit stays off.
+     */
+    public static final DeviceProfile ATOM_XL = new DeviceProfile(
+            "Unihertz Atom XL", AgoldUsb.BRIDGE_PORT, 115200, Audio.TINY_SERVICE, null, 0,
+            AgoldUsb.MCU_POWER, AgoldUsb.HANDLE_PTT, "power on = 1",
+            new String[] { "android.intent.action.PTT.down", "android.intent.action.PTT.up" },
+            "com.agold.intercom",
+            new String[] {
+                    "allow untrusted_app ttyACM_device chr_file { open read write ioctl getattr lock }",
+                    "typeattribute ttyACM_device mlstrustedobject",
+                    "allow untrusted_app agui_device chr_file { open read getattr }",       // /dev/stmcu: reception start / end
+                    "typeattribute agui_device mlstrustedobject" },
+            null, true, false);
+    static {
+        ATOM_XL.id = "unihertz-atomxl"; ATOM_XL.revision = 1; ATOM_XL.protocol = "agold";
+        ATOM_XL.bandsHz = new long[] { 400_000_000L, 480_000_000L };          // the UHF module (DMR006.U4A); to be measured
+        // the bridge's USB Audio Class card: S16_LE, 2 channels, 32 kHz both ways, no mixer controls (the HAL's pcm_open)
+        ATOM_XL.directAudio = new DirectAudio(1, 0, 0, new String[0], new String[0], new String[0], new String[0]);
+        ATOM_XL.directAudio.rate = 32000;
+    }
+
     public static final DeviceProfile UNKNOWN = new DeviceProfile(
             Build.MANUFACTURER + " " + Build.MODEL + " (not supported yet)", "/dev/ttyS0", 57600, Audio.TINY_SERVICE, null, 0,
             null, null, "1", null, "", new String[0], null, false, false);
@@ -237,6 +263,7 @@ public final class DeviceProfile {
     static DeviceProfile detectBuiltIn(String m, boolean dmr009, boolean intercom) {
         if (m.contains("armor 20wt") || m.contains("armor_20wt")) return ARMOR_20WT;
         if (m.contains("w6+") && m.contains("sl8541e")) return ANYSECU_W6;          // "UNISOC W6+ sl8541e_3h10_32b"
+        if (m.contains("unihertz atom_xl")) return ATOM_XL;                         // "Unihertz Atom_XL Atom_XL"
         if (dmr009 || m.contains("armor 26")) return ARMOR_26_ULTRA;
         if (intercom || m.contains("xplore")) return XPLORE_1;
         return UNKNOWN;

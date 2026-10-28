@@ -60,6 +60,42 @@ public class AgoldUsbTest {
         assertFalse(d.contains(AgoldUsb.MODULE_ANSWERED));
     }
 
+    @Test public void giveBackNeedsTheBridgesAnswer() {
+        String ok = AgoldUsb.describe("port: after 10 tenths of a second\nbridge: " + BRIDGE + "\nmodule: " + MODULE + "\nafter: power on = 0, HAL running\n");
+        assertTrue(AgoldUsb.bridgeAnswered(ok));
+        assertFalse(AgoldUsb.bridgeAnswered(AgoldUsb.describe("port: none after 10 s\nafter: power on = 0, HAL running\n")));
+        assertFalse(AgoldUsb.bridgeAnswered(AgoldUsb.describe("port: after 10 tenths of a second\nbridge: \nmodule: \nafter: power on = 0, HAL running\n")));
+        assertFalse(AgoldUsb.bridgeAnswered("not run: com.agold.intercom is running\n"));
+        assertFalse(AgoldUsb.bridgeAnswered(null));
+    }
+
+    @Test public void appBlockDefaultsStopUsUntilSwitchedOff() {
+        String pkg = "com.macdmr.radio";
+        assertEquals("background cleanup, boot blocker, start blocker", AgoldUsb.appBlockProblem("on", "null", "null", pkg));
+        // what Settings -> App block wrote on the bench Atom XL after the three switches were turned off (2026-10-28)
+        String off = "{\"com.macdmr.radio\":{\"blockactivity\":false,\"blockboot\":false,\"blockstart\":false,\"clean\":false,\"packageName\":\"com.macdmr.radio\"}}";
+        assertNull(AgoldUsb.appBlockProblem("on", "null", off, pkg));
+        assertEquals("background cleanup", AgoldUsb.appBlockProblem("on", "1", off.replace("\"clean\":false", "\"clean\":true"), pkg));
+        assertNull(AgoldUsb.appBlockProblem("on", "0", "null", pkg));
+        assertNull(AgoldUsb.appBlockProblem("", "null", "null", pkg));
+    }
+
+    @Test public void stmcuBytesAreReceptionEdges() {
+        assertEquals(1, AgoldUsb.receiveStatus(0));
+        assertEquals(2, AgoldUsb.receiveStatus(1));
+        assertEquals(-1, AgoldUsb.receiveStatus(2));
+    }
+
+    @Test public void powerScriptsFollowTheHalsOrder() {
+        String up = AgoldUsb.POWER_UP;
+        assertTrue(up.indexOf("usb_path") < up.indexOf("mcu_power"));
+        assertTrue(up.indexOf("mcu_power") < up.indexOf("rstmcu"));
+        String down = AgoldUsb.POWER_DOWN;
+        assertTrue(down.startsWith("echo 0 > " + AgoldUsb.MCU_POWER));
+        assertTrue(down.indexOf("cmode") > down.indexOf("usb_path"));
+        assertTrue(down.trim().endsWith("start aguiextmodule;"));
+    }
+
     @Test public void controllerDirFromTheUdcLink() {
         assertEquals("/sys/devices/platform/11201000.usb3", AgoldUsb.controllerDir("/sys/devices/platform/11201000.usb3/udc/musb-hdrc\n"));
         assertNull(AgoldUsb.controllerDir("/sys/class/udc/*"));     // the glob matched nothing
