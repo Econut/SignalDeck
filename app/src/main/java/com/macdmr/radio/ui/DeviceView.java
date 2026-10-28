@@ -355,6 +355,12 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
 
     private void doReimport() {
         final Context c = getContext(); if (svc == null) return;
+        if (!svc.stockHasAreas()) {                                      // the W6's and the Xplore 1's stock app: one channel list
+            new android.app.AlertDialog.Builder(c).setTitle("Re-import the stock app's channels?").setMessage("Replaces all channels in SignalDeck with the ones saved in the phone's stock radio app.")
+                    .setPositiveButton("Import", (dd, w) -> new Thread(() -> { final String r = svc.reimportFromStock(null); post(() -> android.widget.Toast.makeText(c, r, android.widget.Toast.LENGTH_LONG).show()); }).start())
+                    .setNegativeButton("Cancel", null).show();
+            return;
+        }
         new Thread(() -> {
             final java.util.List<String> areas = svc.stockAreas();
             post(() -> {

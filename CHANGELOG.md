@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Channels: ask before importing the stock app's channels
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner: the automatic import should ask first | When SignalDeck takes the radio with an empty channel list, it no longer imports the stock app's channels by itself: the phone asks (Import / Start empty), and so does an open SignalDeck Web page (`stockImport` event and status flag, `POST /api/channels/stockimport`); the first answer counts and closes the other. Start empty is remembered (prefs `radio/stockImportDeclined`) until a later import; Device → Re-import still imports. Re-import on the W6+ and the Xplore 1 now uses their own importers (it called the DMR phones' area importer) and asks once without an area list. Help (first run, Device tools, Radios that do less) says so. | `RadioService.java`, `ui/ChannelsView.java`, `ui/DeviceView.java`, `web/WebHost.java`, `assets/web/app.js`, `ui/HelpView.java` | Host suite 417/0. Device (W6, 2026-10-28), empty list at start: the phone asked; the web saw `stockImport: true`; answered Import on the phone (128 channels) and, another time, from the web (128 channels, the phone's dialog closed itself, a second answer got 409); Start empty stored the setting and a restart did not ask again; Device → Re-import on the W6 showed its single-list dialog, imported 128 and cleared the setting. Not run on a DMR phone. |
+
 ## 2026-10-28 — Channels: the phone and SignalDeck Web update each other live
 
 | Backlog | Change | Files | Test |
