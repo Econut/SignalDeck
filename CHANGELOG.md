@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Device report: the side-key capture names the key devices and drops the sensor flood
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 report gaps 4 and B6 (plan item 7) | The PTT key capture lists every input device that reports keys, with its key names (from `getevent -pl`), so a side key on its own device is recognisable even when nobody presses it (W6: `hook_dmr: KEY_F2 KEY_F3`). The event capture keeps key and switch events only and counts motion and sensor events per device instead of listing them: on the W6 the accelerometer's ~1000 lines in 10 s had buried any key. | `DeviceReport.java` (`captureKeys`, `keyEvents`, `keyDevices`), `PttCaptureTest.java` | Host: `PttCaptureTest` on the W6's real `getevent` output; all host tests pass. **Device: W6** through `run_checks.sh`: seven key devices listed, `hook_dmr: KEY_F2 KEY_F3` among them, "848 motion/sensor events from /dev/input/event9 accelerometer left out". No key pressed (that step is the owner's). |
+
 ## 2026-10-27 — Bench: which Android audio source hears the radio (W6 receive-audio test)
 
 | Backlog | Change | Files | Test |
