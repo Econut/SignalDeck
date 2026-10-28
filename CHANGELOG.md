@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Intercom: the spectrum bars stand inside the panel
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner (W6): the spectrum bars are barely visible, cut off by the bottom of the rain panel | The bars were anchored 22.5 dp below the activity panel's bottom edge (a port of the module's drawing: the taller bar zone was added downwards), so the lower part of every bar, and the whole of small bars, was off the panel on every phone. They now stand on the panel's floor inside the border and grow upwards to the same heights (62.5 dp, 14 dp while captions are on). | `CircuitBoardView.java` | Host suite. Device: see the PR. |
+
 ## 2026-10-28 — ANYSECU W6+: tested for receive
 
 | Backlog | Change | Files | Test |
