@@ -1099,8 +1099,8 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- modes ----------------------------------------------------------------------------------------
 
-    public boolean softSqOn() { return softSq.isEnabled(); }
-    public int softSqLevel() { return softSq.level(); }
+    public boolean softSqOn() { ChannelStore.Channel c = current; return profile.softSqInModule ? c != null && softSqFor(c) : softSq.isEnabled(); }   // the W6: on in the module, not as an app gate
+    public int softSqLevel() { ChannelStore.Channel c = current; return profile.softSqInModule && c != null ? Math.max(1, Math.min(9, c.softSqLevel)) : softSq.level(); }
     public boolean monitorOn() { return monitorOn; }
     public boolean recordOn() { return recordOn; }
     public boolean scanning() { return scanner.isScanning(); }
@@ -1143,7 +1143,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         updateModeWake();
         refreshControls();
         final String zn = zoneName();
-        ui.post(() -> { for (Listener l : listeners) l.onModes(softSq.isEnabled(), softSq.level(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zn); });
+        ui.post(() -> { for (Listener l : listeners) l.onModes(softSqOn(), softSqLevel(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zn); });
     }
 
     /** Soft SQ on/off for the current analog channel (persisted per channel): on = the module's squelch is held open and the app gates the audio; off = the module's own squelch level. */
@@ -1157,7 +1157,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         level = Math.max(1, Math.min(9, level));                             // 1-9 everywhere (the web slider once sent 0-100)
         ChannelStore.Channel ch = current; if (ch == null) return;
         ch.softSqLevel = level; store.update(ch);
-        softSq.configure(softSqFor(ch), level, ch.rxType, ch.rxSubCode);   // the scan's Soft SQ counts too, or moving the slider would switch its gate off
+        softSq.configure(softGate(ch), level, ch.rxType, ch.rxSubCode);   // the scan's Soft SQ counts too, or moving the slider would switch its gate off
+        if (profile.softSqInModule && softSqFor(ch)) { ui.removeCallbacks(moduleSqWrite); ui.postDelayed(moduleSqWrite, 300); }   // the module's squelch follows the slider (once it rests)
         pushModes();
     }
 
@@ -1385,7 +1386,13 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Squelch byte for the module: with Soft SQ on, or on an M17 channel, the radio's squelch is held open (0). An M17 channel needs the audio below the module's one threshold; the speaker gate keeps that raw FM out and only the decoded voice is played. */
-    private int hardwareSq(ChannelStore.Channel ch) { return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq; }
+    private int hardwareSq(ChannelStore.Channel ch) {
+        if (ch != null && !ch.isM17() && profile.softSqInModule && softSqFor(ch)) return Math.max(1, Math.min(8, ch.softSqLevel));   // the W6: Soft SQ is the module's squelch (1-9 to its 1-8)
+        return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq;
+    }
+    /** Soft SQ gates the audio in the app (every radio but those whose module squelch does it). */
+    private boolean softGate(ChannelStore.Channel ch) { return softSqFor(ch) && !profile.softSqInModule; }
+    private final Runnable moduleSqWrite = () -> { ChannelStore.Channel c = current; if (c != null) worker.execute(() -> rewriteAnalogSquelch(c)); };   // no tones in the audio (the W6): the module keeps its squelch and tone
     /** APRS, SSTV and satellite channels: the radio's squelch wide open (its single threshold sits near -90 dBm, far
      *  above a satellite or a distant digipeater), so the decoders get every signal; Soft SQ keeps the speaker quiet
      *  until something is really there. */
@@ -1414,7 +1421,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Re-evaluate the squelch for the current channel (Soft SQ key, scan started/stopped): detector config, blackout and the module's squelch byte. */
     private synchronized void refreshSquelch(ChannelStore.Channel ch) {
         if (ch == null || ch.isDigital() || ch.isM17() || current != ch) return;
-        boolean soft = softSqFor(ch);
+        boolean soft = softGate(ch);
         softSq.configure(soft, ch.softSqLevel, ch.rxType, ch.rxSubCode);
         if (soft) { softSq.onRetune(); squelchOpen = false; } else squelchOpen = true;
         rewriteAnalogSquelch(ch);
@@ -1479,7 +1486,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 log("MON off: the channel changed");
             }
             current = ch; if (fromStore) store.setActive(ch.number);
-            softSq.configure(softSqFor(ch), ch.softSqLevel, ch.rxType, ch.rxSubCode);
+            softSq.configure(softGate(ch), ch.softSqLevel, ch.rxType, ch.rxSubCode);
             softSq.onRetune();
             squelchOpen = !softSq.isEnabled();                     // with Soft SQ on, stay muted until the detector opens (no burst of static after a retune)
             ui.post(() -> { for (Listener l : listeners) l.onChannel(ch); });
@@ -2446,7 +2453,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- listeners ----------------------------------------------------------------------------------
 
-    public void addListener(Listener l) { listeners.add(l); l.onLink(link); if (current != null) l.onChannel(current); l.onModes(softSq.isEnabled(), softSq.level(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zoneName()); l.onCaption(captionsOn, "", null); l.onRx(receiving); l.onTx(transmitting); if (rssi != -999) l.onRssi(rssi); if (stockImportPending) l.onStockImportOffer(); }   // a page built later (intercom look switched) starts from the live receive/transmit state, not "idle"
+    public void addListener(Listener l) { listeners.add(l); l.onLink(link); if (current != null) l.onChannel(current); l.onModes(softSqOn(), softSqLevel(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zoneName()); l.onCaption(captionsOn, "", null); l.onRx(receiving); l.onTx(transmitting); if (rssi != -999) l.onRssi(rssi); if (stockImportPending) l.onStockImportOffer(); }   // a page built later (intercom look switched) starts from the live receive/transmit state, not "idle"
     public void removeListener(Listener l) { listeners.remove(l); }
     private void noChannel() { ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onNoChannel(); }); }
     private final Runnable channelsChanged = () -> { for (Listener l : new ArrayList<>(listeners)) l.onChannels(); };
