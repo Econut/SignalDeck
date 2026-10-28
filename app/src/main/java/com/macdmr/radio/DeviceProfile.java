@@ -47,7 +47,7 @@ public final class DeviceProfile {
     public String[][] lineSetup;         // {node, value} written in this order before the power line, every bring-up (null = none)
     /** TINY_SERVICE phones: how to reach the radio audio straight on the sound hardware when the ROM lacks the vendor service (null = not known). */
     public DirectAudio directAudio;
-    /** "mcu68" (the DMR module's 68 … 10 frames, RadioEngine) or "sa818" (AT+DMO… text commands, AtModuleEngine). */
+    /** "mcu68" (the DMR module's 68 … 10 frames, RadioEngine), "agold" (those commands inside the 7E 96 69 envelope), or "sa818" (AT+DMO… text commands, AtModuleEngine). */
     public String protocol = "mcu68";
     /**
      * What the module tunes, as {low, high} pairs in Hz (both ends included). The HR-C7000 module itself refuses

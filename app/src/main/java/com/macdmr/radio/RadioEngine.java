@@ -156,7 +156,8 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
 
     public RadioEngine(DeviceProfile p, Events ev) {
         this.profile = p; this.ev = ev;
-        this.port = new UartPort(p.controlPort, this);
+        FrameCodec codec = "agold".equals(p.protocol) ? new AgoldEnvelope() : FrameCodec.armor();
+        this.port = new UartPort(p.controlPort, this, codec);
         this.power = p.power();
     }
 

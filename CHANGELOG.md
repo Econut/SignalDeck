@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Agold envelope around the module's commands
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL handoff, framing | The control port can wrap the same module commands in the Agold `7E 96 69` envelope when a profile's protocol is `agold`. The Armor framing is unchanged. Route 00 reports stay off the engine. No phone behaviour yet: no profile uses it. | `FrameCodec.java`, `AgoldEnvelope.java`, `UartPort.java`, `RadioEngine.java` | Host: `AgoldEnvelopeTest` against the captured Atom XL frames (version request and reply, set results, a bridge report, a bad checksum, a cut frame). The Armor codec still matches `Frame`. |
+
 ## 2026-10-28 — Device report: on a USB-bridge phone, ask the bridge first; vendor keys named as PTT candidates
 
 | Backlog | Change | Files | Test |
