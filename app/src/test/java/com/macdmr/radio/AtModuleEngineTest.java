@@ -69,7 +69,8 @@ public class AtModuleEngineTest {
         assertSame(DeviceProfile.ANYSECU_W6, DeviceProfile.detectBuiltIn("unisoc w6+ sl8541e_3h10_32b", false, false));
         assertSame(DeviceProfile.UNKNOWN, DeviceProfile.detectBuiltIn("someone w6 phone", false, false));
         DeviceProfile w6 = DeviceProfile.ANYSECU_W6;
-        assertEquals("sa818", w6.protocol); assertFalse(w6.verified);                       // never transmits until tested on air
+        assertEquals("sa818", w6.protocol); assertTrue(w6.verified);                        // tested for receive (revision 2)
+        assertTrue(w6.txBlocked); assertTrue(w6.copy(true, true).txBlocked);              // but never transmits until confirmed on air
         assertEquals(DeviceProfile.Audio.CAMCORDER, w6.audio); assertEquals(9600, w6.baud);
         assertEquals("sa818", w6.copy(true, false).protocol);                               // an advisory's copy keeps the protocol and lines
         assertSame(w6.rxLinesOn, w6.copy(true, false).rxLinesOn);
