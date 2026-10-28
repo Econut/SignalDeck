@@ -740,6 +740,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         watchUsbDuringTx();
         ProfileRegistry.init(this);
         profile = DeviceProfile.detect();
+        softSq.toneDetect = profile.subaudible;
         ProfileRegistry.maybeFetch();                               // a newer revision or an advisory, at most every 12 h
         store = new ChannelStore(this);
         zoneId = getSharedPreferences("radio", MODE_PRIVATE).getLong("zone", 0);
@@ -1027,6 +1028,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         int n = 0;
         for (int i = 0; i + 3 < len && n + 1 < mono.length; i += 4) { mono[n++] = b[i]; mono[n++] = b[i + 1]; }
         boolean open = injecting || current == null || current.isDigital() ? true : softSq.process(mono, n);
+        if (profile.muteLines != null) engine.setSpeakerGate(open);         // the W6: the module drives the speaker, so the gate switches its line
         if (BuildConfig.DEBUG && softSq.isEnabled() && System.currentTimeMillis() - lastSqDiag > 2000) { lastSqDiag = System.currentTimeMillis(); log("soft sq: " + softSq.describe() + " gate=" + open); }
         if (open != squelchOpen && softSq.isEnabled()) log("soft squelch " + (open ? "open" : "closed") + (current != null && current.rxType == 1 ? " (CTCSS " + com.macdmr.radio.dsp.ToneTable.ctcssLabel(current.rxSubCode) + ")" : ""));
         if (open != squelchOpen && softSq.isEnabled()) { softGateHistory(open); squelchOpen = open; pushModes(); }   // pages see the gate (activity box, Soft SQ number colour)
@@ -1391,7 +1393,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Squelch byte for the module: with Soft SQ on, or on an M17 channel, the radio's squelch is held open (0). An M17 channel needs the audio below the module's one threshold; the speaker gate keeps that raw FM out and only the decoded voice is played. */
-    private int hardwareSq(ChannelStore.Channel ch) { return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq; }
+    private int hardwareSq(ChannelStore.Channel ch) { return ch != null && (ch.isM17() || (softSqFor(ch) && profile.subaudible)) ? 0 : ch == null ? 0 : ch.sq; }   // no tones in the audio (the W6): the module keeps its squelch and tone
     /** APRS, SSTV and satellite channels: the radio's squelch wide open (its single threshold sits near -90 dBm, far
      *  above a satellite or a distant digipeater), so the decoders get every signal; Soft SQ keeps the speaker quiet
      *  until something is really there. */

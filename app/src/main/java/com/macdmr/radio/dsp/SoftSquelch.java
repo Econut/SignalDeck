@@ -21,10 +21,12 @@ public final class SoftSquelch {
     private volatile double toneHz = -1, adjLow = -1, adjHigh = -1;
     private boolean open;
     private long lastOpen;
+    /** False when the receive audio carries no sub-audible tones (the W6): the noise detector gates, the module does the tone. */
+    public volatile boolean toneDetect = true;
 
     public void configure(boolean enabled, int level, int rxToneType, int rxToneCode) {
         this.enabled = enabled; this.level = Math.max(1, Math.min(9, level));
-        if (rxToneType == 1) { toneHz = ToneTable.ctcssHz(rxToneCode); adjLow = ToneTable.ctcssHz(rxToneCode - 1); adjHigh = ToneTable.ctcssHz(rxToneCode + 1); }
+        if (rxToneType == 1 && toneDetect) { toneHz = ToneTable.ctcssHz(rxToneCode); adjLow = ToneTable.ctcssHz(rxToneCode - 1); adjHigh = ToneTable.ctcssHz(rxToneCode + 1); }
         else toneHz = -1;
         tone.reset(); noise.reset(); open = false; lastOpen = 0;
     }

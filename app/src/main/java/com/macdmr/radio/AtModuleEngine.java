@@ -211,9 +211,24 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
     }
     /** Media volume 0-8 (0 = speaker off), as the stock app does: its module volume follows the media volume, and at 0 it leaves the speaker off. */
     @Override public void setSpeakerLevel(int level) {
-        int was = speakerLevel; speakerLevel = Math.max(0, Math.min(8, level));
+        speakerLevel = Math.max(0, Math.min(8, level));
         if (speakerLevel > 0 && speakerLevel != moduleVolume && running) { moduleVolume = speakerLevel; async("SETVOLUME", "AT+DMOSETVOLUME=" + speakerLevel, null); }
-        if (rxOn && (was == 0) != (speakerLevel == 0)) lines(speakerLevel == 0 ? profile.muteLines : profile.rxLinesOn);   // changed while receiving
+        speakerWorker.execute(this::applySpeaker);
+    }
+    private volatile boolean gateOpen = true;
+    /** Soft SQ's gate: closed switches the speaker route off (as volume 0 does); the camcorder input keeps the audio for the decoders. */
+    @Override public void setSpeakerGate(boolean open) {
+        if (open == gateOpen || profile.muteLines == null) return;
+        gateOpen = open; speakerWorker.execute(this::applySpeaker);         // a root write: never on the audio thread
+    }
+    private boolean muted() { return speakerLevel == 0 || !gateOpen; }
+    private final java.util.concurrent.ExecutorService speakerWorker = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private boolean speakerMuted;                                        // what the lines say now (while receiving), guarded by this
+    /** While receiving, switch the speaker route to match the volume and Soft SQ's gate. */
+    private synchronized void applySpeaker() {
+        if (!rxOn) return;
+        boolean m = muted(); if (m == speakerMuted) return;
+        speakerMuted = m; lines(m ? profile.muteLines : profile.rxLinesOn);
     }
     /** Media volume (0..max) to the module's 0-8 the way the stock app maps it (on a 0-25 scale: 1-3 = 1 ... 22-25 = 8). */
     static int speakerLevelFor(int media, int max) { return media <= 0 || max <= 0 ? 0 : Math.max(1, Math.min(8, (int) Math.ceil(media * 8.0 / max))); }
@@ -304,9 +319,12 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
             if (rootRead) v = RootSetup.run("cat " + profile.rxDetectNode).trim();
             boolean on = "1".equals(v);
             if (on != was) {
-                was = on; rxOn = on;
-                if (on) { lines(profile.rxLinesOn); if (speakerLevel == 0) lines(profile.muteLines); ev.status(1, RadioEngine.statusName(1)); }
-                else { ev.status(2, RadioEngine.statusName(2)); lines(profile.rxLinesOff); }
+                synchronized (this) {
+                    was = on; rxOn = on;
+                    if (on) { lines(profile.rxLinesOn); speakerMuted = muted(); if (speakerMuted) lines(profile.muteLines); }
+                    else lines(profile.rxLinesOff);
+                }
+                ev.status(on ? 1 : 2, RadioEngine.statusName(on ? 1 : 2));
             }
             try { Thread.sleep(rootRead ? 250 : 100); } catch (InterruptedException e) { return; }
         }

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — ANYSECU W6+: Soft SQ gates the speaker
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner: Soft SQ does not appear to work on the W6 | On the W6 the module drives the speaker and the app plays nothing, so Soft SQ's gate (which mutes the app's playback) changed nothing you hear; and Soft SQ set the module's squelch to 0, which on this module is monitor (always open, tones ignored), so turning it on let static and every carrier through. Now a module that drives the speaker gets the gate through `ModuleEngine.setSpeakerGate`: a shut gate switches the speaker route off like volume 0 (on a worker thread, the root write never runs on the audio thread), the camcorder input keeps the audio for the decoders. A profile whose audio carries no sub-audible tones (`subaudible` false: the W6, cut below ~300 Hz) keeps the channel's own squelch and tone in the module with Soft SQ on, and Soft SQ uses its noise detector (never the CTCSS detector, which cannot hear the tone). Help (Radios that do less). | `AtModuleEngine.java`, `ModuleEngine.java`, `DeviceProfile.java`, `dsp/SoftSquelch.java`, `RadioService.java`, `ui/HelpView.java`, `AtModuleEngineTest.java` | Host suite. Device: see the PR. |
+
 ## 2026-10-28 — ANYSECU W6+: tested for receive
 
 | Backlog | Change | Files | Test |

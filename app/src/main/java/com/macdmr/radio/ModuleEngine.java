@@ -25,6 +25,8 @@ public interface ModuleEngine {
      * follows Android's media volume, 0 = speaker off, 1-8 the module's volume. Other modules ignore it.
      */
     default void setSpeakerLevel(int level) { }
+    /** Soft SQ's gate for a module that drives the speaker itself (the W6): false switches the speaker off while the decoders keep hearing. */
+    default void setSpeakerGate(boolean open) { }
 
     DeviceProfile profile();
     boolean isOpen();

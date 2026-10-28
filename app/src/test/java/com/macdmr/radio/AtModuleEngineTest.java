@@ -100,4 +100,9 @@ public class AtModuleEngineTest {
         assertNotNull(DeviceProfile.ANYSECU_W6.muteLines); assertNull(DeviceProfile.ARMOR_26_ULTRA.muteLines);
         assertArrayEquals(DeviceProfile.ANYSECU_W6.muteLines, DeviceProfile.ANYSECU_W6.copy(true, false).muteLines);
     }
+
+    @Test public void softSqOnTheW6LeavesTheToneToTheModule() {
+        assertFalse(DeviceProfile.ANYSECU_W6.subaudible); assertFalse(DeviceProfile.ANYSECU_W6.copy(true, false).subaudible);   // audio cut below ~300 Hz: no CTCSS to detect
+        assertTrue(DeviceProfile.ARMOR_26_ULTRA.subaudible);
+    }
 }
