@@ -367,6 +367,8 @@ public final class WebHost {
     private JSONObject statusJson() throws Exception {
         JSONObject o = new JSONObject();
         o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current()));
+        com.macdmr.radio.DeviceProfile prof = svc.profile();                  // what this radio can do: the pages hide what it cannot (an analog-only radio has no DMR)
+        o.put("radio", new JSONObject().put("dmr", prof.dmr()).put("messages", prof.hasMessages()).put("contacts", prof.hasContacts()));
         o.put("transmitting", svc.isTransmitting()).put("firmwareLoad", svc.firmwareLoading()).put("hearing", svc.hearing()).put("rssi", svc.lastRssi()).put("caller", svc.currentCaller());
         o.put("softSq", svc.softSqOn()).put("softSqLevel", svc.softSqLevel()).put("monitor", svc.monitorOn()).put("promiscuous", svc.promiscuousOn()).put("record", svc.recordOn())
                 .put("scanning", svc.scanning()).put("vfo", svc.vfoActive()).put("zone", svc.zoneName()).put("zoneId", svc.zoneId())

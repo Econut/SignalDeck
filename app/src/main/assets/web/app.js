@@ -100,8 +100,20 @@ async function refresh() { try { S.status = await api('status'); renderStatus();
 function setConn(ok) { $('connDot').className = 'dot ' + (ok ? 'ok' : 'bad'); $('connText').textContent = ok ? 'Live' : 'Reconnecting…'; }
 
 // ---- intercom ----
+/** What this radio can do (status.radio): an analog-only radio hides the DMR parts, and Messages / Contacts while they have nothing to carry. */
+function applyRadio(rd) {
+  rd = rd || { dmr: true, messages: true, contacts: true };
+  S.dmr = rd.dmr !== false;
+  document.body.classList.toggle('no-dmr', !S.dmr);
+  const nav = p => document.querySelector('a[data-page="' + p + '"]');
+  if (nav('messages')) nav('messages').classList.toggle('hidden', rd.messages === false);
+  if (nav('contacts')) nav('contacts').classList.toggle('hidden', rd.contacts === false);
+  if ((S.page === 'messages' && rd.messages === false) || (S.page === 'contacts' && rd.contacts === false)) location.hash = '#intercom';
+  if (!S.dmr && S.chFilter >= 2) { S.chFilter = 0; $('chFilter').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.f === '0')); }
+}
 function renderStatus() {
   const s = S.status; if (!s) return; const ch = s.channel || {};
+  applyRadio(s.radio);
   $('chNum').textContent = s.vfo ? 'VFO' : (ch.number != null ? String(ch.number).padStart(2, '0') : '--');
   $('chName').textContent = ch.name || (ch.digital ? 'Digital' : 'Analog');
   $('freq').textContent = ch.rxFreq ? mhz(ch.rxFreq) : '---.----';
