@@ -483,6 +483,17 @@ public final class ChannelStore extends SQLiteOpenHelper {
         else {s.id=getWritableDatabase().insertOrThrow("scanlists",null,v);}
     }
     public void deleteScanList(long id){getWritableDatabase().delete("scanlists","_id=?",new String[]{String.valueOf(id)});}
+    /** Apply one channel's checked lists without disturbing any other member. */
+    public void setChannelScanLists(long channelId,java.util.Set<Long> selected){
+        boolean exists=false;for(Channel c:all())if(c.id==channelId)exists=true;
+        if(!exists)throw new IllegalArgumentException("Save the channel before assigning scan lists");
+        SQLiteDatabase db=getWritableDatabase();db.beginTransaction();
+        try{for(ScanList s:scanLists()){
+            java.util.LinkedHashSet<Long> ids=new java.util.LinkedHashSet<>();for(long id:s.channelIds)if(id!=channelId || selected.contains(s.id))ids.add(id);
+            if(selected.contains(s.id))ids.add(channelId);
+            s.channelIds=new long[ids.size()];int i=0;for(long id:ids)s.channelIds[i++]=id;saveScanList(s);
+        }db.setTransactionSuccessful();}finally{db.endTransaction();}
+    }
     public List<Channel> scanChannels(long id){
         ScanList s=scanList(id);List<Channel> out=new ArrayList<>();if(s==null)return out;
         java.util.Map<Long,Channel> byId=new java.util.HashMap<>();for(Channel c:all())byId.put(c.id,c);

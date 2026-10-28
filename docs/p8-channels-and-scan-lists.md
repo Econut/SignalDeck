@@ -2,6 +2,10 @@
 
 The main radio layout is unchanged. These features reuse ChannelStore, the channel editor, ZonesDialog and Scanner.
 
+Main.5a adds **Scan lists** directly below the channel name in Add/Edit channel. Tick any saved lists (or leave None), confirm the selection, then press the channel's Save button. Existing memberships are preselected when editing. Cancelling either the picker or the editor does not save membership changes. New-channel membership is written after insertion supplies its stable ID; other list members and their order are preserved. Create named lists using SCAN → Manage scan lists first.
+
+Main.5a validation: 88 focused regression tests and the isolated on-device database/PTT checks passed, including adding a channel to multiple lists, removing it from one list without removing other members, and preserving existing ordering. Actual Add-channel selection, cancel-without-saving and existing-channel preselection were checked against the user's PMR Channels list without changing the three saved channels. Version 136 APK SHA-256: `687f82c2b3ec117bbd93b96c513a94618e809133d8c8f06181dc28c12c87b33f`.
+
 - **Channels tab:** add a channel with +; tap a saved channel for Use, Edit or Delete. Save retains frequency, FM/DMR settings, bandwidth, tones, squelch, power and receive-only status. New channels created while a named zone is selected are added to that zone. The channel detail card also offers **Zones for this channel** to assign it to existing zones.
 - **ZONE: ALL:** select or manage named zones using the existing zone manager. Zones control the channel list and arrow navigation. A channel can belong to more than one zone.
 - **SCAN:** choose Current zone or a saved scan list. **Manage scan lists → New scan list** names a list and lets you select channels from all zones. Each option includes its frequency and zone names. Existing lists can be renamed, refilled or deleted without deleting channels.

@@ -15,6 +15,12 @@ final class P8ChannelManagementChecks {
             ChannelStore.ScanList list=new ChannelStore.ScanList();list.name="Mixed";list.channelIds=new long[]{a.id,c.id,a.id,999999};db.saveScanList(list);
             check(list.channelIds.length==2,"Scan membership must deduplicate and reject missing IDs");
             check(db.scanChannels(list.id).size()==2,"List must cross zones");
+            ChannelStore.ScanList second=new ChannelStore.ScanList();second.name="Second";second.channelIds=new long[]{b.id};db.saveScanList(second);
+            java.util.Set<Long> selected=new java.util.HashSet<>();selected.add(list.id);selected.add(second.id);db.setChannelScanLists(c.id,selected);
+            check(db.scanChannels(second.id).size()==2 && db.scanChannels(second.id).get(0).id==b.id,"New channel membership lost other members");
+            check(db.scanChannels(list.id).get(0).id==a.id,"Unchanged membership reordered list");
+            selected.remove(second.id);db.setChannelScanLists(c.id,selected);check(db.scanChannels(second.id).size()==1 && db.scanChannels(second.id).get(0).id==b.id,"Deselect removed other channels");
+            db.deleteScanList(second.id);
             c.name="Edited";c.sq=7;c.band=0;c.power=1;c.rxType=1;c.rxSubCode=12;c.txType=3;c.txSubCode=23;c.softSq=true;c.softSqLevel=6;c.notes="Saved settings";db.update(c);
             long listId=list.id,zoneId=local.id,channelId=c.id;db.close();db=new ChannelStore(ctx,file);
             ChannelStore.Channel loaded=db.byNumber(c.number);

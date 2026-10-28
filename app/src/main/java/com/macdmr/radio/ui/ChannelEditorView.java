@@ -34,6 +34,10 @@ public class ChannelEditorView extends LinearLayout {
     private final ChannelStore.Channel ch;
     private final boolean isNew;
     private final Done done;
+    private TextView scanListsButton;
+    private final java.util.Set<Long> selectedScanLists=new java.util.HashSet<>();
+    private final java.util.List<ChannelStore.ScanList> scanListOptions=new java.util.ArrayList<>();
+    private boolean scanListsLoaded;
     private final LinearLayout form;
     private EditText name, tx, rx, call, key, groups, notes;
     private EditText lat, lon;
@@ -114,6 +118,10 @@ public class ChannelEditorView extends LinearLayout {
         section(form, "Channel");
         name = textInto(form, "Channel name", H_NAME, ch.name, InputType.TYPE_CLASS_TEXT);
         nameCounter(name);
+        if(com.macdmr.radio.BuildConfig.P8_OFFLINE){
+            scanListsButton=Neo.button(c,"Scan lists: None","scan",Neo.CYAN);scanListsButton.setTextSize(14);scanListsButton.setMaxLines(2);
+            form.addView(scanListsButton);scanListsButton.setOnClickListener(v->pickScanLists());
+        }
         choiceInto(form, "Channel type", H_TYPE, new String[] { "Digital", "Analog", "M17" }, ch.type, v -> { ch.type = v; refreshGroups(); });
         // receive first: repeater lists give the output (what you hear) and the offset
         rx = textInto(form, "Receive frequency (MHz)", H_RX, ch.rxFreq > 0 ? String.format(Locale.US, "%.5f", ch.rxFreq / 1e6) : "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -208,7 +216,27 @@ public class ChannelEditorView extends LinearLayout {
 
     /** What was heard and sent on this channel (the same list as the card's History), newest first, grouped by day. */
     private LinearLayout historyBox; private com.macdmr.radio.RadioService svc;
-    public void attach(com.macdmr.radio.RadioService s) { svc = s; if (historyBox != null) refreshHistory(); }
+    public void attach(com.macdmr.radio.RadioService s) { svc = s; if (historyBox != null) refreshHistory();
+        if(svc!=null && scanListsButton!=null){scanListOptions.clear();scanListOptions.addAll(svc.store().scanLists());selectedScanLists.clear();
+            for(ChannelStore.ScanList list:scanListOptions)for(long id:list.channelIds)if(id==ch.id && ch.id>0)selectedScanLists.add(list.id);
+            scanListsLoaded=true;refreshScanListsLabel();}
+    }
+    private void refreshScanListsLabel(){
+        String label="None";if(selectedScanLists.size()==1)for(ChannelStore.ScanList list:scanListOptions)if(selectedScanLists.contains(list.id))label=list.name;
+        if(selectedScanLists.size()>1)label=selectedScanLists.size()+" selected";scanListsButton.setText("Scan lists: "+label);
+    }
+    private void pickScanLists(){
+        if(scanListOptions.isEmpty()){new android.app.AlertDialog.Builder(getContext()).setTitle("No saved scan lists")
+            .setMessage("Create a list using SCAN → Manage scan lists first. You can then choose it here. Membership is applied when you save the channel.")
+            .setPositiveButton("OK",null).show();return;}
+        String[] names=new String[scanListOptions.size()];boolean[] checked=new boolean[names.length];
+        for(int i=0;i<names.length;i++){names[i]=scanListOptions.get(i).name;checked[i]=selectedScanLists.contains(scanListOptions.get(i).id);}
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Add channel to scan lists").setMultiChoiceItems(names,checked,(d,w,on)->checked[w]=on)
+            .setPositiveButton("Use selection",(d,w)->{selectedScanLists.clear();for(int i=0;i<checked.length;i++)if(checked[i])selectedScanLists.add(scanListOptions.get(i).id);refreshScanListsLabel();})
+            .setNegativeButton("Cancel",null).show();
+    }
+    /** Called after the channel insert supplies its stable ID. Cancel never writes membership. */
+    public void saveScanMembership(){if(scanListsLoaded && svc!=null)svc.store().setChannelScanLists(ch.id,selectedScanLists);}
     private void refreshHistory() {
         final Context c = getContext(); float d = Theme.dp(c);
         historyBox.removeAllViews();

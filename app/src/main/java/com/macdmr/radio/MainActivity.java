@@ -124,7 +124,7 @@ public class MainActivity extends AppCompatActivity {
             final ChannelStore.Channel target = isNew ? new ChannelStore.Channel() : ch;
             if (isNew && svc != null && svc.current() != null) { target.type = svc.current().type; target.rxFreq = svc.current().rxFreq; target.txFreq = svc.current().txFreq; }
             editor = new com.macdmr.radio.ui.ChannelEditorView(this, target, isNew, (c2, saved) -> {
-                if (saved && svc != null) {svc.saveChannel(c2, isNew);android.widget.Toast.makeText(this,"Channel saved",android.widget.Toast.LENGTH_SHORT).show();}
+                if (saved && svc != null) {svc.saveChannel(c2, isNew);((com.macdmr.radio.ui.ChannelEditorView)editor).saveScanMembership();android.widget.Toast.makeText(this,"Channel saved",android.widget.Toast.LENGTH_SHORT).show();}
                 content.removeView(editor); editor = null; channels.reload();
             });
             ((com.macdmr.radio.ui.ChannelEditorView) editor).attach(svc);
