@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — Select several channels: delete, star, add to a zone, take out of a zone (phone and web)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner, 2026-10-27 (all phones) | **Channel list on the phone:** long-press a channel (or Select several on its sheet) to select; taps tick rows (an empty box or a tick replaces the star), All ticks every channel shown; a bar replaces the header with Star (or unstar when all are favourites), Zone (an existing zone or a new one by name; ★ Favourites keeps its own Star), Out of zone (only when a zone is open; a zone is never left empty), Delete (confirmed; highest number first, so the renumbering never moves a channel still to go; the active channel keeps playing unless it was deleted). **SignalDeck Web:** the Channels page has Select and the same actions (`POST /api/channels/bulk` with `action` delete / zone / unzone / star / unstar, `numbers`, `zoneId`, `zoneName`). Both call the same service methods. Delete is refused while transmitting or loading firmware. Help: Channels → "Several channels at once". When Restricted mode (PR 26) merges, these actions go under its zone lock. | `RadioService.java` (`deleteChannels`, `addChannelsToZone`, `removeChannelsFromZone`, `favouriteChannels`), `ChannelStore.java` (`withNumbers`, `withoutNumbers`, `deleteOrder`), `ui/ChannelsView.java`, `web/WebHost.java`, `assets/web/index.html`, `app.js`, `app.css`, `ui/HelpView.java`, `ChannelSelectionTest.java` | Host: `ChannelSelectionTest`; all host tests pass; app.js parses. **Device: W6** (any phone, no radio use): three channels long-pressed and ticked, added to a new zone (the Zones sheet listed it with 3 channels); one channel deleted (128 → 127). **Web on the W6** (curl through adb forward): star/unstar 2, add 2 to a zone, take 2 out, a refusal to empty a zone, delete 1, an unknown action refused. Not run on the Armor. |
+
 ## 2026-10-26 — Firmware the catalogue does not list yet: asked once, noticed on the Device page
 
 | Backlog | Change | Files | Test |

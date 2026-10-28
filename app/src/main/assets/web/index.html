@@ -105,10 +105,11 @@
     <section id="page-channels" class="page hidden">
       <div class="grid-side wide">
         <div class="panel">
-          <div class="row between"><span class="label">CHANNELS</span><div class="row"><button class="btn small-btn" id="chVfo">VFO</button><button class="btn small-btn" id="chNew">New channel</button></div></div>
+          <div class="row between"><span class="label">CHANNELS</span><div class="row"><button class="btn small-btn" id="chSelect" title="Tick several channels to delete them, star them or put them in a zone">Select</button><button class="btn small-btn" id="chVfo">VFO</button><button class="btn small-btn" id="chNew">New channel</button></div></div>
           <div class="row wrap chtools"><select id="chZone" aria-label="Zone shown in the list (the radio steps and scans in it)"></select>
             <div class="seg" id="chFilter"><button type="button" data-f="0" class="on">All</button><button type="button" data-f="1">★ Favourites</button><button type="button" data-f="2">Analog</button><button type="button" data-f="3">DMR</button></div></div>
           <input id="chSearch" placeholder="Search name, frequency or number" class="search full" style="margin-top:10px">
+          <div id="chSelBar" class="sel-bar hidden"><span id="chSelCount" class="mono">0 selected</span><div class="row wrap"><button class="btn small-btn" id="chSelAll">All</button><button class="btn small-btn" id="chSelStar">Star</button><select id="chSelZoneTo" aria-label="Zone to add the selected channels to"></select><button class="btn small-btn" id="chSelZone">Add to zone</button><button class="btn small-btn" id="chSelOut" title="Take the selected channels out of the zone shown">Out of zone</button><button class="btn small-btn danger" id="chSelDel">Delete</button><button class="btn small-btn" id="chSelDone">Done</button></div></div>
           <div id="chList" class="list"></div>
         </div>
         <div class="panel" id="edPanel">

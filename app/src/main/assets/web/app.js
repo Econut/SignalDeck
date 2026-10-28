@@ -200,7 +200,8 @@ function renderChannels() {
   const q = $('chSearch').value.trim().toLowerCase(); const cur = (S.status.channel || {}).number; const f = S.chFilter;
   const rows = S.channels.filter(c => (!q || (c.name || '').toLowerCase().includes(q) || mhz(c.rxFreq).includes(q) || String(c.number) === q)
     && (f === 0 || (f === 1 && c.fav) || (f === 2 && !c.digital) || (f === 3 && c.digital)));
-  $('chList').innerHTML = rows.map(c => '<div class="item click' + (c.number === cur ? ' cur' : '') + '" data-n="' + c.number + '"><span class="n">' + c.number + '</span><div class="main"><div>' + esc(c.name || '—') + '</div><div class="sub mono">' + mhz(c.rxFreq) + ' MHz · ' + (c.digital ? 'DMR CC' + c.cc : 'FM') + '</div></div>'
+  S.chShown = rows.map(c => c.number);
+  $('chList').innerHTML = rows.map(c => '<div class="item click' + (c.number === cur ? ' cur' : '') + (S.chSel && S.chSel.has(c.number) ? ' sel' : '') + '" data-n="' + c.number + '"><span class="n">' + c.number + '</span><div class="main"><div>' + esc(c.name || '—') + '</div><div class="sub mono">' + mhz(c.rxFreq) + ' MHz · ' + (c.digital ? 'DMR CC' + c.cc : 'FM') + '</div></div>'
     + '<button type="button" class="star' + (c.fav ? ' on' : '') + '" data-star="' + c.number + '" aria-label="' + (c.fav ? 'Remove from favourites' : 'Add to favourites') + '" title="' + (c.fav ? 'Remove from ★ Favourites' : 'Add to ★ Favourites') + '">' + (c.fav ? '★' : '☆') + '</button>'
     + '<button type="button" class="act" data-edit="' + c.number + '">Edit</button></div>').join('') || '<div class="empty">' + (f === 1 ? 'No favourites in this zone: tap a ☆ to star a channel' : 'No channels') + '</div>';
 }
@@ -208,10 +209,40 @@ $('chZone').onchange = async () => { await act('zone', { id: +$('chZone').value 
 $('chFilter').onclick = e => { const b = e.target.closest('button'); if (!b) return; S.chFilter = +b.dataset.f; $('chFilter').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); renderChannels(); };
 $('chSearch').oninput = renderChannels;
 $('chList').onclick = e => {
+  if (S.chSel) { const it = e.target.closest('.item'); if (it) { const n = +it.dataset.n; if (S.chSel.has(n)) S.chSel.delete(n); else S.chSel.add(n); it.classList.toggle('sel', S.chSel.has(n)); chSelCount(); } return; }
   const ed = e.target.closest('[data-edit]'); if (ed) { openEditor(+ed.dataset.edit); return; }
   const st = e.target.closest('[data-star]'); if (st) { const n = +st.dataset.star, ch = S.channels.find(c => c.number === n); act('channel/star', { number: n, on: !(ch && ch.fav) }).then(() => { loadChannels(); loadZones(); if (S.page === 'channels') loadZonesEditor(); }); return; }
   const it = e.target.closest('.item'); if (it) act('channel/select', { number: +it.dataset.n });
 };
+
+// selecting several channels (as on the phone: long-press there, Select here): delete, star, add to a zone, take out of the zone shown
+S.chSel = null;
+function chSelCount() {
+  const n = S.chSel ? S.chSel.size : 0; $('chSelCount').textContent = n + ' selected';
+  ['chSelStar', 'chSelZone', 'chSelOut', 'chSelDel'].forEach(id => { $(id).disabled = n === 0; });
+  $('chSelOut').classList.toggle('hidden', !(+$('chZone').value > 0));
+}
+function setChSelecting(on) {
+  S.chSel = on ? new Set() : null;
+  $('chList').classList.toggle('selecting', on); $('chSelBar').classList.toggle('hidden', !on); $('chSelect').classList.toggle('hidden', on);
+  $('chSelZoneTo').innerHTML = (S.zones || []).filter(z => z.id > 0 && z.name !== '\u2605 Favourites').map(z => '<option value="' + z.id + '">' + esc(z.name) + '</option>').join('') + '<option value="new">New zone…</option>';
+  renderChannels(); chSelCount();
+}
+async function chBulk(action, extra) {
+  const j = await act('channels/bulk', Object.assign({ action, numbers: [...S.chSel] }, extra || {}));
+  if (j) { setChSelecting(false); await loadChannels(); loadZones(); if (S.page === 'channels' && typeof loadZonesEditor === 'function') loadZonesEditor(); }
+}
+$('chSelect').onclick = () => setChSelecting(true);
+$('chSelDone').onclick = () => setChSelecting(false);
+$('chSelAll').onclick = () => { const shown = S.chShown || [], every = shown.length && shown.every(n => S.chSel.has(n)); shown.forEach(n => every ? S.chSel.delete(n) : S.chSel.add(n)); renderChannels(); chSelCount(); };
+$('chSelStar').onclick = () => { const allFav = [...S.chSel].every(n => (S.channels.find(c => c.number === n) || {}).fav); chBulk(allFav ? 'unstar' : 'star'); };
+$('chSelZone').onclick = () => {
+  const v = $('chSelZoneTo').value;
+  if (v === 'new') { const name = prompt('Name of the new zone'); if (name && name.trim()) chBulk('zone', { zoneId: 0, zoneName: name.trim() }); }
+  else chBulk('zone', { zoneId: +v });
+};
+$('chSelOut').onclick = () => { if (confirm('Take ' + S.chSel.size + ' channel(s) out of this zone? The channels themselves stay.')) chBulk('unzone', { zoneId: +$('chZone').value }); };
+$('chSelDel').onclick = () => { if (confirm('Delete ' + S.chSel.size + ' channel(s)? They are removed from every zone and the channels after them move up.')) chBulk('delete'); };
 
 // ---- APRS ----
 async function loadAprs() {

@@ -1542,6 +1542,54 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (current != null && current.id == ch.id) { current = null; int n = store.count(); if (n > 0) selectChannel(Math.min(ch.number, n)); }
     }
 
+    // ---- several channels at once (the channel list's selection, on the phone and on the web) ----
+
+    /** Delete several channels (highest number first: the renumbering never moves one still to go). Refused while transmitting or loading firmware. */
+    public String deleteChannels(java.util.Collection<Integer> numbers) {
+        if (firmwareLoading()) return "Radio busy, loading firmware";
+        if (isTransmitting()) return "Not while transmitting";
+        ChannelStore.Channel cur = current; long curId = cur != null ? cur.id : -1; int curNum = cur != null ? cur.number : -1;
+        boolean curGone = false; int n = 0;
+        for (int num : ChannelStore.deleteOrder(numbers)) {
+            ChannelStore.Channel ch = store.byNumber(num); if (ch == null) continue;
+            if (ch.id == curId) curGone = true;
+            store.delete(ch); n++;
+        }
+        if (curGone) { current = null; int left = store.count(); if (left > 0) selectChannel(Math.min(curNum, left)); }
+        else if (cur != null) for (ChannelStore.Channel c : store.all()) if (c.id == curId) { cur.number = c.number; break; }   // its number may have moved down: same channel, nothing re-tuned
+        return n == 0 ? "No channels deleted" : "Deleted " + n + (n == 1 ? " channel" : " channels");
+    }
+
+    /** Add several channels to a zone: an existing one ({@code zoneId} > 0) or a new one named {@code newName}. */
+    public String addChannelsToZone(long zoneId, String newName, java.util.Collection<Integer> numbers) {
+        ChannelStore.Zone z;
+        if (zoneId > 0) { z = store.zone(zoneId); if (z == null) return "No such zone"; }
+        else { if (newName == null || newName.trim().isEmpty()) return "A new zone needs a name"; z = new ChannelStore.Zone(); z.name = newName.trim(); }
+        java.util.List<Integer> ok = new java.util.ArrayList<>(); for (Integer n : numbers) if (n != null && store.byNumber(n) != null) ok.add(n);
+        if (ok.isEmpty()) return "No channels selected";
+        int before = z.numbers.length; z.numbers = ChannelStore.withNumbers(z.numbers, ok);
+        long id = store.saveZone(z);
+        if (zoneId() == id) setZone(id);                                     // the active zone changed: scan and arrows follow it
+        int added = z.numbers.length - before;
+        return (zoneId > 0 ? "Added " + added + (added == 1 ? " channel" : " channels") + " to zone " : "New zone ") + z.name + (zoneId > 0 ? "" : " with " + z.numbers.length + (z.numbers.length == 1 ? " channel" : " channels"));
+    }
+
+    /** Take several channels out of a zone (the channels themselves stay). A zone is never left empty: delete it instead. */
+    public String removeChannelsFromZone(long zoneId, java.util.Collection<Integer> numbers) {
+        ChannelStore.Zone z = store.zone(zoneId); if (z == null) return "No such zone";
+        int[] left = ChannelStore.withoutNumbers(z.numbers, numbers);
+        if (left.length == 0) return "That would leave zone " + z.name + " empty: delete the zone instead (Zones)";
+        int removed = z.numbers.length - left.length; z.numbers = left; store.saveZone(z);
+        if (zoneId() == zoneId) setZone(zoneId);
+        return "Took " + removed + (removed == 1 ? " channel" : " channels") + " out of zone " + z.name;
+    }
+
+    /** Star or unstar several channels (the ★ Favourites zone). */
+    public String favouriteChannels(java.util.Collection<Integer> numbers, boolean on) {
+        int n = 0; for (Integer num : numbers) if (num != null && store.byNumber(num) != null) { store.setFavourite(num, on); n++; }
+        return (on ? "Starred " : "Unstarred ") + n + (n == 1 ? " channel" : " channels");
+    }
+
     /** Save an edited or new channel; if it is the active one, re-program the radio. */
     public void saveChannel(ChannelStore.Channel ch, boolean isNew) {
         if (isNew) store.insert(ch); else store.update(ch);

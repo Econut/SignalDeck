@@ -774,6 +774,21 @@ public final class WebHost {
                 return ok(String.format(java.util.Locale.US, "VFO %.4f MHz", v.rxFreq / 1e6));
             }
             case "/api/vfo/exit": if (!post) break; onMain(() -> { svc.exitVfo(); return null; }); return ok("Back to the channel");
+            case "/api/channels/bulk": if (!post) break; {                    // the channel list's selection: {action: delete | zone | unzone | star | unstar, numbers[], zoneId, zoneName}
+                JSONArray ns = b.optJSONArray("numbers"); java.util.List<Integer> nums = new java.util.ArrayList<>();
+                if (ns != null) for (int i = 0; i < ns.length(); i++) nums.add(ns.optInt(i, 0));
+                if (nums.isEmpty()) return WebServer.Response.error(400, "Select at least one channel");
+                final String action = b.optString("action", ""); final long zid = b.optLong("zoneId", 0); final String zname = b.optString("zoneName", "");
+                String msg;
+                switch (action) {
+                    case "delete": msg = onMain(() -> svc.deleteChannels(nums)); break;
+                    case "zone": msg = onMain(() -> svc.addChannelsToZone(zid, zname, nums)); break;
+                    case "unzone": msg = onMain(() -> svc.removeChannelsFromZone(zid, nums)); break;
+                    case "star": case "unstar": msg = onMain(() -> svc.favouriteChannels(nums, action.equals("star"))); break;
+                    default: return WebServer.Response.error(400, "Unknown action " + action);
+                }
+                return ok(msg);
+            }
             case "/api/channel/delete": if (!post) break; {
                 ChannelStore.Channel ch = svc.store().byNumber(b.optInt("number", 0));
                 if (ch == null) return WebServer.Response.error(404, "No such channel");
