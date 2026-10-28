@@ -6,7 +6,7 @@ import android.view.KeyEvent;
 public final class P8ButtonBindings {
     private P8ButtonBindings(){}
     public static java.util.function.Consumer<KeyEvent> learning;
-    public static boolean acceptable(int code){return (code>=KeyEvent.KEYCODE_F1 && code<=KeyEvent.KEYCODE_F12) || (code>=KeyEvent.KEYCODE_BUTTON_A && code<=KeyEvent.KEYCODE_BUTTON_MODE);}
+    public static boolean acceptable(int code){return code==KeyEvent.KEYCODE_CAMERA || (code>=KeyEvent.KEYCODE_F1 && code<=KeyEvent.KEYCODE_F12) || (code>=KeyEvent.KEYCODE_BUTTON_A && code<=KeyEvent.KEYCODE_BUTTON_MODE);}
     public static boolean handle(Context c,RadioService service,KeyEvent e){
         if(learning!=null){learning.accept(e);return true;}
         android.content.SharedPreferences p=c.getSharedPreferences("p8_buttons",0);
