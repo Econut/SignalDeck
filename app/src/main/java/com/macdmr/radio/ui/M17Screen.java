@@ -90,6 +90,7 @@ public final class M17Screen extends ModeScreen {
             : svc.profile().symbolEngine() ? "Receive only on this firmware: transmitting M17 needs the module firmware with the symbol engine. "
             : "Receive only: this radio's module cannot send M17. ")
             + "The radio's audio path removes the low tones M17 needs, so SignalDeck rebuilds them on receive (" + st.calibration() + ")."
+            + (svc.canHoldRawAudio() ? "" : " On this phone the radio plays its own sound through the speaker, so you hear its buzz under the decoded voice while a transmission plays.")
             + (st.held() ? " The module's voice filter is held open, so a transmission already in progress can still lock." : " It needs a fairly strong signal and the start of each transmission (its preamble)."));
     }
 }

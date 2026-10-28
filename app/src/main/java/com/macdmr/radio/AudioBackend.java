@@ -18,6 +18,10 @@ public interface AudioBackend {
 
     void setSink(Sink s);
     void setGate(Gate g);
+    /** True when SignalDeck itself plays the radio's receive audio (through the {@link Gate}), so it can hold that audio
+     *  back, for example while M17 voice is decoded. False when the radio drives the speaker on its own and the gate
+     *  cannot silence it (the W6+'s camcorder route). */
+    default boolean appPlaysRadio() { return true; }
     /** Open the RX stream and play it (through the gate). */
     String startRx(boolean speaker);
     String stopRx();

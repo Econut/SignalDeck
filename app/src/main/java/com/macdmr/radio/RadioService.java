@@ -982,7 +982,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
                         : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
-                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()) && !(profile.appPlayback && pttDown) && !dataQuiet());   // app playback (the W6): nothing to the speaker while keyed   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
+                audio.setGate(() -> squelchOpen && !muted && !rawHeld() && !(profile.appPlayback && pttDown) && !dataQuiet());   // M17 in play, a data mode without MON, or app playback while keyed: the raw FM stays off the speaker; decoded M17 voice has its own track
             }
             String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -1026,8 +1026,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (open != squelchOpen && softSq.isEnabled()) log("soft squelch " + (open ? "open" : "closed") + (current != null && current.rxType == 1 ? " (CTCSS " + com.macdmr.radio.dsp.ToneTable.ctcssLabel(current.rxSubCode) + ")" : ""));
         if (open != squelchOpen && softSq.isEnabled()) { softGateHistory(open); squelchOpen = open; pushModes(); }   // pages see the gate (activity box, Soft SQ number colour)
         squelchOpen = open;
-        boolean m17Channel = current != null && current.isM17();
-        if (web != null && open && !muted && !pttDown && !m17Channel && !dataQuiet()) web.rxAudio(mono, n);      // an M17 channel sends decoded voice, not the raw FM
+        boolean held = rawHeld();                  // M17 in play: the raw FM goes nowhere
+        if (web != null && open && !muted && !pttDown && !held && !dataQuiet()) web.rxAudio(mono, n);      // M17 sends decoded voice, and a data mode without MON sends nothing
         ClipRecorder clip = this.clip;                                            // listen check: what arrived, before the speaker
         if (clip != null && (!clipOnlyHeard || rxActive()) && !clip.write(mono, n)) this.clip = null;
         int peak = 0;
@@ -1066,12 +1066,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                 recorder.write(mono, n);
             } catch (Throwable t) { log("record: " + t); recorder = null; }
         }
-        final int p = m17Channel ? 0 : peak;
+        final int p = held ? 0 : peak;
         ui.post(() -> { for (Listener l : listeners) l.onAudioLevel(p); });
         // the intercom bars (phone and web): the spectrum of what the speaker plays; zeros once, when it stops
-        float[] sb = !m17Channel && open && !muted ? spectrum.feed(mono, n) : null;
+        float[] sb = !held && open && !muted ? spectrum.feed(mono, n) : null;
         if (sb != null) { final float[] copy = sb.clone(); spectrumZero = false; ui.post(() -> { for (Listener l : listeners) l.onSpectrum(copy); }); }
-        else if ((m17Channel || !(open && !muted)) && !spectrumZero) { spectrumZero = true; spectrum.reset(); final float[] z = new float[com.macdmr.radio.dsp.Spectrum.BANDS]; ui.post(() -> { for (Listener l : listeners) l.onSpectrum(z); }); }
+        else if ((held || !(open && !muted)) && !spectrumZero) { spectrumZero = true; spectrum.reset(); final float[] z = new float[com.macdmr.radio.dsp.Spectrum.BANDS]; ui.post(() -> { for (Listener l : listeners) l.onSpectrum(z); }); }
     }
 
     private final com.macdmr.radio.dsp.Spectrum spectrum = new com.macdmr.radio.dsp.Spectrum();
@@ -3291,6 +3291,14 @@ public class RadioService extends Service implements RadioEngine.Events {
     private com.macdmr.radio.ham.FormStore forms;
     // ---- M17 receive ----
     private volatile M17Station m17;
+    /** Hold the radio's own receive audio back (speaker, SignalDeck Web, spectrum) because M17 is in play: the channel is
+     *  an M17 channel, or PKT → M17 receive is decoding a transmission on an ordinary FM channel (its raw audio would be a
+     *  4FSK buzz under the decoded voice). Works wherever {@link AudioBackend#appPlaysRadio} is true. */
+    boolean rawHeld() { M17Station m = m17; return rawHeldFor(current != null && current.isM17(), m != null && m.receiving()); }
+    static boolean rawHeldFor(boolean m17Channel, boolean m17Decoding) { return m17Channel || m17Decoding; }
+    /** Whether SignalDeck can hold the radio's audio back on this phone ({@link #rawHeld}); false where the radio plays
+     *  through the speaker by itself. */
+    public boolean canHoldRawAudio() { AudioBackend a = audio; return a == null || a.appPlaysRadio(); }
     /** An M17 (or later raw-discriminator) decoder wants the module's voice filter held open. */
     private volatile boolean dataReceive;
     private final java.util.concurrent.atomic.AtomicInteger dataHoldGen = new java.util.concurrent.atomic.AtomicInteger();

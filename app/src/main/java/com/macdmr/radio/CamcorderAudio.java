@@ -42,6 +42,7 @@ public final class CamcorderAudio implements AudioBackend {
 
     @Override public void setSink(Sink s) { sink = s; }
     @Override public void setGate(Gate g) { gate = g; }   // only used when this backend plays the audio itself
+    @Override public boolean appPlaysRadio() { return play; }   // app playback: the gate holds the radio's audio back; otherwise the module drives the speaker
 
     /** Mono 16-bit samples, times {@link #GAIN} and clipped, to the stereo (L == R) little-endian frames the sink takes. */
     static int toStereo(short[] mono, int n, byte[] out) { return toStereo(mono, n, out, GAIN); }
