@@ -74,7 +74,10 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
         running = false;
         port.stopDivert();
         port.close();
+        root.close();
     }
+    /** The speaker, receive and transmit lines change at every reception: one root shell for them, not an su (and a Magisk toast) each time. */
+    private final RootShell root = new RootShell();
 
     // ---- lines in ----------------------------------------------------------------------------------
 
@@ -301,7 +304,7 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
             String v = null;
             if (!rootRead) try (FileInputStream f = new FileInputStream(profile.rxDetectNode)) { byte[] b = new byte[8]; int n = f.read(b); v = n > 0 ? new String(b, 0, n).trim() : ""; }
                 catch (IOException e) { rootRead = true; ev.log("receive line not readable directly (" + e.getMessage() + "): reading it through root every 250 ms"); }
-            if (rootRead) v = RootSetup.run("cat " + profile.rxDetectNode).trim();
+            if (rootRead) v = root.run("cat " + profile.rxDetectNode).trim();
             boolean on = "1".equals(v);
             if (on != was) {
                 was = on; rxOn = on;
@@ -317,7 +320,7 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
         if (l == null || l.length == 0) return;
         StringBuilder c = new StringBuilder();
         for (String[] p : l) c.append("echo ").append(p[1]).append(" > ").append(p[0]).append("; ");
-        String r = RootSetup.run(c.toString());
+        String r = root.run(c.toString());
         if (!r.isEmpty()) ev.log("lines: " + r);
     }
 
