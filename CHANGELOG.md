@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — A radio without DMR shows no DMR pages
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 (analog-only module) | On a phone whose module has no DMR (`DeviceProfile.dmr()` false: the W6's SA818-class module): the Contacts and Messages tabs (DMR contacts and texts) are hidden; a new channel is analog and the channel type is not offered (an old DMR channel can still be changed); the Analog/DMR filters on the channel list are hidden; Module firmware shows the module's version but opens no loader (the loader speaks the DMR module's YModem path only). Every DMR phone is unchanged. Help (Untested profiles) says so. | `DeviceProfile.java` (`dmr`), `MainActivity.java`, `ui/ChannelsView.java`, `ui/ChannelEditorView.java`, `ui/DeviceView.java`, `ui/HelpView.java`, `AtModuleEngineTest.java` | Host: all host tests pass (`dmr()` false only for the W6). **Device: W6**: three tabs (Intercom, Channels, Device); a new channel's form has no type row; the channel list shows All and Favourites only. |
+
 ## 2026-10-27 — The ANYSECU W6+: an engine for SA818-class analog modules, receive first
 
 | Backlog | Change | Files | Test |

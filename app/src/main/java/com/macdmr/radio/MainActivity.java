@@ -92,6 +92,7 @@ public class MainActivity extends AppCompatActivity {
             tab.setOnClickListener(v -> show(idx));
             tabs[i] = t; tabIcon[i] = e; tabInd[i] = ind; tabCell[i] = tab;
             nav.addView(tab, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            if ((i == 2 || i == 3) && !com.macdmr.radio.DeviceProfile.detect().dmr()) tab.setVisibility(View.GONE);   // DMR contacts and texts: not on an analog-only radio
         }
         modeBar = buildModeBar();
         root.addView(modeBar, 1);                                  // under the page, over the tab bar: a running mode, tap to open its page

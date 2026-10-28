@@ -215,6 +215,9 @@ public final class DeviceProfile {
 
     public SysfsGpio power() { return new SysfsGpio(powerNode, powerOnToken); }
 
+    /** False on a phone whose module has no DMR (an SA818-class analog module): the DMR pages and choices are hidden. */
+    public boolean dmr() { return !"sa818".equals(protocol); }
+
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);

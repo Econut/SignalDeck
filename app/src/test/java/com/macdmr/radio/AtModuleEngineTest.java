@@ -73,6 +73,8 @@ public class AtModuleEngineTest {
         assertEquals(DeviceProfile.Audio.CAMCORDER, w6.audio); assertEquals(9600, w6.baud);
         assertEquals("sa818", w6.copy(true, false).protocol);                               // an advisory's copy keeps the protocol and lines
         assertSame(w6.rxLinesOn, w6.copy(true, false).rxLinesOn);
+        assertFalse(w6.dmr());                                                              // the DMR pages and choices are hidden
+        assertTrue(DeviceProfile.ARMOR_26_ULTRA.dmr() && DeviceProfile.XPLORE_1.dmr() && DeviceProfile.UNKNOWN.dmr());
     }
 
     @Test public void receiveAudioFramesAreStereo() {
