@@ -745,6 +745,10 @@ public class RadioService extends Service implements RadioEngine.Events {
         zoneId = getSharedPreferences("radio", MODE_PRIVATE).getLong("zone", 0);
         if (coverage().enabled()) { coverage.resume(); startForegroundTyped(true); }
         engine = "sa818".equals(profile.protocol) ? new AtModuleEngine(profile, this) : new RadioEngine(profile, this);   // the W6's AT module, else the DMR module
+        if (profile.muteLines != null) {                                 // the module drives the speaker itself: follow Android's media volume, like the stock app
+            followMediaVolume();
+            try { registerReceiver(mediaVolume, new android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION")); } catch (Throwable t) { log("volume receiver: " + t); }
+        }
         packet = new PacketEngine(packetHost);
         packet.applySettings();
         com.macdmr.radio.car.RadioCallService.register(this);
@@ -820,6 +824,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         try { if (customKey != null) customKey.stop(); } catch (Throwable ignored) { }
         try { if (netWatch != null) netWatch.stop(); } catch (Throwable ignored) { }
         try { unregisterReceiver(diag); } catch (Throwable ignored) { }
+        if (profile != null && profile.muteLines != null) try { unregisterReceiver(mediaVolume); } catch (Throwable ignored) { }
         try { if (powerOff != null) unregisterReceiver(powerOff); } catch (Throwable ignored) { }
         try { if (pttDown) { if (audio != null) audio.stopTx(); engine.ptt(false); } } catch (Throwable ignored) { }
         try { if (audio != null) { audio.stopRx(); } } catch (Throwable ignored) { }
@@ -3145,6 +3150,20 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- emergency ----------------------------------------------------------------------------------
     /** Send an emergency on the current channel: DMR text with coordinates, or an APRS emergency position. Returns what happened. */
+    /** Media volume changes (the W6: the module drives the speaker, so Android's volume reaches it only through here). */
+    private final android.content.BroadcastReceiver mediaVolume = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(android.content.Context c, Intent i) {
+            if (i.getIntExtra("android.media.EXTRA_VOLUME_STREAM_TYPE", -1) == android.media.AudioManager.STREAM_MUSIC) followMediaVolume();
+        }
+    };
+    private void followMediaVolume() {
+        try {
+            android.media.AudioManager am = (android.media.AudioManager) getSystemService(AUDIO_SERVICE);
+            int lv = AtModuleEngine.speakerLevelFor(am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC), am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC));
+            ModuleEngine e = engine; if (e != null) e.setSpeakerLevel(lv);
+        } catch (Throwable t) { log("media volume: " + t); }
+    }
+
     public String emergency(String text, int toNumber, int toType, String toName) {
         ChannelStore.Channel ch = current;
         if (!isReady() || ch == null) return "Not sent: the radio is not on";

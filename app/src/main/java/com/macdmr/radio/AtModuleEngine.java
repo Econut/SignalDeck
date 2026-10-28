@@ -36,6 +36,9 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
     private volatile boolean monitor;
     private volatile int squelchOverride = -1;
     private volatile int moduleVolume = -1;
+    /** The level that follows Android's media volume (-1 until RadioService sets it): 0 mutes the speaker, 1-8 the module volume. */
+    private volatile int speakerLevel = -1;
+    private volatile boolean rxOn;
 
     // answers: the line waited for, by command name
     private final Object answerLock = new Object();
@@ -200,10 +203,20 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
     static int moduleVolumeFor(int dmrVolume) { return Math.max(1, Math.min(8, Math.round(dmrVolume / 2f))); }
 
     @Override public void setVolume(int v) {
-        int m = moduleVolumeFor(v); if (m == moduleVolume) return;
+        int lv = speakerLevel;
+        int m = lv > 0 ? lv : lv == 0 ? Math.max(1, moduleVolume) : moduleVolumeFor(v);   // the media volume rules once it is known; at 0 the amplifier is off instead
+        if (m == moduleVolume) return;
         moduleVolume = m;
         async("SETVOLUME", "AT+DMOSETVOLUME=" + m, null);
     }
+    /** Media volume 0-8 (0 = speaker off), as the stock app does: its module volume follows the media volume, and at 0 it leaves the speaker off. */
+    @Override public void setSpeakerLevel(int level) {
+        int was = speakerLevel; speakerLevel = Math.max(0, Math.min(8, level));
+        if (speakerLevel > 0 && speakerLevel != moduleVolume && running) { moduleVolume = speakerLevel; async("SETVOLUME", "AT+DMOSETVOLUME=" + speakerLevel, null); }
+        if (rxOn && (was == 0) != (speakerLevel == 0)) lines(speakerLevel == 0 ? profile.muteLines : profile.rxLinesOn);   // changed while receiving
+    }
+    /** Media volume (0..max) to the module's 0-8 the way the stock app maps it (on a 0-25 scale: 1-3 = 1 ... 22-25 = 8). */
+    static int speakerLevelFor(int media, int max) { return media <= 0 || max <= 0 ? 0 : Math.max(1, Math.min(8, (int) Math.ceil(media * 8.0 / max))); }
     /** Not sent: the stock app's AT+DMOSETMIC arguments were never seen on the wire, and a guessed format is not worth the risk. */
     @Override public void setMic(int gain) { ev.log("AT: mic gain not set (AT+DMOSETMIC's format is not known yet)"); }
     @Override public void setSquelch(int level) { squelchOverride = Math.max(0, Math.min(8, level)); sendGroup(); }
@@ -291,8 +304,8 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
             if (rootRead) v = RootSetup.run("cat " + profile.rxDetectNode).trim();
             boolean on = "1".equals(v);
             if (on != was) {
-                was = on;
-                if (on) { lines(profile.rxLinesOn); ev.status(1, RadioEngine.statusName(1)); }
+                was = on; rxOn = on;
+                if (on) { lines(profile.rxLinesOn); if (speakerLevel == 0) lines(profile.muteLines); ev.status(1, RadioEngine.statusName(1)); }
                 else { ev.status(2, RadioEngine.statusName(2)); lines(profile.rxLinesOff); }
             }
             try { Thread.sleep(rootRead ? 250 : 100); } catch (InterruptedException e) { return; }
