@@ -1,6 +1,6 @@
 # W6 engine design: SignalDeck on an SA818-class analog module (2026-10-27)
 
-**Status: design for the owner's review. Nothing here is built yet.** Sources: the stock app's start-up sniffed by the
+**Status: approved by the owner 2026-10-27. Built: the `ModuleEngine` interface (SignalDeck #38) and `AtModuleEngine` with the W6 profile, receive only (#40). Transmit waits for the owner.** Sources: the stock app's start-up sniffed by the
 device report (`sdtrace`, `reports/20261027_serial_sniff/`), the stock app `com.flyscale.analogpoc` disassembled with
 the Android SDK's `dexdump` and `aapt2` (classes `SerialHandle`, `SerialManage`, `BoService`, `DmrReceiver`,
 `CustomKeyEventImpl`, `ChannelValueUtil`; resource arrays `analog_*`), its channel table, and the probe's answers.
@@ -142,7 +142,7 @@ a clean analog walkie-talkie with SignalDeck's channel management, scanning, key
 | # | Test | Who | Why |
 |---|---|---|---|
 | 1 | **Done 2026-10-27, passed (`RX_AUDIO_TEST.md`): `CAMCORDER` carries the module's audio.** Receive audio path: a carrier with a 1 kHz tone on a W6 channel (HackRF in the cage, or a station); while the receive broadcast is on, record every ALSA capture device and Android's `MIC`, `VOICE_RECOGNITION`, `UNPROCESSED` sources, and dump the mixer before/after. Receive only. | owner provides the signal; I run the capture | decides recording, captions and every decoder |
-| 2 | **RSSI query:** `RSSI?\r` (and `AT+DMORSSI?\r`) once each, with and without a signal. Identity-style reads. | me (needs the owner's OK: it is a command the stock app never sends) | decides S-meter, scope, coverage |
+| 2 | **Done 2026-10-27: no answer** (`RSSI?` six times, each with a retry, with and without a signal), so no signal readings on the W6. **RSSI query:** `RSSI?\r` (and `AT+DMORSSI?\r`) once each, with and without a signal. Identity-style reads. | me (needs the owner's OK: it is a command the stock app never sends) | decides S-meter, scope, coverage |
 | 3 | **Transmit path in the cage:** the stock app keyed twice with the device report's sniffer and a GPIO/mixer snapshot running, a receiver confirming RF; then, with SignalDeck playing a tone to each Android playback route while the owner keys, whether the tone is on air. | owner keys | confirms the PTT sequence; decides every generated-audio feature |
 | 4 | **The silent module:** once (2026-10-27) the module stopped answering until a reboot, powered and with the port free. Watch for it with the bench driver in a loop; when it happens, record `gpio322` and try `gpio322 ← 0`, 1 s, `← 1`, then `AT+DMOCONNECT`. | me, after the owner OKs writing the power line | the engine needs a recovery step; the report must never leave a radio dead |
 | 5 | **Power saving:** the module's `AUTOPOWCONTR` value is stored in the module and not readable. Ask the owner what the stock settings show before anything is changed; power saving may explain test 4. | owner reads the stock settings page | |
