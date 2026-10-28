@@ -1,0 +1,2 @@
+getvar:all                                         FAILED (AdbWriteEndpointSync failed: The semaphore timeout period has expired. (121))
+Finished. Total time: 5.002s
