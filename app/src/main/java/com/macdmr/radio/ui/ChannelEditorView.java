@@ -58,7 +58,7 @@ public class ChannelEditorView extends LinearLayout {
     private static final String H_TYPE = "Digital (DMR) channels carry voice and text as data and need a colour code, a time slot and a call target. Analog channels are classic FM. M17 channels are wide FM with M17 layered on them: a destination callsign (or everyone) and a channel access number. Switching shows the settings that apply.";
     private static final String H_M17 = "Who this channel calls. @ALL is everyone. A callsign calls that station. Pick from contacts uses a contact that has a callsign. Your own callsign, the one you transmit from, is the station callsign in APRS settings.";
     private static final String H_CAN = "Channel access number, 0 to 15. Radios only hear each other when this matches. 0 is the usual choice.";
-    private static final String H_TX = "The frequency you transmit on, in MHz. On a simplex channel it is the same as the receive frequency; on a repeater channel it is the repeater's input (for example +5 MHz on UHF GMRS, or ±0.6 MHz on 2 m). This radio covers 136–174 and 400–480 MHz.";
+    private static final String H_TX = "The frequency you transmit on, in MHz. On a simplex channel it is the same as the receive frequency; on a repeater channel it is the repeater's input (for example +5 MHz on UHF GMRS, or ±0.6 MHz on 2 m). Left empty, it is the receive frequency (simplex). This radio tunes " + com.macdmr.radio.DeviceProfile.detect().bandsText() + ".";
     private static final String H_RX = "The frequency you listen on, in MHz. On a repeater channel it is the repeater's output. This radio tunes " + com.macdmr.radio.DeviceProfile.detect().bandsText() + "; other frequencies (220 MHz, for example) cannot be saved.";
     private static final String H_POS = "Optional position of the station or repeater this channel reaches. With it the intercom shows the place name and its distance and bearing from you. Use my position fills in the phone's last known location.";
     private static final String H_RXONLY = "Receive only: this channel never transmits. Talk, the side key, the voice keyer, beacons, replies and every other transmission are refused while you are on it (a listening post, a channel you are not licensed for, a frequency that should stay quiet). NOAA weather, marine and railroad channels are always receive only, whatever this says.";
@@ -483,26 +483,34 @@ public class ChannelEditorView extends LinearLayout {
     }
 
     /** Validate + copy the text fields into the channel. */
+    /** A typed number, or a plain message naming the field (Java's own says only "empty String" or "For input string"). */
+    static double number(String text, String what) {
+        String t = text == null ? "" : text.trim();
+        if (t.isEmpty()) throw new IllegalArgumentException("Enter " + what);
+        try { return Double.parseDouble(t); } catch (NumberFormatException e) { throw new IllegalArgumentException("\"" + t + "\" is not a number: check " + what); }
+    }
     private boolean apply() {
         try {
             ch.name = ChannelStore.fitName(name.getText().toString());
             ch.notes = notes.getText().toString().trim();
-            ch.txFreq = (int) Math.round(Double.parseDouble(tx.getText().toString().trim()) * 1e6);
-            ch.rxFreq = (int) Math.round(Double.parseDouble(rx.getText().toString().trim()) * 1e6);
+            ch.rxFreq = (int) Math.round(number(rx.getText().toString(), "the receive frequency (MHz)") * 1e6);
+            String txs = tx.getText().toString().trim();
+            ch.txFreq = txs.isEmpty() ? ch.rxFreq : (int) Math.round(number(txs, "the send frequency (MHz)") * 1e6);   // empty: simplex
             if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) throw new IllegalArgumentException("Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText());
             if (ch.rxFreq < 300_000_000) ch.band = 1;                                  // VHF must be wide on this radio
             String la = lat.getText().toString().trim(), lo = lon.getText().toString().trim();
             if (la.isEmpty() && lo.isEmpty()) { ch.lat = 0; ch.lon = 0; }
-            else { ch.lat = Double.parseDouble(la); ch.lon = Double.parseDouble(lo); if (Math.abs(ch.lat) > 90 || Math.abs(ch.lon) > 180) throw new IllegalArgumentException("Latitude must be within ±90 and longitude within ±180"); }
+            else if (la.isEmpty() || lo.isEmpty()) throw new IllegalArgumentException("Enter both latitude and longitude, or leave both empty");
+            else { ch.lat = number(la, "the latitude"); ch.lon = number(lo, "the longitude"); if (Math.abs(ch.lat) > 90 || Math.abs(ch.lon) > 180) throw new IllegalArgumentException("Latitude must be within ±90 and longitude within ±180"); }
             if (ch.isM17()) {
                 ch.m17dest = com.macdmr.radio.ChannelStore.Channel.cleanM17Dest(m17Dest.getText().toString());
                 ch.band = 1;
                 ch.sq = 0;
                 ch.cc = ch.can();
             } else if (ch.isDigital()) {
-                ch.txContact = call.getText().toString().trim().isEmpty() ? 0 : Integer.parseInt(call.getText().toString().trim());
+                ch.txContact = call.getText().toString().trim().isEmpty() ? 0 : (int) number(call.getText().toString(), "the call number");
                 List<Integer> g = new ArrayList<>();
-                for (String s : groups.getText().toString().split("[,; ]+")) { s = s.trim(); if (!s.isEmpty()) g.add(Integer.parseInt(s)); }
+                for (String s : groups.getText().toString().split("[,; ]+")) { s = s.trim(); if (!s.isEmpty()) g.add((int) number(s, "each RX group list entry")); }
                 // the radio passes a group call only if its talkgroup is in this list (measured on air 2026-10-15): include the call target
                 if (ch.contactType == 1 && ch.txContact > 0 && !g.contains(ch.txContact)) g.add(0, ch.txContact);
                 if (g.size() > 32) throw new IllegalArgumentException("At most 32 talkgroups in the RX list (including the call number)");

@@ -25,6 +25,11 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | W6 handoff follow-up: the packet finder needs UHF frequencies entered by hand on the W6 | There is no standard set of 70 cm packet frequencies to ship, so the finder's Settings get **Use my channels**: it fills the list with the frequencies of your own analog channels this radio tunes (each once, at most 20). On a radio the 2 m defaults miss (the W6) the empty-list line points to it. Help (Packet finder → Settings). | `PacketFinder.java`, `ui/PacketFinderDialog.java`, `ui/HelpView.java` | Host suite. Device: see the PR. |
+## 2026-10-28 — Channel editor: plain messages for empty or mistyped numbers
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 handoff follow-up: the channel editor's "empty String" message | Saving with an empty or mistyped number showed Java's own text ("empty String", "For input string"); the phone editor now names the field ("Enter the receive frequency (MHz)", "\"44o.1\" is not a number: check the send frequency (MHz)", "Enter both latitude and longitude, or leave both empty"), and an empty send frequency means simplex (the receive frequency), on the phone and in SignalDeck Web (which answered "No value for txMHz"). The send-frequency help names this radio's bands (it said 136–174 and 400–480 MHz on every phone). | `ui/ChannelEditorView.java`, `web/WebHost.java`, `EditorNumberTest.java` | Host: `EditorNumberTest` + suite. Device: see the PR. |
 
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 

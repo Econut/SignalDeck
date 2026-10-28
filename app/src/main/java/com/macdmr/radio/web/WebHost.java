@@ -273,8 +273,10 @@ public final class WebHost {
             ch.name = ChannelStore.fitName(b.optString("name", ch.name));
             int asked = b.optInt("type", ch.type);
             ch.type = asked == ChannelStore.Channel.TYPE_M17 ? ChannelStore.Channel.TYPE_M17 : asked == 0 ? 0 : 1;
-            ch.txFreq = (int) Math.round(b.getDouble("txMHz") * 1e6);
-            ch.rxFreq = (int) Math.round(b.getDouble("rxMHz") * 1e6);
+            double rxm = b.optDouble("rxMHz", Double.NaN), txm = b.optDouble("txMHz", Double.NaN);   // an empty field arrives as null or NaN
+            if (Double.isNaN(rxm)) return "Enter the receive frequency (MHz)";
+            if (Double.isNaN(txm)) txm = rxm;                                                       // empty send frequency: simplex
+            ch.rxFreq = (int) Math.round(rxm * 1e6); ch.txFreq = (int) Math.round(txm * 1e6);
             if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) return "Frequencies must be inside " + com.macdmr.radio.DeviceProfile.detect().bandsText();
             ch.power = b.optInt("power", ch.power) == 1 ? 1 : 0;
             ch.relay = b.optInt("relay", ch.relay) == 1 ? 1 : 2;
