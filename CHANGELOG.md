@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-27 — M17 receive keeps working after you transmit
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner report from the MMDVM hotspot bench (after an M17 key, the signal bar moved but no M17 audio came through until a channel change) | After a symbol-engine transmission (M17 voice and texts, POCSAG pages, symbol streams) the module leaves its receive audio muted: on FW26 the receive RMS fell from about 5600 to 1.3 after the unkey and stayed there, and reopening the phone's audio stream did not help. SignalDeck now writes the current channel again after those transmissions (what the channel change did by hand), which also puts the M17 voice-filter hold back. Plain-audio transmissions re-send the hold after the unkey as well. | `RadioService.java` | Host suite 382/0. **Device: Armor 26 Ultra, FW26, hotspot bench 2026-10-27 19:04**: hotspot M17 heard (99 frames, 83 good), Armor M17 key, hotspot M17 heard again (100 frames, 86 good); before the fix the second one was not heard (receive RMS 1.3). |
+
 ## 2026-10-26 — Firmware the catalogue does not list yet: asked once, noticed on the Device page
 
 | Backlog | Change | Files | Test |

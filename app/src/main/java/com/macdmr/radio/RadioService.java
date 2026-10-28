@@ -668,7 +668,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 engine.ptt(true);
                 log("TX " + label + " (" + ms + " ms)");
                 try { Thread.sleep(200); if (audio != null) log(audio.playPcm(pcm)); }
-                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null) audio.startRx(true); }
+                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null) audio.startRx(true); holdAfterTx(); }
                 if (ms > ThermalGuard.LONG_MS) history("tx", "\uD83D\uDCFB Long transmission " + Math.round(ms / 1000.0) + " s (" + label + "); " + thermal.state());
                 if (onDone != null) onDone.run();
             } catch (Throwable t) { log("TX " + label + ": " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
@@ -1835,10 +1835,10 @@ public class RadioService extends Service implements RadioEngine.Events {
                 paceSym(fill, keyed);
             }
             history(home, "pkt", "📟 Page sent to " + nRic + (nRic == 1 ? " RIC" : " RICs") + " at " + baud + " baud");
-            if (keyed) unkeyAfterStop();
+            if (keyed) { unkeyAfterStop(); rxAfterSym(); }
         } catch (Throwable t) { log("page: " + t); history("warn", "⚠️ Page failed: " + t.getMessage()); }
         finally {
-            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } }
+            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } holdAfterTx(); }
             if (hopped) exitVfo();
         }
     }
@@ -2074,7 +2074,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             }
             if (arm && !keyed) { engine.ptt(true); keyed = true; log("sym key"); }
             log("sym done bytes=" + data.length);
-            if (eot && keyed && !nounkey) unkeyAfterStop();
+            if (eot && keyed && !nounkey) { unkeyAfterStop(); rxAfterSym(); }
             else if (keyed && nounkey) log("sym nounkey");
         } catch (Throwable t) { log("sym: " + t); }
     }
@@ -2192,10 +2192,10 @@ public class RadioService extends Service implements RadioEngine.Events {
                 paceSym(fill, keyed);
             }
             log("m17 voice frames " + fn);
-            if (keyed) unkeyAfterStop();
+            if (keyed) { unkeyAfterStop(); rxAfterSym(); }
         } catch (Throwable t) { log("m17 voice: " + t); }
         finally {
-            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } }
+            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } holdAfterTx(); }
             m17Down = false; m17Tx = false; m17Script = null;
             if (rec != null) { try { rec.stop(); } catch (Throwable ignored) { } rec.release(); }
             if (c2 != null) c2.close();
@@ -2251,7 +2251,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (done != null) done.run();
         } catch (Throwable t) { log("tones " + label + ": " + t); }
         finally {
-            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } }
+            if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } holdAfterTx(); }
             pttDown = false; thermal.after(ms); refreshControls();
             if (rxAudioOn && audio != null) audio.startRx(true);
         }
@@ -2329,6 +2329,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         while (status4At == seen && System.currentTimeMillis() - t0 < 2500) Thread.sleep(20);
         engine.ptt(false);
         log("sym unkey");
+        holdAfterTx();
     }
     public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
     /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
@@ -3220,6 +3221,22 @@ public class RadioService extends Service implements RadioEngine.Events {
         dataReceive = hold;
         scheduleDataHold(hold);
         return null;
+    }
+
+    /** After any unkey: the module's unkey path rewrites the voice filter, so a held M17 receive goes deaf until the hold is
+     *  sent again (seen 2026-10-27 on the hotspot bench: after an M17 key the signal bar moved but no M17 was decoded until a
+     *  channel change). Every transmit path calls this once its carrier is down. */
+    private void holdAfterTx() { if (dataReceive) scheduleDataHold(true); }
+
+    /** After a symbol-engine transmission (M17 voice and texts, pages, symbol streams) the module leaves its receive audio
+     *  muted: measured 2026-10-27 on FW26, the receive RMS fell from about 5600 to 1.3 after the unkey and stayed there while
+     *  the signal meter still moved, and reopening the phone's audio stream did not help; only a channel write brought it back
+     *  (the owner's workaround was changing channel and back). So the current channel is written again, which also puts the
+     *  M17 voice-filter hold back. */
+    private void rxAfterSym() {
+        ChannelStore.Channel c = current;
+        if (c == null) return;
+        try { log("rx after sym: channel " + c.number + " rewritten " + applyChannelNow(c, c != vfo)); } catch (Throwable t) { log("rx after sym: " + t); }
     }
 
     /** Re-send the voice-filter hold after a channel, VFO or tone write. Those writes put the filter back. */
