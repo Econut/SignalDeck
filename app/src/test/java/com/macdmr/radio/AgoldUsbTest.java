@@ -26,6 +26,40 @@ public class AgoldUsbTest {
         assertNull(AgoldUsb.powered("cat: No such file or directory"));
     }
 
+    private static String hex(byte[] b) { StringBuilder s = new StringBuilder(); for (byte x : b) s.append(String.format("%02x ", x & 0xFF)); return s.toString().trim(); }
+
+    @Test public void requestsAreTheStockAppsBytes() {
+        // IComUtils.makePackage({0,1},{1},{1}) and ({1,52},{1},{1}), as sent on the Atom XL 2026-10-28
+        assertEquals("7e 96 69 00 01 01 00 01 01 fd fd 81", hex(AgoldFrames.request(0x00, 0x01, 0x01)));
+        assertEquals("7e 96 69 01 34 01 00 01 01 fc ca 81", hex(AgoldFrames.request(0x01, 0x34, 0x01)));
+    }
+
+    // the replies the Atom XL's bridge and module gave the probe (and the stock app) on 2026-10-28
+    private static final String BRIDGE = " 7e 96 69 00 01 00 00 0e 32 30 32 30 31 30 31 36 31 36 31 35 34 31 8e a1 81";
+    private static final String MODULE = " 7e 96 69 01 34 00 00 10 44 4d 52 30 30 36 2e 55 34 41 2e 56 30 36 37 00 18 0d 81";
+
+    @Test public void probeRepliesDecodedAndChecked() {
+        String d = AgoldUsb.describe("port: after 10 tenths of a second\nbridge: " + BRIDGE + "\nmodule: " + MODULE + "\nafter: power on = 0, HAL running\n");
+        assertTrue(d, d.contains("bridge version (route 00, cmd 0x01): \"20201016161541\", checksum ok"));
+        assertTrue(d, d.contains("module version (route 01, cmd 0x34): \"DMR006.U4A.V067\", checksum ok"));
+        assertTrue(d, d.contains(AgoldUsb.MODULE_ANSWERED + "DMR006.U4A.V067 (bridge 20201016161541)"));
+        assertTrue(d, d.contains("clean-up: radio off, HAL running"));
+        assertFalse(d.contains(AgoldUsb.BRIDGE_SILENT));
+    }
+
+    @Test public void aWrongChecksumIsNotAnAnswer() {
+        String bad = MODULE.replace("18 0d", "18 0e");
+        assertNull(AgoldUsb.text(bad, 0x01, 0x34));
+        assertTrue(AgoldUsb.describe("module: " + bad + "\n").contains("checksum WRONG"));
+    }
+
+    @Test public void aSilentBridgeIsAWarning() {
+        String d = AgoldUsb.describe("port: none after 10 s\nafter: power on = 0, HAL running\n");
+        assertTrue(d.contains("not asked"));
+        assertTrue(d.contains(AgoldUsb.BRIDGE_SILENT));
+        assertFalse(d.contains(AgoldUsb.MODULE_ANSWERED));
+    }
+
     @Test public void controllerDirFromTheUdcLink() {
         assertEquals("/sys/devices/platform/11201000.usb3", AgoldUsb.controllerDir("/sys/devices/platform/11201000.usb3/udc/musb-hdrc\n"));
         assertNull(AgoldUsb.controllerDir("/sys/class/udc/*"));     // the glob matched nothing

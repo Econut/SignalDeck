@@ -47,6 +47,44 @@ public final class AgoldFrames {
         }
     }
 
+    /**
+     * The 16-bit one's-complement sum the stock app puts after the body (IComUtils.checkSum): big-endian words over
+     * route … body, an odd last byte in the high half, folded and inverted.
+     */
+    static int checksum(int[] b, int from, int to) {
+        int s = 0, i = from;
+        for (; i + 1 < to; i += 2) s += ((b[i] & 0xFF) << 8) | (b[i + 1] & 0xFF);
+        if (i < to) s += (b[i] & 0xFF) << 8;
+        while ((s >> 16) > 0) s = (s & 0xFFFF) + (s >> 16);
+        return s ^ 0xFFFF;
+    }
+
+    /** A request frame as the stock app builds it (IComUtils.makePackage: rw 01, length big-endian). */
+    static byte[] request(int route, int cmd, int... data) {
+        int[] f = new int[8 + data.length + 3];
+        f[0] = 0x7E; f[1] = 0x96; f[2] = 0x69; f[3] = route; f[4] = cmd; f[5] = 1; f[6] = data.length >> 8; f[7] = data.length & 0xFF;
+        System.arraycopy(data, 0, f, 8, data.length);
+        int c = checksum(f, 3, 8 + data.length);
+        f[8 + data.length] = c >> 8; f[9 + data.length] = c & 0xFF; f[10 + data.length] = 0x81;
+        byte[] out = new byte[f.length]; for (int i = 0; i < f.length; i++) out[i] = (byte) f[i];
+        return out;
+    }
+
+    /** True when a complete frame's own checksum matches its route … body. */
+    static boolean checksumOk(Frame f) {
+        if (!f.complete()) return false;
+        int end = 8 + f.declaredLen;
+        for (int i = 0; i < end + 2; i++) if (f.bytes[i] < 0) return false;          // a blanked byte: cannot tell
+        return checksum(f.bytes, 3, end) == ((f.bytes[end] << 8) | f.bytes[end + 1]);
+    }
+
+    /** The body of a complete reply as text (the version replies are ASCII, NUL-padded). */
+    static String bodyText(Frame f) {
+        StringBuilder s = new StringBuilder();
+        for (int b : f.body()) if (b >= 0x20 && b < 0x7F) s.append((char) b);
+        return s.toString();
+    }
+
     /** Every frame in one line of log text. */
     static List<Frame> find(String line) {
         List<Frame> out = new ArrayList<>();

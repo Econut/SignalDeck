@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Device report: ask the Atom XL's radio through its USB bridge
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL handoff, Phase C (identity probe through the envelope; gap list 4) | When the serial probe got no answer on a phone with the Agold USB bridge, the checks ask through the bridge themselves, only while the radio is off and the stock app is not running: stop the HAL (`stop aguiextmodule`), switch the USB port to host (`mcu/usb_path` 1; `mcu_power` alone powers the bridge without it), power the bridge, wait for `/dev/ttyACM0`, send the stock app's own two version queries (route 00 cmd 0x01 and route 01 cmd 0x34, built like its `IComUtils.makePackage`), then power off, `usb_path` 0, the `cmode` toggle and `start aguiextmodule`, all in one root script so the clean-up always runs. Replies are decoded and their checksums checked; a module answer counts as the probe's answer, the draft profile's protocol cites it, and a silent bridge is a warning (the stock app updates the bridge's firmware when it gets no version reply at start-up). Nothing tunes, keys or changes a setting. Help (Run all checks) says so. | `AgoldUsb.java`, `AgoldFrames.java`, `FirstRunCheck.java`, `DraftProfile.java`, `ui/HelpView.java`, `AgoldUsbTest.java` | Host: request frames equal the stock app's bytes, the Atom XL's real replies decode with checksums ok, a wrong checksum is no answer, a silent bridge warns; suite 434/0. Device (Atom XL, 2026-10-28 14:39, `run_checks.sh` over Wi-Fi): bridge `20201016161541`, module `DMR006.U4A.V067`, checksums ok, "answered the version query: yes"; USB back after the watch and after the probe (12 s). Other phones: not reached (bridge property absent). |
+
 ## 2026-10-28 — Device report: draft profile, the summary in 00_SUMMARY.txt, PTT broadcasts and HIDL interfaces from the code
 
 | Backlog | Change | Files | Test |

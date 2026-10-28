@@ -56,7 +56,9 @@ final class DraftProfile {
         String agold = first(watch, "module replies in its log: (the module answered the stock app \\d+ times \\(Agold frames[^\\n]*)", 1);
         String at = first(probe, "an AT-command module \\(SA818 class\\) answered on (\\S+) at (\\d+) baud", 0);
         String family = first(summary, "(?m)^its serial traffic \\(stock_serial.txt\\): ([^\\n]+)", 1);
+        String viaBridge = first(section(r, "Radio probe through the USB bridge"), Pattern.quote(AgoldUsb.MODULE_ANSWERED) + "([^\\n]+)", 1);
         if (at != null) f.add(new Field("protocol", "sa818", HIGH, "the probe: " + at.trim()));
+        else if (viaBridge != null) f.add(new Field("protocol", "mcu68 inside the Agold 7E 96 69 envelope (no engine for the envelope yet)", HIGH, "SignalDeck's own probe through the bridge, checksums verified: " + viaBridge.trim()));
         else if (agold != null) f.add(new Field("protocol", "mcu68 inside the Agold 7E 96 69 envelope (no engine for the envelope yet)", HIGH, agold.replaceAll("\\)\\s*$", ")")));
         else if (summary.contains("radio module answered the version query: yes")) f.add(new Field("protocol", "mcu68", HIGH, "the probe's 0x34 version query was answered"));
         else if (family != null && !family.startsWith("none")) f.add(new Field("protocol", family, MEDIUM, "the stock app's serial traffic"));

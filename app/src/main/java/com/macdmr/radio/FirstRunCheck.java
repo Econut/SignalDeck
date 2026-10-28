@@ -84,6 +84,14 @@ public final class FirstRunCheck {
                 DeviceReport.append("Radio probe (module power switched on first)", r2);
                 answered = r2.contains("answered"); r = r2;
             }
+            if (!answered && AgoldUsb.bridged()) {                             // Atom XL: ask through the USB bridge, the HAL stopped meanwhile
+                p.step("Probe: asking the radio through its USB bridge (USB to a computer is off for about 10 s)");
+                String b = AgoldUsb.identityProbe(c.getCacheDir(), watchPkg != null ? watchPkg : dp.stockApp.isEmpty() ? "com.agold.intercom" : dp.stockApp);
+                DeviceReport.append("Radio probe through the USB bridge", b);
+                int k = b.indexOf(AgoldUsb.MODULE_ANSWERED);
+                if (k >= 0) { answered = true; sum.append("radio module answered through the USB bridge: ").append(b.substring(k + AgoldUsb.MODULE_ANSWERED.length(), b.indexOf('\n', k)).trim()).append('\n'); }
+                if (b.contains(AgoldUsb.BRIDGE_SILENT)) sum.append("WARNING: ").append(b.substring(b.indexOf(AgoldUsb.BRIDGE_SILENT), b.indexOf('\n', b.indexOf(AgoldUsb.BRIDGE_SILENT)))).append('\n');
+            }
             if (r.contains(RadioProbe.AT_MARK))
                 sum.append("radio module answered: yes, with AT commands (SA818 class)").append(atWhere(r)).append(": SignalDeck has no engine for this module family yet\n");
             else sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');

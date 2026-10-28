@@ -76,6 +76,79 @@ final class AgoldUsb {
         return r.append("USB port given back to the socket (").append(dir).append("/cmode 0, then 1)\n").toString();
     }
 
+    static final String USB_PATH = "/sys/bus/platform/drivers/mcu/usb_path", HAL_SERVICE = "aguiextmodule";
+
+    /**
+     * Ask the bridge and the module who they are, with nobody else on the line (Atom XL, measured by hand 2026-10-28):
+     * stop the HAL, switch the USB port to host ({@link #USB_PATH} 1: {@link #MCU_POWER} alone powers the bridge
+     * without it), power the bridge, wait for {@link #BRIDGE_PORT}, send the stock app's own two version queries (route
+     * 00 cmd 01, route 01 cmd 0x34), then power off, give the port back to the socket and start the HAL again, in one
+     * root script so the clean-up runs whatever happened. Nothing tunes, keys or changes a setting. Only while the radio
+     * is off and the stock app is not running. The stock app updates the bridge's firmware when the bridge does not
+     * answer its version query at start-up, so the result says whether the bridge answered.
+     */
+    static String identityProbe(java.io.File dir, String stockApp) {
+        if (!RootSetup.run("pidof " + stockApp + " || true").replaceAll("[^0-9]", "").isEmpty()) return "not run: " + stockApp + " is running\n";
+        if (!Boolean.FALSE.equals(powered(RootSetup.run("cat " + MCU_POWER + " 2>/dev/null")))) return "not run: the radio is not off (" + MCU_POWER + ")\n";
+        java.io.File q1 = new java.io.File(dir, "agold_q_bridge.bin"), q2 = new java.io.File(dir, "agold_q_module.bin");
+        try {
+            try (java.io.FileOutputStream o = new java.io.FileOutputStream(q1)) { o.write(AgoldFrames.request(0x00, 0x01, 0x01)); }
+            try (java.io.FileOutputStream o = new java.io.FileOutputStream(q2)) { o.write(AgoldFrames.request(0x01, 0x34, 0x01)); }
+        } catch (java.io.IOException e) { return "not run: " + e + "\n"; }
+        String ask = "rm -f $R; ( timeout 3 cat " + BRIDGE_PORT + " > $R ) & sleep 0.3; cat $Q > " + BRIDGE_PORT + "; wait; echo \"$N: $(od -An -tx1 $R | tr -d '\\n')\"; ";
+        String out = RootSetup.run("S=stty; [ -x /data/adb/magisk/busybox ] && S='/data/adb/magisk/busybox stty'; R=/data/local/tmp/signaldeck_agold_reply; "
+                + "stop " + HAL_SERVICE + "; sleep 1; echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; "
+                + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; "
+                + "if [ -e " + BRIDGE_PORT + " ]; then echo \"port: after $((i*5)) tenths of a second\"; sleep 2; $S -F " + BRIDGE_PORT + " raw -echo 2>&1; "
+                + "Q=" + q1.getAbsolutePath() + "; N=bridge; " + ask + "Q=" + q2.getAbsolutePath() + "; N=module; " + ask
+                + "else echo 'port: none after 10 s'; fi; "
+                + "echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; "
+                + "for u in /sys/class/udc/*; do d=$(readlink -f $u); d=${d%/udc/*}; [ -f $d/cmode ] && { echo 0 > $d/cmode; sleep 1; echo 1 > $d/cmode; }; done; "
+                + "start " + HAL_SERVICE + "; sleep 1; rm -f $R; echo \"after: $(cat " + MCU_POWER + "), HAL $(pidof vendor.mediatek.hardware." + HAL_SERVICE + "@1.0-service >/dev/null && echo running || echo NOT running)\"");
+        q1.delete(); q2.delete();
+        return describe(out);
+    }
+
+    static final String MODULE_ANSWERED = "the module answered through the bridge: ", BRIDGE_SILENT = "the bridge did not answer";
+
+    /** The probe's raw lines in words: each reply decoded and its checksum checked. */
+    static String describe(String out) {
+        StringBuilder r = new StringBuilder();
+        String port = null, bridge = null, module = null, after = null;
+        for (String l : out.split("\n")) {
+            String t = l.trim();
+            if (t.startsWith("port: ")) port = t.substring(6);
+            else if (t.startsWith("bridge: ")) bridge = t.substring(8);
+            else if (t.startsWith("module: ")) module = t.substring(8);
+            else if (t.startsWith("after: ")) after = t.substring(7).replace("power on = 0", "off").replace("power on = 1", "STILL ON");
+        }
+        r.append(BRIDGE_PORT).append(": ").append(port == null ? "?" : port).append('\n');
+        r.append(reply("bridge version (route 00, cmd 0x01)", bridge, 0x00, 0x01));
+        r.append(reply("module version (route 01, cmd 0x34)", module, 0x01, 0x34));
+        String b = text(bridge, 0x00, 0x01), m = text(module, 0x01, 0x34);
+        if (m != null) r.append(MODULE_ANSWERED).append(m).append(b != null ? " (bridge " + b + ")" : "").append('\n');
+        if (b == null) r.append(BRIDGE_SILENT).append(": the stock app updates the bridge's firmware when that happens at its start-up; restart the phone before opening it\n");
+        r.append("clean-up: radio ").append(after == null ? "?" : after).append('\n');
+        return r.toString();
+    }
+
+    private static String reply(String what, String hex, int route, int cmd) {
+        if (hex == null) return "  " + what + ": not asked\n";
+        if (hex.trim().isEmpty()) return "  " + what + ": no reply in 3 s\n";
+        for (AgoldFrames.Frame f : AgoldFrames.find(hex.trim().toUpperCase(java.util.Locale.US).replaceAll("\\s+", " ")))
+            if (f.route() == route && f.cmd() == cmd && f.reply())
+                return "  " + what + ": \"" + AgoldFrames.bodyText(f) + "\", checksum " + (AgoldFrames.checksumOk(f) ? "ok" : "WRONG") + " (" + hex.trim() + ")\n";
+        return "  " + what + ": no reply frame in (" + hex.trim() + ")\n";
+    }
+
+    /** The decoded body of a checksum-valid reply, or null. */
+    static String text(String hex, int route, int cmd) {
+        if (hex == null) return null;
+        for (AgoldFrames.Frame f : AgoldFrames.find(hex.trim().toUpperCase(java.util.Locale.US).replaceAll("\\s+", " ")))
+            if (f.route() == route && f.cmd() == cmd && f.reply() && AgoldFrames.checksumOk(f)) return AgoldFrames.bodyText(f);
+        return null;
+    }
+
     /** USB devices and USB sound card streams as root, taken while the radio is on (the bridge exists only then). */
     static String whileOn() {
         return RootSetup.run("for d in /sys/bus/usb/devices/*; do n=${d##*/}; "
