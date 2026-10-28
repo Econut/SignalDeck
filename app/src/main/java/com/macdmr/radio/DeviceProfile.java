@@ -11,11 +11,13 @@ import android.os.Build;
 import java.io.File;
 
 /**
- * Everything that differs between phones that carry this DMR module family. The protocol itself
- * (RadioEngine) is shared. Detection: build fingerprint first, then which sysfs nodes exist.
+ * Everything that differs between phones that carry this DMR module family, and phones with an SA818-class analog
+ * module ({@link #protocol} "sa818", driven by {@link AtModuleEngine}). Detection: build fingerprint first, then which
+ * sysfs nodes exist.
  */
 public final class DeviceProfile {
-    public enum Audio { TINY_SERVICE, UART_PCM }
+    /** TINY_SERVICE: PrizeTinyService; UART_PCM: a second UART; CAMCORDER: Android's camcorder input carries the radio (W6). */
+    public enum Audio { TINY_SERVICE, UART_PCM, CAMCORDER }
 
     public final String name;
     public final String controlPort;     // MCU command UART
@@ -45,6 +47,18 @@ public final class DeviceProfile {
     public String[][] lineSetup;         // {node, value} written in this order before the power line, every bring-up (null = none)
     /** TINY_SERVICE phones: how to reach the radio audio straight on the sound hardware when the ROM lacks the vendor service (null = not known). */
     public DirectAudio directAudio;
+    /** "mcu68" (the DMR module's 68 … 10 frames, RadioEngine) or "sa818" (AT+DMO… text commands, AtModuleEngine). */
+    public String protocol = "mcu68";
+    /** sa818: the module's receive line, a GPIO input that reads 1 while the squelch is open (null = none). */
+    public String rxDetectNode;
+    /** sa818: {node, value} written in order when reception starts / ends and when the transmitter keys / unkeys (the stock app's audio and PTT lines). */
+    public String[][] rxLinesOn, rxLinesOff, txLinesOn, txLinesOff;
+    /**
+     * Set when the module drives the speaker itself, outside Android's audio (the W6: module to amplifier through switches):
+     * written after {@link #rxLinesOn} while Android's media volume is 0, so the speaker is silent and the recorded audio
+     * stays. The module's own volume then follows the media volume.
+     */
+    public String[][] muteLines;
 
     /**
      * The radio's audio as plain ALSA streams on the phone's sound card, for a ROM without the vendor audio service
@@ -154,6 +168,36 @@ public final class DeviceProfile {
                 { "/sys/devices/platform/intercom/intercom_power_control", "1" } };
     }
 
+    /**
+     * ANYSECU W6+ (UNISOC, analog UHF 400–470 MHz, 32-bit Android 12): an SA818-class module (PB202EU05) on /dev/ttyS2 at
+     * 9600, driven with AT+DMO… commands, from the device report's serial sniff and the stock app's code
+     * (docs/w6/ENGINE_DESIGN.md). Power is gpio322; reception is gpio189 (an input); the receive audio reaches Android on
+     * the camcorder input (docs/w6/RX_AUDIO_TEST.md). Transmit is not tested on air: unverified, so it never transmits.
+     * Never read the flyscale_misc attributes on this phone: two of them panic the kernel.
+     */
+    public static final DeviceProfile ANYSECU_W6 = new DeviceProfile(
+            "ANYSECU W6+", "/dev/ttyS2", 9600, Audio.CAMCORDER, null, 0,
+            "/sys/class/gpio/gpio322/value", "/sys/class/gpio/gpio188/value", "1",
+            new String[] { "fly.privkey.poc.down", "fly.privkey.poc.up" },
+            "com.flyscale.analogpoc",
+            new String[] {
+                    "allow untrusted_app console_device chr_file { open read write ioctl getattr lock }",
+                    "typeattribute console_device mlstrustedobject" },
+            null, true, false);
+    static {
+        ANYSECU_W6.id = "anysecu-w6plus"; ANYSECU_W6.revision = 1; ANYSECU_W6.protocol = "sa818";
+        ANYSECU_W6.rxDetectNode = "/sys/class/gpio/gpio189/value";
+        // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)
+        ANYSECU_W6.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
+        // the speaker route only: the stock app skips it at volume 0; the amplifier must stay on, the camcorder input is behind it (measured: amplifier off = silent recording)
+        ANYSECU_W6.muteLines = new String[][] { { "/sys/class/gpio/gpio183/value", "0" } };
+        ANYSECU_W6.rxLinesOff = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "0" } };
+        // the stock app's startSpeaker / stopSpeaker: mic to the module, built-in mic, then PTT (used only once verified)
+        ANYSECU_W6.txLinesOn = new String[][] { { "/sys/class/gpio/gpio222/value", "1" }, { "/sys/class/gpio/gpio179/value", "0" }, { "/sys/class/gpio/gpio188/value", "1" } };
+        ANYSECU_W6.txLinesOff = new String[][] { { "/sys/class/gpio/gpio188/value", "0" }, { "/sys/class/gpio/gpio222/value", "0" } };
+        ANYSECU_W6.scanDwellMs = 1500;
+    }
+
     /** Any other phone: nothing is touched until a device report has been made and a profile written. */
     public static final DeviceProfile UNKNOWN = new DeviceProfile(
             Build.MANUFACTURER + " " + Build.MODEL + " (not supported yet)", "/dev/ttyS0", 57600, Audio.TINY_SERVICE, null, 0,
@@ -171,6 +215,7 @@ public final class DeviceProfile {
     /** Model text first (the Armor 20WT has the same dmr009 node as the Armor 26 Ultra, on another port), then the nodes. */
     static DeviceProfile detectBuiltIn(String m, boolean dmr009, boolean intercom) {
         if (m.contains("armor 20wt") || m.contains("armor_20wt")) return ARMOR_20WT;
+        if (m.contains("w6+") && m.contains("sl8541e")) return ANYSECU_W6;          // "UNISOC W6+ sl8541e_3h10_32b"
         if (dmr009 || m.contains("armor 26")) return ARMOR_26_ULTRA;
         if (intercom || m.contains("xplore")) return XPLORE_1;
         return UNKNOWN;
@@ -181,7 +226,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -194,9 +239,23 @@ public final class DeviceProfile {
         p.id = o.getString("id"); p.revision = o.getInt("revision"); p.globalSquelch = o.optBoolean("globalSquelch", false); p.scanDwellMs = o.optLong("scanDwellMs", 1500); p.minWriteGapMs = o.optLong("minWriteGapMs", 0);
         org.json.JSONArray ls = o.optJSONArray("lineSetup");
         if (ls != null) { p.lineSetup = new String[ls.length()][]; for (int i = 0; i < ls.length(); i++) p.lineSetup[i] = strings(ls.getJSONArray(i)); }
+        p.protocol = o.optString("protocol", "mcu68"); p.rxDetectNode = o.optString("rxDetectNode", null);
+        p.rxLinesOn = pairs(o.optJSONArray("rxLinesOn")); p.rxLinesOff = pairs(o.optJSONArray("rxLinesOff")); p.muteLines = pairs(o.optJSONArray("muteLines"));
+        p.txLinesOn = pairs(o.optJSONArray("txLinesOn")); p.txLinesOff = pairs(o.optJSONArray("txLinesOff"));
         org.json.JSONObject da = o.optJSONObject("directAudio");
         if (da != null) p.directAudio = DirectAudio.fromJson(da);
         return p;
+    }
+    /** [[node, value], …] from the profile list; only /sys paths and short digit values (they end up on a root command line). */
+    private static String[][] pairs(org.json.JSONArray a) throws org.json.JSONException {
+        if (a == null) return null;
+        String[][] out = new String[a.length()][];
+        for (int i = 0; i < out.length; i++) {
+            String[] p = strings(a.getJSONArray(i));
+            if (p.length != 2 || !p[0].matches("/sys/[A-Za-z0-9_./-]{1,120}") || !p[1].matches("[0-9]{1,3}")) throw new org.json.JSONException("bad line " + i);
+            out[i] = p;
+        }
+        return out;
     }
     private static String[] strings(org.json.JSONArray a) {
         if (a == null) return new String[0];
