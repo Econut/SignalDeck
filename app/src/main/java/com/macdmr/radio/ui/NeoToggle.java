@@ -26,6 +26,13 @@ public class NeoToggle extends NeonToggle {
         setOn(false);
     }
 
+    /** Smaller label, icon and padding for the compact intercom (66 x 44 dp keys instead of 76 x 54). */
+    public void compact() {
+        Context c = getContext();
+        setTextSize(10.5f); int sz = Theme.dp(c, 17); icon.setBounds(0, 0, sz, sz); setCompoundDrawables(null, icon, null, null);
+        setCompoundDrawablePadding(Theme.dp(c, 2)); setPadding(Theme.dp(c, 2), Theme.dp(c, 3), Theme.dp(c, 2), Theme.dp(c, 3));
+    }
+
     @Override public void setOn(boolean v) {
         super.setOn(v);
         if (icon == null) return;   // called from the parent constructor before this one has run
