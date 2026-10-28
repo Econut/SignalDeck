@@ -62,6 +62,14 @@ public final class DeviceProfile {
      * where the noise detector listens, nor the sub-audible tones; its module squelch (levels 1-8) works.
      */
     public boolean softSqInModule;
+    /**
+     * SignalDeck plays the received audio itself (an AudioTrack on Android's media stream) and keeps the module's own
+     * speaker route off; the module volume stays at {@link #fixedModuleVolume}. The W6: Android's volume then works as on
+     * other phones, the received level is fixed (a squelch can be calibrated), and the app's gate mutes what you hear.
+     */
+    public boolean appPlayback;
+    /** The module volume held while {@link #appPlayback} is on (the camcorder gain is calibrated at 4 of 8 on the W6). */
+    public int fixedModuleVolume = 4;
     /** sa818: the module's receive line, a GPIO input that reads 1 while the squelch is open (null = none). */
     public String rxDetectNode;
     /** sa818: {node, value} written in order when reception starts / ends and when the transmitter keys / unkeys (the stock app's audio and PTT lines). */
@@ -202,7 +210,7 @@ public final class DeviceProfile {
         // Revision 2 (2026-10-28): tested for receive on the owner's W6+ (take-over, 128 channels, tones, APRS, SSTV, FT8,
         // M17 from a HackRF), so it takes the radio over like a supported phone.
         // Revision 3 (2026-10-28): transmit confirmed on the air by the owner in the cage, so txBlocked is cleared.
-        ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false; ANYSECU_W6.softSqInModule = true;
+        ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false; ANYSECU_W6.softSqInModule = true; ANYSECU_W6.appPlayback = true;
         ANYSECU_W6.rxDetectNode = "/sys/class/gpio/gpio189/value";
         // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)
         ANYSECU_W6.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
@@ -288,7 +296,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -309,7 +317,7 @@ public final class DeviceProfile {
             for (int i = 0; i < bands.length(); i++) p.bandsHz[i] = bands.getLong(i);
             for (int i = 0; i < bands.length(); i += 2) if (p.bandsHz[i] >= p.bandsHz[i + 1]) throw new org.json.JSONException("bandsHz: low below high");
         }
-        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false);
+        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false); p.appPlayback = o.optBoolean("appPlayback", false); p.fixedModuleVolume = Math.max(1, Math.min(8, o.optInt("fixedModuleVolume", 4)));
         p.rxLinesOn = pairs(o.optJSONArray("rxLinesOn")); p.rxLinesOff = pairs(o.optJSONArray("rxLinesOff")); p.muteLines = pairs(o.optJSONArray("muteLines"));
         p.txLinesOn = pairs(o.optJSONArray("txLinesOn")); p.txLinesOff = pairs(o.optJSONArray("txLinesOff"));
         org.json.JSONObject da = o.optJSONObject("directAudio");

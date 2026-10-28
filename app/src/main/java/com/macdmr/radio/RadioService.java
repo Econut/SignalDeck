@@ -752,7 +752,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         zoneId = getSharedPreferences("radio", MODE_PRIVATE).getLong("zone", 0);
         if (coverage().enabled()) { coverage.resume(); startForegroundTyped(true); }
         engine = "sa818".equals(profile.protocol) ? new AtModuleEngine(profile, this) : new RadioEngine(profile, this);   // the W6's AT module, else the DMR module
-        if (profile.muteLines != null) {                                 // the module drives the speaker itself: follow Android's media volume, like the stock app
+        if (profile.muteLines != null && !profile.appPlayback) {                                 // the module drives the speaker itself: follow Android's media volume, like the stock app
             followMediaVolume();
             try { registerReceiver(mediaVolume, new android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION")); } catch (Throwable t) { log("volume receiver: " + t); }
         }
@@ -979,9 +979,9 @@ public class RadioService extends Service implements RadioEngine.Events {
         try {
             if (audio == null) {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
-                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio() : vendorOrDirectAudio();
+                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
-                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()));   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
+                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()) && !(profile.appPlayback && pttDown));   // app playback (the W6): nothing to the speaker while keyed   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
             }
             String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
