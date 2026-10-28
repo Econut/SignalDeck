@@ -85,4 +85,14 @@ public class AtModuleEngineTest {
         java.nio.ShortBuffer sb = java.nio.ByteBuffer.wrap(g).order(java.nio.ByteOrder.LITTLE_ENDIAN).asShortBuffer();
         assertEquals(1200, sb.get(0)); assertEquals(1200, sb.get(1)); assertEquals(32767, sb.get(2)); assertEquals(-32768, sb.get(4));
     }
+
+    /** The stock app's media-volume to module-volume bands (0-25: 0 = speaker off, 1-3 = 1, 4-6 = 2 ... 22-25 = 8). */
+    @Test public void speakerFollowsMediaVolumeLikeTheStockApp() {
+        int[] want = new int[26];
+        for (int v = 1; v <= 25; v++) want[v] = v < 4 ? 1 : v < 7 ? 2 : v < 10 ? 3 : v < 13 ? 4 : v < 16 ? 5 : v < 19 ? 6 : v < 22 ? 7 : 8;
+        for (int v = 0; v <= 25; v++) assertEquals("media " + v, want[v], AtModuleEngine.speakerLevelFor(v, 25));
+        assertEquals(8, AtModuleEngine.speakerLevelFor(15, 15)); assertEquals(1, AtModuleEngine.speakerLevelFor(1, 15)); assertEquals(0, AtModuleEngine.speakerLevelFor(3, 0));
+        assertNotNull(DeviceProfile.ANYSECU_W6.muteLines); assertNull(DeviceProfile.ARMOR_26_ULTRA.muteLines);
+        assertArrayEquals(DeviceProfile.ANYSECU_W6.muteLines, DeviceProfile.ANYSECU_W6.copy(true, false).muteLines);
+    }
 }
