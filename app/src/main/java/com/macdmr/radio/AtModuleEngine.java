@@ -204,7 +204,7 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
 
     @Override public void setVolume(int v) {
         int lv = speakerLevel;
-        int m = lv > 0 ? lv : lv == 0 ? Math.max(1, moduleVolume) : moduleVolumeFor(v);   // the media volume rules once it is known; at 0 the amplifier is off instead
+        int m = lv > 0 ? lv : lv == 0 ? Math.max(1, moduleVolume) : moduleVolumeFor(v);   // the media volume rules once it is known; at 0 the speaker route is off instead
         if (m == moduleVolume) return;
         moduleVolume = m;
         async("SETVOLUME", "AT+DMOSETVOLUME=" + m, null);
