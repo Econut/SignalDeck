@@ -906,7 +906,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             P8RxProtocol.Channel wire=P8MainRadio.channel(ch,monitorOn,p8ModuleVolume(),localId());
             p8Tunes.clear();p8Tunes.put(wire,ch);setLink("connecting P8");
             p8Receiver=new P8Receiver(this,new P8Receiver.Listener(){
-                public void status(String text){if(text.startsWith("CONTROL"))log(text);else if(text.startsWith("TUNED") || text.startsWith("Module") || text.startsWith("TX") || text.startsWith("RSSI") || text.startsWith("Spectrum")){p8Status=text;log(text);}}
+                public void status(String text){if(text.startsWith("CONTROL") || text.startsWith("Tune response"))log(text);else if(text.startsWith("TUNED") || text.startsWith("Module") || text.startsWith("TX") || text.startsWith("RSSI") || text.startsWith("Spectrum")){p8Status=text;log(text);}}
                 public void rssi(int raw,double dbm){rssi0(raw,dbm);}
                 public void spectrum(float[] bands){p8Spectrum=bands.clone();final float[] copy=p8Spectrum;ui.post(()->{for(Listener l:listeners)l.onSpectrum(copy);});}
                 public void tuned(P8RxProtocol.Channel channel){ui.post(()->{ChannelStore.Channel acked=p8Tunes.remove(channel);if(acked==null || p8Closing)return;if(acked.id>0){ChannelStore.Channel stored=store.byNumber(acked.number);if(stored==null || stored.id!=acked.id)return;}current=acked;scanner.acknowledged(acked.number);if(acked.id>0)store.setActive(acked.number);setLink("ready");for(Listener l:listeners)l.onChannel(acked);pushModes();});}

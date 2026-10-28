@@ -29,6 +29,7 @@ static long tx_end;
 static long last_pcm_write;
 static uint32_t tuned_hz;
 static int tuned_command;
+static int first_tune=1;
 static long millis(void) {struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec*1000L+t.tv_nsec/1000000L;}
 /* Only this fixed PTT node can be written; no power, audio, calibration or firmware API. */
 static int ptt_write(int released){
@@ -98,6 +99,7 @@ JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_open(JNIEnv *e,jcla
     (void)c;
 #if P8_OPEN_PROBE_REVIEWED
     if(control>=0 || pcm>=0){fail(e,"RX session already open");return;}
+    first_tune=1;
     control=open_port("/dev/ttysWK0",0,207,5,B57600,&control_term,&control_saved);
     if(control<0){fail(e,"Cannot open command UART");return;}
     pcm=open_port("/dev/ttyS0",1,4,64,B230400,&pcm_term,&pcm_saved);
@@ -141,7 +143,9 @@ JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_tune(JNIEnv *
     if(busy){fail(e,"Cannot configure channel during TX or after PTT release failure");return NULL;}
     if(write(control,bytes,(size_t)length)!=length){fail(e,"Receive command write failure; no retry");return NULL;}
     /* Accumulate response fragments without emitting ACKs or any other command. */
-    unsigned char reply[4096];int used=0;long end=millis()+700;
+    /* Initial handover may take longer than a running-session retune. One write, no retry. */
+    unsigned char reply[4096];int used=0;long end=millis()+(first_tune?2500:700);
+    first_tune=0;
     while(millis()<end && used<(int)sizeof reply) {
         struct pollfd p={control,POLLIN,0};int remaining=(int)(end-millis());if(remaining<=0)break;
         int n=poll(&p,1,remaining);

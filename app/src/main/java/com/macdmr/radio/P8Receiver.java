@@ -57,6 +57,7 @@ public final class P8Receiver {
     public void moduleVolume(int n){P8AudioSettings.module(n);moduleLevel=n;pendingVolume.set(n);}
     public void muteTestPlayback(boolean mute){mutedTestPlayback=mute;}
     public void stop(){stop=true;}
+    private static String responseHex(byte[] data){StringBuilder out=new StringBuilder();for(int i=0;i<Math.min(data.length,64);i++)out.append(String.format(java.util.Locale.US,"%02x",data[i]&255));return out.toString();}
     private void guard() throws Exception {
         if((context.getPackageManager().getApplicationInfo("com.wtwd.ucee.dmr",0).flags&ApplicationInfo.FLAG_STOPPED)==0)throw new Exception("Intercom is running/not force-stopped; close RX first");
         for(String path:new String[]{P8Protocol.PTT_NODE,P8Protocol.POWER_NODE,P8Protocol.AUDIO_CONTROL_NODE})
@@ -109,7 +110,7 @@ public final class P8Receiver {
                 }
                 if(txOwned){control.feed(P8ReceiveNative.readControl(),receiveStatus);int n=microphone.read(micBytes,micFill,160-micFill,android.media.AudioRecord.READ_NON_BLOCKING);if(n<0)throw new Exception("Microphone read failure");micFill+=n;if(micFill==160){if(SystemClock.elapsedRealtime()>=txDeadline-12){pttRequested=false;continue;}long sent=P8ReceiveNative.writeMicrophone(micBytes,160);if(lastMicWrite!=0){long gap=sent-lastMicWrite;minMicGap=Math.min(minMicGap,gap);maxMicGap=Math.max(maxMicGap,gap);}lastMicWrite=sent;microphoneBytes+=160;for(int i=0;i<160;i+=2)microphonePeak=Math.max(microphonePeak,Math.abs((int)(short)((micBytes[i]&255)|(micBytes[i+1]<<8))));micFill=0;}SystemClock.sleep(2);continue;}
                 P8RxProtocol.Channel ch=requested.getAndSet(null);
-                if(ch!=null){radioReceiving=false;listener.receiving(false);if(mainTelemetry){rssiDisplay.receiving(false);rssiPoll.tuned(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));P8RxProtocol.requireAck(control,reply,receiveStatus,ch.command());current=ch.toString();tunes++;
+                if(ch!=null){radioReceiving=false;listener.receiving(false);if(mainTelemetry){rssiDisplay.receiving(false);rssiPoll.tuned(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}long tuneStart=SystemClock.elapsedRealtime();byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));listener.status("Tune response cmd=0x"+Integer.toHexString(ch.command())+" waitMs="+(SystemClock.elapsedRealtime()-tuneStart)+" bytes="+reply.length+" hex="+responseHex(reply));P8RxProtocol.requireAck(control,reply,receiveStatus,ch.command());current=ch.toString();tunes++;
                     int index=0;for(int i=0;i<channels.length;i++)if(channels[i]==ch)index=i;
                     tunedChannel=ch;scan.tuned(index,SystemClock.elapsedRealtime());listener.tuned(ch);listener.status("TUNED (ACK) · "+current);}
                 int level=pendingVolume.getAndSet(-1);
