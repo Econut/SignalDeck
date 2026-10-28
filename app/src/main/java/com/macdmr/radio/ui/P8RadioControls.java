@@ -13,12 +13,12 @@ import com.macdmr.radio.RadioService;
 public final class P8RadioControls extends LinearLayout {
     private final RadioService service;
     private TextView menu;private final android.os.Handler ui=new android.os.Handler(android.os.Looper.getMainLooper());
-    private final Runnable refresh=new Runnable(){public void run(){setKeepScreenOn(service.isTransmitting());menu.setText("P8 menu");menu.setContentDescription("P8 radio controls. "+(service.txInhibited()?"Receive only":"Analogue PTT available"));ui.postDelayed(this,500);}};
+    private final Runnable refresh=new Runnable(){public void run(){setKeepScreenOn(service.isTransmitting());menu.setText("P8 MENU");menu.setContentDescription("P8 radio controls. "+(service.txInhibited()?"Receive only":"Analogue PTT available"));ui.postDelayed(this,500);}};
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();ui.post(refresh);}
     @Override protected void onDetachedFromWindow(){ui.removeCallbacks(refresh);super.onDetachedFromWindow();}
     public P8RadioControls(Context c,RadioService s){super(c);service=s;setOrientation(HORIZONTAL);setGravity(android.view.Gravity.END);
-        menu=Neo.button(c,"P8 menu","",Neo.CYAN);menu.setTextSize(12);menu.setSingleLine(true);
-        addView(menu,new LayoutParams(LayoutParams.WRAP_CONTENT,Theme.dp(c,40)));menu.setOnClickListener(v->controls());
+        menu=Neo.button(c,"P8 MENU","menu",Neo.CYAN);menu.setTextSize(11);menu.setSingleLine(true);menu.setMinHeight(0);menu.setPadding(Theme.dp(c,8),0,Theme.dp(c,8),0);menu.setCompoundDrawablePadding(Theme.dp(c,5));
+        addView(menu,new LayoutParams(LayoutParams.MATCH_PARENT,Theme.dp(c,40)));menu.setOnClickListener(v->controls());
     }
     private void controls(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("P8 radio").setItems(new String[]{"Connect","Hand back to Intercom","Receive volume","Transmit settings","Stop transmitting","Programmable buttons","Connection details","Intercom App info / release"},(d,index)->{
         switch(index){

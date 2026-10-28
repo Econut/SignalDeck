@@ -43,7 +43,9 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     // new look only
     private final boolean neo;
     private LinearLayout neoHeader, chipRow;
-    private TextView bigNum, smeterText;
+    private TextView bigNum, smeterText, p8ChannelName;
+    private FrameLayout p8MenuSlot;
+    private boolean p8Layout(){return neo && com.macdmr.radio.BuildConfig.P8_OFFLINE;}
     private TextView[] readLabel;
     private SMeterView smeter;
     private String zoneName = "ALL";
@@ -100,7 +102,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         history.clear(); if (svc != null && ch != null) for (String l : svc.store().recentHistory(ch.number, 3)) history.addLast(l);
         renderHistory();
     }
-    private void reopenPanel(String why) { if (!panelClosed) return; android.util.Log.i("IntercomView", "activity box reopened: " + why); restoreBox.setVisibility(GONE); panelClosed = false; infoPanel.setVisibility(VISIBLE); }
+    private void reopenPanel(String why) { if (p8Layout() || !panelClosed) return; android.util.Log.i("IntercomView", "activity box reopened: " + why); restoreBox.setVisibility(GONE); panelClosed = false; infoPanel.setVisibility(VISIBLE); }
 
     public IntercomView(Context c) {
         super(c);
@@ -258,13 +260,13 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
 
         // ---- PTT (176 dp, centred) with the six satellites at the module's exact offsets ----
         final FrameLayout bottom = new FrameLayout(c);
-        ptt = new PttButton(c);
-        bottom.addView(ptt, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
+        ptt = p8Layout()?new P8PttBar(c):new PttButton(c);
+        bottom.addView(ptt, new FrameLayout.LayoutParams(p8Layout()?FrameLayout.LayoutParams.MATCH_PARENT:FrameLayout.LayoutParams.WRAP_CONTENT, p8Layout()?FrameLayout.LayoutParams.MATCH_PARENT:FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
         if (neo) {
-            softSq = new NeoToggle(c, "softsq", "SOFT SQ", Neo.CYAN); txt = new NeoToggle(c, "txt", "TXT", Neo.VIOLET); vfo = new NeoToggle(c, "vfo", "VFO", Neo.AMBER);
+            softSq = new NeoToggle(c, "softsq", "SOFT SQ", Neo.CYAN); txt = new NeoToggle(c, "txt", "TXT", Neo.VIOLET); vfo = new NeoToggle(c, "vfo", "VFO", p8Layout()?Neo.CYAN:Neo.AMBER);
             rec = new NeoToggle(c, "rec", "REC", Neo.RED); mon = new NeoToggle(c, "mon", "MON", Neo.AMBER); pkt = new NeoToggle(c, "pkt", "PKT", Neo.GREEN);
             NeonToggle[] l = { softSq, txt, vfo }, r = { rec, mon, pkt };
-            for (int i = 0; i < 3; i++) { bottom.addView(l[i], neoSat(d, Gravity.START, 4 + i * 59)); bottom.addView(r[i], neoSat(d, Gravity.END, 4 + i * 59)); }
+            if(!p8Layout())for (int i = 0; i < 3; i++) { bottom.addView(l[i], neoSat(d, Gravity.START, 4 + i * 59)); bottom.addView(r[i], neoSat(d, Gravity.END, 4 + i * 59)); }
         } else {
         softSq = new NeonToggle(c, "🎚️", "SOFT SQ", Theme.SOFTSQ); txt = new NeonToggle(c, "✍️", "TXT", Theme.TXT); vfo = new NeonToggle(c, "🎛️", "VFO", Theme.VFO);
         rec = new NeonToggle(c, "🔴", "REC", Theme.REC); mon = new NeonToggle(c, "👁️", "MON", Theme.MON); pkt = new NeonToggle(c, "📡", "PKT", Theme.PKT);
@@ -276,7 +278,18 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         bottom.addView(pkt, sat(d, 76, Gravity.END, 16, 112));
         }
         LayoutParams btl = new LayoutParams(LayoutParams.MATCH_PARENT, (int) (182 * d)); btl.topMargin = dp4;   // PTT + satellites need 182 dp (classic offsets 4/58/112 dp + 70 dp)
-        if (neo && !com.macdmr.radio.BuildConfig.P8_OFFLINE) addView(bottom, btl);
+        if(p8Layout()){
+            panelClosed=true;infoPanel.setVisibility(GONE);restoreBox.setVisibility(VISIBLE);
+            restoreBox.setImageDrawable(new Neo.IconDrawable("menu",Neo.CYAN));restoreBox.setContentDescription("Show radio activity");
+            LinearLayout shortcuts=new LinearLayout(c);shortcuts.setBaselineAligned(false);
+            inlineShortcut(softSq);inlineShortcut(vfo);
+            LayoutParams first=new LayoutParams(0,(int)(40*d),1);first.rightMargin=(int)(4*d);shortcuts.addView(softSq,first);
+            LayoutParams second=new LayoutParams(0,(int)(40*d),1);second.rightMargin=(int)(4*d);shortcuts.addView(vfo,second);
+            p8MenuSlot=new FrameLayout(c);shortcuts.addView(p8MenuSlot,new LayoutParams(0,(int)(40*d),1));
+            LayoutParams shortLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(40*d));shortLp.setMargins((int)(8*d),(int)(4*d),(int)(8*d),0);addView(shortcuts,shortLp);
+            LayoutParams talkLp=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(56*d));talkLp.setMargins((int)(8*d),(int)(4*d),(int)(8*d),(int)(4*d));addView(bottom,talkLp);
+        }
+        else if (neo) addView(bottom, btl);
         else {
             // classic: the PTT area keeps its 182 dp design and is scaled down to the room left (a mode bar takes ~55 dp), so
             // all six satellites stay on the page and tappable (touches follow the scaling)
@@ -293,7 +306,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
             addView(holder, hold);
         }
         // Mode satellites. Those not brought over yet say so instead of pretending to toggle.
-        softSq.setOnClickListener(v -> { if (svc != null) svc.setSoftSq(!softSq.isOn()); });
+        softSq.setOnClickListener(v -> { if (svc != null){svc.setSoftSq(!softSq.isOn());if(p8Layout())android.widget.Toast.makeText(c,"P8 uses hardware squelch; edit SQ in Channels",android.widget.Toast.LENGTH_SHORT).show();} });
         rec.setOnClickListener(v -> { if (svc != null) svc.setRecord(!rec.isOn()); });
         mon.setOnClickListener(v -> { if (svc != null) svc.setMonitor(!mon.isOn()); });
         txt.setOnClickListener(v -> {
@@ -315,6 +328,13 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         vfo.setOnLongClickListener(v -> { if (svc != null && svc.vfoActive()) { svc.exitVfo(); android.widget.Toast.makeText(c, "VFO off", android.widget.Toast.LENGTH_SHORT).show(); } return true; });
         pkt.setOnClickListener(v -> { if (svc != null) PktDialog.show(c, svc); });   // the packet tools; running modes are one tap away at the top
         ptt.setListener(down -> { if (svc != null) svc.ptt(down); });
+    }
+
+    private void inlineShortcut(NeonToggle toggle){
+        if(toggle instanceof NeoToggle)((NeoToggle)toggle).setInline(true);
+        android.graphics.drawable.Drawable icon=toggle.getCompoundDrawables()[1];
+        if(icon!=null)icon.setBounds(0,0,Theme.dp(getContext(),18),Theme.dp(getContext(),18));
+        toggle.setCompoundDrawables(icon,null,null,null);toggle.setCompoundDrawablePadding(Theme.dp(getContext(),5));toggle.setTextSize(11);toggle.setLetterSpacing(0.03f);toggle.setSingleLine(true);toggle.setMinHeight(0);toggle.setPadding(Theme.dp(getContext(),8),0,Theme.dp(getContext(),8),0);
     }
 
     private static FrameLayout.LayoutParams neoSat(float d, int side, int topDp) {
@@ -352,7 +372,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     /** The new look's top half: header, channel strip, readout, S-meter, SCAN/ZONE, Soft SQ slider. */
     private void buildNeoTop(final Context c, final float d) {
         final int m = (int) (16 * d);
-        neoHeader = Neo.header(c, "", "Zone · ALL");
+        neoHeader = Neo.header(c, p8Layout()?"P8 RX":"", "Zone · ALL");
         title = Neo.headerTitle(neoHeader);
         ImageView logo = new ImageView(c); logo.setImageDrawable(new Neo.IconDrawable("radio", Neo.CYAN));
         LayoutParams lg = new LayoutParams((int) (28 * d), (int) (28 * d)); lg.rightMargin = (int) (12 * d);
@@ -365,19 +385,23 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         addView(neoHeader);
 
         // channel strip: arrows, big number, mode chips
-        FrameLayout strip = new FrameLayout(c);
+        FrameLayout strip = new FrameLayout(c);if(p8Layout())strip.setBackground(Neo.card(c,Neo.LINE,12));
         ImageView prev = roundArrow(c, "left", "Previous channel"), next = roundArrow(c, "right", "Next channel");
         FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams((int) (50 * d), (int) (50 * d), Gravity.START | Gravity.CENTER_VERTICAL); pl.leftMargin = (int) (18 * d);
         FrameLayout.LayoutParams nl = new FrameLayout.LayoutParams((int) (50 * d), (int) (50 * d), Gravity.END | Gravity.CENTER_VERTICAL); nl.rightMargin = (int) (18 * d);
+        if(p8Layout()){pl.width=pl.height=nl.width=nl.height=(int)(44*d);pl.leftMargin=nl.rightMargin=0;prev.setBackground(null);next.setBackground(null);prev.setPadding((int)(12*d),(int)(12*d),(int)(12*d),(int)(12*d));next.setPadding((int)(12*d),(int)(12*d),(int)(12*d),(int)(12*d));}
         strip.addView(prev, pl); strip.addView(next, nl);
         LinearLayout mid = new LinearLayout(c); mid.setOrientation(VERTICAL); mid.setGravity(Gravity.CENTER_HORIZONTAL);
-        bigNum = Neo.text(c, "--", Neo.CYAN, 50, Neo.display(c)); bigNum.setLetterSpacing(0.04f); bigNum.setPadding((int) (22 * d), (int) (2 * d), (int) (22 * d), (int) (2 * d)); bigNum.setBackground(glow(Neo.CYAN));
+        bigNum = Neo.text(c, "--", Neo.CYAN, p8Layout()?17:50, p8Layout()?Neo.ui(c):Neo.display(c));bigNum.setLetterSpacing(0.04f);bigNum.setSingleLine(true);bigNum.setGravity(Gravity.CENTER);
         mid.addView(bigNum);
-        chipRow = new LinearLayout(c); chipRow.setGravity(Gravity.CENTER); chipRow.setPadding(0, (int) (4 * d), 0, 0);
-        mid.addView(chipRow);
-        strip.addView(mid, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER));
-        LayoutParams sl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); sl.topMargin = (int) (6 * d);
-        addView(strip, sl);
+        if(p8Layout()){p8ChannelName=Neo.text(c,"",Neo.CYAN,16,Neo.uiSemi(c));p8ChannelName.setSingleLine(true);p8ChannelName.setEllipsize(android.text.TextUtils.TruncateAt.END);p8ChannelName.setGravity(Gravity.CENTER);mid.addView(p8ChannelName,new LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.WRAP_CONTENT));}
+        else {bigNum.setPadding((int)(22*d),(int)(2*d),(int)(22*d),(int)(2*d));bigNum.setBackground(glow(Neo.CYAN));}
+        chipRow = new LinearLayout(c);chipRow.setGravity(Gravity.CENTER);chipRow.setPadding(0,p8Layout()?0:(int)(4*d),0,0);
+        if(!p8Layout())mid.addView(chipRow);
+        FrameLayout.LayoutParams middle=new FrameLayout.LayoutParams(p8Layout()?FrameLayout.LayoutParams.MATCH_PARENT:FrameLayout.LayoutParams.WRAP_CONTENT,FrameLayout.LayoutParams.WRAP_CONTENT,Gravity.CENTER);
+        if(p8Layout())middle.leftMargin=middle.rightMargin=(int)(44*d);strip.addView(mid,middle);
+        LayoutParams sl = new LayoutParams(LayoutParams.MATCH_PARENT,p8Layout()?(int)(50*d):LayoutParams.WRAP_CONTENT);sl.topMargin=(int)(6*d);if(p8Layout())sl.leftMargin=sl.rightMargin=(int)(8*d);addView(strip,sl);
+        if(p8Layout()){LayoutParams chips=new LayoutParams(LayoutParams.MATCH_PARENT,(int)(24*d));chips.topMargin=(int)(4*d);addView(chipRow,chips);}
         prev.setOnClickListener(v -> { if (svc != null) new Thread(() -> svc.stepChannel(-1)).start(); });
         next.setOnClickListener(v -> { if (svc != null) new Thread(() -> svc.stepChannel(1)).start(); });
 
@@ -387,17 +411,20 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         LinearLayout ro = new LinearLayout(c); ro.setBaselineAligned(false);
         readLabel = new TextView[4]; TextView[] val = new TextView[4];
         float[] wts = { 1.15f, 1.15f, 0.85f, 1f };
-        for (int i = 0; i < 4; i++) {
-            LinearLayout cell = new LinearLayout(c); cell.setOrientation(VERTICAL);
-            readLabel[i] = Neo.caps(c, ""); cell.addView(readLabel[i]);
-            val[i] = Neo.text(c, "", Neo.TEXT, 15.5f, Neo.mono(c)); val[i].setSingleLine(true); val[i].setPadding(0, (int) (4 * d), 0, 0);
-            cell.addView(val[i], new LayoutParams(LayoutParams.MATCH_PARENT, (int) (22 * d)));
-            ro.addView(cell, new LayoutParams(0, LayoutParams.WRAP_CONTENT, wts[i]));
-            if (i == 3) cell.setOnLongClickListener(v -> { pickTalkgroup(); return true; });   // long-press only: no accidental change
+        LinearLayout frequencyCell=null;
+        for (int i=0;i<4;i++){
+            LinearLayout cell=new LinearLayout(c);cell.setOrientation(VERTICAL);
+            readLabel[i]=Neo.caps(c,"");if(p8Layout())readLabel[i].setTextSize(10.5f);
+            val[i]=Neo.text(c,"",Neo.TEXT,p8Layout()&&i==0?23:p8Layout()&&i==1?14:15.5f,Neo.mono(c));val[i].setSingleLine(true);
+            androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(val[i],11,p8Layout()&&i==0?23:p8Layout()&&i==1?14:16,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+            if(p8Layout()&&i==1){LinearLayout rxLine=new LinearLayout(c);rxLine.setGravity(Gravity.CENTER_VERTICAL);rxLine.addView(readLabel[i]);LayoutParams valueLp=new LayoutParams(0,(int)(20*d),1);valueLp.leftMargin=(int)(7*d);rxLine.addView(val[i],valueLp);frequencyCell.addView(rxLine);}
+            else {cell.addView(readLabel[i]);cell.addView(val[i],new LayoutParams(LayoutParams.MATCH_PARENT,(int)((p8Layout()&&i==0?26:22)*d)));ro.addView(cell,new LayoutParams(0,LayoutParams.WRAP_CONTENT,p8Layout()?(i==0?2.5f:i==2?0.6f:1f):wts[i]));}
+            if(i==0)frequencyCell=cell;
+            if(i==3)cell.setOnLongClickListener(v->{pickTalkgroup();return true;});
         }
-        send = val[0]; receive = val[1]; squelch = val[2]; power = val[3];
+        send=val[0];receive=val[1];squelch=val[2];power=val[3];
         rcard.addView(ro);
-        android.view.View rdiv = new android.view.View(c); rdiv.setBackgroundColor(Neo.DIVIDER); LayoutParams rdl = new LayoutParams(LayoutParams.MATCH_PARENT, 1); rdl.setMargins(0, (int) (8 * d), 0, (int) (6 * d));
+        android.view.View rdiv = new android.view.View(c); rdiv.setBackgroundColor(Neo.DIVIDER); LayoutParams rdl = new LayoutParams(LayoutParams.MATCH_PARENT, 1); rdl.setMargins(0, (int) ((p8Layout()?4:8) * d), 0, (int) ((p8Layout()?3:6) * d));
         rcard.addView(rdiv, rdl);
         LayoutParams rl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); rl.setMargins(m, (int) (8 * d), m, 0);
         addView(rcard, rl);
@@ -408,7 +435,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         LinearLayout sm = rcard;
         LinearLayout smTop = new LinearLayout(c); smTop.setGravity(Gravity.CENTER_VERTICAL);
         smTop.addView(Neo.caps(c, "Signal"), new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-        smeterText = Neo.text(c, "NO SIGNAL", Neo.DIM, 17, Neo.mono(c)); smTop.addView(smeterText);
+        smeterText = Neo.text(c, p8Layout()?"RSSI —":"NO SIGNAL", Neo.DIM, p8Layout()?11:17, Neo.mono(c)); smTop.addView(smeterText);
         sm.addView(smTop);
         smeter = new SMeterView(c); LayoutParams mlp = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); mlp.topMargin = (int) (4 * d);
         sm.addView(smeter, mlp);
@@ -421,12 +448,12 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         LinearLayout br = new LinearLayout(c); br.setBaselineAligned(false);
         scanBtn = Neo.button(c, "SCAN", "scan", Neo.CYAN); zoneBtn = Neo.button(c, "ZONE: ALL", "zone", Neo.CYAN);
         for (TextView t : new TextView[] { scanBtn, zoneBtn }) {
-            t.setLetterSpacing(0.12f); t.setTextSize(15.5f); t.setMinHeight((int) (44 * d)); t.setSingleLine(true); t.setMaxLines(1);
+            t.setLetterSpacing(0.12f); t.setTextSize(15.5f); t.setMinHeight((int) ((p8Layout()?40:44) * d)); t.setSingleLine(true); t.setMaxLines(1);
             // long zone names: the text shrinks to fit (down to 10 sp) instead of being cut off
             androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(t, (int) (10 * getResources().getDisplayMetrics().scaledDensity), (int) (15.5f * getResources().getDisplayMetrics().scaledDensity), 1, android.util.TypedValue.COMPLEX_UNIT_PX);
         }
-        LayoutParams b1 = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); b1.rightMargin = (int) (4 * d);
-        LayoutParams b2 = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f); b2.leftMargin = (int) (4 * d);
+        LayoutParams b1 = new LayoutParams(0, p8Layout()?(int)(40*d):LayoutParams.WRAP_CONTENT, 1f); b1.rightMargin = (int) (4 * d);
+        LayoutParams b2 = new LayoutParams(0, p8Layout()?(int)(40*d):LayoutParams.WRAP_CONTENT, 1f); b2.leftMargin = (int) (4 * d);
         br.addView(scanBtn, b1); br.addView(zoneBtn, b2); scanZoneRow = br;
         LayoutParams brl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); brl.setMargins(m, (int) (6 * d), m, 0);
         addView(br, brl);
@@ -467,7 +494,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     }
 
     private P8RadioControls p8Controls;
-    public void attach(RadioService s) { svc = s; s.addListener(this);if(s.p8Main() && p8Controls==null){p8Controls=new P8RadioControls(getContext(),s);addView(p8Controls);softSq.setVisibility(GONE);pkt.setVisibility(GONE);txt.setVisibility(GONE);rec.setVisibility(GONE);} }
+    public void attach(RadioService s) { svc = s; s.addListener(this);if(s.p8Main() && p8Controls==null){p8Controls=new P8RadioControls(getContext(),s);if(p8Layout())p8MenuSlot.addView(p8Controls,new FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT,LayoutParams.MATCH_PARENT));else addView(p8Controls);if(!p8Layout())softSq.setVisibility(GONE);pkt.setVisibility(GONE);txt.setVisibility(GONE);rec.setVisibility(GONE);} }
 
     private void editGoogleKey() {
         if (svc == null) return;
@@ -523,19 +550,20 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         headline.setText("●  " + t); headline.setTextColor(col);
         ptt.setState(tx ? PttButton.State.TX : receivingNow() ? PttButton.State.RX : (svc != null && svc.isReady() && svc.txInhibited() ? PttButton.State.BUSY : PttButton.State.IDLE));
         board.isReceiving = rx;
+        if(p8Layout()){title.setText(tx?"P8 TX":"P8 RX");title.setTextColor(tx?Neo.RED:Neo.TEXT);}
     }
 
     /** New look: number, chips and the four readout cells for the channel. */
     private void neoChannel(ChannelStore.Channel ch, boolean isVfo) {
         Context c = getContext(); float d = Theme.dp(c);
-        title.setText((isVfo ? "VFO" : ch.name).toUpperCase(java.util.Locale.US));
-        bigNum.setText(isVfo ? "VFO" : String.format(java.util.Locale.US, "%02d", ch.number % 100));
-        int numCol = isVfo ? Neo.AMBER : Neo.CYAN; bigNum.setTextColor(numCol); bigNum.setBackground(glow(numCol));
+        if(!p8Layout())title.setText((isVfo ? "VFO" : ch.name).toUpperCase(java.util.Locale.US));
+        bigNum.setText(isVfo?"VFO":String.format(java.util.Locale.US,p8Layout()?"Channel %02d":"%02d",p8Layout()?ch.number:ch.number%100));if(p8ChannelName!=null)p8ChannelName.setText(ch.name);
+        int numCol = isVfo ? Neo.AMBER : Neo.CYAN; bigNum.setTextColor(p8Layout()?Neo.TEXT:numCol);if(!p8Layout())bigNum.setBackground(glow(numCol));
         chipRow.removeAllViews();
         TextView[] chips = { Neo.chip(c, ch.isM17() ? "M17" : ch.isDigital() ? "DMR" : "FM", ch.isM17() || ch.isDigital() ? Neo.VIOLET : Neo.CYAN), Neo.chip(c, ch.rxFreq < 300_000_000 ? "VHF" : "UHF", Neo.CYAN), Neo.chip(c, ch.power == 1 ? "HIGH PWR" : "LOW PWR", Neo.AMBER) };
         for (int i = 0; i < chips.length; i++) { LayoutParams lp = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT); if (i > 0) lp.leftMargin = (int) (6 * d); chipRow.addView(chips[i], lp); }
         readLabel[0].setText("TX"); readLabel[1].setText("RX");
-        send.setText(ChannelsView.mhz(ch.txFreq)); receive.setText(ChannelsView.mhz(ch.rxFreq));
+        send.setText(p8Layout()?String.format(java.util.Locale.US,"%.5f",ch.txFreq/1e6):ChannelsView.mhz(ch.txFreq));receive.setText(p8Layout()?String.format(java.util.Locale.US,"%.5f",ch.rxFreq/1e6):ChannelsView.mhz(ch.rxFreq));
         if (ch.isM17()) {
             readLabel[2].setText("CAN"); squelch.setText(String.valueOf(ch.can())); power.setTextColor(Neo.TEXT);
             readLabel[3].setText("DEST"); power.setText(ch.m17Dest());
@@ -623,7 +651,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         boolean on = receivingNow() && lastDbm != -999;
         smeter.setDbm(on ? lastDbm : -999);
         if (on) { smeterText.setText(SMeterView.sUnits(lastDbm) + "  " + lastDbm + " dBm"); smeterText.setTextColor(lastDbm > -93 ? Neo.AMBER_LIGHT : Neo.TEXT); smeterText.setTextSize(17); }
-        else { smeterText.setText(lastDbm == -999 ? "NO SIGNAL" : "NO SIGNAL  \u00B7  floor " + lastDbm + " dBm"); smeterText.setTextColor(Neo.DIM); smeterText.setTextSize(12.5f); }
+        else { smeterText.setText(p8Layout() && lastDbm == -999 ? (receivingNow()?"RECEIVING · RSSI —":"RSSI —") : lastDbm == -999 ? "NO SIGNAL" : "NO SIGNAL  \u00B7  floor " + lastDbm + " dBm"); smeterText.setTextColor(Neo.DIM); smeterText.setTextSize(12.5f); }
     }
     @Override public void onRssi(int dbm) {
         lastDbm = dbm; updateMeter();
@@ -651,7 +679,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     /** The slider only while Soft SQ is on and the channel is FM; the activity panel takes the room otherwise (the talk key does not move). */
     private void showSqRow(boolean sqOn) {
         if (sqRow == null) return;
-        boolean show = sqOn && chanFm;
+        boolean show = !p8Layout() && sqOn && chanFm;
         if (show == sqShown) return;
         sqShown = show; sqRow.setVisibility(show ? VISIBLE : GONE);
     }

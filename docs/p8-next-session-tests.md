@@ -16,3 +16,9 @@ Work through these one at a time with logs running; stop on unexpected PTT or ha
 10. **DMR:** verify profile and channel validation offline first. DMR live operation remains unverified; no DMR transmit test is included in this checklist. Do not present it as working until protocol/settings and an appropriate live setup are established.
 
 Record for each item: APK version, pass/fail, visible behavior, relevant log timestamps and follow-up. The successful voice test does not validate every channel, physical key or digital mode.
+
+## Main-screen follow-up
+
+- Signal-strength feed: connect verified P8 RSSI data to the original segmented meter. Until available, show RSSI unavailable rather than fabricating dBm or labelling audible reception as no signal.
+- Main.3 redesign: verify physical PTT changes both header and full-width bar to red, then restores cyan on release. Isolated Android touch/render checks cover cancel, focus loss and detach without radio access.
+- Soft SQ shortcut retains the existing handler: P8 currently uses hardware squelch; implementing a software gate is separate from this UI redesign.

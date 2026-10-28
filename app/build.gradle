@@ -30,8 +30,9 @@ android {
                                 appIcon: p8OfflineBuild ? '@drawable/ic_p8_lab' : '@mipmap/ic_launcher']
         minSdk 29
         targetSdk 34
-        versionCode 129
-        versionName p8OfflineBuild ? "1.0.0-beta.20-p8-main.2b" : "1.0.0-beta.20"
+        testInstrumentationRunner "com.macdmr.radio.P8UiInstrumentation"
+        versionCode 130
+        versionName p8OfflineBuild ? "1.0.0-beta.20-p8-main.3" : "1.0.0-beta.20"
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }   // the phones this radio family ships in are ARM; keeps the Vosk natives to two ABIs
     }
 

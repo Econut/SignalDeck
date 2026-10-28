@@ -14,6 +14,8 @@ import android.view.Gravity;
 public class NeoToggle extends NeonToggle {
     private int accent;
     private Neo.IconDrawable icon;
+    private boolean inline;
+    public void setInline(boolean value){inline=value;setOn(isOn());}
 
     public NeoToggle(Context c, String iconName, String label, int accent) {
         super(c, "", label, Theme.SOFTSQ);
@@ -30,7 +32,7 @@ public class NeoToggle extends NeonToggle {
         super.setOn(v);
         if (icon == null) return;   // called from the parent constructor before this one has run
         Context c = getContext();
-        GradientDrawable g = new GradientDrawable(); g.setCornerRadius(Theme.dp(c, 16));
+        GradientDrawable g = new GradientDrawable(); g.setCornerRadius(Theme.dp(c, inline?8:16));
         g.setColor(Neo.alpha(accent, v ? 0x40 : 0x12)); g.setStroke(Theme.dp(c, v ? 2 : 1.5f), v ? accent : Neo.alpha(accent, 0xB0));
         setBackground(g);
         setTextColor(v ? 0xFFFFFFFF : accent); icon.setColor(v ? 0xFFFFFFFF : accent);
