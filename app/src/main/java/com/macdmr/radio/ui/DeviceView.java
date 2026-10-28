@@ -700,7 +700,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                 + "One run of the checks tells us what we need to make it work. It takes about two minutes.\n\n" : "")
                 + "What happens:\n• a device report (phone, ports, radio module, the stock walkie-talkie app; only reads)\n"
                 + "• 10 s to press the side PTT key a few times\n"
-                + "• with root, the stock walkie-talkie app is opened for 15 s so we can see how it starts the radio (do not press PTT then), and closed again\n"
+                + "• with root, the stock walkie-talkie app is closed, then opened for 15 s so we can see how it starts the radio and what it sends to it (do not press PTT then), and closed again\n"
                 + "• with Magisk root, the radio probe (asks the module who it is on the serial ports the walkie-talkie app uses: the DMR version query and the SA818 AT handshake; switches the module on if it does not answer"
                 + (dp.supported ? "" : ", only on phones with a profile") + ")\n"
                 + (canTrial ? "• optionally a 30-second trial: SignalDeck takes the radio (receive only, nothing is transmitted), records what the module and the audio do, then gives it back to " + dp.stockApp + "\n" : "")
@@ -793,7 +793,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
 
     private void shareReport() {
         new android.app.AlertDialog.Builder(getContext()).setTitle("Share the device report")
-                .setMessage("The report holds phone model and build facts, serial-port and radio-module node names, the walkie-talkie app's package details, library and framework file names, running radio processes, and (with root) SELinux labels and short radio-related log excerpts with message text removed and long numbers masked. After Run all checks it also holds SignalDeck's own log (packet, position, message and caller lines removed; callsigns and IDs masked) and, after the trial, a 5-second raw copy of what the radio received (rx_audio_raw.bin: whatever the channel carried). No accounts, contacts, messages, location or identifiers such as IMEI.\n\nThe copied stock walkie-talkie APK is the manufacturer's software: include it if you are comfortable posting it, or share without it (we can ask for it privately).")
+                .setMessage("The report holds phone model and build facts, serial-port and radio-module node names, the walkie-talkie app's package details, library and framework file names, running radio processes, and (with root) SELinux labels and short radio-related log excerpts with message text removed and long numbers masked. After Run all checks it also holds SignalDeck's own log (packet, position, message and caller lines removed; callsigns and IDs masked), the bytes the stock app exchanged with the radio module while it started (stock_serial.txt: commands, channel frequencies and the module's answers; radio IDs blanked) and, after the trial, a 5-second raw copy of what the radio received (rx_audio_raw.bin: whatever the channel carried). No accounts, contacts, messages, location or identifiers such as IMEI.\n\nThe copied stock walkie-talkie APK is the manufacturer's software: include it if you are comfortable posting it, or share without it (we can ask for it privately).")
                 .setPositiveButton("Share all", (dd, w) -> askStation(true)).setNeutralButton("Without the APK", (dd, w) -> askStation(false)).setNegativeButton("Cancel", null).show();
     }
 

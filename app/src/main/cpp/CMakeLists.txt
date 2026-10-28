@@ -15,3 +15,11 @@ target_link_options(sdalsa PRIVATE -s)
 if(SDALSA_ASSET_DIR)
     set_target_properties(sdalsa PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SDALSA_ASSET_DIR}/sdalsa/${ANDROID_ABI})
 endif()
+
+# sdtrace: the device report's serial sniffer (ptrace, read only), shipped and run the same way as sdalsa.
+add_executable(sdtrace sdtrace/sdtrace.c)
+target_compile_options(sdtrace PRIVATE -O2 -Wall -Wextra)
+target_link_options(sdtrace PRIVATE -s)
+if(SDALSA_ASSET_DIR)
+    set_target_properties(sdtrace PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${SDALSA_ASSET_DIR}/sdtrace/${ANDROID_ABI})
+endif()

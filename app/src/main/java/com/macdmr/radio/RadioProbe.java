@@ -199,11 +199,11 @@ public final class RadioProbe {
     static final byte[] QUERY_AGOLD_25 = { 0x7E, (byte) 0x96, 0x69, 0x01, 0x25, 0x01, 0x00, 0x00, (byte) 0xFD, (byte) 0xDA, (byte) 0x81 };
     private static String printf(byte[] q) { StringBuilder s = new StringBuilder("printf '"); for (byte b : q) s.append(String.format(Locale.US, "\\x%02x", b & 0xFF)); return s.append("' > ").toString(); }
     /**
-     * SA818-class identity queries (both only read): the handshake every such module answers, and its version. Either
-     * answer counts: the W6's module (2026-10-27) answered the 15-byte handshake with an error echo missing one byte
-     * ("AT+DMOCONNEC:1") but the 12-byte version query cleanly ("+DMOVERQ:PB202EU05"), so a long write loses a byte there.
+     * SA818-class identity queries (both only read): the handshake every such module answers, and its version, each
+     * ending in a bare \r as the W6's stock app sends them (sniffed 2026-10-27). The first command after the probe's speed
+     * changes loses its first byte on the W6 ("T+DMOCONNECT\r:1", an error echo), so either answer counts.
      */
-    static final byte[] AT_CONNECT = "AT+DMOCONNECT\r\n".getBytes(), AT_VERSION = "AT+DMOVERQ\r\n".getBytes();
+    static final byte[] AT_CONNECT = "AT+DMOCONNECT\r".getBytes(), AT_VERSION = "AT+DMOVERQ\r".getBytes();
     static final String AT_MARK = "an AT-command module (SA818 class) answered";
     /**
      * An SA818-class answer: a "+DMO…" reply in the received bytes (hex as the probe prints it). Our own command coming
