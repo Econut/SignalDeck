@@ -212,7 +212,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         LinearLayout diag = Neo.tile(c, "diag", Neo.AMBER, "Diagnostics", "Live protocol log");
         LinearLayout widget = Neo.tile(c, "widget", Neo.VIOLET, "Home widget", "Channel, scan and Talk");
         LinearLayout sos = Neo.tile(c, "alert", Neo.RED, "Emergency", "Send your position");
-        LinearLayout[] tiles = { backup, restore, reimport, radioIdTile, report, upd, help, diag, widget, sos };
+        java.util.List<LinearLayout> tl = new java.util.ArrayList<>(java.util.Arrays.asList(backup, restore, reimport, radioIdTile, report, upd, help, diag, widget, sos));
+        if (!com.macdmr.radio.DeviceProfile.detect().dmr()) tl.remove(radioIdTile);   // names for DMR IDs: nothing to look up without DMR
+        if (tl.size() % 2 == 1) tl.add(null);
+        LinearLayout[] tiles = tl.toArray(new LinearLayout[0]);
         for (int i = 0; i < tiles.length; i += 2) {
             LinearLayout r = new LinearLayout(c); r.setBaselineAligned(false);
             LayoutParams l1 = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1f); l1.setMargins(0, 0, (int) (4 * d), (int) (8 * d));
