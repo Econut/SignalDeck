@@ -276,7 +276,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         bottom.addView(pkt, sat(d, 76, Gravity.END, 16, 112));
         }
         LayoutParams btl = new LayoutParams(LayoutParams.MATCH_PARENT, (int) (182 * d)); btl.topMargin = dp4;   // PTT + satellites need 182 dp (classic offsets 4/58/112 dp + 70 dp)
-        if (neo) addView(bottom, btl);
+        if (neo && !com.macdmr.radio.BuildConfig.P8_OFFLINE) addView(bottom, btl);
         else {
             // classic: the PTT area keeps its 182 dp design and is scaled down to the room left (a mode bar takes ~55 dp), so
             // all six satellites stay on the page and tappable (touches follow the scaling)
@@ -467,7 +467,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     }
 
     private P8RadioControls p8Controls;
-    public void attach(RadioService s) { svc = s; s.addListener(this);if(s.p8Main() && p8Controls==null){p8Controls=new P8RadioControls(getContext(),s);addView(p8Controls,0);softSq.setVisibility(GONE);pkt.setVisibility(GONE);txt.setVisibility(GONE);rec.setVisibility(GONE);} }
+    public void attach(RadioService s) { svc = s; s.addListener(this);if(s.p8Main() && p8Controls==null){p8Controls=new P8RadioControls(getContext(),s);addView(p8Controls);softSq.setVisibility(GONE);pkt.setVisibility(GONE);txt.setVisibility(GONE);rec.setVisibility(GONE);} }
 
     private void editGoogleKey() {
         if (svc == null) return;

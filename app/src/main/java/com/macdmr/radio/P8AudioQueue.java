@@ -8,6 +8,7 @@ public final class P8AudioQueue {
     public interface Writer {int write(byte[] data,int offset,int count);}
     private final ArrayDeque<byte[]> chunks=new ArrayDeque<>();private int offset,pending;
     public int pending(){return pending;}
+    public void clear(){chunks.clear();offset=0;pending=0;}
     public void add(byte[] bytes,int off,int n){if(n<0 || pending+n>32000)throw new IllegalStateException("Speaker backlog exceeded two seconds; stop RX");chunks.add(Arrays.copyOfRange(bytes,off,off+n));pending+=n;}
     public void drain(Writer writer){while(!chunks.isEmpty()){
         byte[] b=chunks.peek();int n=writer.write(b,offset,b.length-offset);

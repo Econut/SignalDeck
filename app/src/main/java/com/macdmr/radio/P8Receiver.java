@@ -26,13 +26,17 @@ public final class P8Receiver {
     private volatile boolean stop,scanning;private volatile int gain=1;
     private volatile int moduleLevel=1;private final AtomicInteger pendingVolume=new AtomicInteger(-1);
     private boolean mutedTestPlayback;
+    private boolean normalTransmit;private volatile int timeoutMs=60000;private final P8PttEdge pttEdge=new P8PttEdge();
     private boolean txCapable,txPrepared;private volatile boolean pttRequested,txOwned;private long txDeadline;
     private final P8TxStatus txStatus=new P8TxStatus();private long microphoneBytes;private int microphonePeak;
+    private long lastMicWrite,minMicGap=Long.MAX_VALUE,maxMicGap;
     private final P8TxPolicy txPolicy=new P8TxPolicy();private android.media.AudioRecord microphone;private final byte[] micBytes=new byte[160];private int micFill;
     public void enableTransmitTest(){txCapable=BuildConfig.P8_TX_TEST_REVIEWED;}
+    public void enableAnalogueTransmit(int ms){P8AnaloguePolicy.timeout(ms);normalTransmit=true;timeoutMs=ms;txCapable=BuildConfig.P8_TX_TEST_REVIEWED;}
+    public void timeout(int ms){P8AnaloguePolicy.timeout(ms);timeoutMs=ms;}
     public void armTransmitTest(){if(!txCapable)throw new IllegalStateException("RX-only controller");txPolicy.arm(SystemClock.elapsedRealtime());}
     public void cancelTransmitTest(){txPolicy.cancel();pttRequested=false;}
-    public void ptt(boolean down){pttRequested=down;}
+    public synchronized void ptt(boolean down){if(!down){pttEdge.release();pttRequested=false;}else if(pttEdge.press())pttRequested=true;}
     private final AtomicReference<P8RxProtocol.Channel> requested=new AtomicReference<>();private volatile P8RxProtocol.Channel[] channels;
     private long frames,bytes,clipped,tunes;private String current="";
     public P8Receiver(Context c,Listener l){context=c.getApplicationContext();listener=l;}
@@ -42,7 +46,7 @@ public final class P8Receiver {
         if(!ACTIVE.compareAndSet(false,true))throw new IllegalStateException("An RX session is already active");
         channels=list.clone();requested.set(initial);stop=false;new Thread(this::run,"P8-receive-only").start();
     }
-    public void tune(P8RxProtocol.Channel ch){scanning=false;requested.set(ch);}
+    public void tune(P8RxProtocol.Channel ch){pttRequested=false;scanning=false;requested.set(ch);}
     public void scan(boolean enabled){scanning=enabled;}
     public void gain(int n){P8AudioSettings.gain(n);gain=n;}
     public void moduleVolume(int n){P8AudioSettings.module(n);moduleLevel=n;pendingVolume.set(n);}
@@ -77,18 +81,18 @@ public final class P8Receiver {
                 if(txOwned && (!pttRequested || SystemClock.elapsedRealtime()>=txDeadline)){endTransmit();audio.play();}
                 guard();
                 if(pttRequested && !txOwned){
-                    if(tunedChannel!=null && txPolicy.consume(SystemClock.elapsedRealtime(),tunedChannel.hz,tunedChannel.command())){
+                    if(tunedChannel!=null && requested.get()==null && (normalTransmit ? tunedChannel.txAllowed && tunedChannel.command()==0x23 : txPolicy.consume(SystemClock.elapsedRealtime(),tunedChannel.hz,tunedChannel.command()))){
                         if(!txPrepared){P8ReceiveNative.prepareTransmit();txPrepared=true;}
                         int buffer=Math.max(3200,android.media.AudioRecord.getMinBufferSize(8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT));
                         microphone=new android.media.AudioRecord(android.media.MediaRecorder.AudioSource.MIC,8000,AudioFormat.CHANNEL_IN_MONO,AudioFormat.ENCODING_PCM_16BIT,buffer);
                         if(microphone.getState()!=android.media.AudioRecord.STATE_INITIALIZED)throw new Exception("Microphone initialisation failed");
                         microphone.startRecording();if(microphone.getRecordingState()!=android.media.AudioRecord.RECORDSTATE_RECORDING)throw new Exception("Microphone capture failed");
                         if(!pttRequested){microphone.stop();microphone.release();microphone=null;continue;}
-                        audio.pause();audio.flush();txOwned=true;txStatus.keyed(SystemClock.elapsedRealtime());txDeadline=SystemClock.elapsedRealtime()+P8TxPolicy.MAX_KEY_MS;
-                        P8ReceiveNative.key(true);listener.transmitting(true);listener.status("TX TEST keyed; native watchdog maximum 2 seconds");
-                    }else {pttRequested=false;listener.status("TX locked: arm one Channel 9 analogue test first");}
+                        audio.pause();audio.flush();speaker.clear();txOwned=true;lastMicWrite=0;minMicGap=Long.MAX_VALUE;maxMicGap=0;txStatus.keyed(SystemClock.elapsedRealtime());int limit=normalTransmit?timeoutMs:(int)P8TxPolicy.MAX_KEY_MS;txDeadline=SystemClock.elapsedRealtime()+limit;
+                        P8ReceiveNative.keyTimed(true,limit);listener.transmitting(true);listener.status("TX keyed; timeout "+(limit/1000)+" seconds");
+                    }else {pttRequested=false;listener.status("TX blocked: channel is receive-only, digital or not yet tuned");}
                 }
-                if(txOwned){control.feed(P8ReceiveNative.readControl(),receiveStatus);int n=microphone.read(micBytes,micFill,160-micFill,android.media.AudioRecord.READ_NON_BLOCKING);if(n<0)throw new Exception("Microphone read failure");micFill+=n;if(micFill==160){P8ReceiveNative.writeMicrophone(micBytes,160);microphoneBytes+=160;for(int i=0;i<160;i+=2)microphonePeak=Math.max(microphonePeak,Math.abs((int)(short)((micBytes[i]&255)|(micBytes[i+1]<<8))));micFill=0;}SystemClock.sleep(2);continue;}
+                if(txOwned){control.feed(P8ReceiveNative.readControl(),receiveStatus);int n=microphone.read(micBytes,micFill,160-micFill,android.media.AudioRecord.READ_NON_BLOCKING);if(n<0)throw new Exception("Microphone read failure");micFill+=n;if(micFill==160){if(SystemClock.elapsedRealtime()>=txDeadline-12){pttRequested=false;continue;}long sent=P8ReceiveNative.writeMicrophone(micBytes,160);if(lastMicWrite!=0){long gap=sent-lastMicWrite;minMicGap=Math.min(minMicGap,gap);maxMicGap=Math.max(maxMicGap,gap);}lastMicWrite=sent;microphoneBytes+=160;for(int i=0;i<160;i+=2)microphonePeak=Math.max(microphonePeak,Math.abs((int)(short)((micBytes[i]&255)|(micBytes[i+1]<<8))));micFill=0;}SystemClock.sleep(2);continue;}
                 P8RxProtocol.Channel ch=requested.getAndSet(null);
                 if(ch!=null){byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));P8RxProtocol.requireAck(control,reply,receiveStatus,ch.command());current=ch.toString();tunes++;
                     int index=0;for(int i=0;i<channels.length;i++)if(channels[i]==ch)index=i;
@@ -120,7 +124,7 @@ public final class P8Receiver {
     private void endTransmit() throws Exception {
         boolean released=false;
         boolean wasOwned=txOwned;
-        try{P8ReceiveNative.key(false);txOwned=false;txStatus.released(SystemClock.elapsedRealtime());released=true;if(wasOwned)listener.status("TX released; microphoneBytes="+microphoneBytes+", microphonePeak="+microphonePeak);}finally{
+        try{P8ReceiveNative.key(false);txOwned=false;txStatus.released(SystemClock.elapsedRealtime());released=true;if(wasOwned)listener.status("TX released; microphoneBytes="+microphoneBytes+", microphonePeak="+microphonePeak+", writeGapMs="+(minMicGap==Long.MAX_VALUE?0:minMicGap)+".."+maxMicGap);}finally{
             pttRequested=false;if(microphone!=null){try{microphone.stop();}finally{microphone.release();microphone=null;}}micFill=0;if(released)listener.transmitting(false);
         }
     }

@@ -80,8 +80,8 @@ public class RadioService extends Service implements RadioEngine.Events {
     private final Scanner scanner = new Scanner(new Scanner.Host() {
         @Override public java.util.List<ChannelStore.Channel> candidates() { if(!p8Main())return zoneChannels();java.util.List<ChannelStore.Channel> out=new java.util.ArrayList<>();for(ChannelStore.Channel c:zoneChannels())try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());out.add(c);}catch(IllegalArgumentException ignored){}return out; }
         @Override public void tune(ChannelStore.Channel ch) { selectChannel(ch.number); }
-        @Override public boolean receiving() { return softSq.isEnabled() ? squelchOpen : receiving; }   // with Soft SQ on the module's squelch is open and it reports a reception all the time: the soft gate is the activity signal
-        @Override public boolean softGated() { return softSq.isEnabled(); }
+        @Override public boolean receiving() { return p8Main()?receiving:softSq.isEnabled() ? squelchOpen : receiving; }   // with Soft SQ on the module's squelch is open and it reports a reception all the time: the soft gate is the activity signal
+        @Override public boolean softGated() { return !p8Main() && softSq.isEnabled(); }
         @Override public long dwellMs() { return profile.scanDwellMs; }
         @Override public ChannelStore.Channel priority() { int n=scanPriority();ChannelStore.Channel c=n>0?store.byNumber(n):null;if(p8Main() && c!=null)try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());}catch(IllegalArgumentException e){return null;}return c; }
         @Override public void status(boolean s, boolean h, ChannelStore.Channel on) {
@@ -844,17 +844,19 @@ public class RadioService extends Service implements RadioEngine.Events {
     private android.os.PowerManager.WakeLock p8Wake;
     private volatile boolean p8Scanning,p8Closing;
     private volatile boolean p8TxArmed;
+    private long p8ArmGeneration;
     private volatile boolean p8Unsafe;
     private volatile String p8Status="Release Intercom in App info, then Connect";
     public String p8Status(){return p8Status;}
     public boolean p8TxArmed(){return p8TxArmed;}
-    public void p8CancelTransmitTest(){p8TxArmed=false;if(p8Receiver!=null)p8Receiver.cancelTransmitTest();}
+    public void p8CancelTransmitTest(){p8ArmGeneration++;p8TxArmed=false;if(p8Receiver!=null)p8Receiver.cancelTransmitTest();refreshControls();}
     public String p8ArmTransmitTest(){
         if(!BuildConfig.P8_TX_TEST_REVIEWED)return "TX test not enabled in this build";
         if(!isReady() || p8Receiver==null || current==null || current.type!=1 || current.rxFreq!=P8TxPolicy.TEST_HZ)return "Connect and tune analogue 446.10625 MHz first";
         if(scanner.isScanning())scanner.stop();p8Scanning=false;p8Receiver.armTransmitTest();p8TxArmed=true;
-        ui.postDelayed(()->{p8TxArmed=false;refreshControls();},P8TxPolicy.ARM_LIFETIME_MS);
-        refreshControls();p8Status="Armed ONE PTT press on 446.10625 MHz, maximum 2 seconds; expires in 60 seconds";return p8Status;
+        final long generation=++p8ArmGeneration;
+        ui.postDelayed(()->{if(generation!=p8ArmGeneration || !p8TxArmed)return;p8CancelTransmitTest();p8Status="TX test expired; TX locked";refreshControls();},P8TxPolicy.ARM_LIFETIME_MS);
+        refreshControls();p8Status="Armed ONE PTT press on 446.10625 MHz, maximum 10 seconds; expires in 60 seconds";return p8Status;
     }
     private volatile String p8Meter="No PCM measurements yet";
     public String p8AudioMeter(){return p8Meter;}
@@ -862,6 +864,9 @@ public class RadioService extends Service implements RadioEngine.Events {
     private boolean p8RestoreOnClose;
     private final java.util.concurrent.ConcurrentHashMap<P8RxProtocol.Channel,ChannelStore.Channel> p8Tunes=new java.util.concurrent.ConcurrentHashMap<>();
     public boolean p8Main(){return BuildConfig.P8_OFFLINE && BuildConfig.P8_OPEN_PROBE_REVIEWED;}
+    public int p8TransmitTimeout(){int ms=getSharedPreferences("p8_radio",0).getInt("txTimeout",P8AnaloguePolicy.DEFAULT_TIMEOUT_MS);try{P8AnaloguePolicy.timeout(ms);return ms;}catch(IllegalArgumentException e){return P8AnaloguePolicy.DEFAULT_TIMEOUT_MS;}}
+    public String p8SaveTransmitTimeout(int ms){P8AnaloguePolicy.timeout(ms);if(transmitting)return "Release PTT before changing timeout";if(!getSharedPreferences("p8_radio",0).edit().putInt("txTimeout",ms).commit())return "Save failed";if(p8Receiver!=null)p8Receiver.timeout(ms);return "Saved TX timeout: "+(ms/1000)+" seconds";}
+    public String p8ChannelTransmit(boolean allowed){if(current==null || current.type!=1)return "Select an analogue channel first";if(transmitting)return "Release PTT first";if(allowed && ChannelStore.receiveOnly(current.txFreq))return "This frequency is receive-only";p8CancelTransmitTest();current.rxOnly=!allowed;if(current.id>0)store.update(current);applyChannelNow(current,current.id>0);refreshControls();return allowed?"Saved: channel transmit allowed":"Saved: channel receive-only";}
     public int p8ModuleVolume(){return getSharedPreferences("p8_rx",0).getInt("moduleVolume",1);}
     public int p8Gain(){return getSharedPreferences("p8_rx",0).getInt("softwareGain",1);}
     public String p8SaveAudio(String key,int value){
@@ -892,7 +897,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     Runnable done=p8AfterClose;p8AfterClose=null;p8RestoreOnClose=false;if(done!=null)done.run();
                 });}
             });
-            p8Receiver.enableTransmitTest();p8Receiver.gain(p8Gain());p8Receiver.moduleVolume(p8ModuleVolume());
+            p8Receiver.enableAnalogueTransmit(p8TransmitTimeout());p8Receiver.gain(p8Gain());p8Receiver.moduleVolume(p8ModuleVolume());
             android.media.AudioManager am=(android.media.AudioManager)getSystemService(AUDIO_SERVICE);
             int media=getSharedPreferences("p8_rx",0).getInt("mediaVolume",am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC));
             am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC,Math.max(0,Math.min(am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC),media)),0);
@@ -1422,7 +1427,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         return null;
     }
     /** Something is being heard right now (the Soft SQ gate when it is on, else the module's own receive state). */
-    public boolean rxActive() { return softSq.isEnabled() ? squelchOpen : receiving; }
+    public boolean rxActive() { return p8Main()?receiving:softSq.isEnabled() ? squelchOpen : receiving; }
     public DeviceProfile profile() { return profile; }
     public String link() { return link; }
     public boolean isReady() { return "ready".equals(link); }
@@ -1751,7 +1756,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     // ---- PTT ----------------------------------------------------------------------------------------
 
     public boolean txInhibited() {
-        if(p8Main())return !p8TxArmed;
+        if(p8Main())return !BuildConfig.P8_TX_TEST_REVIEWED || !isReady() || p8Closing || p8Unsafe || !p8Tunes.isEmpty() || current==null || current.type!=1 || ChannelStore.receiveOnly(current);
         if (!profile.verified || ProfileRegistry.transmitBlocked()) return true;   // an untested profile never transmits; an advisory can switch it off (the Xplore 1 keys through a GPIO line)
         ChannelStore.Channel ch = current;
         if (ch == null) return true;
@@ -1767,7 +1772,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void pttFromWeb(boolean down, AudioBackend.TxFeed feed) { if (down) webFeedNext = feed; ptt(down); }
 
     public void ptt(final boolean down) {
-        if(p8Main()){if(down && P8ButtonBindings.learning!=null)return;if(p8Receiver!=null && (p8TxArmed || !down))p8Receiver.ptt(down);else if(down)history("warn","P8 TX locked: arm the single approved Channel 9 test first");return;}
+        if(p8Main()){if(down && P8ButtonBindings.learning!=null)return;if(p8Receiver!=null && (!down || !txInhibited())){if(down){scanner.stop();p8Scanning=false;}p8Receiver.ptt(down);}else if(down)history("warn","P8 TX blocked: connect an analogue channel with Transmit allowed");return;}
         worker.execute(() -> {
             try {
                 if (down) {

@@ -12,30 +12,38 @@ import com.macdmr.radio.RadioService;
 /** Compact connection strip in the main radio page; audio settings are ordinary UI, not diagnostics. */
 public final class P8RadioControls extends LinearLayout {
     private final RadioService service;
-    private TextView note,state;private final android.os.Handler ui=new android.os.Handler(android.os.Looper.getMainLooper());
-    private final Runnable refresh=new Runnable(){public void run(){note.setText("P8 · ROOT-FREE · "+(service.p8TxArmed()?"ONE TX TEST ARMED":"TX LOCKED"));state.setText(service.p8Status());ui.postDelayed(this,500);}};
+    private TextView menu;private final android.os.Handler ui=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable refresh=new Runnable(){public void run(){setKeepScreenOn(service.isTransmitting());menu.setText("P8 menu");menu.setContentDescription("P8 radio controls. "+(service.txInhibited()?"Receive only":"Analogue PTT available"));ui.postDelayed(this,500);}};
     @Override protected void onAttachedToWindow(){super.onAttachedToWindow();ui.post(refresh);}
     @Override protected void onDetachedFromWindow(){ui.removeCallbacks(refresh);super.onDetachedFromWindow();}
-    public P8RadioControls(Context c,RadioService s){super(c);service=s;setOrientation(VERTICAL);
-        note=Neo.text(c,"P8 · ROOT-FREE · TX LOCKED",Neo.AMBER,12,Neo.ui(c));addView(note);
-        state=Neo.text(c,service.p8Status(),Neo.MUTED,11,Neo.ui(c));state.setMaxLines(2);addView(state);
-        LinearLayout row=new LinearLayout(c);addView(row);
-        button(row,"Connect",service::bringUp);button(row,"Hand back",()->service.shutDown(true));button(row,"P8 controls",this::controls);
+    public P8RadioControls(Context c,RadioService s){super(c);service=s;setOrientation(HORIZONTAL);setGravity(android.view.Gravity.END);
+        menu=Neo.button(c,"P8 menu","",Neo.CYAN);menu.setTextSize(12);menu.setSingleLine(true);
+        addView(menu,new LayoutParams(LayoutParams.WRAP_CONTENT,Theme.dp(c,40)));menu.setOnClickListener(v->controls());
     }
-    private void controls(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("P8 controls").setItems(new String[]{"Intercom App info / release","Receive volume","Arm one 2-second TX test","Programmable buttons"},(d,index)->{
-        if(index==0){if(service.isReady()){toast("Hand back first");return;}c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr")));}
-        else if(index==1)audio();else if(index==2)arm();else buttons();
+    private void controls(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("P8 radio").setItems(new String[]{"Connect","Hand back to Intercom","Receive volume","Transmit settings","Stop transmitting","Programmable buttons","Connection details","Intercom App info / release"},(d,index)->{
+        switch(index){
+            case 0:com.macdmr.radio.P8MainRadio.takeOver(c,service);break;
+            case 1:service.shutDown(true);break;
+            case 2:audio();break;
+            case 3:transmitSettings();break;
+            case 4:service.p8CancelTransmitTest();toast("PTT release requested");break;
+            case 5:buttons();break;
+            case 6:new android.app.AlertDialog.Builder(c).setTitle("Connection details").setMessage((service.txInhibited()?"Receive only / not connected":"Analogue hold-to-talk")+"\n\n"+service.p8Status()).setPositiveButton("Close",null).show();break;
+            case 7:if(service.isReady()){toast("Hand back first");return;}c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr")));break;
+        }
     }).show();}
-    private void arm(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("First transmit test — 446.10625 MHz")
-            .setMessage("Only use the approved, authorised test setup. Fit the correct antenna or a correctly rated 50-ohm dummy load. Set the other receiver to Channel 9, narrow FM, no tones, and keep it far enough away to avoid feedback. Arming does not transmit. The next physical/on-screen PTT press is limited to two seconds. TX arm expires after 60 seconds and is never saved. DMR TX is disabled.")
-            .setPositiveButton("Arm one test",(d,w)->toast(service.p8ArmTransmitTest())).setNegativeButton("Cancel",null).show();
+    private void transmitSettings(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("Analogue transmit")
+            .setItems(new String[]{"Allow transmit on selected channel","Make selected channel receive-only","Transmit timeout ("+(service.p8TransmitTimeout()/1000)+" seconds)"},(d,which)->{
+                if(which<2){toast(service.p8ChannelTransmit(which==0));return;}
+                new android.app.AlertDialog.Builder(c).setTitle("Maximum continuous transmission").setItems(new String[]{"30 seconds","60 seconds","120 seconds","180 seconds"},(dd,i)->toast(service.p8SaveTransmitTimeout(new int[]{30000,60000,120000,180000}[i]))).show();
+            }).setNegativeButton("Close",null).show();
     }
     private void toast(String text){Toast.makeText(getContext(),text,Toast.LENGTH_LONG).show();}
     private void buttons(){service.p8CancelTransmitTest();Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("Foreground programmable buttons").setItems(new String[]{"Assign button 1","Assign button 2","Clear assignments"},(d,which)->{
         if(which==2){c.getSharedPreferences("p8_buttons",0).edit().clear().commit();toast("Saved: button assignments cleared");return;}
         new android.app.AlertDialog.Builder(c).setTitle("Button "+(which+1)+" action").setItems(new String[]{"None","Next channel","Previous channel","Scan start/stop","Monitor on/off"},(a,action)->{
             if(action==0){c.getSharedPreferences("p8_buttons",0).edit().remove("key"+which).remove("action"+which).commit();toast("Saved: assignment removed");return;}
-            final android.app.AlertDialog learn=new android.app.AlertDialog.Builder(c).setTitle("Press the programmable button").setMessage("Use a programmable key, not PTT, SOS or Power. This learns Android F/gamepad key events while the radio screen is foreground. TX must not be armed.").setNegativeButton("Cancel",null).create();
+            final android.app.AlertDialog learn=new android.app.AlertDialog.Builder(c).setTitle("Press the programmable button").setMessage("Use a programmable key, not PTT, SOS or Power. This learns Android F/gamepad key events while the radio screen is foreground. PTT remains blocked while learning a key.").setNegativeButton("Cancel",null).create();
             com.macdmr.radio.P8ButtonBindings.learning=e->{if(e.getAction()!=android.view.KeyEvent.ACTION_DOWN || e.getRepeatCount()!=0)return;
                 if(!com.macdmr.radio.P8ButtonBindings.acceptable(e.getKeyCode())){toast("That key is reserved; choose a programmable function key");return;}
                 android.content.SharedPreferences p=c.getSharedPreferences("p8_buttons",0);android.content.SharedPreferences.Editor edit=p.edit();int other=1-which;if(p.getInt("key"+other,-1)==e.getKeyCode())edit.remove("key"+other).remove("action"+other);

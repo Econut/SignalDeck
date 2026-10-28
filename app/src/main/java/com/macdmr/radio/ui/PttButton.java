@@ -43,6 +43,15 @@ public class PttButton extends ImageView {
 
     public State getState() { return state; }
 
+    private void releaseHeldPress() {
+        if (!down) return;
+        down = false; setScaleX(1f); setScaleY(1f);
+        if (listener != null) listener.onPtt(false);
+    }
+
+    @Override protected void onDetachedFromWindow() { releaseHeldPress(); super.onDetachedFromWindow(); }
+    @Override public void onWindowFocusChanged(boolean focus) { if (!focus) releaseHeldPress(); super.onWindowFocusChanged(focus); }
+
     @Override protected void onMeasure(int w, int h) { int s = Theme.dp(getContext(), 176); setMeasuredDimension(resolveSize(s, w), resolveSize(s, h)); }
 
     @Override public boolean onTouchEvent(MotionEvent e) {

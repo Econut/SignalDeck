@@ -6,16 +6,17 @@ public final class P8RxProtocol {
     private P8RxProtocol() { }
     public static final class Channel {
         public final String name;public final int hz,bandwidth,squelch,monitor,volume;
+        public int txHz,power,rxToneType,rxToneIndex,txToneType,txToneIndex;public boolean txAllowed;
         private Frame digital;
         public static Channel digital(String name,int hz,int localId,int[] groups,int target,int callType,int cc,int inSlot,int outSlot,int volume){Channel ch=new Channel(name,hz,0,1,2,volume);ch.digital=P8DigitalProtocol.receive(hz,localId,groups,target,callType,cc,inSlot,outSlot,volume);return ch;}
         public int command(){return digital==null?0x23:0x22;}
         public Channel(String name,int hz,int bandwidth,int squelch,int monitor,int volume) {
             if(!((hz>=136000000 && hz<=174000000)||(hz>=400000000 && hz<=480000000)))throw new IllegalArgumentException("RX frequency must be 136–174 or 400–480 MHz");
             if(bandwidth<0 || bandwidth>1 || squelch<0 || squelch>9 || monitor<1 || monitor>2 || volume<1 || volume>9)throw new IllegalArgumentException("Invalid P8 wire settings");
-            this.name=name==null?"RX":name.trim();this.hz=hz;this.bandwidth=bandwidth;this.squelch=squelch;this.monitor=monitor;this.volume=volume;
+            this.name=name==null?"RX":name.trim();this.hz=hz;this.txHz=hz;this.bandwidth=bandwidth;this.squelch=squelch;this.monitor=monitor;this.volume=volume;
         }
         public byte[] packet() {return packet(volume);}
-        public byte[] packet(int moduleLevel) {P8AudioSettings.module(moduleLevel);if(digital!=null){byte[] body=digital.body.clone();body[160]=(byte)moduleLevel;return Frame.request(0x22,body).encode();}return P8Protocol.analog(hz,hz,bandwidth,0,squelch,0,0,0,0,2,moduleLevel,monitor).encode();}
+        public byte[] packet(int moduleLevel) {P8AudioSettings.module(moduleLevel);if(digital!=null){byte[] body=digital.body.clone();body[160]=(byte)moduleLevel;return Frame.request(0x22,body).encode();}return P8Protocol.analog(hz,txHz,bandwidth,power,squelch,rxToneType,rxToneIndex,txToneType,txToneIndex,2,moduleLevel,monitor).encode();}
         @Override public String toString(){return name+" · "+String.format(java.util.Locale.US,"%.5f MHz",hz/1e6);}
     }
     public interface Sink {void frame(Frame f);}

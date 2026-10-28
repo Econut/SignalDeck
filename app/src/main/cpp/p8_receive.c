@@ -26,6 +26,7 @@ static pthread_mutex_t tx_lock=PTHREAD_MUTEX_INITIALIZER;
 static int tx_ready=0,tx_owned=0,tx_error=0,watch_running=0,watch_stop=0;
 static pthread_t watch_thread;
 static long tx_end;
+static long last_pcm_write;
 static uint32_t tuned_hz;
 static int tuned_command;
 static long millis(void) {struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec*1000L+t.tv_nsec/1000000L;}
@@ -79,6 +80,8 @@ static jbyteArray receive(JNIEnv *e,int fd,int timeout) {
     return out;
 }
 static uint32_t le32(const unsigned char *b) {return (uint32_t)b[0]|(uint32_t)b[1]<<8|(uint32_t)b[2]<<16|(uint32_t)b[3]<<24;}
+static int radio_hz(uint32_t hz){return (hz>=136000000 && hz<=174000000)||(hz>=400000000 && hz<=480000000);}
+static int radio_tone(unsigned int type,unsigned int code){return type<=3 && (type==0?code==0:type==1?code<=50:code<=82);}
 static int valid_tune(unsigned char *b) {
     if(b[0]!=0x68 || b[1]!=0x23 || b[2]!=1 || b[3]!=1 || b[6]!=0 || b[7]!=19 || b[27]!=0x10)return 0;
     unsigned int ck=(b[4]<<8)|b[5];uint32_t sum=0;
@@ -86,8 +89,8 @@ static int valid_tune(unsigned char *b) {
     while(sum>>16)sum=(sum&65535)+(sum>>16);
     if((sum^65535)!=ck)return 0;
     uint32_t hz=le32(b+8);
-    if(!((hz>=136000000 && hz<=174000000)||(hz>=400000000 && hz<=480000000)) || le32(b+12)!=hz)return 0;
-    if(b[16]>1 || b[17]!=0 || b[18]>9 || b[19] || b[20] || b[21] || b[22] || b[23]!=2 || b[24]<1 || b[24]>9 || b[25]<1 || b[25]>2 || b[26]!=b[25])return 0;
+    if(!radio_hz(hz) || !radio_hz(le32(b+12)))return 0;
+    if(b[16]>1 || b[17]>1 || b[18]>9 || !radio_tone(b[19],b[20]) || !radio_tone(b[21],b[22]) || b[23]!=2 || b[24]<1 || b[24]>9 || b[25]<1 || b[25]>2 || b[26]!=b[25])return 0;
     return 1;
 }
 #endif
@@ -170,7 +173,7 @@ JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_prepareTransmit(JNI
     if(fstat(rw,&after) || before.st_rdev!=after.st_rdev || before.st_ino!=after.st_ino || before.st_dev!=after.st_dev){close(rw);fail(e,"PCM UART identity changed");return;}
     if(close(pcm)){close(rw);pcm=-1;fail(e,"UART restoration/close error during TX preparation");return;}pcm=rw;
     pthread_mutex_lock(&tx_lock);watch_stop=0;tx_error=0;pthread_mutex_unlock(&tx_lock);
-    if(pthread_create(&watch_thread,NULL,tx_watch,NULL)){fail(e,"TX watchdog unavailable");return;}watch_running=1;tx_ready=1;
+    if(pthread_create(&watch_thread,NULL,tx_watch,NULL)){fail(e,"TX watchdog unavailable");return;}watch_running=1;tx_ready=1;last_pcm_write=0;
 #else
     fail(e,"TX disabled in this build");
 #endif
@@ -184,29 +187,34 @@ JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_acknowledgeStatus(J
     fail(e,"Status acknowledgement disabled in this build");
 #endif
 }
-JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_key(JNIEnv *e,jclass c,jboolean down){
+JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_keyTimed(JNIEnv *e,jclass c,jboolean down,jint timeout){
     (void)c;
 #if P8_OPEN_PROBE_REVIEWED && P8_TX_TEST_REVIEWED
     pthread_mutex_lock(&tx_lock);int error=0;
     if(down){
-        if(!tx_ready || tx_owned || tx_error || tuned_hz!=446106250 || tuned_command!=0x23)error=1;
-        else{tx_owned=1;tx_end=millis()+2000;if(ptt_write(0)){error=1;if(ptt_write(1))tx_error=1;else tx_owned=0;}}
+        if(!tx_ready || tx_owned || tx_error || !radio_hz(tuned_hz) || tuned_command!=0x23 || (timeout!=10000 && timeout!=30000 && timeout!=60000 && timeout!=120000 && timeout!=180000))error=1;
+        else{tx_owned=1;tx_end=millis()+timeout;if(ptt_write(0)){error=1;if(ptt_write(1))tx_error=1;else tx_owned=0;}}
     }else if(tx_owned){if(ptt_write(1)){tx_error=1;error=1;}else tx_owned=0;}
     pthread_mutex_unlock(&tx_lock);if(error)fail(e,"PTT operation refused/failed; stop");
 #else
-    (void)down;fail(e,"TX disabled in this build");
+    (void)down;(void)timeout;fail(e,"TX disabled in this build");
 #endif
 }
-JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_writeMicrophone(JNIEnv *e,jclass c,jbyteArray data,jint length){
+JNIEXPORT jlong JNICALL Java_com_macdmr_radio_P8ReceiveNative_writeMicrophone(JNIEnv *e,jclass c,jbyteArray data,jint length){
     (void)c;
 #if P8_OPEN_PROBE_REVIEWED && P8_TX_TEST_REVIEWED
-    if(length!=160 || (*e)->GetArrayLength(e,data)<length){fail(e,"TX PCM must be one 160-byte stock block");return;}
+    if(length!=160 || (*e)->GetArrayLength(e,data)<length){fail(e,"TX PCM must be one 160-byte stock block");return 0;}
     unsigned char bytes[160];(*e)->GetByteArrayRegion(e,data,0,160,(jbyte*)bytes);
+    /* Stock t2.b spaces every raw 160-byte write by >=10 ms, including buffered capture bursts.
+       Keep the independent PTT watchdog running while this worker waits. */
+    long delay=last_pcm_write+10-millis();
+    if(delay>0){struct timespec pause={delay/1000,(delay%1000)*1000000L};while(nanosleep(&pause,&pause)<0 && errno==EINTR){}}
     pthread_mutex_lock(&tx_lock);int ok=tx_owned && !tx_error && millis()<tx_end;pthread_mutex_unlock(&tx_lock);
-    if(!ok){fail(e,"TX PCM refused outside bounded keyed interval");return;}
-    ssize_t n=write(pcm,bytes,160);if(n!=160){fail(e,"TX PCM write failed/partial; no retry");return;}
+    if(!ok){fail(e,"TX PCM refused outside bounded keyed interval");return 0;}
+    long sent=millis();ssize_t n=write(pcm,bytes,160);if(n!=160){fail(e,"TX PCM write failed/partial; no retry");return 0;}
+    last_pcm_write=millis();return (jlong)sent;
 #else
-    (void)data;(void)length;fail(e,"TX disabled in this build");
+    (void)data;(void)length;fail(e,"TX disabled in this build");return 0;
 #endif
 }
 JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_volume(JNIEnv *e,jclass c,jint level) {
