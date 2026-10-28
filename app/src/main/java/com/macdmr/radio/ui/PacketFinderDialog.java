@@ -47,7 +47,7 @@ public final class PacketFinderDialog {
             boolean on = pf.running();
             status.setText(pf.status());
             sub.setText(on ? "Until " + new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(pf.endsAt())) + " · " + pf.dwellMin() + " min on each of " + pf.freqs().size() + " frequencies"
-                    : pf.freqs().isEmpty() ? "No packet frequency this radio tunes (" + svc.profile().bandsText() + "): add some in Settings"
+                    : pf.freqs().isEmpty() ? "No packet frequency this radio tunes (" + svc.profile().bandsText() + "): add some in Settings (Use my channels fills in yours)"
                     : pf.freqs().size() + " frequencies, " + pf.dwellMin() + " min each, for " + pf.hours() + " h (Settings)");
             go.setText(on ? "Stop" : "Start");
             List<PacketFinder.Station> st = pf.stations();
@@ -109,6 +109,9 @@ public final class PacketFinderDialog {
         LinearLayout v = new LinearLayout(c); v.setOrientation(LinearLayout.VERTICAL); v.setPadding((int) (20 * d), (int) (8 * d), (int) (20 * d), 0);
         v.addView(Neo.label(c, "Frequencies in MHz, separated by commas (empty: the usual 2 m packet frequencies 144.910–145.090). Add your area's 70 cm packet frequencies if you know them.", Neo.MUTED, 13, false));
         final EditText fr = new EditText(c); fr.setText(pf.freqText()); fr.setTextColor(Neo.TEXT); fr.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE); v.addView(fr);
+        TextView mine = Neo.button(c, "Use my channels", "list", Neo.CYAN); mine.setTextSize(13);   // a start on a radio the 2 m defaults miss (the W6): your own channels' frequencies
+        mine.setOnClickListener(x -> { String m = pf.myChannelsText(); if (m.isEmpty()) Toast.makeText(c, "None of your analog channels is in this radio's bands", Toast.LENGTH_SHORT).show(); else fr.setText(m); });
+        v.addView(mine, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (40 * d)));
         final EditText dw = new EditText(c); dw.setHint("Minutes on each frequency"); dw.setText(String.valueOf(pf.dwellMin())); dw.setInputType(InputType.TYPE_CLASS_NUMBER); dw.setTextColor(Neo.TEXT); v.addView(dw);
         final EditText hr = new EditText(c); hr.setHint("For how many hours"); hr.setText(String.valueOf(pf.hours())); hr.setInputType(InputType.TYPE_CLASS_NUMBER); hr.setTextColor(Neo.TEXT); v.addView(hr);
         v.addView(Neo.label(c, "Minutes on each frequency / how many hours in total.", Neo.MUTED, 12, false));

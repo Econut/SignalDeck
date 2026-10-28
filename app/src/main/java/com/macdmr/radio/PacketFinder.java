@@ -140,6 +140,13 @@ public final class PacketFinder {
         if (l.isEmpty()) for (int k : DEFAULT_KHZ) if (ok(k * 1000)) l.add(k * 1000);   // the 2 m defaults: none on a UHF-only radio (the W6)
         return l;
     }
+    /** Your own analog channels this radio tunes, as a MHz list (each frequency once, at most 20): a start where the 2 m defaults do not apply (the W6). */
+    public String myChannelsText() {
+        java.util.LinkedHashSet<Integer> hz = new java.util.LinkedHashSet<>();
+        try { for (com.macdmr.radio.ChannelStore.Channel ch : svc.store().all()) if (!ch.isDigital() && !ch.isM17() && ok(ch.rxFreq) && hz.size() < 20) hz.add(ch.rxFreq); } catch (Throwable ignored) { }
+        StringBuilder b = new StringBuilder(); for (int f : hz) b.append(b.length() > 0 ? ", " : "").append(new java.math.BigDecimal(f).movePointLeft(6).stripTrailingZeros().toPlainString());
+        return b.toString();
+    }
     public String freqText() { StringBuilder b = new StringBuilder(); for (int hz : freqs()) b.append(b.length() > 0 ? ", " : "").append(String.format(Locale.US, "%.3f", hz / 1e6)); return b.toString(); }
     public int dwellMin() { return prefs.getInt("dwell", 3); }
     public int hours() { return prefs.getInt("hours", 2); }

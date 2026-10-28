@@ -20,6 +20,11 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | W6 handoff follow-up: coverage logging records key-ups only on the W6 | On a radio without RSSI (the W6+) the Device switch reads "Records your key-ups with GPS …; this radio gives no signal readings, so nothing is logged as heard", the Map's coverage sheet adds that only key-ups are recorded and the Heard layer stays empty, and Help (Coverage → Turn it on) says so. Nothing changes on the Armor. | `ui/DeviceView.java`, `ui/MapDialog.java`, `ui/HelpView.java` | Host suite. Device: see the PR. |
+## 2026-10-28 — Packet finder: Use my channels
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 handoff follow-up: the packet finder needs UHF frequencies entered by hand on the W6 | There is no standard set of 70 cm packet frequencies to ship, so the finder's Settings get **Use my channels**: it fills the list with the frequencies of your own analog channels this radio tunes (each once, at most 20). On a radio the 2 m defaults miss (the W6) the empty-list line points to it. Help (Packet finder → Settings). | `PacketFinder.java`, `ui/PacketFinderDialog.java`, `ui/HelpView.java` | Host suite. Device: see the PR. |
 
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
