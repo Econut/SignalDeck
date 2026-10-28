@@ -165,13 +165,15 @@ public class CircuitBoardView extends FrameLayout {
                 canvas.drawLine(x, y0, x, y1, dropPaint);
             }
         }
-        float reserveH = (barsCompact ? 10 : 36) * dp, areaTop = h - reserveH - 4 * dp;
-        float barZone = (h - areaTop) * (barsCompact ? 1.0f : 1.5625f), margin = 14 * dp, barW = (w - margin * 2) / NUM_BARS, gap = barW * 0.18f;
+        // the bars stand on the panel's floor (inside the border) and grow up to 62.5 dp (14 dp with captions on); the module
+        // anchored them 22.5 dp below the panel's bottom edge, so the lower part of every bar and all small bars were cut off
+        float floor = h - borderDp * dp - 4 * dp;
+        float barZone = (barsCompact ? 14 : 62.5f) * dp, margin = 14 * dp, barW = (w - margin * 2) / NUM_BARS, gap = barW * 0.18f;
         for (int i = 0; i < NUM_BARS; i++) {
             float bh = Math.max(3 * dp, barHeights[i] * barZone);
             float x1 = margin + i * barW + gap, x2 = x1 + barW - gap * 2;
             barPaint.setColor(((int) (0x38 + barHeights[i] * 0xC0) << 24) | 0x0000E5FF);
-            canvas.drawRoundRect(x1, areaTop + barZone - bh, x2, areaTop + barZone, 2 * dp, 2 * dp, barPaint);
+            canvas.drawRoundRect(x1, floor - bh, x2, floor, 2 * dp, 2 * dp, barPaint);
         }
     }
 

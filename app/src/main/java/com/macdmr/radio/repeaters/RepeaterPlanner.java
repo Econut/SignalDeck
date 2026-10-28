@@ -82,13 +82,15 @@ public final class RepeaterPlanner {
      * Build the plan. {@code talkTgIds} are the TGs the user ticked to transmit on (may be empty).
      * {@code names} maps TG id → name (from the BrandMeister {@code /talkgroup} map); may be null.
      */
-    public static Plan plan(Repeater rep, Set<Integer> talkTgIds, Map<Integer, String> names) {
+    public static Plan plan(Repeater rep, Set<Integer> talkTgIds, Map<Integer, String> names) { return plan(rep, talkTgIds, names, true); }
+    /** {@code dmrRadio} false (the W6): a DMR + FM repeater becomes its FM channel only, a DMR-only one nothing. */
+    public static Plan plan(Repeater rep, Set<Integer> talkTgIds, Map<Integer, String> names, boolean dmrRadio) {
         Plan plan = new Plan();
         if (rep == null) { plan.warnings.add("no repeater"); return plan; }
         plan.zoneName = trim("»" + nz(rep.callsign) + " " + nz(rep.city), com.macdmr.radio.ChannelStore.NAME_MAX);
 
         // FM: exactly one analog channel.
-        if (rep.fm && !rep.dmr) {
+        if (rep.fm && (!rep.dmr || !dmrRadio)) {
             ChannelSpec fm = new ChannelSpec();
             fm.type = 1;
             fm.contactType = 0;
@@ -104,6 +106,10 @@ public final class RepeaterPlanner {
             return plan;
         }
 
+        if (!dmrRadio) {
+            plan.warnings.add("a DMR repeater: this radio has no DMR");
+            return plan;
+        }
         if (!rep.dmr) {
             plan.warnings.add("not a DMR or FM repeater");
             return plan;

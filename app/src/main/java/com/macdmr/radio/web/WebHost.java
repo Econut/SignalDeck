@@ -189,6 +189,9 @@ public final class WebHost {
     private final RadioService.Listener events = new RadioService.Listener() {
         private long lastRssi, lastLevel;
         @Override public void onChannel(ChannelStore.Channel ch) { pub("channel", channelJson(ch)); }
+        @Override public void onChannels() { pub("channels", "{}"); }
+        @Override public void onStockImportOffer() { pub("stockImport", "{}"); }
+        @Override public void onNoChannel() { pub("channel", "{}"); }
         @Override public void onRx(boolean r) { pub("rx", "{\"on\":" + r + "}"); }
         @Override public void onTx(boolean t) { pub("tx", "{\"on\":" + t + "}"); }
         @Override public void onRssi(int dbm) { long now = System.currentTimeMillis(); if (now - lastRssi < 400) return; lastRssi = now; pub("rssi", "{\"dbm\":" + dbm + "}"); }
@@ -366,7 +369,7 @@ public final class WebHost {
     }
     private JSONObject statusJson() throws Exception {
         JSONObject o = new JSONObject();
-        o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current()));
+        o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current())).put("stockImport", svc.stockImportPending());
         com.macdmr.radio.DeviceProfile prof = svc.profile();                  // what this radio can do: the pages hide what it cannot (an analog-only radio has no DMR)
         JSONArray bands = new JSONArray(); for (long hz : prof.bandsHz) bands.put(hz);
         o.put("radio", new JSONObject().put("dmr", prof.dmr()).put("messages", prof.hasMessages()).put("contacts", prof.hasContacts())
@@ -744,6 +747,7 @@ public final class WebHost {
                 if (ch == null) {
                     ch = new ChannelStore.Channel(); ChannelStore.Channel cur = svc.current();
                     if (cur != null) { ch.type = cur.type; ch.rxFreq = cur.rxFreq; ch.txFreq = cur.txFreq; }
+                    if (!svc.profile().dmr() && ch.type == ChannelStore.Channel.TYPE_DMR) ch.type = ChannelStore.Channel.TYPE_FM;   // an analog-only radio: a new channel is analog
                 }
                 JSONObject help = new JSONObject(); for (String[] h : com.macdmr.radio.ui.ChannelEditorView.helpForWeb()) help.put(h[0], h[1]);
                 return ok(new JSONObject().put("channel", channelFull(ch)).put("isNew", n <= 0).put("help", help).put("tones", toneLists()).put("nameMax", ChannelStore.NAME_MAX));
@@ -754,6 +758,7 @@ public final class WebHost {
                 if (ch == null) return WebServer.Response.error(404, "No channel " + n);
                 String err = applyChannel(ch, b);
                 if (err != null) return WebServer.Response.error(400, err);
+                if (n <= 0 && ch.isDigital() && !svc.profile().dmr()) return WebServer.Response.error(400, "This radio has no DMR: add an analog channel");
                 final ChannelStore.Channel c = ch; final boolean isNew = n <= 0;
                 onMain(() -> { svc.saveChannel(c, isNew); return null; });
                 return WebServer.Response.json(200, new JSONObject().put("ok", true).put("message", "Saved " + (c.name.isEmpty() ? "channel " + c.number : c.name)).put("number", c.number).toString());
@@ -779,6 +784,11 @@ public final class WebHost {
                 return ok(String.format(java.util.Locale.US, "VFO %.4f MHz", v.rxFreq / 1e6));
             }
             case "/api/vfo/exit": if (!post) break; onMain(() -> { svc.exitVfo(); return null; }); return ok("Back to the channel");
+            case "/api/channels/stockimport": if (!post) break; {              // the empty-list question: {import: true | false}
+                final boolean yes = b.optBoolean("import", false);
+                String msg = yes ? svc.answerStockImport(true) : onMain(() -> svc.answerStockImport(false));
+                return msg == null ? WebServer.Response.error(409, "Already answered") : ok(msg);
+            }
             case "/api/channels/bulk": if (!post) break; {                    // the channel list's selection: {action: delete | zone | unzone | star | unstar, numbers[], zoneId, zoneName}
                 JSONArray ns = b.optJSONArray("numbers"); java.util.List<Integer> nums = new java.util.ArrayList<>();
                 if (ns != null) for (int i = 0; i < ns.length(); i++) nums.add(ns.optInt(i, 0));

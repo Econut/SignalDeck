@@ -429,6 +429,23 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
 
     // RadioService.Listener
     @Override public void onChannel(ChannelStore.Channel ch) { activeNumber = ch.number; adapter.notifyDataSetChanged(); }
+    /** No channels at take-over: ask whether to import the stock app's (once; the web may answer first). */
+    private android.app.AlertDialog importAsk;
+    @Override public void onStockImportOffer() {
+        if (svc == null || (importAsk != null && importAsk.isShowing())) return;
+        final RadioService s = svc; final Context c = getContext();
+        importAsk = new android.app.AlertDialog.Builder(c).setTitle("Import your channels?")
+                .setMessage("SignalDeck has no channels yet. Import the channels saved in the phone's stock radio app?\n\nStart empty to add your own instead. You can import them later with Device → Re-import.")
+                .setCancelable(false)
+                .setPositiveButton("Import", (d, w) -> new Thread(() -> { final String r = s.answerStockImport(true); if (r != null) post(() -> { android.widget.Toast.makeText(c, r, android.widget.Toast.LENGTH_LONG).show(); reload(); }); }).start())
+                .setNegativeButton("Start empty", (d, w) -> s.answerStockImport(false)).show();
+    }
+    /** Changed elsewhere (SignalDeck Web, an import): reload. A selection ends, since channel numbers may have moved. */
+    @Override public void onChannels() {
+        if (importAsk != null && importAsk.isShowing() && svc != null && !svc.stockImportPending()) importAsk.dismiss();   // answered on the web
+        if (selecting) { setSelecting(false); android.widget.Toast.makeText(getContext(), "Channels changed elsewhere: selection cleared", android.widget.Toast.LENGTH_SHORT).show(); }
+        reload();
+    }
     @Override public void onRx(boolean r) { } @Override public void onTx(boolean t) { } @Override public void onRssi(int dbm) { }
     @Override public void onAudioLevel(int a) { } @Override public void onHistory(String l) { } @Override public void onCaller(String t) { }
     @Override public void onLog(String s) { } @Override public void onLink(String s) { } @Override public void onLocation(String t) { } @Override public void onSms(int f, int ty, String te) { } @Override public void onSmsResult(boolean ok) { }

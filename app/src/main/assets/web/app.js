@@ -74,6 +74,13 @@ function connect() {
   es.onerror = () => { setConn(false); fetch('/api/status').then(r => { if (r.status === 401) showLogin(); }).catch(() => {}); };
   const on = (t, f) => es.addEventListener(t, ev => { try { f(JSON.parse(ev.data)); } catch (e) { console.warn(t, e); } });
   on('channel', ch => { S.status.channel = ch; renderStatus(); loadHistory(); if (S.page === 'channels') renderChannels(); });
+  on('stockImport', () => askStockImport());
+  on('channels', () => {   // changed on the phone (or another browser): reload; a selection ends, since numbers may have moved
+    loadZones();
+    if (S.page !== 'channels') return;
+    if (S.chSel) { setChSelecting(false); toast('Channels changed on the phone: selection cleared'); }
+    loadChannels(); loadZonesEditor();
+  });
   on('rx', d => { S.status.hearing = d.on; renderState(); });
   on('tx', d => { S.status.transmitting = d.on; renderState(); });
   on('rssi', d => { S.status.rssi = d.dbm; renderMeter(); });
@@ -96,7 +103,16 @@ function connect() {
   on('aprs', () => { if (S.page === 'aprs') loadAprs(); });
   on('sstv', d => { const old = S.status.sstv || {}; S.status.sstv = d; renderSstvState(); if (S.page === 'sstv' && (d.stamp !== old.stamp || d.on)) refreshLive(); if (S.page === 'sstv' && ((!d.on && old.on) || (old.gallery !== undefined && d.gallery !== old.gallery))) loadSstv(); });
 }
-async function refresh() { try { S.status = await api('status'); renderStatus(); } catch (e) { } }
+async function refresh() { try { S.status = await api('status'); renderStatus(); if (S.status.stockImport) askStockImport(); } catch (e) { } }
+// No channels at take-over: the phone asks whether to import the stock app's; so does an open page (the first answer counts)
+async function askStockImport() {
+  if (S.stockAsking) return; S.stockAsking = true;
+  try {
+    const yes = confirm('SignalDeck has no channels yet. Import the channels saved in the phone\'s stock radio app?\n\nOK imports them; Cancel starts with no channels (Device → Re-import on the phone can import them later).');
+    const j = await act('channels/stockimport', { import: yes });
+    if (j) { loadZones(); if (S.page === 'channels') loadChannels(); }
+  } finally { S.stockAsking = false; }
+}
 function setConn(ok) { $('connDot').className = 'dot ' + (ok ? 'ok' : 'bad'); $('connText').textContent = ok ? 'Live' : 'Reconnecting…'; }
 
 // ---- intercom ----

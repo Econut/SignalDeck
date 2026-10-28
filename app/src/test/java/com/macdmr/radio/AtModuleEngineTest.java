@@ -70,7 +70,7 @@ public class AtModuleEngineTest {
         assertSame(DeviceProfile.UNKNOWN, DeviceProfile.detectBuiltIn("someone w6 phone", false, false));
         DeviceProfile w6 = DeviceProfile.ANYSECU_W6;
         assertEquals("sa818", w6.protocol); assertTrue(w6.verified);                        // tested for receive (revision 2)
-        assertTrue(w6.txBlocked); assertTrue(w6.copy(true, true).txBlocked);              // but never transmits until confirmed on air
+        assertEquals(3, w6.revision); assertFalse(w6.txBlocked);                            // transmit confirmed on the air (revision 3)
         assertEquals(DeviceProfile.Audio.CAMCORDER, w6.audio); assertEquals(9600, w6.baud);
         assertEquals("sa818", w6.copy(true, false).protocol);                               // an advisory's copy keeps the protocol and lines
         assertSame(w6.rxLinesOn, w6.copy(true, false).rxLinesOn);
@@ -99,5 +99,10 @@ public class AtModuleEngineTest {
         assertEquals(8, AtModuleEngine.speakerLevelFor(15, 15)); assertEquals(1, AtModuleEngine.speakerLevelFor(1, 15)); assertEquals(0, AtModuleEngine.speakerLevelFor(3, 0));
         assertNotNull(DeviceProfile.ANYSECU_W6.muteLines); assertNull(DeviceProfile.ARMOR_26_ULTRA.muteLines);
         assertArrayEquals(DeviceProfile.ANYSECU_W6.muteLines, DeviceProfile.ANYSECU_W6.copy(true, false).muteLines);
+    }
+
+    @Test public void softSqOnTheW6IsTheModulesSquelch() {
+        assertTrue(DeviceProfile.ANYSECU_W6.softSqInModule); assertTrue(DeviceProfile.ANYSECU_W6.copy(true, false).softSqInModule);   // its audio cannot carry a noise squelch
+        assertFalse(DeviceProfile.ARMOR_26_ULTRA.softSqInModule);
     }
 }

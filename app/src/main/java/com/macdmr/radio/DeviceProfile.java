@@ -56,6 +56,12 @@ public final class DeviceProfile {
     public long[] bandsHz = { 136_000_000L, 174_000_000L, 400_000_000L, 480_000_000L };
     /** Whether the module reports signal strength (S-meter, band scope, fox hunt); the W6's answers no RSSI query. */
     public boolean rssi = true;
+    /**
+     * Soft SQ sets the module's own squelch level instead of gating the audio in the app. The W6: its module drives the
+     * speaker itself, its audio level follows the volume (no fixed noise threshold fits) and passes nothing above ~3.4 kHz
+     * where the noise detector listens, nor the sub-audible tones; its module squelch (levels 1-8) works.
+     */
+    public boolean softSqInModule;
     /** sa818: the module's receive line, a GPIO input that reads 1 while the squelch is open (null = none). */
     public String rxDetectNode;
     /** sa818: {node, value} written in order when reception starts / ends and when the transmitter keys / unkeys (the stock app's audio and PTT lines). */
@@ -192,12 +198,11 @@ public final class DeviceProfile {
                     "typeattribute console_device mlstrustedobject" },
             null, true, true);
     static {
-        ANYSECU_W6.id = "anysecu-w6plus"; ANYSECU_W6.revision = 2; ANYSECU_W6.protocol = "sa818";
+        ANYSECU_W6.id = "anysecu-w6plus"; ANYSECU_W6.revision = 3; ANYSECU_W6.protocol = "sa818";
         // Revision 2 (2026-10-28): tested for receive on the owner's W6+ (take-over, 128 channels, tones, APRS, SSTV, FT8,
-        // M17 from a HackRF), so it takes the radio over like a supported phone. Transmit has not been keyed on the air yet:
-        // it stays off until the owner confirms it in the cage, then the next revision clears txBlocked.
-        ANYSECU_W6.txBlocked = true;
-        ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false;
+        // M17 from a HackRF), so it takes the radio over like a supported phone.
+        // Revision 3 (2026-10-28): transmit confirmed on the air by the owner in the cage, so txBlocked is cleared.
+        ANYSECU_W6.bandsHz = new long[] { 400_000_000L, 470_000_000L }; ANYSECU_W6.rssi = false; ANYSECU_W6.softSqInModule = true;
         ANYSECU_W6.rxDetectNode = "/sys/class/gpio/gpio189/value";
         // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)
         ANYSECU_W6.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
@@ -283,7 +288,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -304,7 +309,7 @@ public final class DeviceProfile {
             for (int i = 0; i < bands.length(); i++) p.bandsHz[i] = bands.getLong(i);
             for (int i = 0; i < bands.length(); i += 2) if (p.bandsHz[i] >= p.bandsHz[i + 1]) throw new org.json.JSONException("bandsHz: low below high");
         }
-        p.rssi = o.optBoolean("rssi", true);
+        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false);
         p.rxLinesOn = pairs(o.optJSONArray("rxLinesOn")); p.rxLinesOff = pairs(o.optJSONArray("rxLinesOff")); p.muteLines = pairs(o.optJSONArray("muteLines"));
         p.txLinesOn = pairs(o.optJSONArray("txLinesOn")); p.txLinesOff = pairs(o.optJSONArray("txLinesOff"));
         org.json.JSONObject da = o.optJSONObject("directAudio");

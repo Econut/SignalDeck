@@ -49,7 +49,13 @@ public class RadioService extends Service implements RadioEngine.Events {
         void onSms(int from, int type, String text);
         void onSmsResult(boolean ok);
         void onModes(boolean softSq, int softSqLevel, boolean squelchOpen, boolean monitor, boolean recording, boolean scanning, boolean holding, String zoneName);
-        void onCaption(boolean enabled, String live, String sentence);   // live = current partial ("" to clear); sentence = a finished line (null if none)       // the intercom's location block ("City, State\n(↓S 25.5mi (41.0km))\n959ft (292m) 📍")
+        void onCaption(boolean enabled, String live, String sentence);
+        /** The channel list is empty at take-over: ask whether to import the stock app's channels ({@link #answerStockImport}). */
+        default void onStockImportOffer() { }
+        /** The last channel was deleted: no channel is selected any more (pages show their empty state). */
+        default void onNoChannel() { }
+        /** The channel list or the zones changed (here, on the web or by an import): lists showing them reload. */
+        default void onChannels() { }   // live = current partial ("" to clear); sentence = a finished line (null if none)       // the intercom's location block ("City, State\n(↓S 25.5mi (41.0km))\n959ft (292m) 📍")
     }
 
     public class LocalBinder extends Binder { public RadioService get() { return RadioService.this; } }
@@ -742,6 +748,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         profile = DeviceProfile.detect();
         ProfileRegistry.maybeFetch();                               // a newer revision or an advisory, at most every 12 h
         store = new ChannelStore(this);
+        store.onChange = () -> { ui.removeCallbacks(channelsChanged); ui.postDelayed(channelsChanged, 150); };   // a bulk action is one event
         zoneId = getSharedPreferences("radio", MODE_PRIVATE).getLong("zone", 0);
         if (coverage().enabled()) { coverage.resume(); startForegroundTyped(true); }
         engine = "sa818".equals(profile.protocol) ? new AtModuleEngine(profile, this) : new RadioEngine(profile, this);   // the W6's AT module, else the DMR module
@@ -857,28 +864,15 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (RootSetup.stockAppEnabled(profile)) { log("stock app paused (its icon disappears while this app owns the radio; Device → Release brings it back): " + RootSetup.stockApp(profile, false)); pausedStock = true; Thread.sleep(1500); }
                 }
                 final boolean sa818 = "sa818".equals(profile.protocol);                      // the W6: no DMR, its own channel table
-                if (sa818 && store.count() == 0) {
-                    StringBuilder err = new StringBuilder();
-                    int n = store.importFromFlyscale(this, profile.stockApp, err);
-                    log(n >= 0 ? "imported " + n + " channels from the stock app" + (err.length() > 0 ? " (" + err + ")" : "") : "stock import failed: " + err);
-                }
                 final boolean quickChat = "com.chamsion.quickchat".equals(profile.stockApp);      // Xplore 1: a Room database, no module side tables
-                if (quickChat && store.count() == 0) {
-                    StringBuilder err = new StringBuilder();
-                    int n = store.importFromQuickChat(this, profile.stockApp, err);
-                    log(n >= 0 ? "imported " + n + " channels from QuickChat" + (err.length() > 0 ? " (" + err + ")" : "") : "QuickChat import failed: " + err);
-                    if (n >= 0) getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("tgListsImported", true).apply();
+                if (store.count() == 0 && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("stockImportDeclined", false)) {   // no channels: ask before importing the stock app's (owner, 2026-10-28)
+                    stockImportPending = true; log("no channels: asking whether to import the stock app's");
+                    ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onStockImportOffer(); });
                 }
                 if (!sa818 && !quickChat && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) {     // seed our DMR ID from the stock app's setting
                     String xml = RootSetup.run("cat /data/data/" + profile.stockApp + "/shared_prefs/com.pri.prizeinterphone.data.person.xml");
                     java.util.regex.Matcher m = java.util.regex.Pattern.compile("name=\"pref_person_device_id\" value=\"([0-9]+)\"").matcher(xml);
                     if (m.find()) { setLocalIdQuiet(Integer.parseInt(m.group(1))); log("DMR ID from the stock app: " + m.group(1)); }
-                }
-                if (!sa818 && !quickChat && store.count() == 0) {
-                    StringBuilder err = new StringBuilder();
-                    int n = store.importFromStock(this, profile.stockApp, "default_uhf", err);
-                    log(n >= 0 ? "imported " + n + " channels from the stock app" : "stock import failed: " + err);
-                    if (n >= 0) getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("tgListsImported", true).apply();
                 }
                 if (!getSharedPreferences("radio", MODE_PRIVATE).getBoolean("garbledPktPurged", false)) {   // noise frames logged before the AX.25 plausibility check
                     int k = store.purgeGarbledPacketHistory(); log("removed " + k + " garbled packet lines from the history");
@@ -1105,8 +1099,8 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- modes ----------------------------------------------------------------------------------------
 
-    public boolean softSqOn() { return softSq.isEnabled(); }
-    public int softSqLevel() { return softSq.level(); }
+    public boolean softSqOn() { ChannelStore.Channel c = current; return profile.softSqInModule ? c != null && softSqFor(c) : softSq.isEnabled(); }   // the W6: on in the module, not as an app gate
+    public int softSqLevel() { ChannelStore.Channel c = current; return profile.softSqInModule && c != null ? Math.max(1, Math.min(9, c.softSqLevel)) : softSq.level(); }
     public boolean monitorOn() { return monitorOn; }
     public boolean recordOn() { return recordOn; }
     public boolean scanning() { return scanner.isScanning(); }
@@ -1149,7 +1143,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         updateModeWake();
         refreshControls();
         final String zn = zoneName();
-        ui.post(() -> { for (Listener l : listeners) l.onModes(softSq.isEnabled(), softSq.level(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zn); });
+        ui.post(() -> { for (Listener l : listeners) l.onModes(softSqOn(), softSqLevel(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zn); });
     }
 
     /** Soft SQ on/off for the current analog channel (persisted per channel): on = the module's squelch is held open and the app gates the audio; off = the module's own squelch level. */
@@ -1163,7 +1157,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         level = Math.max(1, Math.min(9, level));                             // 1-9 everywhere (the web slider once sent 0-100)
         ChannelStore.Channel ch = current; if (ch == null) return;
         ch.softSqLevel = level; store.update(ch);
-        softSq.configure(softSqFor(ch), level, ch.rxType, ch.rxSubCode);   // the scan's Soft SQ counts too, or moving the slider would switch its gate off
+        softSq.configure(softGate(ch), level, ch.rxType, ch.rxSubCode);   // the scan's Soft SQ counts too, or moving the slider would switch its gate off
+        if (profile.softSqInModule && softSqFor(ch)) { ui.removeCallbacks(moduleSqWrite); ui.postDelayed(moduleSqWrite, 300); }   // the module's squelch follows the slider (once it rests)
         pushModes();
     }
 
@@ -1391,7 +1386,13 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Squelch byte for the module: with Soft SQ on, or on an M17 channel, the radio's squelch is held open (0). An M17 channel needs the audio below the module's one threshold; the speaker gate keeps that raw FM out and only the decoded voice is played. */
-    private int hardwareSq(ChannelStore.Channel ch) { return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq; }
+    private int hardwareSq(ChannelStore.Channel ch) {
+        if (ch != null && !ch.isM17() && profile.softSqInModule && softSqFor(ch)) return Math.max(1, Math.min(8, ch.softSqLevel));   // the W6: Soft SQ is the module's squelch (1-9 to its 1-8)
+        return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq;
+    }
+    /** Soft SQ gates the audio in the app (every radio but those whose module squelch does it). */
+    private boolean softGate(ChannelStore.Channel ch) { return softSqFor(ch) && !profile.softSqInModule; }
+    private final Runnable moduleSqWrite = () -> { ChannelStore.Channel c = current; if (c != null) worker.execute(() -> rewriteAnalogSquelch(c)); };   // no tones in the audio (the W6): the module keeps its squelch and tone
     /** APRS, SSTV and satellite channels: the radio's squelch wide open (its single threshold sits near -90 dBm, far
      *  above a satellite or a distant digipeater), so the decoders get every signal; Soft SQ keeps the speaker quiet
      *  until something is really there. */
@@ -1420,7 +1421,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Re-evaluate the squelch for the current channel (Soft SQ key, scan started/stopped): detector config, blackout and the module's squelch byte. */
     private synchronized void refreshSquelch(ChannelStore.Channel ch) {
         if (ch == null || ch.isDigital() || ch.isM17() || current != ch) return;
-        boolean soft = softSqFor(ch);
+        boolean soft = softGate(ch);
         softSq.configure(soft, ch.softSqLevel, ch.rxType, ch.rxSubCode);
         if (soft) { softSq.onRetune(); squelchOpen = false; } else squelchOpen = true;
         rewriteAnalogSquelch(ch);
@@ -1485,7 +1486,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 log("MON off: the channel changed");
             }
             current = ch; if (fromStore) store.setActive(ch.number);
-            softSq.configure(softSqFor(ch), ch.softSqLevel, ch.rxType, ch.rxSubCode);
+            softSq.configure(softGate(ch), ch.softSqLevel, ch.rxType, ch.rxSubCode);
             softSq.onRetune();
             squelchOpen = !softSq.isEnabled();                     // with Soft SQ on, stay muted until the detector opens (no burst of static after a retune)
             ui.post(() -> { for (Listener l : listeners) l.onChannel(ch); });
@@ -1555,7 +1556,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public void deleteChannel(ChannelStore.Channel ch) {
         store.delete(ch);
-        if (current != null && current.id == ch.id) { current = null; int n = store.count(); if (n > 0) selectChannel(Math.min(ch.number, n)); }
+        if (current != null && current.id == ch.id) { current = null; int n = store.count(); if (n > 0) selectChannel(Math.min(ch.number, n)); else noChannel(); }
     }
 
     // ---- several channels at once (the channel list's selection, on the phone and on the web) ----
@@ -1571,7 +1572,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (ch.id == curId) curGone = true;
             store.delete(ch); n++;
         }
-        if (curGone) { current = null; int left = store.count(); if (left > 0) selectChannel(Math.min(curNum, left)); }
+        if (curGone) { current = null; int left = store.count(); if (left > 0) selectChannel(Math.min(curNum, left)); else noChannel(); }
         else if (cur != null) for (ChannelStore.Channel c : store.all()) if (c.id == curId) { cur.number = c.number; break; }   // its number may have moved down: same channel, nothing re-tuned
         return n == 0 ? "No channels deleted" : "Deleted " + n + (n == 1 ? " channel" : " channels");
     }
@@ -1716,11 +1717,37 @@ public class RadioService extends Service implements RadioEngine.Events {
         return out;
     }
     public String reimportFromStock() { return reimportFromStock("default_uhf"); }
+    /** The stock app keeps its channels in areas (the DMR phones' app); the W6's and the Xplore 1's have one list. */
+    public boolean stockHasAreas() { return !"sa818".equals(profile.protocol) && !"com.chamsion.quickchat".equals(profile.stockApp); }
+    /** Replace the channel list with the stock app's: the W6's table, QuickChat's database, or one area of the DMR phones' app. */
     public String reimportFromStock(String areaKey) {
-        StringBuilder err = new StringBuilder();
-        int n = store.importFromStock(this, profile.stockApp, areaKey, err);
-        if (n >= 0) { int keep = store.activeNumber(); selectChannel(keep); }
+        StringBuilder err = new StringBuilder(); int n;
+        if ("sa818".equals(profile.protocol)) n = store.importFromFlyscale(this, profile.stockApp, err);
+        else if ("com.chamsion.quickchat".equals(profile.stockApp)) n = store.importFromQuickChat(this, profile.stockApp, err);
+        else n = store.importFromStock(this, profile.stockApp, areaKey == null ? "default_uhf" : areaKey, err);
+        if (n >= 0) {
+            getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("tgListsImported", true).putBoolean("stockImportDeclined", false).apply();   // imported: an empty list asks again later
+            stockImportPending = false; int keep = store.activeNumber(); selectChannel(keep);
+        }
+        log(n >= 0 ? "imported " + n + " channels from the stock app" + (err.length() > 0 ? " (" + err + ")" : "") : "stock import failed: " + err);
         return n >= 0 ? "Imported " + n + " channels" + (err.length() > 0 ? " (" + err + ")" : "") : "Import failed: " + err;
+    }
+
+    private volatile boolean stockImportPending;
+    /** True while the empty-list question is open (the phone and the web both show it until one answers). */
+    public boolean stockImportPending() { return stockImportPending; }
+    /**
+     * The answer to the empty-list question: import the stock app's channels, or start empty (remembered, so it is not
+     * asked again; Device → Re-import still imports). Null when it was already answered elsewhere.
+     */
+    public String answerStockImport(boolean importThem) {
+        synchronized (this) { if (!stockImportPending) return null; stockImportPending = false; }
+        if (!importThem) {
+            getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("stockImportDeclined", true).apply();
+            log("stock import declined: starting with no channels"); ui.post(channelsChanged);
+            return "Starting with no channels";
+        }
+        return reimportFromStock(null);
     }
 
     public int localId() { return getSharedPreferences("radio", MODE_PRIVATE).getInt("dmrId", 1); }
@@ -2426,8 +2453,10 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- listeners ----------------------------------------------------------------------------------
 
-    public void addListener(Listener l) { listeners.add(l); l.onLink(link); if (current != null) l.onChannel(current); l.onModes(softSq.isEnabled(), softSq.level(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zoneName()); l.onCaption(captionsOn, "", null); l.onRx(receiving); l.onTx(transmitting); if (rssi != -999) l.onRssi(rssi); }   // a page built later (intercom look switched) starts from the live receive/transmit state, not "idle"
+    public void addListener(Listener l) { listeners.add(l); l.onLink(link); if (current != null) l.onChannel(current); l.onModes(softSqOn(), softSqLevel(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zoneName()); l.onCaption(captionsOn, "", null); l.onRx(receiving); l.onTx(transmitting); if (rssi != -999) l.onRssi(rssi); if (stockImportPending) l.onStockImportOffer(); }   // a page built later (intercom look switched) starts from the live receive/transmit state, not "idle"
     public void removeListener(Listener l) { listeners.remove(l); }
+    private void noChannel() { ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onNoChannel(); }); }
+    private final Runnable channelsChanged = () -> { for (Listener l : new ArrayList<>(listeners)) l.onChannels(); };
 
     private void setLink(String s) { link = s; ui.post(() -> { for (Listener l : listeners) l.onLink(s); }); updateNotification(); }
 

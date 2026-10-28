@@ -102,6 +102,9 @@ public final class ChannelStore extends SQLiteOpenHelper {
     public static boolean inBand(int hz) { return com.macdmr.radio.DeviceProfile.inBands(hz); }   // the phone's radio (the W6 tunes 400-470 MHz only)
 
     public ChannelStore(Context c) { super(c, "radio.db", null, 5); }
+    /** Run after every change to the channel list or the zones, from any caller (RadioService turns it into one onChannels event). */
+    public volatile Runnable onChange;
+    private void changed() { Runnable r = onChange; if (r != null) try { r.run(); } catch (Throwable ignored) { } }
     /** A separate database file (the backup self-test restores into a scratch copy). */
     public ChannelStore(Context c, String file) { super(c, file, null, 5); }
 
@@ -254,7 +257,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
 
     public long insert(Channel ch) {
         if (ch.number <= 0) ch.number = count() + 1;
-        return ch.id = getWritableDatabase().insert("channels", null, values(ch));
+        ch.id = getWritableDatabase().insert("channels", null, values(ch)); changed(); return ch.id;
     }
 
     public void delete(Channel ch) {
@@ -269,6 +272,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
             z.numbers = new int[l.size()]; for (int i = 0; i < l.size(); i++) z.numbers[i] = l.get(i);
             saveZone(z);
         }
+        changed();
     }
 
     /** Frequencies this radio never transmits on: NOAA weather (162.400 to 162.550 MHz), the marine VHF band (156.000 to 157.450 MHz) and the AAR railroad channels (159.810 to 161.565 MHz). */
@@ -278,7 +282,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
         return (txHz >= 162_400_000 && txHz <= 162_550_000) || (txHz >= 156_000_000 && txHz <= 157_450_000) || (txHz >= 159_810_000 && txHz <= 161_565_000);
     }
 
-    public void update(Channel ch) { getWritableDatabase().update("channels", values(ch), "_id=?", new String[] { String.valueOf(ch.id) }); }
+    public void update(Channel ch) { getWritableDatabase().update("channels", values(ch), "_id=?", new String[] { String.valueOf(ch.id) }); changed(); }
 
     /**
      * Delete packet lines ("📡 SRC>…") whose source is not a callsign: noise frames that passed the FCS were logged
@@ -469,10 +473,11 @@ public final class ChannelStore extends SQLiteOpenHelper {
     public Zone zone(long id) { for (Zone z : zones()) if (z.id == id) return z; return null; }
     public long saveZone(Zone z) {
         ContentValues v = new ContentValues(); v.put("name", z.name); v.put("numbers", joinInts(z.numbers));
-        if (z.id > 0) { getWritableDatabase().update("zones", v, "_id=?", new String[] { String.valueOf(z.id) }); return z.id; }
-        return z.id = getWritableDatabase().insert("zones", null, v);
+        if (z.id > 0) getWritableDatabase().update("zones", v, "_id=?", new String[] { String.valueOf(z.id) });
+        else z.id = getWritableDatabase().insert("zones", null, v);
+        changed(); return z.id;
     }
-    public void deleteZone(long id) { getWritableDatabase().delete("zones", "_id=?", new String[] { String.valueOf(id) }); }
+    public void deleteZone(long id) { getWritableDatabase().delete("zones", "_id=?", new String[] { String.valueOf(id) }); changed(); }
 
     /** A zone's channel numbers with {@code add} joined in: sorted, each number once. */
     static int[] withNumbers(int[] zone, java.util.Collection<Integer> add) {
@@ -790,6 +795,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
             } catch (Throwable t) { err.append("softsq: ").append(t.getMessage()).append("; "); }
             importModuleTgLists(ctx, stockPackage, stockIdToNumber, err);
             sdb.close();
+            changed();
             return n;
         } catch (Throwable t) { err.append(t.toString()); return -1; }
     }
@@ -824,6 +830,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
             db.setTransactionSuccessful();
         } catch (Throwable t) { err.append("channels: ").append(t.getMessage()); n = -1; }
         finally { db.endTransaction(); sdb.close(); }
+        changed();
         return n;
     }
 
@@ -892,6 +899,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
             } catch (Throwable t) { err.append("contacts: ").append(t.getMessage()).append("; "); }
             finally { cdb.close(); }
         } else err.append("no QuickChat contacts database; ");
+        changed();
         return n;
     }
 
