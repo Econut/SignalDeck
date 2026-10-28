@@ -53,6 +53,16 @@ public final class SplashView extends View {
         setOnClickListener(v -> finish());
     }
 
+    /**
+     * The version line: 22 units of the panel scale, but at least 15 dp on a small screen (under
+     * {@link IntercomView#COMPACT_BELOW_DP} tall), where the scale makes it about 9 dp (W6+, 480x854).
+     */
+    float versionSize() {
+        float v = 22 * s;
+        int hdp = getResources().getConfiguration().screenHeightDp;
+        return hdp > 0 && hdp < IntercomView.COMPACT_BELOW_DP ? Math.max(v, 15 * Theme.dp(getContext())) : v;
+    }
+
     @Override protected void onSizeChanged(int w, int h, int ow, int oh) {
         s = Math.min(w / 784f, h / 1168f * 1.25f);
         ox = (w - 784 * s) / 2; oy = h * 0.5f - 700 * s;      // the panel's middle sits a little below the centre
@@ -145,7 +155,7 @@ public final class SplashView extends View {
 
         // version near the bottom
         small.setTextAlign(Paint.Align.CENTER); small.setColor(0xFFC3C8CE); small.setAlpha((int) (255 * span(t, 900, 500)));
-        float vs = small.getTextSize(); small.setTextSize(22 * s);
+        float vs = small.getTextSize(); small.setTextSize(versionSize());
         small.setLetterSpacing(0.14f); cv.drawText(version, getWidth() / 2f, getHeight() * 0.80f, small);   // above the bottom 15 %, where system toasts appear
         small.setTextSize(vs);
         small.setLetterSpacing(0); small.setColor(GREY);
