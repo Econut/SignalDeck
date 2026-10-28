@@ -102,6 +102,7 @@ JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_open(JNIEnv *e,jcla
     if(control<0){fail(e,"Cannot open command UART");return;}
     pcm=open_port("/dev/ttyS0",1,4,64,B230400,&pcm_term,&pcm_saved);
     if(pcm<0){int rc=shutdown_ports();fail(e,rc?"PCM open and restoration failure":"Cannot open PCM UART; command closed");}
+    else if(tcflush(pcm,TCIFLUSH)!=0){int rc=shutdown_ports();fail(e,rc?"PCM input flush and restoration failure":"Cannot discard stale PCM input at open");}
 #else
     fail(e,"Receive transport disabled in this build");
 #endif
@@ -156,7 +157,12 @@ JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_tune(JNIEnv *
         }
         if(complete_ack)break; /* Java validates full checksum/status; do not wait out the deadline. */
     }
-    if(bytes[1]==0x23 || bytes[1]==0x22){tuned_hz=le32(bytes+8);tuned_command=bytes[1];}
+    if(bytes[1]==0x23 || bytes[1]==0x22){
+        /* Input captured before this channel's response belongs to startup/the previous channel.
+           Discard only the host PCM receive queue; never flush control replies or transmit data. */
+        if(tcflush(pcm,TCIFLUSH)!=0){fail(e,"Cannot discard pre-tune PCM input");return NULL;}
+        tuned_hz=le32(bytes+8);tuned_command=bytes[1];
+    }
     jbyteArray out=(*e)->NewByteArray(e,used);if(out && used)(*e)->SetByteArrayRegion(e,out,0,used,(jbyte*)reply);return out;
 #else
     (void)packet;fail(e,"Receive transport disabled");return NULL;
