@@ -193,7 +193,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
 
         // ---- circuit-board panel (250 dp, 10 dp side margins, 8 dp top, 2 dp 35 % cyan border, radius 12) ----
         FrameLayout panel = new FrameLayout(c);
-        board = new CircuitBoardView(c); board.animateIdle = animatedPanel(c);   // draws the panel frame itself (its own surface: the window cannot paint over it)
+        board = new CircuitBoardView(c);if(p8Layout()){board.liveSpectrumOnly=true;board.spectrum=new float[com.macdmr.radio.dsp.Spectrum.BANDS];board.setContentDescription("Received audio spectrum, 200 Hz to 3.6 kHz");} board.animateIdle = animatedPanel(c);   // draws the panel frame itself (its own surface: the window cannot paint over it)
         board.setFrame(0xFF0B1823, 0x5900E5FF, 2, 12, Theme.BG);   // fill = classic page navy with the panel's faint cyan tint
         panel.addView(board, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
         final LinearLayout infoPanel = new LinearLayout(c); infoPanel.setOrientation(VERTICAL); this.infoPanel = infoPanel;

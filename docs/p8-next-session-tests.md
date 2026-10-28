@@ -19,6 +19,7 @@ Record for each item: APK version, pass/fail, visible behavior, relevant log tim
 
 ## Main-screen follow-up
 
-- Signal-strength feed: connect verified P8 RSSI data to the original segmented meter. Until available, show RSSI unavailable rather than fabricating dBm or labelling audible reception as no signal.
+- Main.4 signal-strength feed: initial live receive test passed. Read-only command 0x32 returned raw 135 (-52.5 dBm) and 133 (-53.5 dBm); idle sentinel values 225/226 are rejected and shown as unavailable. These are module RSSI estimates, not independently calibrated measurements.
+- Main.4 spectrum: actual received PCM now feeds the existing 18-band FFT (200–3600 Hz). User confirmed moving bars and a dBm reading during speech from the other radio; logs confirm RX and FFT activity. This is an audio spectrum, not an RF band sweep. Compact graph clipping was corrected without changing panel widths. Focused offline tests: 84 passed; release/native build passed. No P8 transmission was performed for this test.
 - Main.3 redesign: verify physical PTT changes both header and full-width bar to red, then restores cyan on release. Isolated Android touch/render checks cover cancel, focus loss and detach without radio access.
 - Soft SQ shortcut retains the existing handler: P8 currently uses hardware squelch; implementing a software gate is separate from this UI redesign.

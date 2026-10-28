@@ -40,6 +40,8 @@ public class CircuitBoardView extends FrameLayout {
     public volatile int audioAmplitude = 0;
     /** The received audio's spectrum (left = low notes), set by the intercom; null = fall back to the level. */
     public volatile float[] spectrum;
+    /** P8 compact card: real FFT bands only, with all bars inside the available height. */
+    public volatile boolean liveSpectrumOnly=false;
     /** Captions visible: draw the VU bars as a thin strip so the transcription box can sit low without being drawn through. */
     public volatile boolean barsCompact = false;
     public volatile boolean isReceiving = false;
@@ -133,7 +135,7 @@ public class CircuitBoardView extends FrameLayout {
 
     /** {@code scale}: frame time relative to the original 50 ms, so the drops keep the same speed at any frame rate. */
     private void tick(boolean moveDrops, float scale) {
-        if (moveDrops) for (int i = 0; i < NUM_DROPS; i++) {
+        if (moveDrops && !liveSpectrumOnly) for (int i = 0; i < NUM_DROPS; i++) {
             dropY[i] += dropSpeed[i] * scale;
             if (dropY[i] - dropLength[i] > h) {
                 dropY[i] = -dropLength[i] * rng.nextFloat(); dropX[i] = dropLane();
@@ -145,7 +147,8 @@ public class CircuitBoardView extends FrameLayout {
         float[] sp = spectrum;
         for (int i = 0; i < NUM_BARS; i++) {
             float target;
-            if (sp != null && sp.length == NUM_BARS) target = isReceiving ? sp[i] : 0f;                 // the real spectrum: one bar per band
+            if (sp != null && sp.length == NUM_BARS) target = liveSpectrumOnly || isReceiving ? sp[i] : 0f;                 // the real spectrum: one bar per band
+            else if(liveSpectrumOnly)target=0f;
             else { float center = NUM_BARS / 2.0f, dist = Math.abs(i - center) / center, env = 1.0f - dist * 0.55f; target = norm * env * (0.60f + rng.nextFloat() * 0.80f); }
             barHeights[i] += (target > barHeights[i]) ? (target - barHeights[i]) * 0.55f : (target - barHeights[i]) * 0.12f;
         }
@@ -156,7 +159,7 @@ public class CircuitBoardView extends FrameLayout {
         canvas.drawColor(fill);
         if (w > 0 && h > 0) canvas.scale(bufW / (float) w, bufH / (float) h);   // geometry in view pixels, buffer at half size
         float lo = borderDp * dp + 1, hi = h - borderDp * dp - 1;
-        for (int i = 0; i < NUM_DROPS; i++) {
+        if(!liveSpectrumOnly)for (int i = 0; i < NUM_DROPS; i++) {
             float x = dropX[i], headY = dropY[i], len = dropLength[i]; int segs = 5; float segLen = len / segs;
             for (int s = 0; s < segs; s++) {
                 float y0 = headY - len + s * segLen, y1 = y0 + segLen;
@@ -166,9 +169,10 @@ public class CircuitBoardView extends FrameLayout {
             }
         }
         float reserveH = (barsCompact ? 10 : 36) * dp, areaTop = h - reserveH - 4 * dp;
-        float barZone = (h - areaTop) * (barsCompact ? 1.0f : 1.5625f), margin = 14 * dp, barW = (w - margin * 2) / NUM_BARS, gap = barW * 0.18f;
+        if(liveSpectrumOnly)areaTop=4*dp;
+        float barZone = liveSpectrumOnly?Math.max(1,h-8*dp):(h - areaTop) * (barsCompact ? 1.0f : 1.5625f), margin = 14 * dp, barW = (w - margin * 2) / NUM_BARS, gap = barW * 0.18f;
         for (int i = 0; i < NUM_BARS; i++) {
-            float bh = Math.max(3 * dp, barHeights[i] * barZone);
+            float bh = Math.max((liveSpectrumOnly?1:3) * dp, barHeights[i] * barZone);
             float x1 = margin + i * barW + gap, x2 = x1 + barW - gap * 2;
             barPaint.setColor(((int) (0x38 + barHeights[i] * 0xC0) << 24) | 0x0000E5FF);
             canvas.drawRoundRect(x1, areaTop + barZone - bh, x2, areaTop + barZone, 2 * dp, 2 * dp, barPaint);

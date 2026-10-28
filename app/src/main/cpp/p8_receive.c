@@ -253,6 +253,18 @@ JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_readControl(J
     fail(e,"Receive transport disabled");return NULL;
 #endif
 }
+JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_requestRssi(JNIEnv *e,jclass c) {
+    (void)c;
+#if P8_OPEN_PROBE_REVIEWED
+    /* Fixed read-RSSI packet only. Asynchronous: never block the audio owner awaiting a reply. */
+    const unsigned char query[10]={0x68,0x32,1,1,0x95,0xbb,0,1,1,0x10};
+    pthread_mutex_lock(&tx_lock);int blocked=tx_owned || tx_error;pthread_mutex_unlock(&tx_lock);
+    if(control<0 || blocked){fail(e,"RSSI read refused during TX/closed session");return;}
+    if(write(control,query,sizeof query)!=(ssize_t)sizeof query)fail(e,"RSSI read request failed; no retry");
+#else
+    fail(e,"Receive telemetry disabled");
+#endif
+}
 JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_close(JNIEnv *e,jclass c) {
     (void)c;
 #if P8_OPEN_PROBE_REVIEWED

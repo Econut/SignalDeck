@@ -858,6 +858,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         ui.postDelayed(()->{if(generation!=p8ArmGeneration || !p8TxArmed)return;p8CancelTransmitTest();p8Status="TX test expired; TX locked";refreshControls();},P8TxPolicy.ARM_LIFETIME_MS);
         refreshControls();p8Status="Armed ONE PTT press on 446.10625 MHz, maximum 10 seconds; expires in 60 seconds";return p8Status;
     }
+    private volatile float[] p8Spectrum=new float[com.macdmr.radio.dsp.Spectrum.BANDS];
     private volatile String p8Meter="No PCM measurements yet";
     public String p8AudioMeter(){return p8Meter;}
     private Runnable p8AfterClose;
@@ -884,7 +885,9 @@ public class RadioService extends Service implements RadioEngine.Events {
             P8RxProtocol.Channel wire=P8MainRadio.channel(ch,monitorOn,p8ModuleVolume(),localId());
             p8Tunes.clear();p8Tunes.put(wire,ch);setLink("connecting P8");
             p8Receiver=new P8Receiver(this,new P8Receiver.Listener(){
-                public void status(String text){if(text.startsWith("CONTROL"))log(text);else if(text.startsWith("TUNED") || text.startsWith("Module") || text.startsWith("TX")){p8Status=text;log(text);}}
+                public void status(String text){if(text.startsWith("CONTROL"))log(text);else if(text.startsWith("TUNED") || text.startsWith("Module") || text.startsWith("TX") || text.startsWith("RSSI") || text.startsWith("Spectrum")){p8Status=text;log(text);}}
+                public void rssi(int raw,double dbm){rssi0(raw,dbm);}
+                public void spectrum(float[] bands){p8Spectrum=bands.clone();final float[] copy=p8Spectrum;ui.post(()->{for(Listener l:listeners)l.onSpectrum(copy);});}
                 public void tuned(P8RxProtocol.Channel channel){ui.post(()->{ChannelStore.Channel acked=p8Tunes.remove(channel);if(acked==null || p8Closing)return;current=acked;if(acked.id>0)store.setActive(acked.number);setLink("ready");for(Listener l:listeners)l.onChannel(acked);pushModes();});}
                 public void receiving(boolean on){receiving=on;ui.post(()->{for(Listener l:listeners)l.onRx(on);});}
                 public void transmitting(boolean on){p8TxArmed=false;transmitting=on;ui.post(()->{for(Listener l:listeners)l.onTx(on);refreshControls();});}
@@ -897,7 +900,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     Runnable done=p8AfterClose;p8AfterClose=null;p8RestoreOnClose=false;if(done!=null)done.run();
                 });}
             });
-            p8Receiver.enableAnalogueTransmit(p8TransmitTimeout());p8Receiver.gain(p8Gain());p8Receiver.moduleVolume(p8ModuleVolume());
+            p8Receiver.enableAnalogueTransmit(p8TransmitTimeout());p8Receiver.enableMainTelemetry();p8Receiver.gain(p8Gain());p8Receiver.moduleVolume(p8ModuleVolume());
             android.media.AudioManager am=(android.media.AudioManager)getSystemService(AUDIO_SERVICE);
             int media=getSharedPreferences("p8_rx",0).getInt("mediaVolume",am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC));
             am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC,Math.max(0,Math.min(am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC),media)),0);
@@ -2456,7 +2459,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- listeners ----------------------------------------------------------------------------------
 
-    public void addListener(Listener l) { listeners.add(l); l.onLink(link); if (current != null) l.onChannel(current); l.onModes(softSq.isEnabled(), softSq.level(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zoneName()); l.onCaption(captionsOn, "", null); l.onRx(receiving); l.onTx(transmitting); if (rssi != -999) l.onRssi(rssi); }   // a page built later (intercom look switched) starts from the live receive/transmit state, not "idle"
+    public void addListener(Listener l) { listeners.add(l); l.onLink(link); if (current != null) l.onChannel(current); l.onModes(softSq.isEnabled(), softSq.level(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zoneName()); l.onCaption(captionsOn, "", null); l.onRx(receiving); l.onTx(transmitting); if (rssi != -999) l.onRssi(rssi);if(p8Main())l.onSpectrum(p8Spectrum.clone()); }   // a page built later (intercom look switched) starts from the live receive/transmit state, not "idle"
     public void removeListener(Listener l) { listeners.remove(l); }
 
     private void setLink(String s) { link = s; ui.post(() -> { for (Listener l : listeners) l.onLink(s); }); updateNotification(); }

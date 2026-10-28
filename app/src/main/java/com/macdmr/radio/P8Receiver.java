@@ -20,12 +20,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class P8Receiver {
     public interface Listener {void status(String text);void closed(boolean safe,String reason);
         default void levels(double peak,double rms,long clips,long recent){} default void moduleApplied(int level){}
+        default void rssi(int raw,double dbm){} default void spectrum(float[] bands){}
         default void tuned(P8RxProtocol.Channel channel){} default void receiving(boolean on){} default void transmitting(boolean on){} }
     private static final AtomicBoolean ACTIVE=new AtomicBoolean();
     private final Context context;private final Listener listener;
     private volatile boolean stop,scanning;private volatile int gain=1;
     private volatile int moduleLevel=1;private final AtomicInteger pendingVolume=new AtomicInteger(-1);
-    private boolean mutedTestPlayback;
+    private boolean mutedTestPlayback;private boolean mainTelemetry,radioReceiving;
+    private final P8Rssi.Poll rssiPoll=new P8Rssi.Poll();private final P8AudioSpectrum audioSpectrum=new P8AudioSpectrum();
+    private long rssiQueries,rssiReplies,spectrumUpdates;
+    public void enableMainTelemetry(){mainTelemetry=true;}
     private boolean normalTransmit;private volatile int timeoutMs=60000;private final P8PttEdge pttEdge=new P8PttEdge();
     private boolean txCapable,txPrepared;private volatile boolean pttRequested,txOwned;private long txDeadline;
     private final P8TxStatus txStatus=new P8TxStatus();private long microphoneBytes;private int microphonePeak;
@@ -64,14 +68,21 @@ public final class P8Receiver {
         AudioTrack audio=null;String reason="RX closed";boolean safe=true,nativeLoaded=false;
         P8RxProtocol.Scan scan=new P8RxProtocol.Scan();P8RxProtocol.Stream control=new P8RxProtocol.Stream(txCapable);PcmFramer pcm=new PcmFramer();P8AudioQueue speaker=new P8AudioQueue();
         P8AudioSettings.Meter meter=new P8AudioSettings.Meter();long previousClips=0;
-        P8RxProtocol.Sink receiveStatus=f->{if(f.cmd==0x36 && f.body.length==1){
+        P8RxProtocol.Sink receiveStatus=f->{
+            if(f.cmd==0x32 && mainTelemetry && rssiPoll.waiting()){
+                double dbm=rssiPoll.reply(f,SystemClock.elapsedRealtime());int raw=f.body.length==1?f.body[0]&255:-1;rssiReplies++;
+                listener.rssi(raw,dbm);
+                if(dbm==P8Rssi.UNKNOWN || rssiReplies==1 || rssiReplies%30==0)listener.status("RSSI reply raw="+raw+" dBm="+dbm+(rssiPoll.disabled()?"; polling suspended":""));
+                return;
+            }
+            if(f.cmd==0x36 && f.body.length==1){
             listener.status("CONTROL "+f.toString());
             if(txCapable){if(f.rw!=2 || f.sr!=0)return;try{P8ReceiveNative.acknowledgeStatus();}catch(java.io.IOException e){throw new IllegalStateException("Status ACK failed; stop",e);}}
             int s=f.body[0]&255;if(s==3 || s==4){boolean on=txStatus.status(s,SystemClock.elapsedRealtime());
                 if(s==3 && !on){try{if(readState(P8Protocol.PTT_NODE)!=1)throw new IllegalStateException("PTT not released");}catch(Exception e){throw new IllegalStateException("Unexpected TX start without confirmed GPIO release",e);}listener.status("TX start reply delayed after release; remaining in receive");}
-                if(!on)pttRequested=false;listener.transmitting(on);}else if(s==1 || s==10 || s==12){scan.signal(SystemClock.elapsedRealtime());listener.receiving(true);}else if(s==2 || s==11 || s==13)listener.receiving(false);}};
+                if(!on)pttRequested=false;listener.transmitting(on);}else if(s==1 || s==10 || s==12){radioReceiving=true;scan.signal(SystemClock.elapsedRealtime());listener.receiving(true);}else if(s==2 || s==11 || s==13){radioReceiving=false;listener.receiving(false);}}};
         try{
-            guard();P8ReceiveNative.load();nativeLoaded=true;P8ReceiveNative.open();
+            guard();P8ReceiveNative.load();nativeLoaded=true;P8ReceiveNative.open();if(mainTelemetry){listener.spectrum(audioSpectrum.clear());listener.rssi(-1,P8Rssi.UNKNOWN);}
             int size=Math.max(3200,AudioTrack.getMinBufferSize(8000,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT));
             audio=new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 .setAudioFormat(new AudioFormat.Builder().setSampleRate(8000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
@@ -90,13 +101,14 @@ public final class P8Receiver {
                         if(microphone.getState()!=android.media.AudioRecord.STATE_INITIALIZED)throw new Exception("Microphone initialisation failed");
                         microphone.startRecording();if(microphone.getRecordingState()!=android.media.AudioRecord.RECORDSTATE_RECORDING)throw new Exception("Microphone capture failed");
                         if(!pttRequested){microphone.stop();microphone.release();microphone=null;continue;}
+                        if(mainTelemetry){rssiPoll.pause(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}
                         audio.pause();audio.flush();speaker.clear();txOwned=true;lastMicWrite=0;minMicGap=Long.MAX_VALUE;maxMicGap=0;txStatus.keyed(SystemClock.elapsedRealtime());int limit=normalTransmit?timeoutMs:(int)P8TxPolicy.MAX_KEY_MS;txDeadline=SystemClock.elapsedRealtime()+limit;
                         P8ReceiveNative.keyTimed(true,limit);listener.transmitting(true);listener.status("TX keyed; timeout "+(limit/1000)+" seconds");
                     }else {pttRequested=false;listener.status("TX blocked: channel is receive-only, digital or not yet tuned");}
                 }
                 if(txOwned){control.feed(P8ReceiveNative.readControl(),receiveStatus);int n=microphone.read(micBytes,micFill,160-micFill,android.media.AudioRecord.READ_NON_BLOCKING);if(n<0)throw new Exception("Microphone read failure");micFill+=n;if(micFill==160){if(SystemClock.elapsedRealtime()>=txDeadline-12){pttRequested=false;continue;}long sent=P8ReceiveNative.writeMicrophone(micBytes,160);if(lastMicWrite!=0){long gap=sent-lastMicWrite;minMicGap=Math.min(minMicGap,gap);maxMicGap=Math.max(maxMicGap,gap);}lastMicWrite=sent;microphoneBytes+=160;for(int i=0;i<160;i+=2)microphonePeak=Math.max(microphonePeak,Math.abs((int)(short)((micBytes[i]&255)|(micBytes[i+1]<<8))));micFill=0;}SystemClock.sleep(2);continue;}
                 P8RxProtocol.Channel ch=requested.getAndSet(null);
-                if(ch!=null){byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));P8RxProtocol.requireAck(control,reply,receiveStatus,ch.command());current=ch.toString();tunes++;
+                if(ch!=null){radioReceiving=false;listener.receiving(false);if(mainTelemetry){rssiPoll.tuned(SystemClock.elapsedRealtime());listener.rssi(-1,P8Rssi.UNKNOWN);listener.spectrum(audioSpectrum.clear());}byte[] reply=P8ReceiveNative.tune(ch.packet(moduleLevel));P8RxProtocol.requireAck(control,reply,receiveStatus,ch.command());current=ch.toString();tunes++;
                     int index=0;for(int i=0;i<channels.length;i++)if(channels[i]==ch)index=i;
                     tunedChannel=ch;scan.tuned(index,SystemClock.elapsedRealtime());listener.tuned(ch);listener.status("TUNED (ACK) · "+current);}
                 int level=pendingVolume.getAndSet(-1);
@@ -106,11 +118,20 @@ public final class P8Receiver {
                 pcm.feed(data,data.length,(b,o,n)->{
                     frames++;long magnitude=0;for(int i=o;i<o+n;i+=2)magnitude+=Math.abs((int)(short)((b[i]&255)|(b[i+1]<<8)));
                     if(magnitude/(n/2)>300)scan.signal(SystemClock.elapsedRealtime());
+                    if(mainTelemetry && !mutedTestPlayback){float[] bands=audioSpectrum.feed(b,o,n,SystemClock.elapsedRealtime());if(bands!=null){listener.spectrum(bands);if(++spectrumUpdates==1)listener.status("Spectrum connected to received PCM FFT (200–3600 Hz)");}}
                     int appliedGain=gain;meter.feed(b,o,n,appliedGain);clipped+=P8RxProtocol.amplify(b,o,n,appliedGain);
                     speaker.add(b,o,n);
                 });
                 speaker.drain((b,o,n)->player.write(b,o,n,AudioTrack.WRITE_NON_BLOCKING));
                 long now=SystemClock.elapsedRealtime();
+                if(mainTelemetry){
+                    if(rssiPoll.timedOut(now)){listener.rssi(-1,P8Rssi.UNKNOWN);listener.status("RSSI query unanswered; polling suspended for this session");}
+                    if(rssiPoll.stale(now))listener.rssi(-1,P8Rssi.UNKNOWN);
+                    if(rssiPoll.queryDue(now,radioReceiving || (tunedChannel!=null && (tunedChannel.squelch==0 || tunedChannel.monitor==1)),pttRequested || requested.get()!=null || tunedChannel==null)){
+                        P8ReceiveNative.requestRssi();if(++rssiQueries==1)listener.status("RSSI initial read-only probe sent; awaiting P8 response");
+                    }
+                    float[] expired=audioSpectrum.expire(now);if(expired!=null)listener.spectrum(expired);
+                }
                 if(scanning){int i=scan.advance(now,channels.length);if(i>=0)requested.compareAndSet(null,channels[i]);}
                 if(now>=nextStatus){listener.status((scanning?"SCANNING · ":"RX · ")+current+"\nPCM bytes "+bytes+" · frames "+frames+" · clipped "+clipped+" · queued audio bytes "+speaker.pending()+" · gain ×"+gain+" · module "+moduleLevel+" · tunes "+tunes);
                     listener.levels(meter.peakDb(),meter.rmsDb(),meter.clips(),meter.clips()-previousClips);previousClips=meter.clips();meter.resetWindow();nextStatus=now+500;}
@@ -120,7 +141,8 @@ public final class P8Receiver {
             txPolicy.cancel();if(nativeLoaded && txCapable)try{endTransmit();}catch(Exception | LinkageError e){safe=false;reason+="; PTT release failure: "+e.getMessage();}
             if(audio!=null){try{audio.pause();audio.flush();audio.release();}catch(Exception ignored){}}
             if(nativeLoaded)try{P8ReceiveNative.close();}catch(Exception | LinkageError e){safe=false;reason+="; close/restore failed: "+e.getMessage();}
-            ACTIVE.set(false);listener.closed(safe,reason+"; PCM bytes="+bytes+", frames="+frames+", clips="+clipped+", pendingAudioAtClose="+speaker.pending()+", tunes="+tunes+", microphoneBytes="+microphoneBytes+", microphonePeak="+microphonePeak);
+            if(mainTelemetry){listener.spectrum(audioSpectrum.clear());listener.rssi(-1,P8Rssi.UNKNOWN);}
+            ACTIVE.set(false);listener.closed(safe,reason+"; RSSI queries="+rssiQueries+", RSSI replies="+rssiReplies+", FFT updates="+spectrumUpdates+"; PCM bytes="+bytes+", frames="+frames+", clips="+clipped+", pendingAudioAtClose="+speaker.pending()+", tunes="+tunes+", microphoneBytes="+microphoneBytes+", microphonePeak="+microphonePeak);
         }
     }
     private void endTransmit() throws Exception {
