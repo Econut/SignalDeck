@@ -190,6 +190,7 @@ public final class WebHost {
         private long lastRssi, lastLevel;
         @Override public void onChannel(ChannelStore.Channel ch) { pub("channel", channelJson(ch)); }
         @Override public void onChannels() { pub("channels", "{}"); }
+        @Override public void onStockImportOffer() { pub("stockImport", "{}"); }
         @Override public void onNoChannel() { pub("channel", "{}"); }
         @Override public void onRx(boolean r) { pub("rx", "{\"on\":" + r + "}"); }
         @Override public void onTx(boolean t) { pub("tx", "{\"on\":" + t + "}"); }
@@ -368,7 +369,7 @@ public final class WebHost {
     }
     private JSONObject statusJson() throws Exception {
         JSONObject o = new JSONObject();
-        o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current()));
+        o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current())).put("stockImport", svc.stockImportPending());
         com.macdmr.radio.DeviceProfile prof = svc.profile();                  // what this radio can do: the pages hide what it cannot (an analog-only radio has no DMR)
         JSONArray bands = new JSONArray(); for (long hz : prof.bandsHz) bands.put(hz);
         o.put("radio", new JSONObject().put("dmr", prof.dmr()).put("messages", prof.hasMessages()).put("contacts", prof.hasContacts())
@@ -781,6 +782,11 @@ public final class WebHost {
                 return ok(String.format(java.util.Locale.US, "VFO %.4f MHz", v.rxFreq / 1e6));
             }
             case "/api/vfo/exit": if (!post) break; onMain(() -> { svc.exitVfo(); return null; }); return ok("Back to the channel");
+            case "/api/channels/stockimport": if (!post) break; {              // the empty-list question: {import: true | false}
+                final boolean yes = b.optBoolean("import", false);
+                String msg = yes ? svc.answerStockImport(true) : onMain(() -> svc.answerStockImport(false));
+                return msg == null ? WebServer.Response.error(409, "Already answered") : ok(msg);
+            }
             case "/api/channels/bulk": if (!post) break; {                    // the channel list's selection: {action: delete | zone | unzone | star | unstar, numbers[], zoneId, zoneName}
                 JSONArray ns = b.optJSONArray("numbers"); java.util.List<Integer> nums = new java.util.ArrayList<>();
                 if (ns != null) for (int i = 0; i < ns.length(); i++) nums.add(ns.optInt(i, 0));
