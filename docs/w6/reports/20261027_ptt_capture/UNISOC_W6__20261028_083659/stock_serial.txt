@@ -1,0 +1,14 @@
+sdtrace: pid 20680, watching /dev/tty for 15000 ms
+527.1 sdtrace: attached to 17 threads
+984.4 20680 open /dev/ttyS2 -> fd 68
+984.8 20680 get fd 68 9600 8N1 raw iflag=0 oflag=0x4 cflag=0xcbd lflag=0 -> 0
+984.9 20680 set fd 68 9600 8N1 raw iflag=0 oflag=0x4 cflag=0xcbd lflag=0 -> 0
+1054.5 20729 W fd 68 14: 41 54 2b 44 4d 4f 43 4f 4e 4e 45 43 54 0d |AT+DMOCONNECT.|
+1135.9 20728 R fd 68 17: 0d 0a 2b 44 4d 4f 43 4f 4e 4e 45 43 54 3a 30 0d 0a |..+DMOCONNECT:0..|
+1178.1 20731 W fd 68 11: 41 54 2b 44 4d 4f 56 45 52 51 0d |AT+DMOVERQ.|
+1258.1 20730 W fd 68 45: 41 54 2b 44 4d 4f 53 45 54 47 52 4f 55 50 3d 31 2c 34 33 35 2e 30 32 35 2c 34 33 35 2e 30 32 35 2c 32 34 30 2c 32 34 30 2c 33 2c 31 0d |AT+DMOSETGROUP=1,435.025,435.025,240,240,3,1.|
+1297.0 20729 R fd 68 20: 2b 44 4d 4f 56 45 52 51 3a 50 42 32 30 32 45 55 30 35 0d 0a |+DMOVERQ:PB202EU05..|
+1365.2 20734 W fd 68 18: 41 54 2b 44 4d 4f 53 45 54 56 4f 4c 55 4d 45 3d 31 0d |AT+DMOSETVOLUME=1.|
+1437.5 20731 R fd 68 18: 0d 0a 2b 44 4d 4f 53 45 54 47 52 4f 55 50 3a 30 0d 0a |..+DMOSETGROUP:0..|
+1588.2 20744 R fd 68 19: 0d 0a 2b 44 4d 4f 53 45 54 56 4f 4c 55 4d 45 3a 30 0d 0a |..+DMOSETVOLUME:0..|
+15536.2 sdtrace: detached; 101 waiting-byte polls (FIONREAD) not listed

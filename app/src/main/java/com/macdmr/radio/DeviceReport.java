@@ -458,20 +458,71 @@ public final class DeviceReport {
         try { if (Build.VERSION.SDK_INT >= 33) c.registerReceiver(br, f, Context.RECEIVER_EXPORTED); else c.registerReceiver(br, f); } catch (Throwable ignored) { }
         keyCapture = e -> keys.append(String.format(Locale.US, "  key %s code=%d scan=%d device=%d flags=0x%x\n", e.getAction() == KeyEvent.ACTION_DOWN ? "DOWN" : "UP  ", e.getKeyCode(), e.getScanCode(), e.getDeviceId(), e.getFlags()));
         boolean root = suPresent() && RootSetup.haveRoot();
-        String events = "", logs = "";
+        String events = "", logs = "", devices = "";
         try {
             if (root) {
                 RootSetup.run("logcat -c");
-                events = RootSetup.run("timeout " + seconds + " getevent -lt 2>&1 | grep -v 'SYN_REPORT' | head -200");
+                devices = keyDevices(RootSetup.run("getevent -pl 2>&1 | head -400"));
+                events = keyEvents(RootSetup.run("timeout " + seconds + " getevent -lt 2>&1 | grep -v 'SYN_REPORT' | head -6000"));
                 logs = redact(RootSetup.run("logcat -d 2>/dev/null | grep -iE 'ptt|intercom|interphone|walkie|KeyEvent|keycode' | head -80"));
             } else Thread.sleep(seconds * 1000L);
         } catch (Throwable ignored) { }
         keyCapture = null;
         try { c.unregisterReceiver(br); } catch (Throwable ignored) { }
         String layouts = root ? keyLayouts(rawKeys(events)) : "";
-        return "Activity key events and known PTT broadcasts:\n" + (keys.length() == 0 ? "  (none reached the app)\n" : keys) + "\nInput events (root getevent):\n" + (events.isEmpty() ? "  (n/a)\n" : events + "\n")
+        return "Activity key events and known PTT broadcasts:\n" + (keys.length() == 0 ? "  (none reached the app)\n" : keys)
+                + (devices.isEmpty() ? "" : "\nInput devices with keys (root getevent -pl; a side key is often on its own device):\n" + devices)
+                + "\nInput events (root getevent; keys and switches only):\n" + (events.isEmpty() ? "  (n/a)\n" : events + "\n")
                 + (layouts.isEmpty() ? "" : "\nWhat the key layouts make of those keys (root):\n" + layouts)
                 + "\nLog lines during the capture (root):\n" + (logs.isEmpty() ? "  (n/a)\n" : logs + "\n");
+    }
+
+    /**
+     * The key and switch events of a getevent -lt capture, with the device list it starts with; motion and sensor events
+     * (EV_ABS, EV_REL, EV_MSC: the W6's accelerometer sent about 1000 lines in 10 s and buried any key) are counted per
+     * device instead of listed. At most 300 lines.
+     */
+    static String keyEvents(String raw) {
+        StringBuilder out = new StringBuilder();
+        java.util.Map<String, Integer> dropped = new java.util.TreeMap<>();
+        java.util.Map<String, String> names = new java.util.HashMap<>();
+        String lastDev = null; int lines = 0;
+        for (String l : (raw == null ? "" : raw).split("\n")) {
+            String t = l.trim(); if (t.isEmpty()) continue;
+            java.util.regex.Matcher add = Pattern.compile("^add device \\d+: (/dev/input/\\S+)").matcher(t);
+            if (add.find()) { lastDev = add.group(1); continue; }
+            java.util.regex.Matcher nm = Pattern.compile("^name:\\s+\"(.*)\"").matcher(t);
+            if (nm.find() && lastDev != null) { names.put(lastDev, nm.group(1)); continue; }
+            java.util.regex.Matcher ev = Pattern.compile("(/dev/input/\\S+): (EV_[A-Z]+)").matcher(t);
+            if (!ev.find()) continue;
+            if (ev.group(2).equals("EV_KEY") || ev.group(2).equals("EV_SW")) { if (lines++ < 300) out.append("  ").append(t).append(names.containsKey(ev.group(1)) ? "   (" + names.get(ev.group(1)) + ")" : "").append('\n'); }
+            else dropped.merge(ev.group(1), 1, Integer::sum);
+        }
+        if (lines == 0) out.append("  no key or switch events\n");
+        if (lines > 300) out.append("  … ").append(lines - 300).append(" more key events\n");
+        for (java.util.Map.Entry<String, Integer> e : dropped.entrySet())
+            out.append("  (").append(e.getValue()).append(" motion/sensor events from ").append(e.getKey()).append(names.containsKey(e.getKey()) ? " " + names.get(e.getKey()) : "").append(" left out)\n");
+        return out.toString();
+    }
+
+    /** From getevent -pl: each input device that reports keys, with its key names ("event12 hook_dmr: KEY_F2 KEY_F3"). */
+    static String keyDevices(String pl) {
+        StringBuilder out = new StringBuilder();
+        String dev = null, name = ""; java.util.List<String> keys = null; boolean inKeys = false;
+        for (String l : ((pl == null ? "" : pl) + "\nadd device 0: /dev/null").split("\n")) {
+            java.util.regex.Matcher add = Pattern.compile("^add device \\d+: /dev/input/(\\S+)|^add device \\d+: (/dev/null)").matcher(l.trim());
+            if (add.find()) {
+                if (dev != null && keys != null && !keys.isEmpty()) out.append("  ").append(dev).append(" ").append(name).append(": ").append(String.join(" ", keys.subList(0, Math.min(40, keys.size())))).append(keys.size() > 40 ? " …" : "").append('\n');
+                dev = add.group(1); name = ""; keys = new java.util.ArrayList<>(); inKeys = false; continue;
+            }
+            String t = l.trim();
+            java.util.regex.Matcher nm = Pattern.compile("^name:\\s+\"(.*)\"").matcher(t);
+            if (nm.find()) { name = nm.group(1); continue; }
+            if (t.startsWith("KEY (0001):")) { inKeys = true; t = t.substring(11); }
+            else if (t.matches("^[A-Z]{2,4}\\s+\\([0-9a-f]{4}\\):.*") || t.startsWith("input props") || t.startsWith("events:")) { inKeys = false; continue; }
+            if (inKeys && keys != null) for (String k : t.split("\\s+")) if (k.matches("(KEY|BTN)_[A-Z0-9_]+|[0-9a-f]{4}")) keys.add(k);
+        }
+        return out.length() == 0 ? "  (none)\n" : out.toString();
     }
 
     /** JNI entry points of a native library, by scanning for "Java_" symbol names: tells us the Java class the vendor's serial opener binds to. */
