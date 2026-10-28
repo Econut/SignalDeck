@@ -8,7 +8,7 @@ the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and aft
 
 | Backlog | Change | Files | Test |
 |---|---|---|---|
-| Atom XL handoff, framing | The control port can wrap the same module commands in the Agold `7E 96 69` envelope when a profile's protocol is `agold`. The Armor framing is unchanged. Route 00 reports stay off the engine. No phone behaviour yet: no profile uses it. | `FrameCodec.java`, `AgoldEnvelope.java`, `UartPort.java`, `RadioEngine.java` | Host: `AgoldEnvelopeTest` against the captured Atom XL frames (version request and reply, set results, a bridge report, a bad checksum, a cut frame). The Armor codec still matches `Frame`. |
+| Atom XL handoff, framing | The control port can wrap the same module commands in the Agold `7E 96 69` envelope when a profile's protocol is `agold`. The Armor framing is unchanged. Route 00 reports stay off the engine. A `0x36` push keeps its status byte; only a reply (`rw` 00) folds a result byte into `sr`. Any other module reply is delivered too, and each unlisted command is logged once. No phone behaviour yet: no profile uses it. | `FrameCodec.java`, `AgoldEnvelope.java`, `UartPort.java`, `RadioEngine.java` | Host: `AgoldEnvelopeTest` against the captured Atom XL frames (version request and reply, set results, a bridge report, a bad checksum, a cut frame), plus a `0x36` push and its reply and an unlisted `0x26`. The Armor codec still matches `Frame`. |
 
 ## 2026-10-28 — Device report: on a USB-bridge phone, ask the bridge first; vendor keys named as PTT candidates
 

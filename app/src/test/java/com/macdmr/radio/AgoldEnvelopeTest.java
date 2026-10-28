@@ -97,6 +97,43 @@ public class AgoldEnvelopeTest {
         assertEquals(0, got.sr);
     }
 
+    @Test public void statusPushKeepsItsBodyAndTheReplyFoldsTheResult() {
+        AgoldEnvelope env = new AgoldEnvelope();
+        Frame[] out = new Frame[1];
+        byte[] push = AgoldFramesTest.frame(1, 0x36, 1, new byte[] { 3 });
+        assertEquals(push.length, env.tryDecode(push, 0, push.length, out));
+        assertEquals(0x36, out[0].cmd);
+        assertEquals(0, out[0].sr);
+        assertArrayEquals(new byte[] { 3 }, out[0].body);
+        byte[] reply = AgoldFramesTest.frame(1, 0x36, 0, new byte[] { 0 });
+        assertEquals(reply.length, env.tryDecode(reply, 0, reply.length, out));
+        assertEquals(0, out[0].sr);
+        assertEquals(0, out[0].body.length);
+        byte[] refused = AgoldFramesTest.frame(1, 0x36, 0, new byte[] { 1 });
+        env.tryDecode(refused, 0, refused.length, out);
+        assertEquals(1, out[0].sr);
+        assertEquals(0, out[0].body.length);
+    }
+
+    @Test public void unlistedRepliesAreMappedAndLoggedOnce() {
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        AgoldEnvelope env = new AgoldEnvelope();
+        env.setLog(lines::add);
+        Frame[] out = new Frame[1];
+        byte[] result = AgoldFramesTest.frame(1, 0x26, 0, new byte[] { 1 });
+        assertEquals(result.length, env.tryDecode(result, 0, result.length, out));
+        assertEquals(0x26, out[0].cmd);
+        assertEquals(1, out[0].sr);
+        assertEquals(0, out[0].body.length);
+        byte[] again = AgoldFramesTest.frame(1, 0x26, 0, new byte[] { 0 });
+        env.tryDecode(again, 0, again.length, out);
+        byte[] data = AgoldFramesTest.frame(1, 0x3B, 0, new byte[] { 4, 5 });
+        env.tryDecode(data, 0, data.length, out);
+        assertEquals(0, out[0].sr);
+        assertArrayEquals(new byte[] { 4, 5 }, out[0].body);
+        assertEquals(java.util.Arrays.asList("envelope cmd=0x26 unlisted", "envelope cmd=0x3B unlisted"), lines);
+    }
+
     @Test public void armorCodecMatchesFrame() {
         FrameCodec codec = FrameCodec.armor();
         Frame f = Frame.request(0x23, (byte) 1, (byte) 2);

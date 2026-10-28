@@ -7,11 +7,17 @@
 package com.macdmr.radio;
 
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * The Agold USB bridge envelope around the Armor command set: {@code 7E 96 69 | route | cmd | rw | len(2, BE) | body |
  * checksum(2, BE) | 81}. Route 01 is the module. The result of a set command is the body's one byte, not a header
- * field. Route 00 is the bridge itself and never becomes a module frame.
+ * field, and only on a reply ({@code rw} 00). A module push keeps that byte in the body. A command that is
+ * not in either table is still delivered: one reply byte is the result, anything else is data. Each such
+ * command is logged once. Route 00 is the bridge itself and never becomes a module frame.
  */
 public final class AgoldEnvelope implements FrameCodec {
     /** Module replies whose body is the data (version, RSSI, caller, text, read-back, the symbol engine). */
@@ -20,8 +26,11 @@ public final class AgoldEnvelope implements FrameCodec {
     private static final int[] SET = { 0x22, 0x23, 0x2E, 0x30, 0x31, 0x36 };
 
     private BridgeListener bridge;
+    private Consumer<String> log;
+    private final Set<Integer> logged = new HashSet<>();
 
     @Override public void setBridge(BridgeListener listener) { bridge = listener; }
+    @Override public void setLog(Consumer<String> log) { this.log = log; }
 
     @Override public byte[] encode(Frame frame) {
         int[] data = new int[frame.body.length];
@@ -52,15 +61,20 @@ public final class AgoldEnvelope implements FrameCodec {
             return total;
         }
         if (route != 1) return total;
-        if (listed(DATA, cmd)) {
-            out[0] = new Frame(cmd, rw, 0, body);
-            return total;
-        }
-        if (listed(SET, cmd) && body.length >= 1) {
-            out[0] = new Frame(cmd, rw, body[0] & 0xFF, new byte[0]);
-            return total;
-        }
+        out[0] = moduleFrame(cmd, rw, body);
         return total;
+    }
+
+    private Frame moduleFrame(int cmd, int rw, byte[] body) {
+        if (listed(DATA, cmd)) return new Frame(cmd, rw, 0, body);
+        boolean reply = rw == 0;
+        if (listed(SET, cmd)) {
+            if (reply && body.length >= 1) return new Frame(cmd, rw, body[0] & 0xFF, new byte[0]);
+            return new Frame(cmd, rw, 0, body);
+        }
+        if (logged.add(cmd) && log != null) log.accept(String.format(Locale.US, "envelope cmd=0x%02X unlisted", cmd));
+        if (reply && body.length == 1) return new Frame(cmd, rw, body[0] & 0xFF, new byte[0]);
+        return new Frame(cmd, rw, 0, body);
     }
 
     private static boolean listed(int[] cmds, int cmd) {

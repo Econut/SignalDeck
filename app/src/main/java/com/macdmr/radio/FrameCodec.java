@@ -27,6 +27,9 @@ public interface FrameCodec {
     /** Where route-00 reports go. The Armor codec never calls it. */
     default void setBridge(BridgeListener listener) { }
 
+    /** One line when an unlisted module command is seen. The Armor codec never calls it. */
+    default void setLog(java.util.function.Consumer<String> log) { }
+
     /** Today's {@code 68 … 10} framing. */
     static FrameCodec armor() { return ARMOR; }
 

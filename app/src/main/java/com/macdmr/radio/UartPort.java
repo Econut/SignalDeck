@@ -50,6 +50,7 @@ public final class UartPort {
         this.path = path; this.listener = l;
         this.codec = codec == null ? FrameCodec.armor() : codec;
         this.codec.setBridge(l::onBridge);
+        this.codec.setLog(l::onLog);
     }
 
     public synchronized void open() throws IOException { open(0); }
