@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — ANYSECU W6+: SignalDeck plays the audio, and Soft SQ works
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner: is there no way to make Soft SQ work on the W6? (proceed with decoupling the volumes) | **The W6 now plays its received audio through SignalDeck** (profile `appPlayback`): `CamcorderAudio` writes the camcorder audio to an `AudioTrack` on the media stream through the service's gate (nothing while keyed), the module's own speaker route stays off at every reception, and the module volume is held at `fixedModuleVolume` 4, the level the camcorder gain was calibrated at; the media-volume follower is off. So the volume keys work as on other phones, and the received level no longer moves with the volume. **Soft SQ** then works as an app gate again with this phone's own noise thresholds (`softSqThresholds` 11 … 2.4, close cap 12; `NoiseSquelchDetector.setTable`), measured with a HackRF: static 12.8–27.6, TTS speech at gain 7 ~11, gain 9 ~4.4, gain 11 and up ≤ 3.5. Its CTCSS detector is off (`subaudible` false: the audio is cut below ~300 Hz); on a channel with a receive tone the module keeps squelch 1 and checks the tone. Replaces the Soft-SQ-in-the-module approach on the W6 (`softSqInModule` stays for other phones). Help (Radios that do less) and `docs/w6/FEATURES.md`. | `CamcorderAudio.java`, `AtModuleEngine.java`, `DeviceProfile.java`, `RadioService.java`, `dsp/NoiseSquelchDetector.java`, `dsp/SoftSquelch.java`, `ui/HelpView.java`, `docs/w6/FEATURES.md`, `W6SoftSqTest.java`, `AtModuleEngineTest.java` | Host suite 423/0. W6: the owner listened (slight delay, totally acceptable; clean; volume keys work, 0 silent); the module's speaker line stays 0 while receiving and Android shows SignalDeck's AudioTrack playing. Gate on the device, share of time open: level 1 static 0 %, speech gain 7/9/13 100/100/96 %; level 5 0 %, 100/98/98 %; level 9 0 %, 76/88/96 %. |
+
 ## 2026-10-28 — Channels: ask before importing the stock app's channels
 
 | Backlog | Change | Files | Test |

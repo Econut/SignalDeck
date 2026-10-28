@@ -101,8 +101,8 @@ public class AtModuleEngineTest {
         assertArrayEquals(DeviceProfile.ANYSECU_W6.muteLines, DeviceProfile.ANYSECU_W6.copy(true, false).muteLines);
     }
 
-    @Test public void softSqOnTheW6IsTheModulesSquelch() {
-        assertTrue(DeviceProfile.ANYSECU_W6.softSqInModule); assertTrue(DeviceProfile.ANYSECU_W6.copy(true, false).softSqInModule);   // its audio cannot carry a noise squelch
+    @Test public void softSqInTheModuleIsOffOnBuiltInProfiles() {
+        assertFalse(DeviceProfile.ANYSECU_W6.softSqInModule);                                // since app playback the W6 gates in the app (W6SoftSqTest)
         assertFalse(DeviceProfile.ARMOR_26_ULTRA.softSqInModule);
     }
 }

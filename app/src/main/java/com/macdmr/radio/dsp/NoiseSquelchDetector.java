@@ -72,8 +72,9 @@ public final class NoiseSquelchDetector {
                 amp /= HI.length;
                 highAmp = amp;
                 smoothed = smoothed > 900 ? amp : smoothed * (1 - EMA) + amp * EMA;
-                double open = threshFor(level);
-                double close = Math.min(open * 1.3, 46);   // hysteresis, but stay below the static floor
+                double[] t = table;
+                double open = t != null ? t[Math.max(1, Math.min(9, level)) - 1] : threshFor(level);
+                double close = Math.min(open * 1.3, t != null ? closeCap : 46);   // hysteresis, but stay below the static floor
                 boolean quiet = totalEnergy < (window * 2500.0);   // RMS < ~50: near silence
                 // Silence never opens (a retune or a muted receiver is silent too), but it never closes either: with the
                 // module's squelch held open, silence on an open channel is a carrier with nobody speaking (full FM
@@ -87,6 +88,14 @@ public final class NoiseSquelchDetector {
         }
     }
 
+    private volatile double[] table;
+    private volatile double closeCap = 46;
+    /**
+     * A phone's own thresholds for levels 1-9 (its static floor differs: the W6's camcorder audio at its fixed module level
+     * puts static at 13-28 where the Armor's sits near 50) and the highest close threshold (below its static floor);
+     * null keeps the built-in table.
+     */
+    public void setTable(double[] levels, double cap) { table = levels != null && levels.length == 9 ? levels.clone() : null; closeCap = cap > 0 ? cap : 46; }
     private static double threshFor(int level) {
         if (level < 1) return OPEN_THRESH[1];
         if (level > 9) return OPEN_THRESH[9];

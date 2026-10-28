@@ -18,13 +18,14 @@ push-to-talk). **No** = not available on this radio, with the reason.
 | Channels, zones, favourites, multi-select (delete, add to a zone, star) | Works | Phone and web |
 | Channel editor, VFO | Works | Refuses frequencies outside 400–470 MHz and says so; VFO starts on your channel, FM only |
 | CTCSS / DCS tone squelch | Works (CTCSS) | Every stock channel uses 62.5 Hz; DCS codes are normal polarity only |
-| Receive audio to the speaker | Works | The module drives the speaker itself; loudness = Android media volume (stock mapping), volume 0 switches the speaker route off |
-| Receive audio into the app (camcorder input) | Works | Fixed gain 12; recording and every decoder use it, also at volume 0 |
+| Receive audio to the speaker | Works | SignalDeck plays it (media stream, volume keys as usual; the module's own speaker route stays off, its volume fixed at 4); slight delay, clean (owner, 2026-10-28) |
+| Receive audio into the app (camcorder input) | Works | Fixed gain 12 at the fixed module volume; recording and every decoder use it, at any media volume |
 | Receive response | Measured | Cut below ~300 Hz (−48 dB at 250 Hz, −57 dB at 125–187 Hz), steeper than the Armor; the module's filter command is refused |
 | Signal meter (S-units, dBm) | No | The module answers no RSSI query; the meter says RECEIVING / QUIET from the receive-detect line |
 | Band scope | No | Needs signal readings (hidden) |
 | Scan | Should work | Steps channels on the squelch; untested on the W6 |
-| Soft SQ, MON, REC | Should work | REC/MON use the same audio as the decoders (measured working) |
+| Soft SQ | Works | Own thresholds (static never opens it; level 9 holds back weak signals), noise only: the module checks a channel's tone (HackRF, 2026-10-28) |
+| MON, REC | Should work | REC/MON use the same audio as the decoders (measured working) |
 | Live captions (TXT, Vosk) | Should work | Same audio input; untested |
 
 ## Data modes
