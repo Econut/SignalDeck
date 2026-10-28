@@ -25,6 +25,7 @@ public final class M17Screen extends ModeScreen {
     private final M17Station st;
     private final TextView now, who, meta, stats, note;
     private final LinearLayout list;
+    private LinearLayout texts;
     private int shown = -1;
 
     public M17Screen(Context c, RadioService svc, Runnable onClose) {
@@ -37,6 +38,22 @@ public final class M17Screen extends ModeScreen {
         who = Neo.text(c, "", Neo.TEXT, 26, Neo.mono(c)); who.setGravity(Gravity.CENTER); body.addView(who);
         meta = Neo.text(c, "", Neo.AMBER_LIGHT, 15, Neo.uiMedium(c)); meta.setGravity(Gravity.CENTER); meta.setPadding(0, dp(4), 0, 0); body.addView(meta);
         stats = Neo.text(c, "", Neo.MUTED, 13, Neo.mono(c)); stats.setGravity(Gravity.CENTER); stats.setPadding(0, dp(6), 0, dp(10)); body.addView(stats);
+        if (svc.m17CanSend()) {
+            body.addView(Neo.sheetSection(c, "Text"));
+            android.widget.EditText box = new android.widget.EditText(c);
+            box.setHint("Message"); box.setTextColor(Neo.TEXT); box.setHintTextColor(Neo.MUTED); box.setTypeface(Neo.ui(c)); box.setSingleLine(true);
+            body.addView(box);
+            android.widget.TextView send = Neo.text(c, "Send", Neo.VIOLET_LIGHT, 16, Neo.uiMedium(c));
+            send.setPadding(0, dp(8), 0, dp(8));
+            send.setOnClickListener(v -> {
+                String err = svc.sendM17Sms(null, box.getText().toString());
+                if (err != null) android.widget.Toast.makeText(c, err, android.widget.Toast.LENGTH_SHORT).show();
+                else { box.setText(""); refresh(); }
+            });
+            body.addView(send);
+        }
+        body.addView(Neo.sheetSection(c, "Texts"));
+        texts = new LinearLayout(c); texts.setOrientation(VERTICAL); body.addView(texts);
         body.addView(Neo.sheetSection(c, "Heard"));
         list = new LinearLayout(c); list.setOrientation(VERTICAL); body.addView(list);
         note = Neo.sheetHint(c, ""); note.setOnLongClickListener(v -> { st.resetCalibration(); refresh(); return true; }); body.addView(note);
@@ -69,6 +86,16 @@ public final class M17Screen extends ModeScreen {
         } else {
             set(now, "LISTENING FOR M17"); color(now, Neo.VIOLET_LIGHT);
             set(who, ""); set(meta, ""); set(stats, "");
+        }
+        if (texts != null) {
+            texts.removeAllViews();
+            java.util.List<M17Station.Text> tl = st.texts();
+            java.text.SimpleDateFormat tf = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.US);
+            for (int i = tl.size() - 1; i >= 0 && i >= tl.size() - 30; i--) {
+                M17Station.Text e = tl.get(i);
+                String line = tf.format(new java.util.Date(e.ts)) + (e.sent ? "  sent  " : "  ") + e.src + " → " + e.dst + "  " + e.body;
+                texts.addView(Neo.text(getContext(), line, e.sent ? Neo.VIOLET_LIGHT : Neo.TEXT, 14, Neo.ui(getContext())));
+            }
         }
         List<M17Station.Heard> hl = st.heard();
         if (hl.size() != shown || h != null) {

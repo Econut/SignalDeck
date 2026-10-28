@@ -60,10 +60,41 @@ public class HeldPathReceiverTest {
     private static final class Log implements HeldPathReceiver.Listener {
         final List<String> started = new ArrayList<>(), ended = new ArrayList<>();
         final List<M17.Stream> frames = new ArrayList<>();
+        final List<byte[]> packets = new ArrayList<>();
+        int lost;
         public void started(M17.Lsf l) { started.add(l.src() + ">" + l.dst()); }
         public void link(M17.Lsf l) { started.add("link"); }
         public void frame(M17.Stream s, float q) { frames.add(s); }
         public void ended(int f, int g, String why) { ended.add(why + " " + f); }
+        public void packet(M17.Lsf l, byte[] body) { packets.add(body); }
+        public void framesLost() { lost++; }
+    }
+
+    /** Preamble, packet link setup, the packet frames and the end marker, as the receiver's audio. */
+    static short[] packetAudio(byte[] data) {
+        byte[] lsf = M17.encodePacketLsf("N0CALL", "@ALL", 0);
+        List<int[]> parts = new ArrayList<>();
+        parts.add(M17.preamble());
+        parts.add(M17.lsfSymbols(lsf));
+        parts.addAll(M17.encodePacket(data));
+        parts.add(M17.eotTail());
+        int total = 0; for (int[] p : parts) total += p.length;
+        int[] sym = new int[total]; int at = 0;
+        for (int[] p : parts) { System.arraycopy(p, 0, sym, at, p.length); at += p.length; }
+        return shape(sym);
+    }
+
+    @Test public void aDamagedPacketNotesFramesLost() throws Exception {
+        byte[] good = M17.smsPayload("hi");
+        byte[] bad = good.clone();
+        bad[bad.length - 1] ^= (byte) 0xFF;
+        Log log = new Log();
+        HeldPathReceiver rx = new HeldPathReceiver(identity(), log, false);
+        run(rx, concat(silence(4000), packetAudio(good), silence(8000), packetAudio(bad), silence(12000)), 4);
+        for (int w = 0; log.ended.size() < 2 && w < 4; w++) { Thread.sleep(1100); rx.poll(); }
+        assertEquals("good text", "hi", M17.smsText(log.packets.get(0)));
+        assertEquals("only the good packet", 1, log.packets.size());
+        assertEquals("one frames-lost note", 1, log.lost);
     }
 
     /** Feeds audio in 512-sample blocks with a receiver pass every {@code every} blocks, the way the thread polls while audio arrives. */

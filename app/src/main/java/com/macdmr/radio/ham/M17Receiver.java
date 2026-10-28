@@ -23,6 +23,10 @@ public final class M17Receiver {
         void frame(M17.Stream s, float quality);       // every stream frame (payload = two Codec 2 3200 frames)
         void lsfFromLich(M17.Lsf lsf);                 // the LSF rebuilt from six LICH chunks (late or damaged LSF)
         void ended(int frames, int good, String why);
+        /** A packet whose CRC checked. The body is the type byte and the payload, without the CRC. */
+        default void packet(M17.Lsf lsf, byte[] body) { }
+        /** The last frame arrived and the packet CRC failed, or a frame in the run was missing. */
+        default void framesLost() { }
     }
 
     public static final int L = 8, FB = 24, GROUPS = 4, NCOEF = GROUPS * (2 * L + 1) + FB + 1;
@@ -51,13 +55,14 @@ public final class M17Receiver {
     private final float[] win = new float[160]; private int winFill;
     private int strong; private long preStart48 = -1, preEnd48 = -1;
 
-    private enum State { IDLE, ACQUIRE, STREAM }
+    private enum State { IDLE, ACQUIRE, STREAM, PACKET }
     /** Frames in a row (40 ms each) without the stream sync before the call is given up: the symbol clock holds over that long (W6: 1/10 of a symbol in 4 s). */
     static final int MAX_LOST = 6;
     /** Feedback taps a fit on a phone's own reception keeps (the rest held at 0): fewer spread wrong decisions less (W6: 4 decoded another transmission best, 95 and 92 of 100 frames). */
     public static final int LEARN_FEEDBACK = 4;
     static final int SEARCH = 60;                                // symbols either side of the estimated preamble end
     private State state = State.IDLE;
+    private java.util.List<M17.Packet> packets;
     private long next48;                                         // where the next frame's first sync symbol is expected
     private float gain = 1;
     private final float[] past = new float[FB];
@@ -88,6 +93,7 @@ public final class M17Receiver {
         preamble(v);
         if (state == State.ACQUIRE && n48 > preEnd48 + (SEARCH + 192 + 4) * SPS48 + 5 * L + 60) acquire();
         while (state == State.STREAM && n48 > next48 + 192 * SPS48 + 5 * L + 60) frame();
+        while (state == State.PACKET && n48 > next48 + 192 * SPS48 + 5 * L + 60) packetFrame();
     }
     private float at(long i) { return i < 0 || i >= n48 || n48 - i >= RING ? 0f : x48[(int) (i % RING)]; }
 
@@ -160,7 +166,8 @@ public final class M17Receiver {
         frames = 0; good = 0; lost = 0; java.util.Arrays.fill(lichChunks, null); lsfFromLichSent = false;
         learnA = new double[NCOEF][NCOEF]; learnB = new double[NCOEF]; learnFrames = 0; learnSymbols = 0;
         listener.started(lsf);
-        state = State.STREAM;
+        state = lsf != null && lsf.crcOk && !lsf.stream() ? State.PACKET : State.STREAM;
+        if (state == State.PACKET) packets = new java.util.ArrayList<>();
     }
 
     /** One frame at p0 with timing re-chosen among p0-2..p0+2 (48 kHz samples); returns the chosen start, symbols in sym. */
@@ -197,6 +204,27 @@ public final class M17Receiver {
 
         listener.frame(s, quality);
         if (s.last() && confirmed) end("last frame");                     // an unconfirmed frame's end bit may be a bit error
+    }
+
+    /** A packet frame. Voice frames never come here: this state is entered only from a packet-mode LSF. */
+    private void packetFrame() {
+        long p0 = next48; float[] sym = new float[192]; trackFrame(p0, sym);
+        int pm = 0, em = 0;
+        for (int i = 0; i < 8; i++) {
+            int s = (int) slice(sym[i]);
+            if (s == M17.SYMBOL_MAP[(M17.SYNC_PKT >> (14 - 2 * i)) & 3]) pm++;
+            if (s == M17.EOT_SYMBOLS[i]) em++;
+        }
+        if (em >= 7 && em > pm) { end("end of transmission"); return; }
+        if (pm < 6) { if (++lost >= 2) { end("signal lost"); return; } return; }
+        lost = 0; frames++;
+        M17.Packet p = M17.decodePacket(sym, 8);
+        if (packets != null) packets.add(p);
+        if (p.eof) {
+            byte[] body = M17.assemble(packets);
+            if (body != null) listener.packet(lsf, body); else listener.framesLost();
+            end("last frame");
+        }
     }
 
     /** NLMS on a confirmed frame: re-encode it, then nudge the coefficients toward the exact symbols. */

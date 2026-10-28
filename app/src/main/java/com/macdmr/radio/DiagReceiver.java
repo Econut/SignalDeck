@@ -138,6 +138,8 @@ public final class DiagReceiver extends BroadcastReceiver {
                     break;
                 }
                 if (i.hasExtra("tx")) { s.m17BenchTone(i.getIntExtra("tx", 1500)); break; }
+                String sms = i.getStringExtra("sms");
+                if (sms != null) { Log.i("DiagReceiver", "m17 sms: " + s.sendM17Sms(i.getStringExtra("to"), sms)); break; }
                 if (i.hasExtra("dump")) com.macdmr.radio.M17Station.benchDump = i.getBooleanExtra("dump", false);
                 if (i.hasExtra("on")) Log.i("DiagReceiver", "m17: " + s.setM17(i.getBooleanExtra("on", false), !i.hasExtra("hold") || i.getBooleanExtra("hold", true)));
                 String nm = i.getStringExtra("enc");
