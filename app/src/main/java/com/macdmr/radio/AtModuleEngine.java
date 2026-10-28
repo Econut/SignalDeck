@@ -207,7 +207,8 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
 
     @Override public void setVolume(int v) {
         int lv = speakerLevel;
-        int m = lv > 0 ? lv : lv == 0 ? Math.max(1, moduleVolume) : moduleVolumeFor(v);   // the media volume rules once it is known; at 0 the speaker route is off instead
+        int m = profile.appPlayback ? profile.fixedModuleVolume                                    // SignalDeck plays the audio: a fixed module level
+                : lv > 0 ? lv : lv == 0 ? Math.max(1, moduleVolume) : moduleVolumeFor(v);   // the media volume rules once it is known; at 0 the speaker route is off instead
         if (m == moduleVolume) return;
         moduleVolume = m;
         async("SETVOLUME", "AT+DMOSETVOLUME=" + m, null);
@@ -216,7 +217,7 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
     @Override public void setSpeakerLevel(int level) {
         int was = speakerLevel; speakerLevel = Math.max(0, Math.min(8, level));
         if (speakerLevel > 0 && speakerLevel != moduleVolume && running) { moduleVolume = speakerLevel; async("SETVOLUME", "AT+DMOSETVOLUME=" + speakerLevel, null); }
-        if (rxOn && (was == 0) != (speakerLevel == 0)) lines(speakerLevel == 0 ? profile.muteLines : profile.rxLinesOn);   // changed while receiving
+        if (rxOn && !profile.appPlayback && (was == 0) != (speakerLevel == 0)) lines(speakerLevel == 0 ? profile.muteLines : profile.rxLinesOn);   // changed while receiving
     }
     /** Media volume (0..max) to the module's 0-8 the way the stock app maps it (on a 0-25 scale: 1-3 = 1 ... 22-25 = 8). */
     static int speakerLevelFor(int media, int max) { return media <= 0 || max <= 0 ? 0 : Math.max(1, Math.min(8, (int) Math.ceil(media * 8.0 / max))); }
@@ -308,7 +309,7 @@ public final class AtModuleEngine implements ModuleEngine, UartPort.Listener {
             boolean on = "1".equals(v);
             if (on != was) {
                 was = on; rxOn = on;
-                if (on) { lines(profile.rxLinesOn); if (speakerLevel == 0) lines(profile.muteLines); ev.status(1, RadioEngine.statusName(1)); }
+                if (on) { lines(profile.rxLinesOn); if (speakerLevel == 0 || profile.appPlayback) lines(profile.muteLines); ev.status(1, RadioEngine.statusName(1)); }   // app playback: the module's speaker route stays off
                 else { ev.status(2, RadioEngine.statusName(2)); lines(profile.rxLinesOff); }
             }
             try { Thread.sleep(rootRead ? 250 : 100); } catch (InterruptedException e) { return; }

@@ -746,13 +746,14 @@ public class RadioService extends Service implements RadioEngine.Events {
         watchUsbDuringTx();
         ProfileRegistry.init(this);
         profile = DeviceProfile.detect();
+        softSq.toneDetect = profile.subaudible; softSq.setNoiseTable(profile.softSqThresholds, profile.softSqCloseCap);   // the W6: noise only, on its own scale
         ProfileRegistry.maybeFetch();                               // a newer revision or an advisory, at most every 12 h
         store = new ChannelStore(this);
         store.onChange = () -> { ui.removeCallbacks(channelsChanged); ui.postDelayed(channelsChanged, 150); };   // a bulk action is one event
         zoneId = getSharedPreferences("radio", MODE_PRIVATE).getLong("zone", 0);
         if (coverage().enabled()) { coverage.resume(); startForegroundTyped(true); }
         engine = "sa818".equals(profile.protocol) ? new AtModuleEngine(profile, this) : new RadioEngine(profile, this);   // the W6's AT module, else the DMR module
-        if (profile.muteLines != null) {                                 // the module drives the speaker itself: follow Android's media volume, like the stock app
+        if (profile.muteLines != null && !profile.appPlayback) {                                 // the module drives the speaker itself: follow Android's media volume, like the stock app
             followMediaVolume();
             try { registerReceiver(mediaVolume, new android.content.IntentFilter("android.media.VOLUME_CHANGED_ACTION")); } catch (Throwable t) { log("volume receiver: " + t); }
         }
@@ -979,9 +980,9 @@ public class RadioService extends Service implements RadioEngine.Events {
         try {
             if (audio == null) {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
-                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio() : vendorOrDirectAudio();
+                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
-                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()));   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
+                audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()) && !(profile.appPlayback && pttDown));   // app playback (the W6): nothing to the speaker while keyed   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
             }
             String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -1387,7 +1388,8 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     /** Squelch byte for the module: with Soft SQ on, or on an M17 channel, the radio's squelch is held open (0). An M17 channel needs the audio below the module's one threshold; the speaker gate keeps that raw FM out and only the decoded voice is played. */
     private int hardwareSq(ChannelStore.Channel ch) {
-        if (ch != null && !ch.isM17() && profile.softSqInModule && softSqFor(ch)) return Math.max(1, Math.min(8, ch.softSqLevel));   // the W6: Soft SQ is the module's squelch (1-9 to its 1-8)
+        if (ch != null && !ch.isM17() && profile.softSqInModule && softSqFor(ch)) return Math.max(1, Math.min(8, ch.softSqLevel));   // Soft SQ is the module's squelch (1-9 to its 1-8)
+        if (ch != null && !ch.isM17() && !profile.subaudible && softSqFor(ch) && ch.rxType != 0) return 1;   // no tones in the audio (the W6): the module keeps checking the channel's tone, Soft SQ gates the noise
         return ch != null && (ch.isM17() || softSqFor(ch)) ? 0 : ch == null ? 0 : ch.sq;
     }
     /** Soft SQ gates the audio in the app (every radio but those whose module squelch does it). */
