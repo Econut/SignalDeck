@@ -7,7 +7,7 @@ help: Device → Radios that do less). Status as of 2026-10-27, from the bench (
 walk through the app and SignalDeck Web on the phone.
 
 Legend: **Works** = measured on the W6. **Should work** = built for every analog radio, not yet exercised on the W6.
-**Needs transmit** = works only once transmit is verified (until then the profile is unverified and the app refuses
+**Needs transmit** (before 2026-10-28) = worked only once transmit was verified (until then the app refused
 push-to-talk). **No** = not available on this radio, with the reason.
 
 ## Radio and receive
@@ -33,20 +33,20 @@ push-to-talk). **No** = not available on this radio, with the reason.
 |---|---|---|
 | APRS receive (passive decode on your channel) | Works | 6/6 demo packets on 435.025 MHz |
 | APRS monitoring on 144.390 | No | 2 m, outside 400–470 MHz (hidden; the service refuses it) |
-| APRS send (message, beacon, object, telemetry), auto-ack, digipeater, KISS TNC transmit | Needs transmit | On a UHF channel; automatic beacons go out on 144.390 only, so they do not run here |
+| APRS send (message, beacon, object, telemetry), auto-ack, digipeater, KISS TNC transmit | Should work (transmit verified, mode untested) | On a UHF channel; automatic beacons go out on 144.390 only, so they do not run here |
 | KISS TNC receive, APRS-IS (internet) | Should work | |
 | ISS APRS 437.825 | Should work | In band, both ways |
 | SSTV receive | Works | Robot 36: 238/240 lines, clean colour bars ("Receive here"; 144.500 is hidden) |
 | ISS SSTV 437.550 | Should work | In band |
-| SSTV send | Needs transmit | |
+| SSTV send | Should work (transmit verified, mode untested) | |
 | FT8 over FM receive | Works | Both messages of a two-signal slot, in the app and offline |
-| FT8 send | Needs transmit | |
+| FT8 send | Should work (transmit verified, mode untested) | |
 | M17 receive | Works | Own calibration (`eq_anysecu-w6plus`): 98 and 92 of 100 frames confirmed over the air; self-calibration refines it from received calls (it cannot create one on this phone) |
 | M17 send | No | Needs the HR-C7000 bench firmware's symbol engine |
 | POCSAG pages | No | Same reason (hidden) |
 | RTTY / PSK31, DTMF decode, Morse decode, SAME header decode | Should work | Same audio path as the modes that work; untested |
 | NOAA weather alerts | No | 162 MHz is outside the bands (hidden) |
-| Packet terminal, Winlink over radio | Needs transmit | Only with a UHF packet station or gateway |
+| Packet terminal, Winlink over radio | Should work (transmit verified, mode untested) | Only with a UHF packet station or gateway |
 | Packet finder | Limited | Its 2 m default list is out of band: add UHF frequencies in its Settings |
 | Satellite passes | Limited | Only satellites with a 400–470 MHz downlink are listed; cross-band ones (ISS repeater, SO-50: 145.9 MHz up) are tracked listen-only |
 
@@ -54,8 +54,8 @@ push-to-talk). **No** = not available on this radio, with the reason.
 
 | Feature | W6 | Notes |
 |---|---|---|
-| Talk (push-to-talk, side key, web, Android Auto) | Needs transmit | PTT line `gpio188` and mic line `gpio222` are mapped from the stock app; refused until the owner verifies transmit |
-| Parrot, voice keyer, Morse ID, DTMF send, emergency (APRS) | Needs transmit | |
+| Talk (push-to-talk, side key, web, Android Auto) | Works | Transmit confirmed on the air by the owner (2026-10-28, profile revision 3); PTT line `gpio188` and mic line `gpio222` mapped from the stock app |
+| Parrot, voice keyer, Morse ID, DTMF send, emergency (APRS) | Should work (transmit verified, mode untested) | |
 | Fox hunt | Limited | Be the fox needs transmit; hunting needs signal readings (not available) |
 | Coverage logging | Limited | Key-ups and positions only: no signal readings to map |
 | DMR: digital channels, talkgroups, contacts, texts, RadioID names, DMR roaming, DMR ID | No | No DMR in the module (hidden) |

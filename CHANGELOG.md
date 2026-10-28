@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — ANYSECU W6+: transmit enabled
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 handoff (owner: transmit tests in the cage) | The W6+ profile (revision 3) no longer blocks transmit: the owner keyed it on the air in the cage and confirmed it works, so talk, the side key, the web and the data modes transmit like on a supported phone. Help (Untested profiles), the README phone table and `docs/w6/FEATURES.md` say so; the data modes' transmit (APRS, SSTV, FT8, packet) is listed as should work until each is tried. | `DeviceProfile.java`, `ui/HelpView.java`, `README.md`, `docs/w6/FEATURES.md` | Owner, W6 in the cage 2026-10-28: transmit works (a local build with only the block lifted). Host suite. |
+
 ## 2026-10-28 — ANYSECU W6+: tested for receive
 
 | Backlog | Change | Files | Test |
