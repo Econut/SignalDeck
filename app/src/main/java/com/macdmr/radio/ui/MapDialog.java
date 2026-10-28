@@ -471,7 +471,8 @@ public final class MapDialog {
         final com.macdmr.radio.coverage.CoverageLogger lg = svc.coverage();
         final com.macdmr.radio.coverage.CoverageStore st = lg.store();
         LinearLayout box = Neo.sheetBody(c, "Coverage maps");
-        box.addView(Neo.sheetHint(c, "Heard: the repeater's signal at each place you heard it. Key-ups: places where your transmission opened the repeater (green) or got no reply (red)."));
+        box.addView(Neo.sheetHint(c, "Heard: the repeater's signal at each place you heard it. Key-ups: places where your transmission opened the repeater (green) or got no reply (red)."
+                + (svc.profile().rssi ? "" : " This radio gives no signal readings, so it records key-ups only; the Heard layer stays empty.")));
 
         Neo.NeonSwitch sw = new Neo.NeonSwitch(c); sw.setChecked(lg.enabled());
         final int rxN = st.rxCount(), txN = st.txCount();
