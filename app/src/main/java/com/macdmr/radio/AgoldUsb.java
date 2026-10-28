@@ -81,6 +81,16 @@ final class AgoldUsb {
         return RootSetup.run("for d in /sys/bus/usb/devices/*; do n=${d##*/}; "
                 + "if [ -f $d/idVendor ]; then case $n in usb*) ;; *) echo \"  $n $(cat $d/idVendor):$(cat $d/idProduct)  $(cat $d/manufacturer 2>/dev/null) $(cat $d/product 2>/dev/null)\";; esac; "
                 + "elif [ -f $d/bInterfaceClass ]; then echo \"           $n: class $(cat $d/bInterfaceClass) $(basename $(readlink $d/driver) 2>/dev/null)\"; fi; done; "
-                + "cat /proc/asound/cards; for s in /proc/asound/card[1-9]/stream*; do [ -f $s ] && { echo \"-- $s\"; cat $s; }; done") + "\n";
+                + "cat /proc/asound/cards; for s in /proc/asound/card[1-9]/stream*; do [ -f $s ] && { echo \"-- $s\"; cat $s; }; done; "
+                + "for t in /dev/ttyACM*; do [ -e $t ] || continue; h=''; for p in /proc/[0-9]*; do ls -l $p/fd 2>/dev/null | grep -q \" $t\\$\" && h=\"$h $(tr '\\0' ' ' < $p/cmdline | cut -c1-80)\"; done; "
+                + "echo \"" + PORT_LINE + "$t $(ls -Z $t | cut -d' ' -f1) held by${h:- nobody}\"; done") + "\n";
+    }
+
+    static final String PORT_LINE = "bridge port: ";
+
+    /** {port, SELinux label, holder} from the {@link #PORT_LINE} of a watch, or null. */
+    static String[] port(String watch) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(PORT_LINE) + "(/dev/\\S+) (u:object_r:[A-Za-z0-9_]+:s0)\\S* held by ([^\\n]+)").matcher(watch == null ? "" : watch);
+        return m.find() ? new String[] { m.group(1), m.group(2), m.group(3).trim() } : null;
     }
 }

@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Device report: draft profile, the summary in 00_SUMMARY.txt, PTT broadcasts and HIDL interfaces from the code
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 plan item 8 / baseline B7; Atom XL handoff Phase C (gap list 6–9, 12) | Run all checks ends with a **draft profile** (`DraftProfile`): stock app, protocol, control port, line speed, transport, audio, power line, PTT key, PTT broadcasts, SELinux rule, serial library and the USB note, each with a confidence and its evidence, built from the finished report text only. It is a report section, the end of the checks' summary and, with that summary, the end of `00_SUMMARY.txt` (which had only the generic header). The stock app's code scan now lists **PTT broadcasts** (dotted names with "ptt", not system properties) and the **vendor HIDL interfaces** it calls. On a phone with the USB bridge the watch records the **bridge port, its SELinux label and its holder** while the radio is on, and the summary says the module sits behind the bridge on that port instead of "the probe did not reach the port it is on". Help (Run all checks) says so. | `DraftProfile.java`, `AgoldUsb.java`, `FirstRunCheck.java`, `DeviceReport.java`, `ui/HelpView.java`, `DraftProfileTest.java`, `test/resources/report/*` | Host: `DraftProfileTest` on an Atom XL excerpt and the committed W6 report (the W6 draft equals its profile for stock app, protocol, port, baud and SELinux rule) + suite 430/0. Device (Atom XL, 2026-10-28 14:15, `run_checks.sh` over Wi-Fi): draft as in the PR, USB back after the watch. Not run on the Armor or the W6: their reports gain the two clue lines, the draft section and the summary in `00_SUMMARY.txt`; nothing else changes. |
+
 ## 2026-10-28 — Device report: release the Atom XL's USB port after the stock-app watch
 
 | Backlog | Change | Files | Test |

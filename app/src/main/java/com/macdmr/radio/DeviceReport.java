@@ -240,12 +240,15 @@ public final class DeviceReport {
      */
     public static String apkClues(File apk) {
         java.util.TreeSet<String> paths = new java.util.TreeSet<>(), params = new java.util.TreeSet<>(), bauds = new java.util.TreeSet<>(), logs = new java.util.TreeSet<>(),
-                cmds = new java.util.TreeSet<>(), libs = new java.util.TreeSet<>();
+                cmds = new java.util.TreeSet<>(), libs = new java.util.TreeSet<>(), actions = new java.util.TreeSet<>(), hidl = new java.util.TreeSet<>();
         Pattern pPath = Pattern.compile("/(sys|dev|proc)/[A-Za-z0-9_./-]{2,80}"), pParam = Pattern.compile("\\b[a-z][a-z0-9_]{2,30}=(on|off|1|0|true|false)\\b"),
                 pBaud = Pattern.compile("\\bB(9600|19200|38400|57600|115200|230400|460800|921600)\\b"),
                 // a keyword that starts a word or a camelCase part ("isPttButton", "PTT key"), not one inside a word ("onInterceptTouchEvent")
                 pLog = Pattern.compile("[ -~]{0,50}((?<![A-Za-z])(?i:ptt|pcm|dmr)|(?<=[a-z])(?:Ptt|PTT|Pcm|PCM|Dmr|DMR)|(?i:serial ?port|intercom|interphone|walkie))[ -~]{0,50}"),
                 pCmd = Pattern.compile("\\bAT\\+[A-Z][A-Z0-9]{2,20}[=?]?"),
+                // broadcast names with "ptt" in their last parts (android.intent.action.PTT.down on the Atom XL) and the vendor HIDL interfaces the app calls
+                pAction = Pattern.compile("\\b[a-z][a-z0-9_]*(?:\\.[A-Za-z0-9_]+)+\\.[A-Za-z0-9_]*(?i:ptt)[A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)?\\b"),
+                pHidl = Pattern.compile("\\bvendor(?:\\.[a-z0-9_]+)+@\\d+\\.\\d+::I[A-Za-z0-9_]+"),
                 pFramework = Pattern.compile("(?i).*(activity|intent|content|receiver|launcher|shortcut|broadcast|permission|fragment|view|layout|leanback|androidx|java|kotlin).*");
         try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(apk)) {
             java.util.Enumeration<? extends ZipEntry> en = z.entries();
@@ -267,6 +270,8 @@ public final class DeviceReport {
                         m = pParam.matcher(s); while (m.find()) params.add(m.group());
                         m = pBaud.matcher(s); while (m.find()) bauds.add(m.group());
                         m = pCmd.matcher(s); while (m.find() && cmds.size() < 60) cmds.add(m.group());
+                        if (dex && !s.contains("/") && !s.contains(" ")) { m = pAction.matcher(s); while (m.find() && actions.size() < 20) actions.add(m.group()); }
+                        m = pHidl.matcher(s); while (m.find() && hidl.size() < 10) hidl.add(m.group());
                         if (dex && s.length() <= 100 && logs.size() < 120 && !s.contains("/") && (s.contains(" ") || s.contains(":") || s.contains(","))
                                 && pLog.matcher(s).matches() && !pFramework.matcher(s).matches()) logs.add(s.trim());           // log-like texts, not framework names
                     }
@@ -280,6 +285,8 @@ public final class DeviceReport {
         out.append("  serial speeds: ").append(bauds.isEmpty() ? "-" : String.join(" ", bauds)).append('\n');
         out.append("  native libraries: ").append(libs.isEmpty() ? "-" : String.join("  ", libs)).append('\n');
         out.append("  module commands: ").append(cmds.isEmpty() ? "-" : String.join("  ", cmds)).append('\n');
+        out.append("  PTT broadcasts: ").append(actions.isEmpty() ? "-" : String.join(" ", actions)).append('\n');
+        out.append("  HIDL interfaces: ").append(hidl.isEmpty() ? "-" : String.join(" ", hidl)).append('\n');
         String fam = commandFamily(cmds); if (fam != null) out.append("  protocol hint from its code: ").append(fam).append('\n');
         out.append("  log texts about the radio:\n"); for (String s : logs) out.append("    ").append(mask(s)).append('\n');
         return out.toString();
@@ -377,6 +384,14 @@ public final class DeviceReport {
      * check results, which commands the module refused or answered slowly, odd signal values), so nobody has to dig
      * through the raw sections below.
      */
+    /** The body of the last "==== title ====" section of a report, or null. */
+    static String lastSection(String report, String title) {
+        String h = "==== " + title + " ====";
+        int a = report == null ? -1 : report.lastIndexOf(h); if (a < 0) return null;
+        int from = a + h.length(), end = report.indexOf("\n==== ", from);
+        return report.substring(from, end < 0 ? report.length() : end);
+    }
+
     static String summary(RadioService svc, File reportTxt) {
         StringBuilder b = new StringBuilder("SIGNALDECK DEVICE REPORT \u2014 SUMMARY\n\n");
         b.append("phone: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append(" \u00B7 Android ").append(Build.VERSION.RELEASE).append(" \u00B7 ").append(Build.DISPLAY).append('\n');
@@ -406,6 +421,8 @@ public final class DeviceReport {
             int[] r = svc.engine().rssiCounts();
             b.append(String.format(java.util.Locale.US, "signal readings: %d, of them %d the module's \"no reading\" value%s\n", r[0], r[1], r[1] > 0 ? " (shown as no signal)" : ""));
         }
+        String checks = lastSection(rep, "Summary");                    // Run all checks' verdict, which ends with the draft profile
+        if (checks != null) b.append("\nlatest Run all checks:\n").append(checks.trim()).append('\n');
         b.append("\nThe raw sections follow in report.txt (newest checks at the end).\n");
         return b.toString();
     }

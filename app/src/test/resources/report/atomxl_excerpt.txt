@@ -1,0 +1,80 @@
+==== Walkie-talkie app candidates, ranked (score: evidence) ====
+  examined below: com.agold.intercom
+
+==== Clues in com.agold.intercom's code (paths, audio parameters, serial speeds, PTT log texts) ====
+  paths: /proc/self/fd/  /sys/hall_status/hall_status
+  serial speeds: -
+  native libraries: -
+  module commands: -
+  PTT broadcasts: agui.intercom.intent.action.PTT_TIMEOUT agui.intercom.intent.action.START_PTT agui.intercom.intent.action.STOP_PTT android.intent.action.PTT.down android.intent.action.PTT.timeout android.intent.action.PTT.up ro.agui.ptt.hshookkey ro.default.ptt_exit_time
+  HIDL interfaces: vendor.mediatek.hardware.aguiextmodule@1.0::IAguiExtModule vendor.mediatek.hardware.aguiextmodule@1.0::IAguiExtModuleReadCallback
+
+==== Serial-looking system libraries and their JNI classes ====
+
+==== PTT key capture ====
+Activity key events and known PTT broadcasts:
+Input devices with keys (root getevent -pl; a side key is often on its own device):
+  event0 ACCDET: KEY_VOLUMEDOWN KEY_VOLUMEUP KEY_PLAYPAUSE KEY_VOICECOMMAND
+  event5 mtk-tpd-kpd: KEY_BACK KEY_APPSELECT
+  event4 mtk-tpd: KEY_BACK BTN_TOUCH KEY_APPSELECT
+  event3 fingerprint_key: KEY_ENTER KEY_F11 KEY_HOME KEY_UP KEY_LEFT KEY_RIGHT KEY_DOWN KEY_MENU KEY_WAKEUP KEY_BACK KEY_HOMEPAGE
+  event1 hall-kpd: KEY_F12
+  event2 mtk-kpd: KEY_HOME KEY_VOLUMEDOWN KEY_VOLUMEUP KEY_POWER 00f9 KEY_RESTART
+Input events (root getevent; keys and switches only):
+  no key or switch events
+
+==== The stock app at work (com.agold.intercom, 15 s, receive only) ====
+note: this phone's radio is a USB device on the phone's only USB port: while the radio is on, a computer on the USB cable loses the phone (adb, file transfer). The checks give the port back when they close the stock app; for bench work use Wi-Fi ADB
+devices it holds open: /dev/ashmem1610b75b /dev/binderfs /dev/ion /dev/mali0 /dev/null
+USB devices and USB sound cards while the radio is on (root):
+  1-1 0483:5730  Agold_WX Agold Audio Class
+           1-1:1.0: class 01 snd-usb-audio
+           1-1:1.1: class 01 snd-usb-audio
+           1-1:1.2: class 01 snd-usb-audio
+           1-1:1.3: class 02 cdc_acm
+           1-1:1.4: class 0a cdc_acm
+ 0 [mtsndcard      ]: mt-snd-card - mt-snd-card
+ 1 [Class          ]: USB-Audio - Agold Audio Class
+-- /proc/asound/card1/stream0
+Playback:
+    Format: S16_LE
+    Channels: 2
+    Rates: 32000
+Capture:
+    Format: S16_LE
+    Channels: 2
+    Rates: 32000
+bridge port: /dev/ttyACM0 u:object_r:ttyACM_device:s0 held by /vendor/bin/hw/vendor.mediatek.hardware.aguiextmodule@1.0-service
+module replies in its log: the module answered the stock app 6 times (Agold frames in its log; version DMR006.U4A.V067; 0x22 0x2E accepted)
+radio released before closing: power-off (agui.intercom.intent.action.STOP_DEVICE): Broadcast completed: result=0
+  the radio is off after 0.0 s (/sys/bus/platform/drivers/mcu/mcu_power = 0)
+  USB port given back to the socket (/sys/devices/platform/11201000.usb3/cmode 0, then 1)
+closed: stopped
+
+==== Radio probe ====
+u:object_r:ttyS_device:s0 /dev/ttyS0
+u:object_r:ttyS_device:s0 /dev/ttyS1
+u:object_r:ttyS_device:s0 /dev/ttyS2
+  skipped /dev/ttyS0: in use by system_server                                                (1277) (close that app and probe again)
+Derived sepolicy.rule lines:
+allow untrusted_app ttyS_device chr_file { open read write ioctl getattr lock }
+typeattribute ttyS_device mlstrustedobject
+u:object_r:sysfs:s0 /sys/devices/platform/mt_soc_tdmrx_pcm/driver_override
+u:object_r:sysfs:s0 /sys/devices/platform/mt_soc_tdmrx_pcm/modalias
+u:object_r:sysfs:s0 /sys/devices/platform/mt_soc_tdmrx_pcm/uevent
+u:object_r:sysfs:s0 bind
+u:object_r:sysfs:s0 mt_soc_tdmrx_pcm
+u:object_r:sysfs:s0 uevent
+u:object_r:sysfs:s0 unbind
+u:object_r:sysfs:s0 compatible
+u:object_r:sysfs:s0 name
+u:object_r:sysfs:s0 autosuspend_delay_ms
+u:object_r:sysfs:s0 control
+u:object_r:sysfs:s0 runtime_active_time
+u:object_r:sysfs:s0 runtime_status
+u:object_r:sysfs:s0 runtime_suspended_time
+u:object_r:sysfs:s0 devices
+u:object_r:sysfs:s0 drivers
+u:object_r:sysfs:s0 drivers_autoprobe
+u:object_r:sysfs:s0 drivers_probe
+u:object_r:sysfs:s0 uevent

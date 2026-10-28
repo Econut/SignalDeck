@@ -88,7 +88,11 @@ public final class FirstRunCheck {
                 sum.append("radio module answered: yes, with AT commands (SA818 class)").append(atWhere(r)).append(": SignalDeck has no engine for this module family yet\n");
             else sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');
             if (!named.isEmpty()) sum.append("ports probed: only those the stock app or the profile name (").append(String.join(" ", named)).append(")\n");
-            if (!answered && stockAnswers != null)
+            String[] bridge = AgoldUsb.port(watchText);
+            if (!answered && stockAnswers != null && bridge != null)
+                sum.append("  the module sits behind a USB bridge on ").append(bridge[0]).append(", held by ").append(bridge[2]).append(" while the radio is on; ")
+                   .append(stockAnswers).append(": the module works; SignalDeck's probe does not ask through the bridge yet\n");
+            else if (!answered && stockAnswers != null)
                 sum.append("  but ").append(stockAnswers).append(": the module works; SignalDeck's probe did not reach the port it is on\n");
         }
 
@@ -99,6 +103,9 @@ public final class FirstRunCheck {
         } else if (trial) sum.append("trial take-over skipped: ").append(!dp.supported ? "no profile for this phone yet" : "SignalDeck already owns the radio").append('\n');
 
         DeviceReport.append("SignalDeck log (personal details removed)", DeviceReport.redactAppLog(svc.recentLog()));
+        { File d = DeviceReport.newestDir();                                  // the draft reads the finished report and this summary
+          String draft = DraftProfile.text((d == null ? "" : DeviceReport.readReport(d)) + "\n==== Summary ====\n" + sum);
+          DeviceReport.append("Draft profile", draft); sum.append(draft); }
         DeviceReport.append("Summary", sum.toString());
         p.step("Zipping");
         return DeviceReport.zipNewest(c, true);
