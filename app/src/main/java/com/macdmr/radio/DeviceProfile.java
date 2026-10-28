@@ -197,7 +197,8 @@ public final class DeviceProfile {
         ANYSECU_W6.rxDetectNode = "/sys/class/gpio/gpio189/value";
         // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)
         ANYSECU_W6.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
-        ANYSECU_W6.muteLines = new String[][] { { "/sys/kernel/ext_pa_en/ext_pa_en", "0" } };   // the speaker amplifier (the stock app skips the speaker route at volume 0)
+        // the speaker route only: the stock app skips it at volume 0; the amplifier must stay on, the camcorder input is behind it (measured: amplifier off = silent recording)
+        ANYSECU_W6.muteLines = new String[][] { { "/sys/class/gpio/gpio183/value", "0" } };
         ANYSECU_W6.rxLinesOff = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "0" } };
         // the stock app's startSpeaker / stopSpeaker: mic to the module, built-in mic, then PTT (used only once verified)
         ANYSECU_W6.txLinesOn = new String[][] { { "/sys/class/gpio/gpio222/value", "1" }, { "/sys/class/gpio/gpio179/value", "0" }, { "/sys/class/gpio/gpio188/value", "1" } };
