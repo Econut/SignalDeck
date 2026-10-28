@@ -200,6 +200,30 @@ public final class Neo {
         LinearLayout actions = (LinearLayout) bar.findViewWithTag("actions"); Context c = bar.getContext();
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(Theme.dp(c, 44), Theme.dp(c, 44)); lp.leftMargin = Theme.dp(c, 8);
         actions.addView(v, lp);
+        fitHeader(bar);
+    }
+    /**
+     * When the title and the buttons do not fit side by side (five buttons on a 320 dp wide screen such as the W6+'s
+     * leave the title a letter), the buttons move to a row of their own under the title, at full touch size.
+     * Wider phones keep the one-row header.
+     */
+    static void fitHeader(LinearLayout bar) {
+        Context c = bar.getContext();
+        LinearLayout actions = (LinearLayout) bar.findViewWithTag("actions"); TextView t = headerTitle(bar);
+        if (actions == null || t == null || bar.getOrientation() == LinearLayout.VERTICAL) return;
+        float dp = Theme.dp(c);
+        int widthDp = c.getResources().getConfiguration().screenWidthDp;
+        if (widthDp <= 0) return;
+        float titleDp = t.getPaint().measureText(String.valueOf(t.getText())) / dp + 16;
+        float actionsDp = actions.getChildCount() * 52f;
+        if (28 + titleDp + actionsDp <= widthDp) return;
+        bar.setOrientation(LinearLayout.VERTICAL); bar.setGravity(Gravity.NO_GRAVITY);
+        bar.setPadding(Theme.dp(c, 16), Theme.dp(c, 10), Theme.dp(c, 12), Theme.dp(c, 8));
+        View col = bar.getChildAt(0);
+        col.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        LinearLayout.LayoutParams al = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        al.gravity = Gravity.END; al.topMargin = Theme.dp(c, 6);
+        actions.setLayoutParams(al);
     }
     private static Drawable bottomLine() {
         return new Drawable() {
