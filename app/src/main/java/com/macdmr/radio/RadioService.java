@@ -49,7 +49,11 @@ public class RadioService extends Service implements RadioEngine.Events {
         void onSms(int from, int type, String text);
         void onSmsResult(boolean ok);
         void onModes(boolean softSq, int softSqLevel, boolean squelchOpen, boolean monitor, boolean recording, boolean scanning, boolean holding, String zoneName);
-        void onCaption(boolean enabled, String live, String sentence);   // live = current partial ("" to clear); sentence = a finished line (null if none)       // the intercom's location block ("City, State\n(↓S 25.5mi (41.0km))\n959ft (292m) 📍")
+        void onCaption(boolean enabled, String live, String sentence);
+        /** The last channel was deleted: no channel is selected any more (pages show their empty state). */
+        default void onNoChannel() { }
+        /** The channel list or the zones changed (here, on the web or by an import): lists showing them reload. */
+        default void onChannels() { }   // live = current partial ("" to clear); sentence = a finished line (null if none)       // the intercom's location block ("City, State\n(↓S 25.5mi (41.0km))\n959ft (292m) 📍")
     }
 
     public class LocalBinder extends Binder { public RadioService get() { return RadioService.this; } }
@@ -742,6 +746,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         profile = DeviceProfile.detect();
         ProfileRegistry.maybeFetch();                               // a newer revision or an advisory, at most every 12 h
         store = new ChannelStore(this);
+        store.onChange = () -> { ui.removeCallbacks(channelsChanged); ui.postDelayed(channelsChanged, 150); };   // a bulk action is one event
         zoneId = getSharedPreferences("radio", MODE_PRIVATE).getLong("zone", 0);
         if (coverage().enabled()) { coverage.resume(); startForegroundTyped(true); }
         engine = "sa818".equals(profile.protocol) ? new AtModuleEngine(profile, this) : new RadioEngine(profile, this);   // the W6's AT module, else the DMR module
@@ -1555,7 +1560,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public void deleteChannel(ChannelStore.Channel ch) {
         store.delete(ch);
-        if (current != null && current.id == ch.id) { current = null; int n = store.count(); if (n > 0) selectChannel(Math.min(ch.number, n)); }
+        if (current != null && current.id == ch.id) { current = null; int n = store.count(); if (n > 0) selectChannel(Math.min(ch.number, n)); else noChannel(); }
     }
 
     // ---- several channels at once (the channel list's selection, on the phone and on the web) ----
@@ -1571,7 +1576,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (ch.id == curId) curGone = true;
             store.delete(ch); n++;
         }
-        if (curGone) { current = null; int left = store.count(); if (left > 0) selectChannel(Math.min(curNum, left)); }
+        if (curGone) { current = null; int left = store.count(); if (left > 0) selectChannel(Math.min(curNum, left)); else noChannel(); }
         else if (cur != null) for (ChannelStore.Channel c : store.all()) if (c.id == curId) { cur.number = c.number; break; }   // its number may have moved down: same channel, nothing re-tuned
         return n == 0 ? "No channels deleted" : "Deleted " + n + (n == 1 ? " channel" : " channels");
     }
@@ -2428,6 +2433,8 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public void addListener(Listener l) { listeners.add(l); l.onLink(link); if (current != null) l.onChannel(current); l.onModes(softSq.isEnabled(), softSq.level(), squelchOpen, monitorOn, recordOn, scanner.isScanning(), scanner.isHolding(), zoneName()); l.onCaption(captionsOn, "", null); l.onRx(receiving); l.onTx(transmitting); if (rssi != -999) l.onRssi(rssi); }   // a page built later (intercom look switched) starts from the live receive/transmit state, not "idle"
     public void removeListener(Listener l) { listeners.remove(l); }
+    private void noChannel() { ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onNoChannel(); }); }
+    private final Runnable channelsChanged = () -> { for (Listener l : new ArrayList<>(listeners)) l.onChannels(); };
 
     private void setLink(String s) { link = s; ui.post(() -> { for (Listener l : listeners) l.onLink(s); }); updateNotification(); }
 

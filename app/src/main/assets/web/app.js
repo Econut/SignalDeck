@@ -74,6 +74,12 @@ function connect() {
   es.onerror = () => { setConn(false); fetch('/api/status').then(r => { if (r.status === 401) showLogin(); }).catch(() => {}); };
   const on = (t, f) => es.addEventListener(t, ev => { try { f(JSON.parse(ev.data)); } catch (e) { console.warn(t, e); } });
   on('channel', ch => { S.status.channel = ch; renderStatus(); loadHistory(); if (S.page === 'channels') renderChannels(); });
+  on('channels', () => {   // changed on the phone (or another browser): reload; a selection ends, since numbers may have moved
+    loadZones();
+    if (S.page !== 'channels') return;
+    if (S.chSel) { setChSelecting(false); toast('Channels changed on the phone: selection cleared'); }
+    loadChannels(); loadZonesEditor();
+  });
   on('rx', d => { S.status.hearing = d.on; renderState(); });
   on('tx', d => { S.status.transmitting = d.on; renderState(); });
   on('rssi', d => { S.status.rssi = d.dbm; renderMeter(); });

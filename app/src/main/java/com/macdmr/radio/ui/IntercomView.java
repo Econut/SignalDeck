@@ -646,6 +646,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     }
 
     // RadioService.Listener
+    /** Every channel was deleted: a fresh page shows the empty state ("--") until a channel is selected again. */
+    @Override public void onNoChannel() { if (getContext() instanceof com.macdmr.radio.MainActivity) post(() -> ((com.macdmr.radio.MainActivity) getContext()).rebuildIntercom()); }
     @Override public void onChannel(ChannelStore.Channel ch) {
         boolean isVfo = ch.id < 0;
         if (neo) {

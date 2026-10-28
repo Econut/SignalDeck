@@ -189,6 +189,8 @@ public final class WebHost {
     private final RadioService.Listener events = new RadioService.Listener() {
         private long lastRssi, lastLevel;
         @Override public void onChannel(ChannelStore.Channel ch) { pub("channel", channelJson(ch)); }
+        @Override public void onChannels() { pub("channels", "{}"); }
+        @Override public void onNoChannel() { pub("channel", "{}"); }
         @Override public void onRx(boolean r) { pub("rx", "{\"on\":" + r + "}"); }
         @Override public void onTx(boolean t) { pub("tx", "{\"on\":" + t + "}"); }
         @Override public void onRssi(int dbm) { long now = System.currentTimeMillis(); if (now - lastRssi < 400) return; lastRssi = now; pub("rssi", "{\"dbm\":" + dbm + "}"); }

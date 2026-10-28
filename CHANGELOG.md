@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Channels: the phone and SignalDeck Web update each other live
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner: deletes on the phone should show on the web quickly, and back | Every change to the channel list or the zones (add, edit, delete, star, zone edits, bulk actions, imports) raises one `onChannels` event (150 ms debounce, so a bulk delete is one event). The phone's Channels list reloads on it; SignalDeck Web gets a `channels` event and reloads its list, zone picker and zone editor. A selection open on the other side ends with a note, since channel numbers may have moved. Deleting every channel (phone or web) now clears the intercom on both (it kept showing the last channel). Help (Channels) says so. | `ChannelStore.java`, `RadioService.java`, `web/WebHost.java`, `ui/ChannelsView.java`, `assets/web/app.js`, `ui/HelpView.java` | Host suite 417/0. Device (W6, 2026-10-28): two channels added through the web API showed in the phone list (128 → 130) and on an open web Channels page 225 ms later without the page's own reload; deleting them on the phone (select, Delete) removed them from the web page about 0.5 s after the tap. Delete-all through the web page's own Select / All / Delete with the 128 stock channels: page 555 ms, phone list 0 at once, phone intercom back to its empty "--" state. The selection-cleared note was not exercised. |
+
 ## 2026-10-28 — ANYSECU W6+: tested for receive
 
 | Backlog | Change | Files | Test |

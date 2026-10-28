@@ -429,6 +429,11 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
 
     // RadioService.Listener
     @Override public void onChannel(ChannelStore.Channel ch) { activeNumber = ch.number; adapter.notifyDataSetChanged(); }
+    /** Changed elsewhere (SignalDeck Web, an import): reload. A selection ends, since channel numbers may have moved. */
+    @Override public void onChannels() {
+        if (selecting) { setSelecting(false); android.widget.Toast.makeText(getContext(), "Channels changed elsewhere: selection cleared", android.widget.Toast.LENGTH_SHORT).show(); }
+        reload();
+    }
     @Override public void onRx(boolean r) { } @Override public void onTx(boolean t) { } @Override public void onRssi(int dbm) { }
     @Override public void onAudioLevel(int a) { } @Override public void onHistory(String l) { } @Override public void onCaller(String t) { }
     @Override public void onLog(String s) { } @Override public void onLink(String s) { } @Override public void onLocation(String t) { } @Override public void onSms(int f, int ty, String te) { } @Override public void onSmsResult(boolean ok) { }
