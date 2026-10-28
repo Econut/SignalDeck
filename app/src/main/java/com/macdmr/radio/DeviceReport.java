@@ -234,20 +234,25 @@ public final class DeviceReport {
     /**
      * Strings from the stock app's code and native libraries that tell how it drives the radio: every /sys and /dev path,
      * audio-system parameters ("pdt_play=off"), serial speeds, and log texts about PTT, receive, transmit, power and PCM
-     * (QuickChat's "setPttLaunch" / "setPttReceive" told us that ptt_control 0 keys its transmitter). Only short ASCII
-     * strings from the code, never resources or user data.
+     * (QuickChat's "setPttLaunch" / "setPttReceive" told us that ptt_control 0 keys its transmitter), and the radio module's
+     * command names ("AT+DMOSETGROUP=": the W6's SA818-class module). Native libraries of every ABI are read: the W6 is a
+     * 32-bit phone whose app ships only lib/armeabi-v7a. Only short ASCII strings from the code, never resources or user data.
      */
     public static String apkClues(File apk) {
-        java.util.TreeSet<String> paths = new java.util.TreeSet<>(), params = new java.util.TreeSet<>(), bauds = new java.util.TreeSet<>(), logs = new java.util.TreeSet<>();
+        java.util.TreeSet<String> paths = new java.util.TreeSet<>(), params = new java.util.TreeSet<>(), bauds = new java.util.TreeSet<>(), logs = new java.util.TreeSet<>(),
+                cmds = new java.util.TreeSet<>(), libs = new java.util.TreeSet<>();
         Pattern pPath = Pattern.compile("/(sys|dev|proc)/[A-Za-z0-9_./-]{2,80}"), pParam = Pattern.compile("\\b[a-z][a-z0-9_]{2,30}=(on|off|1|0|true|false)\\b"),
                 pBaud = Pattern.compile("\\bB(9600|19200|38400|57600|115200|230400|460800|921600)\\b"),
-                pLog = Pattern.compile("[ -~]{0,50}(?i:ptt|pcm|serial ?port|intercom|interphone|walkie|dmr)[ -~]{0,50}"),
+                // a keyword that starts a word or a camelCase part ("isPttButton", "PTT key"), not one inside a word ("onInterceptTouchEvent")
+                pLog = Pattern.compile("[ -~]{0,50}((?<![A-Za-z])(?i:ptt|pcm|dmr)|(?<=[a-z])(?:Ptt|PTT|Pcm|PCM|Dmr|DMR)|(?i:serial ?port|intercom|interphone|walkie))[ -~]{0,50}"),
+                pCmd = Pattern.compile("\\bAT\\+[A-Z][A-Z0-9]{2,20}[=?]?"),
                 pFramework = Pattern.compile("(?i).*(activity|intent|content|receiver|launcher|shortcut|broadcast|permission|fragment|view|layout|leanback|androidx|java|kotlin).*");
         try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(apk)) {
             java.util.Enumeration<? extends ZipEntry> en = z.entries();
             while (en.hasMoreElements()) {
                 ZipEntry e = en.nextElement(); String n = e.getName();
-                boolean dex = n.matches("classes\\d*\\.dex"), so = n.startsWith("lib/arm64") && n.endsWith(".so");
+                boolean dex = n.matches("classes\\d*\\.dex"), so = n.startsWith("lib/") && n.endsWith(".so");
+                if (so) libs.add(n);
                 if ((!dex && !so) || e.getSize() > 40_000_000) continue;
                 byte[] b; try (InputStream in = z.getInputStream(e)) { java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] t = new byte[65536]; int k; while ((k = in.read(t)) > 0) bo.write(t, 0, k); b = bo.toByteArray(); }
                 // split into printable runs, as `strings` would
@@ -261,6 +266,7 @@ public final class DeviceReport {
                         java.util.regex.Matcher m = pPath.matcher(s); while (m.find()) paths.add(m.group());
                         m = pParam.matcher(s); while (m.find()) params.add(m.group());
                         m = pBaud.matcher(s); while (m.find()) bauds.add(m.group());
+                        m = pCmd.matcher(s); while (m.find() && cmds.size() < 60) cmds.add(m.group());
                         if (dex && s.length() <= 100 && logs.size() < 120 && !s.contains("/") && (s.contains(" ") || s.contains(":") || s.contains(","))
                                 && pLog.matcher(s).matches() && !pFramework.matcher(s).matches()) logs.add(s.trim());           // log-like texts, not framework names
                     }
@@ -272,8 +278,17 @@ public final class DeviceReport {
         out.append("  paths: ").append(paths.isEmpty() ? "-" : String.join("  ", paths)).append('\n');
         out.append("  audio/system parameters: ").append(params.isEmpty() ? "-" : String.join("  ", params)).append('\n');
         out.append("  serial speeds: ").append(bauds.isEmpty() ? "-" : String.join(" ", bauds)).append('\n');
+        out.append("  native libraries: ").append(libs.isEmpty() ? "-" : String.join("  ", libs)).append('\n');
+        out.append("  module commands: ").append(cmds.isEmpty() ? "-" : String.join("  ", cmds)).append('\n');
+        String fam = commandFamily(cmds); if (fam != null) out.append("  protocol hint from its code: ").append(fam).append('\n');
         out.append("  log texts about the radio:\n"); for (String s : logs) out.append("    ").append(mask(s)).append('\n');
         return out.toString();
+    }
+
+    /** The module family the command names in an app's code point to, or null. */
+    static String commandFamily(java.util.Collection<String> cmds) {
+        int dmo = 0; for (String c : cmds) if (c.startsWith("AT+DMO")) dmo++;
+        return dmo >= 2 ? "SA818-class AT commands (" + dmo + " AT+DMO… names)" : null;
     }
 
     /** Bytes read from each device-tree property (pin-name lists run to a few hundred). */
@@ -774,6 +789,10 @@ public final class DeviceReport {
     }
     private static void kv(StringBuilder r, String k, String v) { r.append(String.format(Locale.US, "  %-28s %s\n", k, v == null ? "" : v.trim())); }
     private static boolean suPresent() { for (String p : new String[] { "/system/bin/su", "/system/xbin/su", "/sbin/su", "/data/adb/magisk", "/debug_ramdisk/su" }) if (new File(p).exists()) return true; return false; }
+    /** A report folder's whole report.txt ({@link #cat} stops at 200 lines; the summary and the clue lines sit far below that). */
+    public static String readReport(File dir) {
+        try { return new String(java.nio.file.Files.readAllBytes(new File(dir, "report.txt").toPath()), java.nio.charset.StandardCharsets.UTF_8); } catch (Throwable t) { return ""; }
+    }
     public static String cat(String path) { try (BufferedReader b = new BufferedReader(new InputStreamReader(new FileInputStream(path)))) { StringBuilder s = new StringBuilder(); String l; int n = 0; while ((l = b.readLine()) != null && n++ < 200) s.append(l).append('\n'); return s.toString(); } catch (Throwable t) { return ""; } }
     static String ls(String dir, Pattern filter) { File[] fs = dir == null ? null : new File(dir).listFiles(); if (fs == null) return "(not readable)"; StringBuilder s = new StringBuilder(); for (File f : fs) if (filter == null || filter.matcher(f.getName()).find()) s.append(f.getName()).append(' '); return s.length() == 0 ? "-" : s.toString(); }
     static String getprop(String k) { return exec("getprop " + k).trim(); }

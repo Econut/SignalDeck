@@ -54,6 +54,12 @@ public class RadioProbeAtTest {
         assertTrue(RadioProbe.looksLikeModule("68 34 00 0c 44 4d 52"));
     }
 
+    @Test public void summaryTakesTheCodeHint() {
+        assertEquals("SA818-class AT commands (7 AT+DMO… names)",
+                FirstRunCheck.codeHint("==== Clues in x ====\n  module commands: AT+DMOCONNECT\n  protocol hint from its code: SA818-class AT commands (7 AT+DMO… names)\n"));
+        assertNull(FirstRunCheck.codeHint("  module commands: -\n"));
+    }
+
     @Test public void summaryNamesWhereTheModuleAnswered() {
         String probe = "  9600 baud, after AT+DMOCONNECT: 2b 44 4d 4f …\n  ^ " + RadioProbe.AT_MARK + " on /dev/ttyS2 at 9600 baud\n";
         assertEquals(" on /dev/ttyS2 at 9600 baud", FirstRunCheck.atWhere(probe));

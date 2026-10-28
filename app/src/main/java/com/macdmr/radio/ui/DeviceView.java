@@ -778,7 +778,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                 final java.io.File zip = com.macdmr.radio.FirstRunCheck.run(c, s, trial, watchPkg, t -> post(() -> pd.setMessage(t + "…")));
                 c.getSharedPreferences("radio", Context.MODE_PRIVATE).edit().putLong("supportChecks", System.currentTimeMillis()).apply();
                 final java.io.File dir = com.macdmr.radio.DeviceReport.newestDir();
-                String rep = dir == null ? "" : com.macdmr.radio.DeviceReport.cat(new java.io.File(dir, "report.txt").getAbsolutePath());
+                String rep = dir == null ? "" : com.macdmr.radio.DeviceReport.readReport(dir);
                 int k = rep.lastIndexOf("==== Summary ====");
                 final String summary = k >= 0 ? rep.substring(k + 17).trim() : "";
                 post(() -> {

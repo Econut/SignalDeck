@@ -2,6 +2,26 @@
 
 Newest first. Phone: ANYSECU W6+ replacement unit, adb `-s W6202601000904` (USB). Plan: `docs/W6_DEVICE_REPORT_PLAN.md`.
 
+## 2026-10-27 18:15 CDT — 32-bit clues (gaps 2, 8, B12); a second kernel panic; a silent module
+
+- Branch `w6/clues-32bit`, stacked on `w6/serial-sniff`. Native libraries of every ABI, `AT+…` names and a protocol
+  hint from the code (in the summary, no root needed), quieter log texts. Found and fixed: three readers of report.txt
+  stopped at line 200 (the Checks done dialog never showed the summary).
+- Correction to Phase 0: the stock APK carries `libserial_port.so` for arm64-v8a, armeabi-v7a, x86 and x86_64, not
+  armeabi-v7a only.
+- **Silent module (open):** in run 06:21 (phone time) the stock app's start-up got answers, but the probe a few seconds
+  later got none; in the next run the stock app sent `AT+DMOCONNECT` 15 times, 1 s apart, unanswered. `gpio322` (power)
+  stayed 1, nothing held `/dev/ttyS2`, the CPU was idle. A reboot brought it back (`+DMOCONNECT:0`). Cause unknown; the
+  run before (06:09) did the same steps and the module answered throughout. Candidates: a vendor service powering the
+  module down through another line when the stock app dies, or the probe's speed changes/binary at 230400 wedging it.
+- **Kernel panic #2 (my fault): reading `flyscale_misc/dmr_pwd` panics the kernel too** (`dmr_pwd_show →
+  gpiod_get_value_cansleep → validate_desc`, the same driver bug as `af_en`). I read it in a script that tested the
+  silent-module question, because Phase 0 had read it safely on the first unit. It does not crash on every unit or
+  boot, so **no attribute of the `misc_flyscale` driver may ever be read** (list names only). The report never reads
+  them. The phone rebooted by itself and is fine; the module answered again.
+- Next: hold. I asked the owner about decompiling the stock app (jadx was blocked by the permission check) before
+  continuing with the silent-module question and the engine design.
+
 ## 2026-10-27 17:25 CDT — Serial sniff + start-up watch (B3, B4; plan items 1, 2)
 
 - Branch `w6/serial-sniff`, stacked on `w6/probe-at`.

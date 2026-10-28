@@ -45,6 +45,8 @@ public final class FirstRunCheck {
                 DeviceReport.append("Clues in " + watchPkg + "'s code", note);
             } catch (Throwable t) { DeviceReport.append("Clues in " + watchPkg + "'s code", String.valueOf(t)); }
         }
+        { File d = DeviceReport.newestDir(); String hint = codeHint(d == null ? "" : DeviceReport.readReport(d));
+          if (hint != null) sum.append("the stock app's code names ").append(hint).append('\n'); }   // works without root
 
         p.step("Press and release the side PTT key a few times now (10 s)");
         DeviceReport.append("PTT key capture", DeviceReport.captureKeys(c, 10));
@@ -71,7 +73,7 @@ public final class FirstRunCheck {
             sum.append("radio probe skipped: SignalDeck owns the radio (Hand back first to probe the ports)\n");
         } else {
             File dir = DeviceReport.newestDir();
-            java.util.Set<String> named = RadioProbe.namedPorts(dir == null ? "" : DeviceReport.cat(new File(dir, "report.txt").getAbsolutePath()), watchText, dp.supported ? dp.controlPort : null);
+            java.util.Set<String> named = RadioProbe.namedPorts(dir == null ? "" : DeviceReport.readReport(dir), watchText, dp.supported ? dp.controlPort : null);
             String r = RadioProbe.run(c, s -> p.step("Probe: " + s), false, named);
             DeviceReport.append("Radio probe", r);
             boolean answered = r.contains("answered");
@@ -168,6 +170,12 @@ public final class FirstRunCheck {
             } catch (Throwable t) { android.util.Log.w("BenchChecks", "failed " + t); }
             finally { benchBusy.set(false); }
         }, "bench-checks").start();
+    }
+
+    /** The first "protocol hint from its code:" in a report, or null. */
+    static String codeHint(String report) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(?m)^  protocol hint from its code: (.+)$").matcher(report == null ? "" : report);
+        return m.find() ? m.group(1).trim() : null;
     }
 
     /** " on /dev/ttyS2 at 9600 baud" from the probe's AT line, or "". */
