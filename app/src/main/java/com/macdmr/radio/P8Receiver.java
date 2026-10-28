@@ -67,7 +67,9 @@ public final class P8Receiver {
         P8RxProtocol.Sink receiveStatus=f->{if(f.cmd==0x36 && f.body.length==1){
             listener.status("CONTROL "+f.toString());
             if(txCapable){if(f.rw!=2 || f.sr!=0)return;try{P8ReceiveNative.acknowledgeStatus();}catch(java.io.IOException e){throw new IllegalStateException("Status ACK failed; stop",e);}}
-            int s=f.body[0]&255;if(s==3 || s==4){boolean on=txStatus.status(s,SystemClock.elapsedRealtime());if(!on)pttRequested=false;listener.transmitting(on);}else if(s==1 || s==10 || s==12){scan.signal(SystemClock.elapsedRealtime());listener.receiving(true);}else if(s==2 || s==11 || s==13)listener.receiving(false);}};
+            int s=f.body[0]&255;if(s==3 || s==4){boolean on=txStatus.status(s,SystemClock.elapsedRealtime());
+                if(s==3 && !on){try{if(readState(P8Protocol.PTT_NODE)!=1)throw new IllegalStateException("PTT not released");}catch(Exception e){throw new IllegalStateException("Unexpected TX start without confirmed GPIO release",e);}listener.status("TX start reply delayed after release; remaining in receive");}
+                if(!on)pttRequested=false;listener.transmitting(on);}else if(s==1 || s==10 || s==12){scan.signal(SystemClock.elapsedRealtime());listener.receiving(true);}else if(s==2 || s==11 || s==13)listener.receiving(false);}};
         try{
             guard();P8ReceiveNative.load();nativeLoaded=true;P8ReceiveNative.open();
             int size=Math.max(3200,AudioTrack.getMinBufferSize(8000,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT));
