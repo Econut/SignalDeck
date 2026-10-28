@@ -40,7 +40,25 @@ public final class RadioProbe {
     /** Labels of ports that belong to another subsystem (the Armor's ttyS1 is the modem mux, mt6825muxd_device): never written to, never opened up. */
     private static final java.util.regex.Pattern OTHER_USE = java.util.regex.Pattern.compile("(?i)mux|modem|ccci|radio|gps|gnss|bt_|bluetooth|nfc|console|wifi|wlan|fm_");
 
-    public static String run(android.content.Context ctx, Progress p, boolean pulsePower) {
+    public static String run(android.content.Context ctx, Progress p, boolean pulsePower) { return run(ctx, p, pulsePower, java.util.Collections.emptySet()); }
+
+    /**
+     * Ports other evidence names: the stock app's code (the report's clue "paths:" lines), the ports it held during the
+     * watch, the profile's control port. When there are any, only those are probed, whatever their label: the W6's module
+     * port carries {@code console_device}, and the one unnamed port beside it ({@code ttySE0}) is the Unisoc engineering
+     * port, which answered the DMR query with "FAIL: Invalid command" (2026-10-27).
+     */
+    static java.util.Set<String> namedPorts(String report, String watch, String profilePort) {
+        java.util.Set<String> out = new java.util.TreeSet<>();
+        java.util.regex.Pattern tty = java.util.regex.Pattern.compile("/dev/tty[A-Za-z]+\\d+");
+        for (String l : (report == null ? "" : report).split("\n")) if (l.trim().startsWith("paths:")) { java.util.regex.Matcher m = tty.matcher(l); while (m.find()) out.add(m.group()); }
+        for (String l : (watch == null ? "" : watch).split("\n")) if (l.startsWith("devices it holds open:") || l.startsWith("at the end of the watch it holds:")) { java.util.regex.Matcher m = tty.matcher(l); while (m.find()) out.add(m.group()); }
+        if (profilePort != null && profilePort.matches("/dev/tty[A-Za-z]+\\d+")) out.add(profilePort);
+        return out;
+    }
+
+    /** @param named ports other evidence names ({@link #namedPorts}); empty = probe every port that is not another subsystem's */
+    public static String run(android.content.Context ctx, Progress p, boolean pulsePower, java.util.Set<String> named) {
         StringBuilder r = new StringBuilder();
         if (!RootSetup.haveRoot()) return "Root is not granted: the probe needs Magisk root (Superuser → allow SignalDeck).";
         p.step("Labels");
@@ -53,8 +71,10 @@ public final class RadioProbe {
             java.util.regex.Matcher m = java.util.regex.Pattern.compile("u:object_r:(\\w+):s0\\s+(/dev/\\S+)").matcher(line);
             if (!m.find()) continue;
             String label = m.group(1), port = m.group(2), held = heldBy(holders, port);
-            // a port another process has open would lose its line settings; a modem/GNSS/BT port is not the radio module
-            if (OTHER_USE.matcher(label).find()) { r.append("  skipped ").append(port).append(": its label ").append(label).append(" belongs to another subsystem\n"); continue; }
+            if (!named.isEmpty() && !named.contains(port)) { r.append("  skipped ").append(port).append(": no app or profile names it (named: ").append(String.join(" ", named)).append(")\n"); continue; }
+            // a port another process has open would lose its line settings; a modem/GNSS/BT port is not the radio module,
+            // unless the stock app itself opens it (the W6's module port is labelled console_device)
+            if (named.isEmpty() && OTHER_USE.matcher(label).find()) { r.append("  skipped ").append(port).append(": its label ").append(label).append(" belongs to another subsystem\n"); continue; }
             if (held != null) { r.append("  skipped ").append(port).append(": in use by ").append(held).append(held.contains(ctx.getPackageName()) ? " (this app: Hand back first)" : " (close that app and probe again)").append('\n'); continue; }
             if (!types.contains(label)) types.add(label);
             ports.add(port);
@@ -178,8 +198,40 @@ public final class RadioProbe {
     static final byte[] QUERY_AGOLD_34 = { 0x7E, (byte) 0x96, 0x69, 0x01, 0x34, 0x01, 0x00, 0x00, (byte) 0xFD, (byte) 0xCB, (byte) 0x81 };
     static final byte[] QUERY_AGOLD_25 = { 0x7E, (byte) 0x96, 0x69, 0x01, 0x25, 0x01, 0x00, 0x00, (byte) 0xFD, (byte) 0xDA, (byte) 0x81 };
     private static String printf(byte[] q) { StringBuilder s = new StringBuilder("printf '"); for (byte b : q) s.append(String.format(Locale.US, "\\x%02x", b & 0xFF)); return s.append("' > ").toString(); }
-    /** Bytes that only a radio module's answer starts with. */
-    static boolean looksLikeModule(String hex) { String h = hex.toLowerCase(Locale.US); return h.contains("68 34") || h.contains("bf aa") || h.contains("7e 96 69"); }
+    /**
+     * SA818-class identity queries (both only read): the handshake every such module answers, and its version. Either
+     * answer counts: the W6's module (2026-10-27) answered the 15-byte handshake with an error echo missing one byte
+     * ("AT+DMOCONNEC:1") but the 12-byte version query cleanly ("+DMOVERQ:PB202EU05"), so a long write loses a byte there.
+     */
+    static final byte[] AT_CONNECT = "AT+DMOCONNECT\r\n".getBytes(), AT_VERSION = "AT+DMOVERQ\r\n".getBytes();
+    static final String AT_MARK = "an AT-command module (SA818 class) answered";
+    /**
+     * An SA818-class answer: a "+DMO…" reply in the received bytes (hex as the probe prints it). Our own command coming
+     * back ("AT+DMO…", an echo or a loopback, also the W6's error echo "AT+DMOCONNEC:1") does not count.
+     */
+    static boolean looksLikeAt(String hex) { return java.util.regex.Pattern.compile("(^|[^T])\\+DMO[A-Z]+:").matcher(asText(hex)).find(); }
+    /** The received hex as text where it is printable ("+DMOCONNECT:0"), for the report. */
+    static String asText(String hex) {
+        StringBuilder t = new StringBuilder();
+        for (String h : hex.trim().split("\\s+")) {
+            if (!h.matches("[0-9a-fA-F]{2}")) continue;
+            int b = Integer.parseInt(h, 16);
+            t.append(b == 0x0d || b == 0x0a ? " " : b >= 0x20 && b < 0x7f ? String.valueOf((char) b) : ".");
+        }
+        return t.toString().trim().replaceAll(" +", " ");
+    }
+
+    /**
+     * Bytes that only a radio module's answer starts with, once any echo of our own query is taken out: the W6's AT
+     * module sends back what it got wrapped in an error ("\r\n…68 34 01 01 95 b9 00 01 01 10…:1\r\n", 2026-10-27),
+     * which is not a DMR module answering.
+     */
+    static boolean looksLikeModule(String hex) {
+        String h = " " + hex.toLowerCase(Locale.US).replaceAll("\\s+", " ").trim() + " ";
+        for (byte[] q : new byte[][] { QUERY_ULEFONE, QUERY_AGOLD_34, QUERY_AGOLD_25 }) h = h.replace(" " + hexOf(q) + " ", " | ");
+        return h.contains("68 34") || h.contains("bf aa") || h.contains("7e 96 69");
+    }
+    private static String hexOf(byte[] q) { StringBuilder s = new StringBuilder(); for (byte b : q) s.append(s.length() == 0 ? "" : " ").append(String.format(Locale.US, "%02x", b & 0xFF)); return s.toString(); }
 
     private static void probePort(StringBuilder r, String stty, String port, Saved saved) {
         boolean usb = port.matches("/dev/tty(ACM|USB)\\d+");
@@ -188,13 +240,44 @@ public final class RadioProbe {
         if (usb) direct = (direct + " " + javaQuery(port, QUERY_AGOLD_34) + " " + javaQuery(port, QUERY_AGOLD_25)).trim();   // a USB MCU ignores the line speed
         r.append("  as-is (opened by the app, no stty): ").append(direct.isEmpty() ? "(nothing received)" : direct).append('\n');
         if (looksLikeModule(direct)) { r.append("  ^ the DMR module answered on this port at its current line speed\n"); return; }
+        if (!usb && !saved.canChange) {                                         // the line cannot be set: the AT handshake as it is
+            String at = javaQuery(port, AT_CONNECT);
+            r.append("  as-is, after AT+DMOCONNECT: ").append(at.isEmpty() ? "(nothing received)" : at + "  \"" + asText(at) + "\"").append('\n');
+            if (looksLikeAt(at)) { r.append("  ^ ").append(AT_MARK).append(" on ").append(port).append(" at ").append(saved.speed.isEmpty() ? "its current" : saved.speed).append(" baud\n"); return; }
+        }
         if (usb) { r.append("  (USB serial: the line speed does not matter, no other speeds tried)\n"); return; }
         if (!saved.canChange) { r.append("  other speeds not tried: its speed ").append(saved.speed.isEmpty() ? "(unreadable)" : saved.speed).append(" could not be put back if changed\n"); return; }
         for (int baud : new int[] { 57600, 115200, 9600, 230400 }) {
-            String out = RootSetup.run(stty + " -F " + port + " " + baud + " raw -echo 2>&1; " + "(timeout 3 cat " + port + " | head -c 400 | od -An -tx1 | tr -d '\\n' | cut -c1-600) & sleep 0.3; " + printf(QUERY_ULEFONE) + port + "; sleep 3.2; echo");
-            String hex = out.replaceAll("\\s+", " ").trim();
+            String hex = query(stty, port, baud, QUERY_ULEFONE);
             r.append(String.format(Locale.US, "  %6d baud (readback %s), after 0x34 query: %s\n", baud, speedOf(RootSetup.run(stty + " -F " + port + " 2>&1 | head -1")), hex.isEmpty() ? "(nothing received)" : hex));
             if (looksLikeModule(hex)) { r.append("  ^ looks like the DMR module answered at ").append(baud).append(" baud\n"); return; }
+        }
+        probeAt(r, stty, port, saved);
+    }
+
+    /** Put the line at {@code baud}, raw, send {@code q}, return up to 400 reply bytes as hex. */
+    private static String query(String stty, String port, int baud, byte[] q) {
+        String out = RootSetup.run(stty + " -F " + port + " " + baud + " raw -echo 2>&1; " + "(timeout 3 cat " + port + " | head -c 400 | od -An -tx1 | tr -d '\\n' | cut -c1-600) & sleep 0.3; " + printf(q) + port + "; sleep 3.2; echo");
+        return out.replaceAll("\\s+", " ").trim();
+    }
+
+    /**
+     * SA818-class modules (the W6's UHF module) answer text, not the DMR frame: AT+DMOCONNECT, then AT+DMOVERQ for the
+     * version, at the port's own speed first, then 9600 (the family's default). Both only read the module's identity;
+     * nothing that tunes, keys or changes a setting is ever sent.
+     */
+    private static void probeAt(StringBuilder r, String stty, String port, Saved saved) {
+        java.util.LinkedHashSet<Integer> bauds = new java.util.LinkedHashSet<>();
+        if (saved.speed.matches("\\d+")) bauds.add(Integer.parseInt(saved.speed));
+        bauds.add(9600);
+        for (int baud : bauds) {
+            String hex = query(stty, port, baud, AT_CONNECT);
+            r.append(String.format(Locale.US, "  %6d baud, after AT+DMOCONNECT: %s\n", baud, hex.isEmpty() ? "(nothing received)" : hex + "  \"" + asText(hex) + "\""));
+            String ver = query(stty, port, baud, AT_VERSION);
+            r.append(String.format(Locale.US, "  %6d baud, after AT+DMOVERQ: %s\n", baud, ver.isEmpty() ? "(nothing received)" : ver + "  \"" + asText(ver) + "\""));
+            if (!looksLikeAt(hex) && !looksLikeAt(ver)) continue;
+            r.append("  ^ ").append(AT_MARK).append(" on ").append(port).append(" at ").append(baud).append(" baud\n");
+            return;
         }
     }
 
