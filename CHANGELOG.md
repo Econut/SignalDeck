@@ -4,6 +4,12 @@ Newest first. Each entry: what changed, the files, and how it was tested (host t
 the move to this repository (2026-10-17 to 2026-10-22, beta.1 to beta.11 and after) are in
 [phonedmrapp/CHANGELOG_DRAFT.md](https://github.com/IIMacGyverII/phonedmrapp/blob/main/CHANGELOG_DRAFT.md).
 
+## 2026-10-28 — Receive-RAM stream offered only on FW27 to FW29
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner 2026-10-28: drop the RAM stream from the firmware (FW30 refuses ops 16/17) | The bench receive stream refuses to start on FW30 and later, with a plain reason, instead of switching the UART to a rate the module no longer serves. Help: the bench stream topic | `RadioService.java`, `HelpView.java`, `RamStreamGateTest.java` | Host suite |
+
 ## 2026-10-26 — A long M17 call stays one listing
 
 | Backlog | Change | Files | Test |

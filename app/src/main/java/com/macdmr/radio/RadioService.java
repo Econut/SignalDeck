@@ -3209,7 +3209,8 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     // ---- FW27 receive-RAM stream (bench): mode 5, the UART at 230400, op 17 halves into a second held-path receiver ----
-    static final int RAM_STREAM_FW = 27, RAM_STREAM_BAUD = 230400;
+    static final int RAM_STREAM_FW = 27, RAM_STREAM_LAST_FW = 29, RAM_STREAM_BAUD = 230400;   // FW30 dropped ops 16/17 (owner, 2026-10-28)
+    static boolean ramStreamFirmware(int tag) { return tag >= RAM_STREAM_FW && tag <= RAM_STREAM_LAST_FW; }
     private volatile com.macdmr.radio.ham.RamStream.Receiver ramStream;
     private volatile com.macdmr.radio.ham.HeldPathReceiver ramStreamRx;
     private volatile boolean ramStreamOn;
@@ -3222,7 +3223,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public String ramStreamStats() { com.macdmr.radio.ham.RamStream.Receiver r = ramStream; return r == null ? "" : r.stats(); }
     /**
      * Bench: the module's FM receive RAM streamed over the UART and decoded as M17 beside the audio-path receiver.
-     * Needs the bench firmware FW27 or later and the M17 receiver running. {@code plain} decodes the stream with no
+     * Needs the bench firmware FW27 to FW29 and the M17 receiver running. {@code plain} decodes the stream with no
      * equaliser (the RAM baseband is flat); otherwise the phone's shipped taps are used for comparison.
      * Returns null when started or stopped, else the reason.
      */
@@ -3268,7 +3269,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (ramStreamOn) return "The stream is already running";
         if (firmwareBusy) return "Radio busy, loading firmware";
         if (!isReady()) return "Radio not ready";
-        if (!Firmware.stubTag(moduleVersion) || Firmware.tagNumber(moduleVersion) < RAM_STREAM_FW) return "Needs the bench firmware FW" + RAM_STREAM_FW + " or later (the module reports " + moduleVersion + ")";
+        if (!Firmware.stubTag(moduleVersion) || !ramStreamFirmware(Firmware.tagNumber(moduleVersion))) return "Needs the bench firmware FW" + RAM_STREAM_FW + " to FW" + RAM_STREAM_LAST_FW + " (FW30 and later have no receive stream; the module reports " + moduleVersion + ")";
         M17Station st = m17;
         if (st == null || !st.running() || st.ear() == null) return "Turn M17 receive on first";
         final com.macdmr.radio.ham.HeldPathReceiver.Listener ear = st.ear();
