@@ -19,6 +19,12 @@ import android.media.MediaRecorder;
  */
 public final class CamcorderAudio implements AudioBackend {
     static final int RATE = 8000, BLOCK = 256;          // 32 ms blocks
+    /**
+     * The camcorder input carries the radio about 21 dB lower than the other phones' audio (W6, 2026-10-27: a 1 kHz tone
+     * at 2.5 kHz deviation arrived at -44 dBFS with the module volume at 4 of 8, and the SSTV decoder skipped a Robot 36
+     * picture as "likely noise"). A fixed gain of 12 brings it to about -22 dBFS; samples are clipped, never wrapped.
+     */
+    static final int GAIN = 12;
     private volatile Sink sink;
     private volatile boolean running;
     private Thread thread;
@@ -27,10 +33,12 @@ public final class CamcorderAudio implements AudioBackend {
     @Override public void setSink(Sink s) { sink = s; }
     @Override public void setGate(Gate g) { }           // the module's own speaker path: the gate does not apply
 
-    /** Mono 16-bit samples to the stereo (L == R) little-endian frames the sink takes. */
-    static int toStereo(short[] mono, int n, byte[] out) {
+    /** Mono 16-bit samples, times {@link #GAIN} and clipped, to the stereo (L == R) little-endian frames the sink takes. */
+    static int toStereo(short[] mono, int n, byte[] out) { return toStereo(mono, n, out, GAIN); }
+    static int toStereo(short[] mono, int n, byte[] out, int gain) {
         for (int i = 0; i < n; i++) {
-            byte lo = (byte) mono[i], hi = (byte) (mono[i] >> 8);
+            int v = Math.max(-32768, Math.min(32767, mono[i] * gain));
+            byte lo = (byte) v, hi = (byte) (v >> 8);
             out[4 * i] = lo; out[4 * i + 1] = hi; out[4 * i + 2] = lo; out[4 * i + 3] = hi;
         }
         return 4 * n;
