@@ -225,6 +225,12 @@ public final class DeviceProfile {
     public boolean hasMessages() { return dmr(); }
     /** Whether the Contacts page is useful here: its entries are DMR IDs and talkgroups today; same rule as {@link #hasMessages}. */
     public boolean hasContacts() { return dmr(); }
+    /**
+     * Whether this phone's module firmware can be read and catalogued (its stock app carries the image, our loader can
+     * dump it). False for an SA818-class module: no firmware file in the stock app, no read command in the module, so
+     * there is nothing the firmware project could take from a submission and the variant check is skipped.
+     */
+    public boolean firmwareCatalogued() { return dmr(); }
 
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {

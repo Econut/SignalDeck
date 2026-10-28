@@ -994,7 +994,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         firmwareText.setText(fwStock.isEmpty() ? "Module firmware" : com.macdmr.radio.Firmware.line(fwStock, fwNow));
         firmwareText.setVisibility(VISIBLE);
         firmwareText.setTextColor(com.macdmr.radio.Firmware.differs(fwStock, fwNow) ? Neo.AMBER_LIGHT : 0xFF9FB4C8);
-        com.macdmr.radio.FirmwareVariantCheck.Finding vf = svc.profile().supported ? com.macdmr.radio.FirmwareVariantCheck.finding(c) : null;
+        com.macdmr.radio.FirmwareVariantCheck.Finding vf = svc.profile().supported && svc.profile().firmwareCatalogued() ? com.macdmr.radio.FirmwareVariantCheck.finding(c) : null;
         variantText.setVisibility(vf == null ? GONE : VISIBLE);
         if (vf != null) variantText.setText("\u26A0 Firmware not in the catalogue yet \u00B7 " + (vf.opened ? "sent to GitHub, waiting for the catalogue" : "tap to submit it"));
         boolean ready = "ready".equals(l), unsupported = "unsupported".equals(l), bad = "no root".equals(l) || unsupported;

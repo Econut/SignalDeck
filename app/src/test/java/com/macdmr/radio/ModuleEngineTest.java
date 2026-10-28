@@ -20,4 +20,12 @@ public class ModuleEngineTest {
         assertEquals("mcu68", plain.protocol());     // an engine that does not say otherwise is the DMR module
         assertTrue(plain.dmr());
     }
+
+    /** The firmware-variant offer is only made where a module image exists to catalogue: not on the SA818-class W6. */
+    @Test public void firmwareCataloguedOnlyForImageModules() {
+        assertFalse(DeviceProfile.ANYSECU_W6.firmwareCatalogued());
+        assertFalse(DeviceProfile.ANYSECU_W6.dmr());
+        assertTrue(DeviceProfile.ARMOR_26_ULTRA.firmwareCatalogued());
+        assertTrue(DeviceProfile.XPLORE_1.firmwareCatalogued());
+    }
 }
