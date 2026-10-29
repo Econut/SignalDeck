@@ -240,7 +240,8 @@ public final class DeviceReport {
      */
     public static String apkClues(File apk) {
         java.util.TreeSet<String> paths = new java.util.TreeSet<>(), params = new java.util.TreeSet<>(), bauds = new java.util.TreeSet<>(), logs = new java.util.TreeSet<>(),
-                cmds = new java.util.TreeSet<>(), libs = new java.util.TreeSet<>(), actions = new java.util.TreeSet<>(), hidl = new java.util.TreeSet<>();
+                cmds = new java.util.TreeSet<>(), libs = new java.util.TreeSet<>(), actions = new java.util.TreeSet<>(), hidl = new java.util.TreeSet<>(),
+                dmrNames = new java.util.TreeSet<>(), named = new java.util.TreeSet<>();
         Pattern pPath = Pattern.compile("/(sys|dev|proc)/[A-Za-z0-9_./-]{2,80}"), pParam = Pattern.compile("\\b[a-z][a-z0-9_]{2,30}=(on|off|1|0|true|false)\\b"),
                 pBaud = Pattern.compile("\\bB(9600|19200|38400|57600|115200|230400|460800|921600)\\b"),
                 // a keyword that starts a word or a camelCase part ("isPttButton", "PTT key"), not one inside a word ("onInterceptTouchEvent")
@@ -272,6 +273,7 @@ public final class DeviceReport {
                         m = pCmd.matcher(s); while (m.find() && cmds.size() < 60) cmds.add(m.group());
                         if (dex && !s.contains("/") && !s.contains(" ")) { m = pAction.matcher(s); while (m.find() && actions.size() < 20) actions.add(m.group()); }
                         m = pHidl.matcher(s); while (m.find() && hidl.size() < 10) hidl.add(m.group());
+                        if (dex && DMR_COMMAND_NAMES.contains(s)) dmrNames.add(s);
                         if (dex && s.length() <= 100 && logs.size() < 120 && !s.contains("/") && (s.contains(" ") || s.contains(":") || s.contains(","))
                                 && pLog.matcher(s).matches() && !pFramework.matcher(s).matches()) logs.add(s.trim());           // log-like texts, not framework names
                     }
@@ -279,22 +281,46 @@ public final class DeviceReport {
                 }
             }
         } catch (Throwable t) { return "  could not read " + apk + ": " + t + "\n"; }
+        try (java.util.zip.ZipFile z = new java.util.zip.ZipFile(apk)) {               // the lines it names: static String fields holding a /sys or /dev path
+            java.util.Enumeration<? extends ZipEntry> en = z.entries();
+            while (en.hasMoreElements() && named.size() < 40) {
+                ZipEntry e = en.nextElement();
+                if (!e.getName().matches("classes\\d*\\.dex") || e.getSize() > 40_000_000) continue;
+                byte[] b; try (InputStream in = z.getInputStream(e)) { java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(); byte[] t = new byte[65536]; int k; while ((k = in.read(t)) > 0) bo.write(t, 0, k); b = bo.toByteArray(); }
+                for (String[] f : DexFields.staticStrings(b, v -> v.matches("/(sys|dev)/[A-Za-z0-9_./-]{2,80}")))
+                    if (named.size() < 40 && !f[0].startsWith("Landroid") && !f[0].startsWith("Ljava")) named.add(f[1] + "=" + f[2]);
+            }
+        } catch (Throwable ignored) { }
         StringBuilder out = new StringBuilder();
         out.append("  paths: ").append(paths.isEmpty() ? "-" : String.join("  ", paths)).append('\n');
+        out.append("  named lines: ").append(named.isEmpty() ? "-" : String.join("  ", named)).append('\n');
         out.append("  audio/system parameters: ").append(params.isEmpty() ? "-" : String.join("  ", params)).append('\n');
         out.append("  serial speeds: ").append(bauds.isEmpty() ? "-" : String.join(" ", bauds)).append('\n');
         out.append("  native libraries: ").append(libs.isEmpty() ? "-" : String.join("  ", libs)).append('\n');
         out.append("  module commands: ").append(cmds.isEmpty() ? "-" : String.join("  ", cmds)).append('\n');
         out.append("  PTT broadcasts: ").append(actions.isEmpty() ? "-" : String.join(" ", actions)).append('\n');
         out.append("  HIDL interfaces: ").append(hidl.isEmpty() ? "-" : String.join(" ", hidl)).append('\n');
-        String fam = commandFamily(cmds); if (fam != null) out.append("  protocol hint from its code: ").append(fam).append('\n');
+        String fam = commandFamily(cmds, dmrNames); if (fam != null) out.append("  protocol hint from its code: ").append(fam).append('\n');
         out.append("  log texts about the radio:\n"); for (String s : logs) out.append("    ").append(mask(s)).append('\n');
         return out.toString();
     }
 
+    /** Command names of the DMR module's 68 … 10 command set as an app's enum spells them (the W6Plus DMR's CMD: SET_DIGITAL = 0x22 …). */
+    static final java.util.Set<String> DMR_COMMAND_NAMES = new java.util.HashSet<>(java.util.Arrays.asList(
+            "SET_DIGITAL", "SET_ANALOG", "QUERY_DIGITAL_CHANNEL", "QUERY_ANALOG_CHANNEL", "SET_TRANSMIT", "QUERY_DIGITAL_VOICE_INFORMATION",
+            "PRINT_STATE", "TRANSMISSION_INTERRUPT", "QUERY_MODULE_CONSISTENCY", "SET_MODULE_CONSISTENCY", "SET_SAVE_POWER_MODE", "SET_TRUNK_MODE"));
+
     /** The module family the command names in an app's code point to, or null. */
-    static String commandFamily(java.util.Collection<String> cmds) {
+    static String commandFamily(java.util.Collection<String> cmds) { return commandFamily(cmds, java.util.Collections.emptySet()); }
+    /**
+     * The same, with the DMR command names found in its code: an app may carry both (the W6Plus DMR's has a few AT+DMO
+     * strings beside its 68 … 10 command enum), and then the serial watch decides.
+     */
+    static String commandFamily(java.util.Collection<String> cmds, java.util.Collection<String> dmrNames) {
         int dmo = 0; for (String c : cmds) if (c.startsWith("AT+DMO")) dmo++;
+        int dmr = dmrNames.size();
+        if (dmr >= 4 && dmo >= 2) return "both the DMR module's 68 … 10 command names (" + dmr + ") and SA818-class AT commands (" + dmo + " AT+DMO… names): the serial watch decides";
+        if (dmr >= 4) return "the DMR module's 68 … 10 command set (" + dmr + " command names)";
         return dmo >= 2 ? "SA818-class AT commands (" + dmo + " AT+DMO… names)" : null;
     }
 
