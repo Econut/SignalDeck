@@ -946,7 +946,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         }
                     }
                 }
-                if (agold) { lineFallback = false; synthRx = false; lineMissed = 0; lineRestarts = 0; monRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
+                if (agold) { lineFallback = false; synthRx = false; lineMissed = 0; lineRestarts = 0; monRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); ui.removeCallbacks(windowCheck); ui.postDelayed(windowCheck, AgoldUsb.POWER_UP_EDGES_MS + 300); }
                 ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
@@ -2855,7 +2855,21 @@ public class RadioService extends Service implements RadioEngine.Events {
         }
         try { engine.powerCycle(); }
         catch (IOException e) { if (agoldBridge()) bridgeLost(e); throw e; }
+        if (agoldBridge()) { ui.removeCallbacks(windowCheck); ui.postDelayed(windowCheck, AgoldUsb.POWER_UP_EDGES_MS + 300); }
     }
+    /**
+     * After a bridge power-up the line's edges are ignored for {@link AgoldUsb#POWER_UP_EDGES_MS} (the bridge toggles it),
+     * so a reception that began or ended meanwhile was missed: a restart in the middle of a carrier swallowed its end and
+     * SignalDeck stayed "receiving" until the next carrier stopped (2026-10-29). When the window ends, the driver's own flag
+     * settles it; a start also needs the signal reading to agree (the flag can be stale on a stuck line).
+     */
+    private final Runnable windowCheck = () -> new Thread(() -> {             // its own thread: the worker is still busy with the restart that powered the bridge up, and the link is not "ready" yet
+        if (!agoldBridge() || exiting || isTransmitting() || !engine.isOpen()) return;
+        String v = RootSetup.run("cat " + AgoldUsb.CALL_IN).trim();
+        int act = AgoldUsb.windowAction(receiving, v, rssi, AgoldUsb.rssiStartDbm(idleFloor));
+        if (act == 2) ui.post(() -> { if (receiving && !monRx) { /* MON holds its own reception open without the line */ log("reception ended during the bridge power-up (call_in " + v + ")"); synthRx = false; status(2, RadioEngine.statusName(2)); } });
+        else if (act == 1) ui.post(() -> { if (!receiving) { log("reception in progress after the bridge power-up (call_in " + v + ", " + rssi + " dBm)"); synthRx = true; status(1, RadioEngine.statusName(1)); } });
+    }, "agold-window-check").start();
     private void bridgeLost(Throwable t) {
         log("the USB bridge did not come back: " + t);
         ui.removeCallbacks(rxWatchdog); ui.removeCallbacks(lineCheck); ui.removeCallbacks(moduleWatch);
@@ -2880,16 +2894,30 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     private volatile boolean bridgeRecoverDeferred;
+    private boolean captureRunning() { return audio instanceof AlsaDirectAudio && ((AlsaDirectAudio) audio).capturing(); }
+    private volatile long captureDeadAt; private volatile boolean recoverHeld; private volatile String heldWhy;
+    private final Runnable heldRecovery = () -> { if (recoverHeld && !exiting) recoverBridgeAudio(heldWhy); };   // re-checked every 0.5 s
     void recoverBridgeAudio(String why) {
         long wait = 20_000 - (System.currentTimeMillis() - lastBridgeRecoverAt);
         if (agoldBridge() && !exiting && !isTransmitting() && wait > 0 && receiving && !bridgeRecoverDeferred) {
             // inside the 20 s window: try once more when it ends if the reception is still on, instead of leaving the capture dead (MON on a stuck line, 2026-10-29)
             bridgeRecoverDeferred = true;
             log("bridge recovery in " + (wait / 1000 + 1) + " s: " + why);
-            ui.postDelayed(() -> { bridgeRecoverDeferred = false; if (receiving && !exiting) recoverBridgeAudio(why); }, wait + 100);
+            ui.postDelayed(() -> { bridgeRecoverDeferred = false; if (receiving && !exiting && !captureRunning()) recoverBridgeAudio(why); }, wait + 100);   // not if the capture came back meanwhile
             return;
         }
         if (!agoldBridge() || exiting || isTransmitting() || wait > 0) { log("bridge recovery skipped: " + why); return; }
+        // a power-cycle in the middle of a reception cuts it off and can hide its edges (2026-10-29), and since the capture
+        // settings of PR 92 a dead capture is rare: wait for the reception to end, at most CAPTURE_DEAD_WAIT_MS
+        long now = System.currentTimeMillis();
+        if (captureDeadAt == 0) captureDeadAt = now;
+        long hold = AgoldUsb.CAPTURE_DEAD_WAIT_MS - (now - captureDeadAt);
+        if (receiving && hold > 0) {
+            if (!recoverHeld) { recoverHeld = true; log("bridge recovery after this reception (at most " + (hold / 1000 + 1) + " s): " + why); }
+            ui.removeCallbacks(heldRecovery); heldWhy = why; ui.postDelayed(heldRecovery, Math.min(hold, 500));
+            return;
+        }
+        recoverHeld = false; captureDeadAt = 0; ui.removeCallbacks(heldRecovery);
         lastBridgeRecoverAt = System.currentTimeMillis();
         worker.execute(() -> {
             try {
