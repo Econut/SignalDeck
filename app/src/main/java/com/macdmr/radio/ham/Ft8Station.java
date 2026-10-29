@@ -139,7 +139,7 @@ public final class Ft8Station {
         return out;
     }
 
-    private void maybeDecode(long now) {
+    private synchronized void maybeDecode(long now) {
         long slot = slotOf(now);
         if (now - slot * 15000L < 14_700 || slot == lastDecodedSlot || decoding) return;   // the signals end at 13.1 s; allow for a late clock
         lastDecodedSlot = slot;
@@ -264,8 +264,12 @@ public final class Ft8Station {
     // ---- transmit scheduling: call this a few times a second ---------------------------------------
 
     public void tick() {
-        if (!running || !txEnabled || nextMsg == null) return;
-        long now = host.now(), next = slotOf(now) + 1;
+        if (!running) return;
+        long now = host.now();
+        // audio that comes only with receptions (the Atom XL opens its capture per reception) stops before 14.7 s: decode the slot from here
+        synchronized (this) { if (anchorMs >= slotOf(now) * 15000L) maybeDecode(now); }
+        if (!txEnabled || nextMsg == null) return;
+        long next = slotOf(now) + 1;
         if ((next & 1) != txParity) return;
         long keyAt = next * 15000L - txAdvanceMs;
         if (now < keyAt || now > keyAt + 600 || scheduledSlot == next) return;

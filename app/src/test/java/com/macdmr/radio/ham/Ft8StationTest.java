@@ -61,6 +61,31 @@ public class Ft8StationTest {
         return null;
     }
 
+    /** Feed {@code x} from {@code fromS} to {@code toS} seconds into the current slot, in 0.25 s blocks as a capture delivers them. */
+    private static void feed(FakeHost h, Ft8Station st, float[] x, double fromS, double toS) {
+        long slot0 = h.now - h.now % 15000; int blk = Ft8.RATE / 4;
+        for (int a = (int) (fromS * Ft8.RATE); a + blk <= (int) (toS * Ft8.RATE); a += blk) {
+            byte[] b = new byte[blk * 2];
+            for (int i = 0; i < blk; i++) { int v = Math.round(x[a + i] * 32767); b[2 * i] = (byte) v; b[2 * i + 1] = (byte) (v >> 8); }
+            h.now = slot0 + (a + blk) * 1000L / Ft8.RATE; st.feed(b, b.length);
+        }
+    }
+
+    @Test public void aSlotHeardOnlyDuringTheReceptionIsStillDecoded() {
+        FakeHost h = new FakeHost(); Ft8Station st = new Ft8Station(h); st.start();
+        float[] x = new float[Ft8.RATE * 15];
+        float[] w = Ft8.synth(Ft8.tones(Ft8Message.pack("CQ K1ABC FN42", null)), 1200, Ft8.RATE);
+        for (int i = 0; i < w.length; i++) x[Ft8.RATE / 2 + i] = 0.1f * w[i];
+        long slot0 = h.now;
+        feed(h, st, x, 0.25, 13.75);                                     // the capture opens with the signal and closes 0.7 s after it
+        assertTrue("not before the slot is over", st.heard().isEmpty());
+        for (h.now = slot0 + 13_750; h.now < slot0 + 15_000; h.now += 250) st.tick();
+        assertEquals(1, st.heard().size());
+        assertEquals("K1ABC", st.heard().get(0).from);
+        for (; h.now < slot0 + 45_000; h.now += 250) st.tick();         // later slots without audio are not decoded again
+        assertEquals(1, st.heard().size());
+    }
+
     @Test public void answersACqAndCompletesTheQso() {
         FakeHost h = new FakeHost(); Ft8Station st = new Ft8Station(h); st.start();
         long slot = h.now / 15000;
