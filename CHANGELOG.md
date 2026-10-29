@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Contribute page on the Device page
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner request 2026-10-28 | Device → **Contribute** (a button at the top of the page and a tile among the tools) opens the ways to help: donate on Ko-fi (GitHub Sponsors joins it once approved), take part (signaldeckradio.com, GitHub issues), or fork the project and make your own phone compatible. New help section Device → Contribute; heart icon; `.github/FUNDING.yml` adds Ko-fi. | `ui/DeviceView.java`, `ui/Neo.java`, `ui/HelpView.java`, `docs/help/`, `.github/FUNDING.yml` | Host suite; device check owed |
+
 ## 2026-10-29 — Atom XL: a drop-out in the sound no longer turns into a run of them
 
 | Backlog | Change | Files | Test |
