@@ -93,6 +93,7 @@ public class AgoldUsbTest {
         assertTrue(up.indexOf("mcu_power") < up.indexOf("rstmcu"));
         String down = AgoldUsb.POWER_DOWN;
         assertTrue(down.startsWith("echo 0 > " + AgoldUsb.MCU_POWER));
+        assertTrue("the USB disconnect is waited for before host mode is left", down.indexOf("/sys/class/tty/ttyACM0") < down.indexOf("> " + "/sys/bus/platform/drivers/mcu/usb_path"));
         assertTrue(down.indexOf("cmode") > down.indexOf("usb_path"));
         assertTrue(down.trim().endsWith("start aguiextmodule;"));
     }

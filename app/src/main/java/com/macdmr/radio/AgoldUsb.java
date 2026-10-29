@@ -92,24 +92,32 @@ final class AgoldUsb {
 
     private static final String STTY = "S=stty; [ -x /data/adb/magisk/busybox ] && S='/data/adb/magisk/busybox stty'; ";
     /**
-     * The HAL's own start-up (traced 2026-10-28): usb_path 1, mcu_power 1, 0.75 s, rstmcu 0 (after a fresh boot the bridge
-     * sits in reset and never enumerates without it), then the port within 3 s; when the controller refuses device ->
-     * host it goes through "none" (power off, usb_path 0) and tries once more for 10 s. Leaves $i set.
-     */
-    /**
      * The port node outlives a power-off while a holder (the HAL, just restarted) keeps it open, so a power-up waits up
      * to 5 s for the old node to go first; otherwise the next step would take the stale node for the new port (a hand-back
      * check that way asked nothing and found the bridge "silent", 2026-10-28).
      */
     private static final String STALE_PORT_GONE = "k=0; while [ -e " + BRIDGE_PORT + " ] && [ $k -lt 25 ]; do sleep 0.2; k=$((k+1)); done; "
             + "[ -e " + BRIDGE_PORT + " ] && echo 'stale port still there'; ";
+    /**
+     * Bridge power off, then wait up to 6 s for the USB disconnect to be processed (the tty leaves /sys/class/tty) before
+     * anything takes the controller out of host mode: switched over too early, the dead bridge stays registered as a
+     * ghost ttyACM0 that no power-up replaces and only a reboot clears (2026-10-28, twice).
+     */
+    private static final String POWER_OFF = "echo 0 > " + MCU_POWER + "; "
+            + "k=0; while [ -e /sys/class/tty/ttyACM0 ] && [ $k -lt 30 ]; do sleep 0.2; k=$((k+1)); done; "
+            + "[ -e /sys/class/tty/ttyACM0 ] && echo 'bridge still registered after power-off'; sleep 0.3; ";
+    /**
+     * The HAL's own start-up (traced 2026-10-28): usb_path 1, mcu_power 1, 0.75 s, rstmcu 0 (after a fresh boot the bridge
+     * sits in reset and never enumerates without it), then the port within 3 s; when the controller refuses device ->
+     * host it goes through "none" (power off, usb_path 0) and tries once more for 10 s. Leaves $i set.
+     */
     private static final String ONE_POWER_UP = "echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; sleep 0.75; echo 0 > " + RSTMCU + "; ";
     static final String POWER_UP = STALE_PORT_GONE + ONE_POWER_UP
             + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 6 ]; do sleep 0.5; i=$((i+1)); done; "
-            + "if [ ! -e " + BRIDGE_PORT + " ]; then echo 'retry: through none'; echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; " + ONE_POWER_UP
+            + "if [ ! -e " + BRIDGE_PORT + " ]; then echo 'retry: through none'; " + POWER_OFF + "echo 0 > " + USB_PATH + "; sleep 0.5; " + ONE_POWER_UP
             + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; fi; ";
     /** Radio off, USB port back to the socket (cable mode 0, then 1), the HAL running again. */
-    static final String POWER_DOWN = "echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; "
+    static final String POWER_DOWN = POWER_OFF + "echo 0 > " + USB_PATH + "; sleep 0.5; "
             + "for u in /sys/class/udc/*; do d=$(readlink -f $u); d=${d%/udc/*}; [ -f $d/cmode ] && { echo 0 > $d/cmode; sleep 1; echo 1 > $d/cmode; }; done; "
             + "start " + HAL_SERVICE + "; ";
 
@@ -122,7 +130,7 @@ final class AgoldUsb {
      */
     static String bridgeUp() throws java.io.IOException {
         String out = RootSetup.run(STTY + "stop " + HAL_SERVICE + "; sleep 0.5; "
-                + "case \"$(cat " + MCU_POWER + ")\" in *'= 1'*) echo 'was powered: off first'; echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5;; esac; "
+                + "case \"$(cat " + MCU_POWER + ")\" in *'= 1'*) echo 'was powered: off first'; " + POWER_OFF + "echo 0 > " + USB_PATH + "; sleep 0.5;; esac; "
                 + POWER_UP
                 + "if [ -e " + BRIDGE_PORT + " ]; then sleep 2; chmod 0666 " + BRIDGE_PORT + "; $S -F " + BRIDGE_PORT + " 115200 raw -echo 2>&1; echo 1 > " + HANDLE_PTT + "; "
                 + "echo \"port: after $((i*5)) tenths of a second\"; else echo 'port: none'; " + POWER_DOWN + "fi");

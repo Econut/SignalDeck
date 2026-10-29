@@ -102,7 +102,9 @@ public final class AlsaDirectAudio implements AudioBackend {
     static String quote(String s) { return "'" + s.replace("'", "'\\''") + "'"; }
 
     private Process start(boolean capture) throws java.io.IOException {
-        Process p = new ProcessBuilder("su", "--context", "u:r:magisk:s0", "-c", command(helper, capture, da)).start();
+        // --mount-master: an app's su otherwise runs in the app's own mount namespace; there the Atom XL's USB card capture
+        // failed with an I/O error while the same helper from a root shell ran for minutes (2026-10-28)
+        Process p = new ProcessBuilder("su", "--mount-master", "--context", "u:r:magisk:s0", "-c", command(helper, capture, da)).start();
         final InputStream es = p.getErrorStream();
         Thread t = new Thread(() -> {                                    // the helper's own messages: busy device, a missing control, xruns
             try (BufferedReader r = new BufferedReader(new InputStreamReader(es))) {

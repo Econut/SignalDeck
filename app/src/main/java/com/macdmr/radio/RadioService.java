@@ -2584,7 +2584,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             try {
                 // while the bridge streams audio it cuts every frame on the port after 12 bytes (measured 2026-10-28), so
                 // the caller (a 20-byte 0x2B reply) is asked before the capture opens and after it closes, as the stock app does
-                if (on) { if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); } if (a != null) { a.stopRx(); log(a.startRx(true)); } }
+                if (on) { if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); } if (a != null) log(a.startRx(true)); }
                 else { if (a != null) a.stopRx(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
             } catch (Throwable t) { log("bridge capture: " + t); }
         });
