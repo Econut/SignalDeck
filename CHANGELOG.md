@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: the radio's sound is read the way the stock app's audio layer reads it, so drop-outs no longer pile up
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture-stall investigation (managing agent, 2026-10-29) | The Atom XL's radio sound comes from the bridge's USB sound card. SignalDeck opened it with 1024-frame periods and 16 of them; the stock app's audio layer (`vendor.mediatek.hardware.aguiextmodule@1.0-service`, disassembled: card 1, 32 kHz, 2 channels, 16-bit) opens it with 1280-frame periods and 4 of them, which changes how the USB driver queues the transfers. With the old setting the capture ran clean for a few receptions, then died 2 s into almost every reception until the phone was restarted, and RTTY and speech were cut. The capture period is now a profile setting, and the Atom XL uses the stock values. | `DeviceProfile`, `AlsaDirectAudio` | Device (Atom XL, fresh boot, HackRF RTTY and speech on 401.025 MHz): 15 receptions, 2 drop-outs each fixed by one bridge restart, no run of failures, RTTY 8 of 8 decoded (6 full, 2 missing the first letters). The old setting the same morning: 4 clean, then the stream kept failing. Host suite 504 / 0 |
+
 ## 2026-10-29 — Atom XL: a bridge that stops taking commands no longer freezes the radio
 
 | Backlog | Change | Files | Test |
