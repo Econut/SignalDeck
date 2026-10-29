@@ -165,21 +165,29 @@ final class AgoldUsb {
     private static final String POWER_OFF = "echo 0 > " + MCU_POWER + "; "
             + "k=0; while [ -e /sys/class/tty/ttyACM0 ] && [ $k -lt 30 ]; do sleep 0.2; k=$((k+1)); done; "
             + "[ -e /sys/class/tty/ttyACM0 ] && echo 'bridge still registered after power-off'; sleep 0.3; ";
-    /** Radio off and the USB controller back in device mode (cable mode 0, then 1); a clean start for the next power-up. */
-    static final String RESET = POWER_OFF + "echo 0 > " + USB_PATH + "; sleep 0.5; "
+    /**
+     * The stock HAL's stop_mcu powers the bridge off, waits 0.2 s, powers it on for 0.2 s (usb_path 1, mcu_power 1,
+     * rstmcu 0) and off again (disassembled 2026-10-29, docs/atomxl/HAL_SEQUENCES.md): too short for the bridge to
+     * enumerate, a reset pulse for its next start. SignalDeck's power-off had no pulse, and a session that SignalDeck
+     * left in the middle of a reception (killed) came back with a reception line that never reported again.
+     */
+    static final String HAL_PULSE = "sleep 0.2; echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; echo 0 > " + RSTMCU + "; sleep 0.2; echo 0 > " + MCU_POWER + "; "
+            + "k=0; while [ -e /sys/class/tty/ttyACM0 ] && [ $k -lt 15 ]; do sleep 0.2; k=$((k+1)); done; ";
+    /** Radio off (with the HAL's pulse) and the USB controller back in device mode (cable mode 0, then 1); a clean start for the next power-up. */
+    static final String RESET = POWER_OFF + HAL_PULSE + "echo 0 > " + USB_PATH + "; sleep 0.5; "
             + "for u in /sys/class/udc/*; do d=$(readlink -f $u); d=${d%/udc/*}; [ -f $d/cmode ] && { echo 0 > $d/cmode; sleep 1; echo 1 > $d/cmode; }; done; sleep 0.5; ";
     /**
      * The HAL's own start-up (traced 2026-10-28): usb_path 1, mcu_power 1, 0.75 s, rstmcu 0 (after a fresh boot the bridge
      * sits in reset and never enumerates without it), then the port within 3 s; when the controller refuses device ->
      * host it goes through "none" (power off, usb_path 0) and tries once more for 10 s. Leaves $i set.
      */
-    private static final String ONE_POWER_UP = "echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; sleep 0.75; echo 0 > " + RSTMCU + "; ";
+    private static final String ONE_POWER_UP = "setprop vendor.agui.extmodule.open 1 2>/dev/null; echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; sleep 0.75; echo 0 > " + RSTMCU + "; ";
     static final String POWER_UP = STALE_PORT_GONE + ONE_POWER_UP
             + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 6 ]; do sleep 0.5; i=$((i+1)); done; "
             + "if [ ! -e " + BRIDGE_PORT + " ]; then echo 'retry: through none'; " + RESET + ONE_POWER_UP
             + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; fi; ";
     /** Radio off, USB port back to the socket, the HAL running again. */
-    static final String POWER_DOWN = RESET + "start " + HAL_SERVICE + "; ";
+    static final String POWER_DOWN = RESET + "setprop vendor.agui.extmodule.open 0 2>/dev/null; start " + HAL_SERVICE + "; ";
 
     /**
      * Take the radio for SignalDeck (design §4, Atom XL): stop the HAL (init does not restart a stopped hal-class

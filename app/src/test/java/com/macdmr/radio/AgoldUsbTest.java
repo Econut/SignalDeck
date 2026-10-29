@@ -130,6 +130,14 @@ public class AgoldUsbTest {
         assertEquals("a carrier is not idle: the floor stays", f, AgoldUsb.nextFloor(f, -74), 0);
     }
 
+    @Test public void powerOffPulsesTheBridgeLikeTheStockHal() {
+        String r = AgoldUsb.RESET;
+        int off = r.indexOf("echo 0 > " + AgoldUsb.MCU_POWER), pulse = r.indexOf("echo 1 > " + AgoldUsb.MCU_POWER), offAgain = r.indexOf("echo 0 > " + AgoldUsb.MCU_POWER, pulse);
+        assertTrue("off first", off >= 0 && off < pulse);
+        assertTrue("then the 0.2 s pulse, out of reset", r.indexOf("echo 0 > " + AgoldUsb.RSTMCU, pulse) > pulse && offAgain > pulse);
+        assertTrue("then host mode is left", r.indexOf("echo 0 > " + AgoldUsb.USB_PATH) > offAgain);
+    }
+
     @Test public void powerScriptsFollowTheHalsOrder() {
         String up = AgoldUsb.POWER_UP;
         assertTrue("the stale port node is waited out first", up.indexOf("while [ -e /dev/ttyACM0 ]") < up.indexOf("usb_path"));
