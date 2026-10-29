@@ -124,6 +124,8 @@ final class AgoldUsb {
 
     /** A write to the bridge's serial port that takes longer than this has failed: the bridge stopped taking data. */
     static final long WRITE_DEADLINE_MS = 2000;
+    /** A capture that died during a reception is restarted (a bridge power-cycle) when the reception ends, or after this long. */
+    static final long CAPTURE_DEAD_WAIT_MS = 5000;
     /** After a charger or USB change, the bridge is left alone this long before it is powered up (the stock app waits 4 s). */
     static final long PLUG_SETTLE_MS = 4000;
     /** How long to wait before a bridge power-up, given the last charger or USB change (0 = none yet). */

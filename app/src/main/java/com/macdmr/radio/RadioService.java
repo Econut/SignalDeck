@@ -2894,16 +2894,30 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     private volatile boolean bridgeRecoverDeferred;
+    private boolean captureRunning() { return audio instanceof AlsaDirectAudio && ((AlsaDirectAudio) audio).capturing(); }
+    private volatile long captureDeadAt; private volatile boolean recoverHeld; private volatile String heldWhy;
+    private final Runnable heldRecovery = () -> { if (recoverHeld && !exiting) recoverBridgeAudio(heldWhy); };   // re-checked every 0.5 s
     void recoverBridgeAudio(String why) {
         long wait = 20_000 - (System.currentTimeMillis() - lastBridgeRecoverAt);
         if (agoldBridge() && !exiting && !isTransmitting() && wait > 0 && receiving && !bridgeRecoverDeferred) {
             // inside the 20 s window: try once more when it ends if the reception is still on, instead of leaving the capture dead (MON on a stuck line, 2026-10-29)
             bridgeRecoverDeferred = true;
             log("bridge recovery in " + (wait / 1000 + 1) + " s: " + why);
-            ui.postDelayed(() -> { bridgeRecoverDeferred = false; if (receiving && !exiting) recoverBridgeAudio(why); }, wait + 100);
+            ui.postDelayed(() -> { bridgeRecoverDeferred = false; if (receiving && !exiting && !captureRunning()) recoverBridgeAudio(why); }, wait + 100);   // not if the capture came back meanwhile
             return;
         }
         if (!agoldBridge() || exiting || isTransmitting() || wait > 0) { log("bridge recovery skipped: " + why); return; }
+        // a power-cycle in the middle of a reception cuts it off and can hide its edges (2026-10-29), and since the capture
+        // settings of PR 92 a dead capture is rare: wait for the reception to end, at most CAPTURE_DEAD_WAIT_MS
+        long now = System.currentTimeMillis();
+        if (captureDeadAt == 0) captureDeadAt = now;
+        long hold = AgoldUsb.CAPTURE_DEAD_WAIT_MS - (now - captureDeadAt);
+        if (receiving && hold > 0) {
+            if (!recoverHeld) { recoverHeld = true; log("bridge recovery after this reception (at most " + (hold / 1000 + 1) + " s): " + why); }
+            ui.removeCallbacks(heldRecovery); heldWhy = why; ui.postDelayed(heldRecovery, Math.min(hold, 500));
+            return;
+        }
+        recoverHeld = false; captureDeadAt = 0; ui.removeCallbacks(heldRecovery);
         lastBridgeRecoverAt = System.currentTimeMillis();
         worker.execute(() -> {
             try {
