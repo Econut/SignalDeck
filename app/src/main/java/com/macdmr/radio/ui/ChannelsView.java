@@ -42,6 +42,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
     private final ListView list;
     private final Adapter adapter = new Adapter();
     private final EditText search;
+    private final TextView viewSelector;
     private final LinearLayout header;
     private final TextView[] chips = new TextView[4];
     private final List<ChannelStore.Channel> all = new ArrayList<>(), shown = new ArrayList<>();
@@ -60,7 +61,7 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         header = Neo.header(c, "Channels", "");
         ImageView nearby = Neo.iconButton(c, "repeaters", Neo.CYAN, "Nearby repeaters");
         nearby.setOnClickListener(v -> { if (svc != null) RepeatersDialog.show(c, svc); });
-        ImageView zone = Neo.iconButton(c, "zone", Neo.CYAN, "Zones");
+        ImageView zone = Neo.iconButton(c, "zone", Neo.CYAN, "Manage zones");
         zone.setOnClickListener(v -> { if (svc != null) ZonesDialog.show(c, svc, this::reload); });
         ImageView add = Neo.iconButton(c, "plus", Neo.GREEN, "Add channel");
         add.setOnClickListener(v -> { if (host != null) host.openEditor(null, true); });
@@ -70,6 +71,11 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
         shareBtn.setOnClickListener(v -> { if (svc != null) CodeplugDialog.menu(c, svc, this::reload); });
         Neo.addAction(header, shareBtn); Neo.addAction(header, mapBtn); Neo.addAction(header, nearby); Neo.addAction(header, zone); Neo.addAction(header, add);
         addView(header);
+
+        viewSelector=Neo.button(c,"View: Follow radio zone","zone",Neo.CYAN);
+        viewSelector.setTextSize(13);viewSelector.setSingleLine(true);viewSelector.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        viewSelector.setOnClickListener(v->chooseView());
+        LayoutParams vl=new LayoutParams(LayoutParams.MATCH_PARENT,Theme.dp(c,40));vl.setMargins(Theme.dp(c,16),Theme.dp(c,8),Theme.dp(c,16),0);addView(viewSelector,vl);
 
         // search field with a line icon
         LinearLayout sf = new LinearLayout(c); sf.setGravity(Gravity.CENTER_VERTICAL);
@@ -127,11 +133,31 @@ public class ChannelsView extends LinearLayout implements RadioService.Listener 
     public void reload() {
         if (svc == null) return;
         try { heard = svc.store().channelLastHeard(); } catch (Throwable t) { heard = new java.util.HashMap<>(); }
-        all.clear(); all.addAll(svc.zoneChannels());
+        android.content.SharedPreferences prefs=getContext().getSharedPreferences("channels_view",Context.MODE_PRIVATE);
+        long saved=prefs.getLong("zone",com.macdmr.radio.ChannelListScope.FOLLOW);
+        long selected=com.macdmr.radio.ChannelListScope.resolve(saved,svc.store().zones());
+        if(saved!=selected)prefs.edit().putLong("zone",selected).apply();
+        ChannelStore.Zone viewing=selected>0?svc.store().zone(selected):null;
+        String scope=selected==com.macdmr.radio.ChannelListScope.FOLLOW?"Follow radio zone · "+svc.zoneName():selected==0?"All channels":"Zone · "+viewing.name;
+        all.clear();all.addAll(selected==com.macdmr.radio.ChannelListScope.FOLLOW?svc.zoneChannels():com.macdmr.radio.ChannelListScope.inZone(svc.store().all(),viewing));
+        viewSelector.setText("View: "+scope);viewSelector.setContentDescription("Channel view: "+scope);
         favs.clear(); ChannelStore.Zone fz = favZone(); if (fz != null) for (int n : fz.numbers) favs.add(n);
         activeNumber = svc.current() != null ? svc.current().number : svc.store().activeNumber();
-        Neo.fitSubtitle(Neo.headerSubtitle(header), ("Zone " + svc.zoneName()).toUpperCase(Locale.US), (all.size() + (all.size() == 1 ? " channel" : " channels")).toUpperCase(Locale.US));
+        Neo.fitSubtitle(Neo.headerSubtitle(header), scope.toUpperCase(Locale.US), (all.size() + (all.size() == 1 ? " channel" : " channels")).toUpperCase(Locale.US));
         filter();
+    }
+
+    private void chooseView(){
+        if(svc==null)return;
+        List<ChannelStore.Zone> zones=svc.store().zones();List<String> labels=new ArrayList<>();List<Long> ids=new ArrayList<>();
+        labels.add("Follow radio zone ("+svc.zoneName()+")");ids.add(com.macdmr.radio.ChannelListScope.FOLLOW);
+        labels.add("All channels");ids.add(com.macdmr.radio.ChannelListScope.ALL);
+        for(ChannelStore.Zone zone:zones){labels.add("Zone: "+zone.name);ids.add(zone.id);}
+        long current=getContext().getSharedPreferences("channels_view",Context.MODE_PRIVATE).getLong("zone",com.macdmr.radio.ChannelListScope.FOLLOW);
+        new android.app.AlertDialog.Builder(getContext()).setTitle("Channels view").setSingleChoiceItems(labels.toArray(new String[0]),ids.indexOf(current),(dialog,which)->{
+            getContext().getSharedPreferences("channels_view",Context.MODE_PRIVATE).edit().putLong("zone",ids.get(which)).apply();
+            dialog.dismiss();reload();
+        }).setNegativeButton("Cancel",null).show();
     }
 
     private void filter() {
