@@ -303,7 +303,9 @@ public final class M17Receiver {
 
     /**
      * Least-squares fit of the coefficients on a recorded transmission whose symbols are known: {@code start8k} is roughly
-     * where symbol 0 (the first preamble symbol) is in the recording; the exact delay is searched. Returns {coefficients..., mse}.
+     * where symbol 0 (the first preamble symbol) is in the recording; the exact delay is searched, and so is the recording's
+     * clock offset against the transmitter (the Atom XL's bridge records about 127 ppm fast: 2.4 symbols over a 4 s
+     * transmission, which a fit at the nominal rate cannot follow). Returns {coefficients..., mse, clock offset in ppm}.
      */
     public static float[] calibrate(short[] audio, int start8k, int[] symbols) { return calibrate(audio, start8k, symbols, FB); }
     /** As above with only the first {@code feedback} feedback taps fitted; a symbol of 0 is unknown (not fitted, 0 in the history). */
@@ -313,29 +315,42 @@ public final class M17Receiver {
         int from = Math.max(0, start8k - 4000), to = Math.min(audio.length, start8k + symbols.length * 8000 / 4800 + 4000);
         r.feedRaw(java.util.Arrays.copyOfRange(audio, from, to));      // just this transmission: the ring holds 8 s
         long base = to48(start8k - from);
-        double[] best = null; double bestE = Double.MAX_VALUE;
+        int[] lead = java.util.Arrays.copyOf(symbols, symbols.length);  // the delay from the first half second, where a clock offset has not moved anything yet
+        for (int k = CLOCK_LEAD; k < lead.length; k++) lead[k] = 0;
+        double[] best = null; double bestE = Double.MAX_VALUE; int bestD = 0;
         for (int d = -120; d <= 120; d += 2) {
-            double[] c = r.fit(base + d, symbols, feedback); if (c == null) continue;
-            if (c[NCOEF] < bestE) { bestE = c[NCOEF]; best = c; }
+            double[] c = r.fit(base + d, lead, feedback, 0); if (c == null) continue;
+            if (c[NCOEF] < bestE) { bestE = c[NCOEF]; bestD = d; }
         }
-        float[] out = new float[NCOEF + 1]; for (int i = 0; i <= NCOEF; i++) out[i] = (float) best[i]; return out;
+        bestE = Double.MAX_VALUE; double bestPpm = 0;
+        for (int step : new int[] { 25, 5 }) {                          // then the clock offset on the whole transmission, coarse and fine
+            double centre = bestPpm; int dc = bestD;
+            for (double ppm = centre - (step == 25 ? 400 : 20); ppm <= centre + (step == 25 ? 400 : 20); ppm += step)
+                for (int d = dc - (step == 25 ? 0 : 4); d <= dc + (step == 25 ? 0 : 4); d += 2) {
+                    double[] c = r.fit(base + d, symbols, feedback, ppm); if (c == null) continue;
+                    if (c[NCOEF] < bestE) { bestE = c[NCOEF]; best = c; bestPpm = ppm; bestD = d; }
+                }
+        }
+        float[] out = new float[NCOEF + 2]; for (int i = 0; i <= NCOEF; i++) out[i] = (float) best[i]; out[NCOEF + 1] = (float) bestPpm; return out;
     }
+    static final int CLOCK_LEAD = 2400;                                 // symbols (0.5 s) used to find the delay before the clock offset
     private void feedRaw(short[] a) { state = State.IDLE; for (short v : a) interpolate(v); }
-    private double[] fit(long p0, int[] sym, int feedback) {
-        if (p0 + (long) sym.length * SPS48 + 5 * L >= n48 || n48 - p0 > RING) return null;
+    private double[] fit(long p0, int[] sym, int feedback, double ppm) {
+        final double sps = SPS48 * (1 + ppm * 1e-6);
+        if (p0 + Math.round(sym.length * sps) + 5 * L >= n48 || n48 - p0 > RING) return null;
         double e = 0; int cnt = 0;
         for (long i = p0 + 20 * SPS48; i < p0 + 172 * SPS48; i++) { float v = at(i); e += v * v; cnt++; }
         gain = (float) Math.sqrt(e / cnt);
         double[][] A = new double[NCOEF][NCOEF]; double[] b = new double[NCOEF]; float[] h = new float[FB];
         int used = 0;                                                    // a symbol of 0 is unknown: not fitted, 0 in the history
         for (int k = 0; k < sym.length; k++) {
-            features(p0 + (long) k * SPS48, h);
+            features(p0 + Math.round(k * sps), h);
             if (sym[k] != 0) { used++; for (int i = 0; i < NCOEF; i++) { b[i] += f[i] * sym[k]; for (int j = i; j < NCOEF; j++) A[i][j] += f[i] * f[j]; } }
             System.arraycopy(h, 0, h, 1, FB - 1); h[0] = sym[k];
         }
         double[] c = solveNormal(A, b, used, feedback); if (c == null) return null;
         double err = 0; java.util.Arrays.fill(h, 0);
-        for (int k = 0; k < sym.length; k++) { features(p0 + (long) k * SPS48, h); double y = 0; for (int i = 0; i < NCOEF; i++) y += c[i] * f[i]; if (sym[k] != 0) err += (y - sym[k]) * (y - sym[k]); System.arraycopy(h, 0, h, 1, FB - 1); h[0] = sym[k]; }
+        for (int k = 0; k < sym.length; k++) { features(p0 + Math.round(k * sps), h); double y = 0; for (int i = 0; i < NCOEF; i++) y += c[i] * f[i]; if (sym[k] != 0) err += (y - sym[k]) * (y - sym[k]); System.arraycopy(h, 0, h, 1, FB - 1); h[0] = sym[k]; }
         double[] out = java.util.Arrays.copyOf(c, NCOEF + 1); out[NCOEF] = err / Math.max(1, used); return out;
     }
     private static double[] solve(double[][] A, double[] b) {
