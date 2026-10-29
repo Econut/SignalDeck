@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-28 — M17 receive after a symbol key on FW31: hold only, no channel rewrite
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| phonedmrapp `radio_firmware/results.md` (F30C hold pass, 2026-10-28) | From FW31 the module clears its own receive mute after a symbol transmission, and the channel rewrite SignalDeck sends afterwards (for older images) put the mute back (receive RMS 1.3). On FW31 and later no extra PTT-off is sent when the module has ended the key itself (status 4), because that second close muted the receiver again; and the channel is written twice after the key, because one write left M17 receive unable to lock (bench: two writes listed the hotspot call 3 of 3; a stopgap until the firmware restores that state). Older images keep the single rewrite and the PTT-off | `RadioService.java`, `SymUnmuteTest.java` | Host suite; bench with Grok on FW31 |
+
 ## 2026-10-27 — POCSAG receive
 
 | Backlog | Change | Files | Test |

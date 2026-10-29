@@ -2488,6 +2488,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         long seen = status4At;
         long t0 = System.currentTimeMillis();
         while (status4At == seen && System.currentTimeMillis() - t0 < 2500) Thread.sleep(20);
+        if (status4At != seen && !rewriteAfterSym(moduleVersion)) { log("sym unkey: the module ended the key itself (FW31+), no 0x26 off"); holdAfterTx(); return; }   // a second close would mute the receiver again (bench 2026-10-28)
         engine.ptt(false);
         log("sym unkey");
         holdAfterTx();
@@ -3511,9 +3512,25 @@ public class RadioService extends Service implements RadioEngine.Events {
      *  the signal meter still moved, and reopening the phone's audio stream did not help; only a channel write brought it back
      *  (the owner's workaround was changing channel and back). So the current channel is written again, which also puts the
      *  M17 voice-filter hold back. */
+    /** The first bench image that clears the module's own receive mute after a symbol key (FW31, phonedmrapp
+     *  radio_firmware/reviews.md 2026-10-28): there a channel write would put the mute back, so only the hold is re-sent. */
+    static final int SYM_UNMUTE_FW = 31;
+    static boolean rewriteAfterSym(String moduleVersion) { return !(Firmware.stubTag(moduleVersion) && Firmware.tagNumber(moduleVersion) >= SYM_UNMUTE_FW); }
     private void rxAfterSym() {
         ChannelStore.Channel c = current;
         if (c == null) return;
+        if (!rewriteAfterSym(moduleVersion)) {
+            // FW31 unmutes itself, but a symbol key still leaves the receive path unable to lock until two channel writes
+            // (bench 2026-10-28: key then one write = silent, two writes = 75 frames listed, 3 of 3). Stopgap until the
+            // firmware restores that state itself.
+            quietRewrite = true;
+            try {
+                boolean a = applyChannelNow(c, c != vfo); Thread.sleep(700); boolean b = applyChannelNow(c, c != vfo);
+                log("rx after sym: FW31, channel " + c.number + " rewritten twice " + a + "/" + b);
+            } catch (Throwable t) { log("rx after sym: " + t); }
+            finally { quietRewrite = false; }
+            return;
+        }
         quietRewrite = true;                                   // the same channel again: no spoken announcement
         try { log("rx after sym: channel " + c.number + " rewritten " + applyChannelNow(c, c != vfo)); } catch (Throwable t) { log("rx after sym: " + t); }
         finally { quietRewrite = false; }
