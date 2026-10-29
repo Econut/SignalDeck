@@ -146,6 +146,33 @@ public class M17Test {
         assertTrue("exact " + exact, exact >= 85);
     }
 
+    /**
+     * Unihertz Atom XL (the bridge's USB card records about 125 ppm fast: 2.4 symbols over a 4 s transmission). The fit
+     * finds the clock offset itself; a table fitted on one HackRF transmission decodes another one recorded five hours
+     * earlier (89 of 100 exact on the bench; the receiver follows the drift frame by frame). M17_AXL_OUT writes the fitted
+     * table (the shipped assets/m17/eq_unihertz-atomxl.txt).
+     */
+    @Test public void decodesTheAtomXlAfterAClockAwareFit() throws Exception {
+        JSONObject fit = new JSONObject(new String(M17Test.class.getResourceAsStream("/m17/m17_rx_atomxl_s9.json").readAllBytes(), "UTF-8")).getJSONArray("parts").getJSONObject(0);
+        JSONObject test = new JSONObject(new String(M17Test.class.getResourceAsStream("/m17/m17_rx_atomxl_s7.json").readAllBytes(), "UTF-8")).getJSONArray("parts").getJSONObject(0);
+        short[] fa = wav(M17Test.class.getResourceAsStream("/m17/m17_rx_atomxl_s9.wav")), ta = wav(M17Test.class.getResourceAsStream("/m17/m17_rx_atomxl_s7.wav"));
+        float[] cal = M17Receiver.calibrate(fa, fit.getInt("start8k"), symbols(fit), M17Receiver.LEARN_FEEDBACK);
+        System.out.printf("Atom XL fit MSE %.3f, clock %+.0f ppm%n", cal[M17Receiver.NCOEF], cal[M17Receiver.NCOEF + 1]);
+        assertTrue("the clock offset is found", cal[M17Receiver.NCOEF + 1] > 90 && cal[M17Receiver.NCOEF + 1] < 160);
+        assertTrue("fits once the clock is followed", cal[M17Receiver.NCOEF] < 0.3);
+        String out = System.getenv("M17_AXL_OUT");
+        if (out != null) { StringBuilder sb = new StringBuilder(); for (int i = 0; i < M17Receiver.NCOEF; i++) sb.append(cal[i]).append('\n'); java.nio.file.Files.write(java.nio.file.Paths.get(out), sb.toString().getBytes("UTF-8")); }
+        final List<byte[]> payloads = new ArrayList<>();
+        M17Receiver rx = new M17Receiver(java.util.Arrays.copyOf(cal, M17Receiver.NCOEF), new M17Receiver.Listener() {
+            public void started(M17.Lsf l) { } public void frame(M17.Stream s, float q) { payloads.add(s.payload); }
+            public void lsfFromLich(M17.Lsf l) { } public void ended(int f, int g, String why) { }
+        });
+        rx.feed(ta, ta.length); rx.feed(new short[8000], 8000);
+        int exact = exactPayloads(payloads, test);
+        System.out.println("Atom XL: exact payloads in the transmission not fitted: " + exact + " of 100");
+        assertTrue("exact " + exact, exact >= 80);
+    }
+
     /** Self-calibration on the W6: the table learned from one call's confirmed frames alone decodes the other call. */
     @Test public void learnsATableFromConfirmedFrames() throws Exception {
         short[] audio = wav(M17Test.class.getResourceAsStream("/m17/m17_rx_w6.wav"));
