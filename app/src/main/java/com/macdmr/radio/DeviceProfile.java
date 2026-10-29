@@ -102,6 +102,8 @@ public final class DeviceProfile {
         public final String[] rxOn, rxOff, txOn, txOff;
         /** The card's rate: 8000 (the phone's codec, as the app uses it) or a multiple of it (the Atom XL's USB card: 32000), converted in the app. */
         public int rate = 8000;
+        /** Capture period in frames and period count; 0 = the default (256 frames per 8 kHz, 4 periods, 16 on a USB card). */
+        public int capturePeriod, capturePeriods;
         public DirectAudio(int card, int captureDevice, int playbackDevice, String[] rxOn, String[] rxOff, String[] txOn, String[] txOff) {
             this.card = card; this.captureDevice = captureDevice; this.playbackDevice = playbackDevice;
             this.rxOn = rxOn; this.rxOff = rxOff; this.txOn = txOn; this.txOff = txOff;
@@ -268,6 +270,7 @@ public final class DeviceProfile {
         ATOM_XL.bandsHz = new long[] { 400_000_000L, 480_000_000L };          // the UHF module (DMR006.U4A); to be measured
         // the bridge's USB Audio Class card: S16_LE, 2 channels, 32 kHz both ways, no mixer controls (the HAL's pcm_open)
         ATOM_XL.directAudio = new DirectAudio(1, 0, 0, new String[0], new String[0], new String[0], new String[0]);
+        ATOM_XL.directAudio.capturePeriod = 1280; ATOM_XL.directAudio.capturePeriods = 4;   // what the stock HAL opens (vendor.mediatek.hardware.aguiextmodule@1.0-service: 32 kHz, 2 ch, 1280 x 4)
         ATOM_XL.directAudio.rate = 32000;
     }
 

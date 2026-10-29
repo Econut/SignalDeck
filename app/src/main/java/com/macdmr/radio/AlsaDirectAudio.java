@@ -95,7 +95,7 @@ public final class AlsaDirectAudio implements AudioBackend {
     static String command(String helper, boolean capture, DeviceProfile.DirectAudio d) {
         StringBuilder b = new StringBuilder("exec ").append(quote(helper)).append(capture ? " cap" : " play")
                 .append(" -c ").append(d.card).append(" -d ").append(capture ? d.captureDevice : d.playbackDevice)
-                .append(" -r ").append(d.rate).append(" -n 2 -p ").append(256 * (d.rate / 8000)).append(" -k ").append(d.rate > 8000 ? 16 : 4).append(capture && d.rate > 8000 ? " -q 1" : "");   // a USB card (Atom XL) gets 512 ms: one overrun stops its stream until the bridge is power-cycled
+                .append(" -r ").append(d.rate).append(" -n 2 -p ").append(capture && d.capturePeriod > 0 ? d.capturePeriod : 256 * (d.rate / 8000)).append(" -k ").append(capture && d.capturePeriods > 0 ? d.capturePeriods : d.rate > 8000 ? 16 : 4).append(capture && d.rate > 8000 ? " -q 1" : "");   // a USB card (Atom XL) gets 512 ms: one overrun stops its stream until the bridge is power-cycled
         for (String c : capture ? d.rxOn : d.txOn) b.append(' ').append(quote(c));
         b.append(" --");
         for (String c : capture ? d.rxOff : d.txOff) b.append(' ').append(quote(c));
