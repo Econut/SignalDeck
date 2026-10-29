@@ -70,7 +70,7 @@ public final class ZonesDialog {
             more.setOnClickListener(v -> zoneMenu(c, svc, z, done));
         }
         row.setClickable(true);
-        row.setOnClickListener(v -> { svc.setZone(z == null ? 0 : z.id); done.run(); });
+        row.setOnClickListener(v -> { String e = svc.setZone(z == null ? 0 : z.id); if (e != null) Toast.makeText(c, e, Toast.LENGTH_LONG).show(); done.run(); });
         return row;
     }
 
@@ -92,11 +92,15 @@ public final class ZonesDialog {
         body.addView(own, rowLp(d));
         body.addView(Neo.sheetSection(c, "Standard lists"));
         Set<String> have = new HashSet<>(); for (ChannelStore.Zone z : svc.store().zones()) have.add(z.name);
+        int hidden = 0;
         for (ChannelPresets.Preset p : ChannelPresets.all()) {
-            LinearLayout r = card(c, p.zone + "  ·  " + p.channels.size() + " channels", p.region + "  ·  " + p.licence + (have.contains(p.zone) ? "\nYou have a zone called " + p.zone + ": adds the missing channels to it" : ""), p.receiveOnly() ? Neo.AMBER : Neo.CYAN);
+            int tun = p.tunableCount();
+            if (tun == 0) { hidden++; continue; }                               // NOAA, marine, MURS, 2 m on a UHF-only radio: nothing it could tune
+            LinearLayout r = card(c, p.zone + "  ·  " + (tun < p.channels.size() ? tun + " of " + p.channels.size() + " tunable" : p.channels.size() + " channels"), p.region + "  ·  " + p.licence + (have.contains(p.zone) ? "\nYou have a zone called " + p.zone + ": adds the missing channels to it" : ""), p.receiveOnly() ? Neo.AMBER : Neo.CYAN);
             r.setOnClickListener(v -> presetSheet(c, svc, p, finished));
             body.addView(r, rowLp(d));
         }
+        if (hidden > 0) body.addView(Neo.sheetHint(c, hidden + " standard list" + (hidden == 1 ? " is" : "s are") + " not shown: none of " + (hidden == 1 ? "its" : "their") + " channels is inside what this radio tunes (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + ")."));
         self[0] = Neo.showSheet(c, body);
     }
 
@@ -129,7 +133,8 @@ public final class ZonesDialog {
                 new AlertDialog.Builder(c).setTitle("Repeater tone").setItems(names, (dd, w) -> { tone[0] = w - 1; tb.setText(w == 0 ? "Tone: None" : "Tone: " + names[w]); }).show();
             });
         }
-        body.addView(Neo.sheetSection(c, p.channels.size() + " channels"));
+        { int tun = p.tunableCount(); body.addView(Neo.sheetSection(c, tun < p.channels.size() ? tun + " of " + p.channels.size() + " channels tunable here" : p.channels.size() + " channels"));
+          if (tun < p.channels.size()) body.addView(Neo.sheetHint(c, "This radio tunes " + com.macdmr.radio.DeviceProfile.detect().bandsText() + ": Add leaves out the channels marked not tunable here.")); }
         TextView list = Neo.label(c, ChannelPresets.preview(p), 0xFFBFC8D0, 12, false); list.setTypeface(Neo.mono(c)); body.addView(list);
         TextView add = Neo.button(c, "Add " + p.zone, "plus", Neo.GREEN); body.addView(add, new LinearLayout.LayoutParams(bl));
         final AlertDialog[] self = new AlertDialog[1];
@@ -137,8 +142,8 @@ public final class ZonesDialog {
             ChannelPresets.Result r;
             try { r = ChannelPresets.install(svc.store(), p, tone[0]); }
             catch (Throwable t) { Toast.makeText(c, "Could not add " + p.zone + ": " + t.getMessage(), Toast.LENGTH_LONG).show(); return; }
-            svc.setZone(r.zoneId);
-            Toast.makeText(c, r.summary, Toast.LENGTH_LONG).show();
+            String ze = svc.setZone(r.zoneId);
+            Toast.makeText(c, r.summary + (ze != null ? "\n" + ze : ""), Toast.LENGTH_LONG).show();
             if (self[0] != null) self[0].dismiss();
             finished.run();
         });
@@ -157,7 +162,7 @@ public final class ZonesDialog {
         Runnable close = () -> { if (self[0] != null) self[0].dismiss(); done.run(); };
         LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT); bl.topMargin = (int) (8 * d);
         TextView use = Neo.button(c, "Use this zone", "zone", Neo.CYAN); body.addView(use, new LinearLayout.LayoutParams(bl));
-        use.setOnClickListener(v -> { svc.setZone(z.id); close.run(); });
+        use.setOnClickListener(v -> { String e = svc.setZone(z.id); if (e != null) Toast.makeText(c, e, Toast.LENGTH_LONG).show(); close.run(); });
         TextView pick = Neo.button(c, "Choose its channels", "channels", Neo.CYAN); body.addView(pick, new LinearLayout.LayoutParams(bl));
         pick.setOnClickListener(v -> pickChannels(c, svc, z, close));
         if (!fav) {

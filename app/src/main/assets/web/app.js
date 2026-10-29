@@ -124,6 +124,7 @@ function applyRadio(rd) {
   document.body.classList.toggle('no-dmr', !S.dmr);
   document.body.classList.toggle('no-rssi', rd.rssi === false);               // no signal readings: no band scope
   document.body.classList.toggle('no-aprs144', rd.aprs144 === false);         // 144.390 out of band: no APRS monitoring
+  S.sstv144 = rd.sstv144 !== false;                                            // 144.500 out of band: SSTV runs on the channel the radio is on
   document.body.classList.toggle('no-wx', rd.weather === false);              // no 162 MHz weather channels
   const nav = p => document.querySelector('a[data-page="' + p + '"]');
   if (nav('messages')) nav('messages').classList.toggle('hidden', rd.messages === false);
@@ -234,7 +235,7 @@ function renderChannels() {
   const rows = S.channels.filter(c => (!q || (c.name || '').toLowerCase().includes(q) || mhz(c.rxFreq).includes(q) || String(c.number) === q)
     && (f === 0 || (f === 1 && c.fav) || (f === 2 && !c.digital) || (f === 3 && c.digital)));
   S.chShown = rows.map(c => c.number);
-  $('chList').innerHTML = rows.map(c => '<div class="item click' + (c.number === cur ? ' cur' : '') + (S.chSel && S.chSel.has(c.number) ? ' sel' : '') + '" data-n="' + c.number + '"><span class="n">' + c.number + '</span><div class="main"><div>' + esc(c.name || '—') + '</div><div class="sub mono">' + mhz(c.rxFreq) + ' MHz · ' + (c.digital ? 'DMR CC' + c.cc : 'FM') + '</div></div>'
+  $('chList').innerHTML = rows.map(c => '<div class="item click' + (c.number === cur ? ' cur' : '') + (S.chSel && S.chSel.has(c.number) ? ' sel' : '') + (c.tunable === false ? ' untunable' : '') + '" data-n="' + c.number + '"' + (c.tunable === false ? ' title="Not tunable on this radio"' : '') + '><span class="n">' + c.number + '</span><div class="main"><div>' + esc(c.name || '—') + '</div><div class="sub mono">' + mhz(c.rxFreq) + ' MHz · ' + (c.digital ? 'DMR CC' + c.cc : 'FM') + (c.tunable === false ? ' · <span class="chip dim">not tunable on this radio</span>' : '') + '</div></div>'
     + '<button type="button" class="star' + (c.fav ? ' on' : '') + '" data-star="' + c.number + '" aria-label="' + (c.fav ? 'Remove from favourites' : 'Add to favourites') + '" title="' + (c.fav ? 'Remove from ★ Favourites' : 'Add to ★ Favourites') + '">' + (c.fav ? '★' : '☆') + '</button>'
     + '<button type="button" class="act" data-edit="' + c.number + '">Edit</button></div>').join('') || '<div class="empty">' + (f === 1 ? 'No favourites in this zone: tap a ☆ to star a channel' : 'No channels') + '</div>';
 }

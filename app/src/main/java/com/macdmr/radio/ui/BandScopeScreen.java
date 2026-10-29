@@ -40,7 +40,7 @@ public final class BandScopeScreen extends ModeScreen {
         info = Neo.text(c, "", Neo.CYAN_LIGHT, 15, Neo.mono(c)); info.setPadding(0, dp(8), 0, dp(2)); col.addView(info);
         peaks = Neo.text(c, "", Neo.MUTED, 13.5f, Neo.uiMedium(c)); peaks.setLineSpacing(0, 1.1f); col.addView(peaks);
         content.addView(col);
-        if (presetIdx < 0 || presetIdx > BandScope.PRESETS.length) presetIdx = 0;
+        if (presetIdx < 0 || presetIdx > BandScope.PRESETS.length || (presetIdx < BandScope.PRESETS.length && !BandScope.fits(BandScope.PRESETS[presetIdx]))) presetIdx = BandScope.firstFitting();   // never start on a band this radio cannot tune (2 m on a UHF-only radio)
         buildButtons();
         setSubtitle("Receive only · nothing is transmitted");
         refresh();
@@ -106,10 +106,11 @@ public final class BandScopeScreen extends ModeScreen {
         refresh();
     }
     private void choosePreset() {
-        int k = BandScope.PRESETS.length; String[] n = new String[k + 1];
-        for (int i = 0; i < k; i++) { BandScope.Preset p = BandScope.PRESETS[i]; int st = BandScope.steps(p.from, p.to, p.step); n[i] = String.format(Locale.US, "%s  (%.3f–%.3f, %s kHz, %d steps, about %s)", p.name, p.from / 1e6, p.to / 1e6, khz(p.step), st, BandScope.duration((long) st * (BandScope.DEFAULT_SETTLE_MS + 300))); }
+        final java.util.List<Integer> idx = new java.util.ArrayList<>(); for (int i = 0; i < BandScope.PRESETS.length; i++) if (BandScope.fits(BandScope.PRESETS[i])) idx.add(i);   // only bands this radio tunes
+        int k = idx.size(); String[] n = new String[k + 1];
+        for (int j = 0; j < k; j++) { BandScope.Preset p = BandScope.PRESETS[idx.get(j)]; int st = BandScope.steps(p.from, p.to, p.step); n[j] = String.format(Locale.US, "%s  (%.3f–%.3f, %s kHz, %d steps, about %s)", p.name, p.from / 1e6, p.to / 1e6, khz(p.step), st, BandScope.duration((long) st * (BandScope.DEFAULT_SETTLE_MS + 300))); }
         n[k] = "Custom range…";
-        new AlertDialog.Builder(c).setTitle("Which band?").setItems(n, (dd, w) -> { if (w == k) customRange(); else picked(w); }).show();
+        new AlertDialog.Builder(c).setTitle("Which band?").setItems(n, (dd, w) -> { if (w == k) customRange(); else picked(idx.get(w)); }).show();
     }
     /** From, to and step of your own; checked against what the radio can tune before it is used. */
     private void customRange() {

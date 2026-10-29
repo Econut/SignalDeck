@@ -34,6 +34,9 @@ public final class ChannelPresets {
         Preset(String zone, String region, String about, String licence) { this.zone = zone; this.region = region; this.about = about; this.licence = licence; }
         public boolean hasRepeaters() { for (Ch c : channels) if (c.repeater) return true; return false; }
         public boolean receiveOnly() { for (Ch c : channels) if (!ChannelStore.receiveOnly(c.tx)) return false; return true; }
+        /** How many of its channels this phone's radio can tune (receive and transmit frequency inside the profile's bands). */
+        public int tunableCount() { return tunableCount(DeviceProfile.detect()); }
+        public int tunableCount(DeviceProfile dp) { int n = 0; for (Ch c : channels) if (tunable(dp, c)) n++; return n; }
         Preset fm(String name, double mhz, boolean high, boolean wide) { channels.add(new Ch(name, mhz, mhz, false, high, wide, false)); return this; }
         Preset split(String name, double rxMhz, double txMhz, boolean high, boolean wide, double txTone) { channels.add(new Ch(name, rxMhz, txMhz, false, high, wide, false, txTone)); return this; }
     }
@@ -42,6 +45,8 @@ public final class ChannelPresets {
     public static final int DMR_SIMPLEX_TG = 99;
 
     private static int hz(double mhz) { return (int) Math.round(mhz * 1e6); }
+    /** Whether the radio of {@code dp} tunes the channel: both frequencies inside its bands (NOAA, marine and 2 m lists on a UHF-only radio: no). */
+    public static boolean tunable(DeviceProfile dp, Ch c) { return dp.tunable(c.rx) && dp.tunable(c.tx); }
 
     public static List<Preset> all() {
         List<Preset> out = new ArrayList<>();
@@ -131,7 +136,7 @@ public final class ChannelPresets {
         return -1;
     }
 
-    public static final class Result { public long zoneId; public int added, reused; public String summary; }
+    public static final class Result { public long zoneId; public int added, reused, skipped; public String summary; }
 
     /**
      * Add the list's channels and its zone. {@code repeaterTone}: CTCSS sub-code for the repeater channels (sent and
@@ -139,11 +144,14 @@ public final class ChannelPresets {
      */
     public static Result install(ChannelStore store, Preset p, int repeaterTone) {
         Result r = new Result();
+        DeviceProfile dp = DeviceProfile.detect();
+        if (p.tunableCount(dp) == 0) throw new IllegalStateException("none of its channels is inside what this radio tunes (" + dp.bandsText() + ")");
         ChannelStore.Zone zone = null; for (ChannelStore.Zone z : store.zones()) if (z.name.equals(p.zone)) zone = z;
         if (zone == null) { zone = new ChannelStore.Zone(); zone.name = p.zone; zone.numbers = new int[0]; }
         List<Integer> nums = new ArrayList<>(); for (int n : zone.numbers) nums.add(n);
         if (p.channels.stream().anyMatch(c -> c.digital)) ensureSimplexContact(store);
         for (Ch c : p.channels) {
+            if (!tunable(dp, c)) { r.skipped++; continue; }                    // the module would refuse it: never add a channel this radio cannot tune
             ChannelStore.Channel ch = build(c, repeaterTone);
             ChannelStore.Channel have = find(store, ch);
             if (have != null) { r.reused++; if (!nums.contains(have.number)) nums.add(have.number); continue; }
@@ -151,7 +159,7 @@ public final class ChannelPresets {
         }
         zone.numbers = new int[nums.size()]; for (int i = 0; i < nums.size(); i++) zone.numbers[i] = nums.get(i);
         r.zoneId = store.saveZone(zone);
-        r.summary = r.added + " channel" + (r.added == 1 ? "" : "s") + " added" + (r.reused > 0 ? ", " + r.reused + " you already had" : "") + " · zone " + p.zone;
+        r.summary = r.added + " channel" + (r.added == 1 ? "" : "s") + " added" + (r.reused > 0 ? ", " + r.reused + " you already had" : "") + (r.skipped > 0 ? ", " + r.skipped + " skipped (outside " + dp.bandsText() + ")" : "") + " · zone " + p.zone;
         return r;
     }
 
@@ -185,9 +193,11 @@ public final class ChannelPresets {
     }
 
     /** One line per channel for the preview: name, frequency (and repeater input), power. */
-    public static String preview(Preset p) {
+    public static String preview(Preset p) { return preview(p, DeviceProfile.detect()); }
+    static String preview(Preset p, DeviceProfile dp) {
         StringBuilder sb = new StringBuilder();
         for (Ch c : p.channels) {
+            if (!tunable(dp, c)) { sb.append(String.format(Locale.US, "%-13s %9.4f", c.name, c.rx / 1e6)).append("  not tunable here\n"); continue; }   // skipped by Add
             sb.append(String.format(Locale.US, "%-13s %9.4f", c.name, c.rx / 1e6));
             if (c.tx != c.rx) sb.append(String.format(Locale.US, " TX %.4f", c.tx / 1e6));
             if (c.txTone > 0) sb.append(String.format(Locale.US, " %.1f", c.txTone));

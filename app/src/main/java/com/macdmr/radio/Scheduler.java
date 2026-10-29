@@ -33,6 +33,14 @@ public final class Scheduler {
     public static final String[] ACTION_NAMES = { "Listen to a channel", "Scan the zone", "APRS monitoring (144.390)", "SSTV receive", "Send an APRS beacon", "Check Winlink mail (radio gateway)", "Check Winlink mail (internet)", "Packet finder (listen for BBSs, nodes, gateways)" };
     /** Actions that use a channel of their own (the rest work on the current one). */
     public static boolean usesChannel(String a) { return LISTEN.equals(a) || SSTV.equals(a) || WINLINK.equals(a); }
+    /** Whether the radio of {@code dp} can run the action at all: APRS monitoring parks on 144.390, which a UHF-only radio (the W6) does not tune. */
+    public static boolean available(DeviceProfile dp, String a) { return !APRS.equals(a) || dp.tunable(PacketEngine.APRS_FREQ_HZ); }
+    /** Why the radio of {@code dp} cannot run the entry ({@code ch}: its channel, null for none or the current one), or null when it can. */
+    public static String bandProblem(DeviceProfile dp, Entry e, ChannelStore.Channel ch) {
+        if (!available(dp, e.action)) return "This radio tunes " + dp.bandsText() + ", not 144.390 MHz: no APRS monitoring";
+        if (usesChannel(e.action) && ch != null && !ChannelStore.tunable(dp, ch)) return ch.name + " is outside " + dp.bandsText() + ": this radio cannot tune it";
+        return null;
+    }
 
     public static final class Entry {
         public int id; public String action = LISTEN, label = ""; public int hour = 19, minute = 0;
