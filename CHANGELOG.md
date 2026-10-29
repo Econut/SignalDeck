@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Device report: the lines a stock app names, an honest protocol hint, and -r on a stopped app
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6Plus DMR report gaps (2026-10-29) | The report's code clues now read the stock app's static String fields with their names (new `DexFields`: the dex tables, class_data and static_values; nothing runs): a "named lines:" row such as `dmr_pwd=/sys/class/gpio/gpio322/value`. The draft profile takes `powerNode` from a field named …pwd/pwr/power… and a new `pttNode` from one named …ptt… (medium confidence). The protocol hint now knows the DMR module's command enum (SET_DIGITAL, SET_ANALOG, …): an app with both those names and AT+DMO… strings (the W6Plus DMR's) reads "both …: the serial watch decides" instead of "SA818-class AT commands". `run_checks.sh -r` now starts SignalDeck without a take-over when it is not running (an install stops it) and hands the radio back, so the stock app is enabled for the watch. Help: Run all checks names the lines. | DexFields, DeviceReport, DraftProfile, scripts/w6/run_checks.sh, HelpView, docs/help | Host suite (`DexFieldsTest`, a synthetic dex). **Device (W6Plus DMR, 2026-10-29):** `run_checks.sh -r` right after an install: draft profile with controlPort /dev/ttyS2, baud 57600, protocol mcu68, powerNode gpio322 (named dmr_pwd), pttNode gpio188 (named dmr_ptt), the hint "both … the serial watch decides"; the first try before the script fix watched a stock app that was still paused. |
+
 ## 2026-10-29 — ANYSECU W6Plus DMR (V69): receive on an untested profile
 
 | Backlog | Change | Files | Test |
