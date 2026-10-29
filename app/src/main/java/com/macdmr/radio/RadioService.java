@@ -2686,6 +2686,12 @@ public class RadioService extends Service implements RadioEngine.Events {
         });
     }
 
+    /** Run all checks' trial: open (or close) the Atom XL's USB capture outside a reception, waiting for it. Other phones: nothing. */
+    public void benchCapture(boolean on) {
+        if (!agoldBridge() || !rxAudioOn || !(audio instanceof AlsaDirectAudio)) return;
+        try { audio.stopRx(); if (on) log("bench capture: " + audio.startRx(true)); } catch (Throwable t) { log("bench capture: " + t); }
+    }
+
     /** The Atom XL's USB bridge (protocol agold). */
     private boolean agoldBridge() { return "agold".equals(profile.protocol); }
 

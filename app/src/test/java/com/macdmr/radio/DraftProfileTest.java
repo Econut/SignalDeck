@@ -38,7 +38,7 @@ public class DraftProfileTest {
         assertEquals("/dev/ttyACM0 (USB serial to a bridge MCU)", d.get("controlPort").value);
         assertEquals("none (USB CDC-ACM)", d.get("baud").value);
         assertEquals("vendor HAL vendor.mediatek.hardware.aguiextmodule@1.0 (the stock app calls it over HwBinder)", d.get("transport").value);
-        assertEquals("USB Audio card 1, 32000 Hz, 2 channels (no SignalDeck backend for it yet)", d.get("audio").value);
+        assertEquals("USB Audio card 1, 32000 Hz, 2 channels (SignalDeck's direct USB capture, per reception)", d.get("audio").value);
         assertTrue(d.get("powerNode").value.startsWith("/sys/bus/platform/drivers/mcu/mcu_power"));
         assertTrue(d.get("powerNode").evidence.endsWith("read it as off"));
         assertTrue(d.get("usb").evidence.contains("behind the bridge"));
@@ -75,7 +75,7 @@ public class DraftProfileTest {
         assertTrue(d.get("protocol").evidence.startsWith("SignalDeck's own probe through the bridge"));
         assertEquals("/dev/ttyACM0 (USB serial to a bridge MCU)", d.get("controlPort").value);
         assertEquals("vendor HAL vendor.mediatek.hardware.aguiextmodule@1.0 (the stock app calls it over HwBinder)", d.get("transport").value);
-        assertEquals("USB Audio card 1, 32000 Hz, 2 channels (no SignalDeck backend for it yet)", d.get("audio").value);
+        assertEquals("USB Audio card 1, 32000 Hz, 2 channels (SignalDeck's direct USB capture, per reception)", d.get("audio").value);
         assertEquals("the probe through the bridge powered it this way", d.get("powerNode").evidence);
         assertTrue(d.get("sepolicy").value.contains("ttyACM_device"));
         assertEquals(DraftProfile.LOW, d.get("sepolicy").confidence);

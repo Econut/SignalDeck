@@ -58,8 +58,8 @@ final class DraftProfile {
         String family = first(summary, "(?m)^its serial traffic \\(stock_serial.txt\\): ([^\\n]+)", 1);
         String viaBridge = first(section(r, "Radio probe through the USB bridge"), Pattern.quote(AgoldUsb.MODULE_ANSWERED) + "([^\\n]+)", 1);
         if (at != null) f.add(new Field("protocol", "sa818", HIGH, "the probe: " + at.trim()));
-        else if (viaBridge != null) f.add(new Field("protocol", "mcu68 inside the Agold 7E 96 69 envelope (no engine for the envelope yet)", HIGH, "SignalDeck's own probe through the bridge, checksums verified: " + viaBridge.trim()));
-        else if (agold != null) f.add(new Field("protocol", "mcu68 inside the Agold 7E 96 69 envelope (no engine for the envelope yet)", HIGH, agold.replaceAll("\\)\\s*$", ")")));
+        else if (viaBridge != null) f.add(new Field("protocol", "agold: mcu68 inside the Agold 7E 96 69 envelope (SignalDeck's agold engine)", HIGH, "SignalDeck's own probe through the bridge, checksums verified: " + viaBridge.trim()));
+        else if (agold != null) f.add(new Field("protocol", "agold: mcu68 inside the Agold 7E 96 69 envelope (SignalDeck's agold engine)", HIGH, agold.replaceAll("\\)\\s*$", ")")));
         else if (summary.contains("radio module answered the version query: yes")) f.add(new Field("protocol", "mcu68", HIGH, "the probe's 0x34 version query was answered"));
         else if (family != null && !family.startsWith("none")) f.add(new Field("protocol", family, MEDIUM, "the stock app's serial traffic"));
         else f.add(new Field("protocol", "unknown", UNKNOWN, "no answer, no serial traffic recognised"));
@@ -94,7 +94,7 @@ final class DraftProfile {
 
         // audio
         Matcher usbAudio = Pattern.compile("-- /proc/asound/card(\\d+)/stream\\d+[\\s\\S]*?Channels: (\\d+)[\\s\\S]*?Rates: (\\d+)").matcher(watch + "\n" + bridgeProbe);
-        if (usbAudio.find()) f.add(new Field("audio", "USB Audio card " + usbAudio.group(1) + ", " + usbAudio.group(3) + " Hz, " + usbAudio.group(2) + " channels (no SignalDeck backend for it yet)", HIGH, "its stream while the radio was on"));
+        if (usbAudio.find()) f.add(new Field("audio", "USB Audio card " + usbAudio.group(1) + ", " + usbAudio.group(3) + " Hz, " + usbAudio.group(2) + " channels (SignalDeck's direct USB capture, per reception)", HIGH, "its stream while the radio was on"));
         else if (r.contains("PrizeTinyService")) f.add(new Field("audio", "TINY_SERVICE", MEDIUM, "PrizeTinyService is a binder service"));
         else f.add(new Field("audio", "unknown", UNKNOWN, "see Sound card streams and mixer, Audio clues"));
 

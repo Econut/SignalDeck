@@ -357,7 +357,9 @@ public final class FirstRunCheck {
             p.step("Trial: reading signal strength and audio");
             File dir = DeviceReport.newestDir();
             File raw = dir != null ? new File(dir, "rx_audio_raw.bin") : null;
+            svc.benchCapture(true);                                     // the Atom XL opens its USB capture per reception: open it for the listen
             String cap = raw != null ? svc.captureRxAudio(raw, 5000) : "no report folder";
+            svc.benchCapture(false);
             StringBuilder rs = new StringBuilder();
             for (int i = 0; i < 5; i++) { svc.pollRssi(); Thread.sleep(1200); rs.append(svc.lastRssi()).append(' '); }
             Thread.sleep(1000);
@@ -375,6 +377,7 @@ public final class FirstRunCheck {
         p.step("Trial: handing the radio back");
         svc.shutDown(true);
         Thread.sleep(3000);
+        for (int w = 0; w < 30 && "agold".equals(svc.profile().protocol) && !RootSetup.stockAppEnabled(svc.profile()); w++) Thread.sleep(1000);   // its hand-back checks the bridge first (~20 s)
         r.append("handed back; stock app enabled: ").append(RootSetup.stockAppEnabled(svc.profile())).append('\n');
         r.append("radio driver kernel messages during the trial:\n").append(newLines(kBefore, RootSetup.run(KMSG)));
         r.append(String.format(Locale.US, "(trial ran %d s)\n", (System.currentTimeMillis() - t0) / 1000));
