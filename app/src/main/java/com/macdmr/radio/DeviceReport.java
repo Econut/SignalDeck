@@ -402,6 +402,7 @@ public final class DeviceReport {
             b.append("profile: ").append(dp.name).append(" (").append(dp.id).append(" revision ").append(dp.revision).append(dp.verified ? ", verified" : ", not verified yet").append(")\n");
             b.append("radio: ").append(svc.isReady() ? "owned by SignalDeck" : "not owned (" + svc.link() + ")").append(svc.moduleVersion().isEmpty() ? "" : " \u00B7 module " + svc.moduleVersion() + (Firmware.differs(svc.stockFirmware(), svc.moduleVersion().trim()) ? " (stock " + svc.stockFirmware() + ")" : "")).append('\n');
             b.append("receive audio: ").append(svc.audioBackendName()).append(svc.audioError() != null ? " \u00B7 ERROR " + svc.audioError() : "").append(" \u00B7 ").append(svc.rxAudioBytes()).append(" bytes so far\n");
+            String line = svc.receptionLineState(); if (line != null) b.append("reception line: ").append(line).append('\n');
         } else b.append("radio: SignalDeck's radio service was not running when this was made\n");
         String rep = "";
         try { rep = new String(java.nio.file.Files.readAllBytes(reportTxt.toPath()), "UTF-8"); } catch (Throwable ignored) { }

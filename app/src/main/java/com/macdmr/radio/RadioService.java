@@ -940,7 +940,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         }
                     }
                 }
-                if (agold) { lineFallback = false; synthRx = false; monRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
+                if (agold) { lineFallback = false; synthRx = false; lineMissed = 0; lineRestarts = 0; monRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
                 ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
@@ -1252,7 +1252,13 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void monitorReception(boolean on) {
         if (!agoldBridge()) return;                                      // on a DMR channel MON admits calls; it opens no audio
         if (on && !receiving && !isTransmitting() && isReady() && current != null && !current.isDigital()) { monRx = true; synthRx = true; log("MON: reception opened without waiting for the reception line"); status(1, RadioEngine.statusName(1)); }
-        else if (!on && monRx) { monRx = false; if (receiving && synthRx) status(2, RadioEngine.statusName(2)); }
+        else if (!on && monRx) {
+            monRx = false;
+            if (receiving && synthRx) {                                  // MON opened it and the line never reported it: a miss too
+                final boolean restart = lineMissedOne(); status(2, RadioEngine.statusName(2));
+                if (restart && current != null) worker.execute(() -> { try { powerCycleOrGiveUp(); applyChannelNow(current, current.id > 0); log("bridge restarted and channel rewritten: the reception line looked stuck"); } catch (Throwable t) { log("bridge restart: " + t); } });
+            }
+        }
     }
 
     /** The first bench image whose receive handler admits every call while the flag is on (promiscuous receive, phonedmrapp docs/promiscuous-rx-patch-spec-2026-10-24.md). */
@@ -2665,7 +2671,8 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void status(int code, String name) {
         switch (code) {
-            case 1: if (agoldBridge() && receiving) { if (synthRx) { synthRx = false; log("reception line caught up with the signal"); } break; }   // already open: an edge after a signal-started reception
+            case 1: if (agoldBridge() && receiving) { if (synthRx) { synthRx = false; lineReported(); log("reception line caught up with the signal"); } break; }   // already open: an edge after a signal-started reception
+                if (agoldBridge() && !synthRx) lineReported();           // an edge from the line itself
                 receiving = true; dmrEvent("start", 0, 0, 0);
                 if (current != null && current.isDigital()) {           // a DMR call: forget the last talker, ask who this is now and again a second later
                     lastCaller = 0; callLogged = false;
@@ -2780,10 +2787,34 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (dbm > -95) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
             else strongCount = 0;
         } else if (synthRx && !monRx) {                                  // a MON reception ends with MON
-            if (dbm < -100) { if (++lowCount >= 2) { lowCount = 0; synthRx = false; status(2, RadioEngine.statusName(2));
-                if (current != null) worker.execute(() -> { try { applyChannelNow(current, current.id > 0); log("channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
+            if (dbm < -100) { if (++lowCount >= 2) { lowCount = 0; final boolean restart = lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
+                if (current != null) worker.execute(() -> { try { if (restart) powerCycleOrGiveUp(); applyChannelNow(current, current.id > 0); log(restart ? "bridge restarted and channel rewritten: the reception line looked stuck" : "channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
             else lowCount = 0;
         }
+    }
+
+    /** Receptions in a row the line did not report, and bridge restarts for it, since the bring-up (Device report). */
+    private volatile int lineMissed, lineRestarts;
+    private void lineReported() {
+        lineMissed = 0;
+        if (lineFallback) { lineFallback = false; log("reception line reports again"); }
+    }
+    /** A reception the line never reported has ended. True when the bridge should be restarted for it now. */
+    private boolean lineMissedOne() {
+        int a = AgoldUsb.stuckLineAction(++lineMissed, lineRestarts, lineFallback);
+        if (a == 1) { lineRestarts++; lineMissed = 0; log("reception line: " + AgoldUsb.STUCK_LINE_MISSES + " receptions in a row it did not report: restarting the bridge"); return true; }
+        if (a == 2) {
+            lineFallback = true;
+            log("reception line still misses receptions after a bridge restart: receptions come from the signal reading (RSSI)");
+            history("warn", "⚠ The radio's reception signal is stuck: SignalDeck detects calls from the signal strength (a little later). Restart the phone to fix it");
+        }
+        return false;
+    }
+    /** For the Device report: how the Atom XL's reception line is doing; null on other phones. */
+    public String receptionLineState() {
+        if (!agoldBridge()) return null;
+        return (lineFallback ? "stuck (receptions from the signal reading)" : "reporting") + " · " + engine.receptionLineBytes() + " bytes since the bridge came up · "
+                + lineMissed + " unreported in a row · " + lineRestarts + " bridge restart" + (lineRestarts == 1 ? "" : "s") + " for it";
     }
 
     /** Atom XL: put "Disable USB audio routing" back as take-over found it. */

@@ -107,6 +107,19 @@ final class AgoldUsb {
     /** Edges read in this long after the reader starts are the bridge's power-up toggles, not receptions. */
     static final long POWER_UP_EDGES_MS = 2000;
 
+    /** Receptions in a row that the line never reported (found from the signal, or opened by MON) before the line counts as stuck. */
+    static final int STUCK_LINE_MISSES = 2;
+    /**
+     * What to do after {@code missed} receptions in a row that the reception line never reported: 0 nothing (yet), 1 restart
+     * the bridge (once per bring-up), 2 stop trusting the line (receptions come from the signal; the phone needs a restart).
+     * The line can stay in its power-up state for a whole session (2026-10-29: one power-up byte, then no edge through MON
+     * and a −71 dBm carrier), and the stock app then hears nothing either.
+     */
+    static int stuckLineAction(int missed, int restarts, boolean fallback) {
+        if (fallback || missed < STUCK_LINE_MISSES) return 0;
+        return restarts == 0 ? 1 : 2;
+    }
+
     /** The engine's 0x36 status code for a {@link #STMCU} byte: 1 RECEIVE_START, 2 RECEIVE_STOP, -1 for anything else. */
     static int receiveStatus(int b) { return b == 0 ? 1 : b == 1 ? 2 : -1; }
 
