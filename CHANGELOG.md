@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: a drop-out in the sound no longer turns into a run of them
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture drop-outs (managing agent, 2026-10-29) | After the radio's sound stopped once during a call, the Atom XL often kept failing for the rest of the session. Part of it was a dead sound stream counted as running (fixed in the change before this one); the rest was the order after a bridge restart: SignalDeck reopened the sound at once, while a call whose end the restart had hidden still looked open; the bridge sends nothing when no call is on, so that stream died 2 s later and started the next restart. Now the sound is reopened only once SignalDeck has settled, from the radio driver's own flag, that a call is still on (or MON is); if that flag cannot be read, a signal above the threshold decides, and the log says so. A call that starts meanwhile opens its own. | `RadioService`, `AgoldUsb` | Host: `AgoldUsbTest` (the flag read back vs an error); full suite 510 / 0. Device (Atom XL, HackRF on 401.025 MHz, with the dead-stream fix): six RTTY / speech calls, 1 drop-out (the first, recovered by one bridge restart) and 5 clean, where the same test earlier gave drop-outs in 4–5 of 6 that kept coming; a 30 s carrier across a forced bridge restart stayed one call and its sound came back after the restart |
+
 ## 2026-10-29 — Atom XL: a stuck reception signal cleared without restarting the phone; no bridge restart in the middle of a call
 
 | Backlog | Change | Files | Test |
