@@ -1,0 +1,32 @@
+==== Walkie-talkie app candidates, ranked (score: evidence) ====
+  examined below: com.flyscale.analogpoc
+
+==== Clues in com.flyscale.analogpoc's code (paths, audio parameters, serial speeds, PTT log texts) ====
+  paths: /dev/ttyS2  /proc/self/fd/  /proc/tty/drivers  /sys/class/gpio/gpio179/value  /sys/class/gpio/gpio181/value  /sys/class/gpio/gpio183/value  /sys/class/gpio/gpio188/value  /sys/class/gpio/gpio189/value  /sys/class/gpio/gpio212/value  /sys/class/gpio/gpio222/value  /sys/class/gpio/gpio223/value  /sys/class/gpio/gpio249/value  /sys/class/gpio/gpio322/value  /sys/class/leds/sc27xx  /sys/kernel/dmr_state/dmr_state  /sys/kernel/ext_pa_en/ext_pa_en  /sys/kernel/m6_pa_en/m6_pa_en
+  serial speeds: -
+
+==== Serial-looking system libraries and their JNI classes ====
+
+==== PTT key capture ====
+Activity key events and known PTT broadcasts:
+Input events (root getevent):
+
+==== The stock app at work (com.flyscale.analogpoc, 15 s, receive only) ====
+devices it holds open: /dev/ashmem6a7a2ce1 /dev/binderfs /dev/ion /dev/mali0 /dev/null /dev/ttyS2 /dev/urandom
+  /dev/ttyS2: speed 9600 baud; rows 0; columns 0; line = 0; intr = ^C; quit = ^\; erase = ^?; kill = ^U; eof = ^D; eol = <undef>;
+module replies in its log: none recognised
+closed: stopped
+
+==== Radio probe ====
+u:object_r:console_device:s0 /dev/ttyS2
+u:object_r:device:s0         /dev/ttySE0
+Derived sepolicy.rule lines:
+allow untrusted_app console_device chr_file { open read write ioctl getattr lock }
+typeattribute console_device mlstrustedobject
+  ^ an AT-command module (SA818 class) answered on /dev/ttyS2 at 9600 baud
+
+==== Summary ====
+watched com.flyscale.analogpoc start up for 15 s
+its serial traffic (stock_serial.txt): SA818-class AT commands (4 of 4 writes start AT+DMO)
+radio module answered: yes, with AT commands (SA818 class) on /dev/ttyS2 at 9600 baud: SignalDeck has no engine for this module family yet
+ports probed: only those the stock app or the profile name (/dev/ttyS2)

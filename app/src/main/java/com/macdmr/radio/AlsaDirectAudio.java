@@ -43,7 +43,7 @@ public final class AlsaDirectAudio implements AudioBackend {
     private AudioTrack track;
     private volatile boolean playing;
     private Process rxProc; private Thread rxThread; private volatile boolean rxRunning;
-    private volatile long rxBlocks;
+    private volatile long rxBlocks, rxDropped;   // rxDropped: USB-card blocks the processing thread could not take in time
     private Process txProc; private Thread txThread; private volatile boolean txRunning;
     private AudioRecord rec;
     private final StringBuilder err = new StringBuilder();
@@ -93,7 +93,7 @@ public final class AlsaDirectAudio implements AudioBackend {
     static String command(String helper, boolean capture, DeviceProfile.DirectAudio d) {
         StringBuilder b = new StringBuilder("exec ").append(quote(helper)).append(capture ? " cap" : " play")
                 .append(" -c ").append(d.card).append(" -d ").append(capture ? d.captureDevice : d.playbackDevice)
-                .append(" -r 8000 -n 2 -p 256 -k 4");
+                .append(" -r ").append(d.rate).append(" -n 2 -p ").append(256 * (d.rate / 8000)).append(" -k ").append(d.rate > 8000 ? 16 : 4).append(capture && d.rate > 8000 ? " -q 1" : "");   // a USB card (Atom XL) gets 512 ms: one overrun stops its stream until the bridge is power-cycled
         for (String c : capture ? d.rxOn : d.txOn) b.append(' ').append(quote(c));
         b.append(" --");
         for (String c : capture ? d.rxOff : d.txOff) b.append(' ').append(quote(c));
@@ -102,7 +102,9 @@ public final class AlsaDirectAudio implements AudioBackend {
     static String quote(String s) { return "'" + s.replace("'", "'\\''") + "'"; }
 
     private Process start(boolean capture) throws java.io.IOException {
-        Process p = new ProcessBuilder("su", "--context", "u:r:magisk:s0", "-c", command(helper, capture, da)).start();
+        // --mount-master: an app's su otherwise runs in the app's own mount namespace; there the Atom XL's USB card capture
+        // failed with an I/O error while the same helper from a root shell ran for minutes (2026-10-28)
+        Process p = new ProcessBuilder("su", "--mount-master", "--context", "u:r:magisk:s0", "-c", command(helper, capture, da)).start();
         final InputStream es = p.getErrorStream();
         Thread t = new Thread(() -> {                                    // the helper's own messages: busy device, a missing control, xruns
             try (BufferedReader r = new BufferedReader(new InputStreamReader(es))) {
@@ -118,6 +120,10 @@ public final class AlsaDirectAudio implements AudioBackend {
         if (p == null) return;
         try { if (!p.waitFor(ms, TimeUnit.MILLISECONDS)) p.destroy(); } catch (InterruptedException e) { p.destroy(); }
     }
+
+    /** Called (on the reader thread) when the capture helper ends while capture should still be running. */
+    private volatile java.util.function.Consumer<String> onCaptureEnded;
+    void setOnCaptureEnded(java.util.function.Consumer<String> c) { onCaptureEnded = c; }
 
     @Override public void setSink(Sink s) { sink = s; }
     @Override public void setGate(Gate g) { gate = g; }
@@ -138,19 +144,43 @@ public final class AlsaDirectAudio implements AudioBackend {
             takeErrors();
             final Process p = start(true); rxProc = p; rxRunning = true; playing = true;
             final long before = rxBlocks;
+            final int f = da.rate / 8000;                                // a faster card (the Atom XL's USB card, 32 kHz) is brought down to 8 kHz here
+            final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
+            // a USB card (f > 1, the Atom XL): the reader only reads; conversion, the sink (decoders) and the speaker run on their
+            // own thread behind a bounded queue that drops when full. A stalled reader lets the card overrun, and one overrun stops
+            // the Atom XL bridge's stream until it is power-cycled (2026-10-28). The 8 kHz codec path (Armor) is unchanged.
+            final java.util.concurrent.ArrayBlockingQueue<byte[]> q = f > 1 ? new java.util.concurrent.ArrayBlockingQueue<>(32) : null;
+            if (q != null) {
+                Thread proc = new Thread(() -> {
+                    byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK];
+                    try {
+                        while (rxRunning || !q.isEmpty()) {
+                            byte[] raw = q.poll(200, TimeUnit.MILLISECONDS); if (raw == null) continue;
+                            rc.decimate(raw, raw.length, buf);
+                            Sink s = sink; if (s != null) s.onPcm(buf, BLOCK);
+                            Gate g = gate;
+                            if (playing && track != null) track.write(g == null || g.open() ? buf : zero, 0, BLOCK, AudioTrack.WRITE_NON_BLOCKING);
+                        }
+                    } catch (Throwable t) { Log.w(TAG, "capture processing: " + t); }
+                }, "sdalsa-rx-proc");
+                proc.start();
+            }
             rxThread = new Thread(() -> {
-                byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK];
+                byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK]; byte[] raw = f > 1 ? new byte[BLOCK * f] : buf;
                 try (InputStream in = p.getInputStream()) {
                     while (rxRunning) {
                         int got = 0;
-                        while (got < BLOCK) { int n = in.read(buf, got, BLOCK - got); if (n < 0) break; got += n; }
-                        if (got < BLOCK) break;                          // the helper ended
+                        while (got < raw.length) { int n = in.read(raw, got, raw.length - got); if (n < 0) break; got += n; }
+                        if (got < raw.length) break;                     // the helper ended
                         rxBlocks++;
+                        if (q != null) { if (!q.offer(raw)) rxDropped++; raw = new byte[BLOCK * f]; continue; }
                         Sink s = sink; if (s != null) s.onPcm(buf, BLOCK);  // squelch decision first
                         Gate g = gate;
                         if (playing && track != null) track.write(g == null || g.open() ? buf : zero, 0, BLOCK);   // keep the stream timing, play silence
                     }
                 } catch (Throwable t) { Log.w(TAG, "capture: " + t); }
+                java.util.function.Consumer<String> ended = onCaptureEnded;
+                if (rxRunning && rxProc == p && ended != null) { try { p.waitFor(300, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) { } ended.accept(takeErrors()); }
             }, "sdalsa-rx");                                             // leaving closes the pipe: the helper's next write fails and it puts the controls back
             rxThread.start();
             long t0 = System.currentTimeMillis();                        // the first block, or the helper's refusal (busy device, missing control)
@@ -192,15 +222,17 @@ public final class AlsaDirectAudio implements AudioBackend {
             }
             final Process p = start(false); txProc = p; txRunning = true;
             final AudioRecord r = rec;
+            final int f = da.rate / 8000;
+            final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
             txThread = new Thread(() -> {
-                byte[] mono = new byte[BLOCK / 2]; byte[] st = new byte[BLOCK];
+                byte[] mono = new byte[BLOCK / 2]; byte[] st = new byte[BLOCK]; byte[] hi = new byte[BLOCK * f];
                 try (OutputStream out = p.getOutputStream()) {
                     while (txRunning) {
                         int n = feed != null ? feed.read(mono, 0, mono.length) : r.read(mono, 0, mono.length);
                         if (n <= 0) continue;
                         int o = stereo(mono, n, st);
                         Level lv = txLevel; if (lv != null) lv.peak(peak(mono, n));
-                        out.write(st, 0, o);
+                        if (rc != null) out.write(hi, 0, rc.interpolate(st, o, hi)); else out.write(st, 0, o);
                     }
                 } catch (Throwable t) { synchronized (err) { err.append(t).append('\n'); } }
             }, "sdalsa-tx");                                             // closing stdin ends the helper: it drains, then puts the controls back
@@ -226,12 +258,14 @@ public final class AlsaDirectAudio implements AudioBackend {
         Process p;
         abortPlay = false;
         synchronized (this) { takeErrors(); try { p = start(false); } catch (Throwable t) { return "playPcm: " + t; } }
+        final int f = da.rate / 8000;
+        final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
         try (OutputStream out = p.getOutputStream()) {
-            byte[] st = new byte[BLOCK];
+            byte[] st = new byte[BLOCK]; byte[] hi = new byte[BLOCK * f];
             for (int pos = 0; pos < mono.length && !abortPlay; pos += BLOCK / 4) {
                 int k = 0;
                 for (int i = pos; i < Math.min(mono.length, pos + BLOCK / 4); i++) { short v = mono[i]; st[k++] = (byte) v; st[k++] = (byte) (v >> 8); st[k++] = (byte) v; st[k++] = (byte) (v >> 8); }
-                out.write(st, 0, k);                                     // the pipe fills and the helper's playback paces it to real time
+                if (rc != null) out.write(hi, 0, rc.interpolate(st, k, hi)); else out.write(st, 0, k);   // the pipe fills and the helper's playback paces it to real time
             }
         } catch (Throwable t) { finish(p, 500); return "playPcm: " + t; }
         finish(p, abortPlay ? 500 : 3000);                               // end of input: the helper drains the last periods, then exits

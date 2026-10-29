@@ -49,7 +49,7 @@ public final class DeviceProfile {
     public String[][] lineSetup;         // {node, value} written in this order before the power line, every bring-up (null = none)
     /** TINY_SERVICE phones: how to reach the radio audio straight on the sound hardware when the ROM lacks the vendor service (null = not known). */
     public DirectAudio directAudio;
-    /** "mcu68" (the DMR module's 68 … 10 frames, RadioEngine) or "sa818" (AT+DMO… text commands, AtModuleEngine). */
+    /** "mcu68" (the DMR module's 68 … 10 frames, RadioEngine), "agold" (those commands inside the 7E 96 69 envelope), or "sa818" (AT+DMO… text commands, AtModuleEngine). */
     public String protocol = "mcu68";
     /**
      * What the module tunes, as {low, high} pairs in Hz (both ends included). The HR-C7000 module itself refuses
@@ -100,6 +100,8 @@ public final class DeviceProfile {
     public static final class DirectAudio {
         public final int card, captureDevice, playbackDevice;
         public final String[] rxOn, rxOff, txOn, txOff;
+        /** The card's rate: 8000 (the phone's codec, as the app uses it) or a multiple of it (the Atom XL's USB card: 32000), converted in the app. */
+        public int rate = 8000;
         public DirectAudio(int card, int captureDevice, int playbackDevice, String[] rxOn, String[] rxOff, String[] txOn, String[] txOff) {
             this.card = card; this.captureDevice = captureDevice; this.playbackDevice = playbackDevice;
             this.rxOn = rxOn; this.rxOff = rxOff; this.txOn = txOn; this.txOff = txOff;
@@ -108,12 +110,14 @@ public final class DeviceProfile {
         static boolean safeControl(String c) { return c != null && c.matches("[A-Za-z0-9 _.,-]{1,80}=[A-Za-z0-9 _.,-]{1,40}"); }
         boolean valid() {
             if (card < 0 || card > 31 || captureDevice < 0 || captureDevice > 63 || playbackDevice < 0 || playbackDevice > 63) return false;
+            if (rate < 8000 || rate > 48000 || rate % 8000 != 0) return false;
             for (String[] l : new String[][] { rxOn, rxOff, txOn, txOff }) { if (l == null) return false; for (String c : l) if (!safeControl(c)) return false; }
             return true;
         }
         static DirectAudio fromJson(org.json.JSONObject o) throws org.json.JSONException {
             DirectAudio d = new DirectAudio(o.getInt("card"), o.getInt("captureDevice"), o.getInt("playbackDevice"),
                     strings(o.optJSONArray("rxOn")), strings(o.optJSONArray("rxOff")), strings(o.optJSONArray("txOn")), strings(o.optJSONArray("txOff")));
+            d.rate = o.optInt("rate", 8000);
             if (!d.valid()) throw new org.json.JSONException("directAudio: bad device number or control");
             return d;
         }
@@ -241,6 +245,32 @@ public final class DeviceProfile {
     }
 
     /** Any other phone: nothing is touched until a device report has been made and a profile written. */
+    /**
+     * Unihertz Atom XL (Agold): the module sits behind a USB bridge MCU on the phone's only USB controller, so the
+     * command port {@code /dev/ttyACM0} and the radio's USB sound card exist only while the bridge is powered, and a
+     * computer on the cable loses the phone meanwhile. SignalDeck stops the vendor HAL and powers the bridge itself
+     * ({@link AgoldUsb#bridgeUp}); Exit and Hand back power it off and give the USB port back. Measured on the bench
+     * Atom XL 2026-10-28 (docs/atomxl in phonedmrapp); unverified until the owner's on-air test, so transmit stays off.
+     */
+    public static final DeviceProfile ATOM_XL = new DeviceProfile(
+            "Unihertz Atom XL", AgoldUsb.BRIDGE_PORT, 115200, Audio.TINY_SERVICE, null, 0,
+            AgoldUsb.MCU_POWER, AgoldUsb.HANDLE_PTT, "power on = 1",
+            new String[] { "android.intent.action.PTT.down", "android.intent.action.PTT.up" },
+            "com.agold.intercom",
+            new String[] {
+                    "allow untrusted_app ttyACM_device chr_file { open read write ioctl getattr lock }",
+                    "typeattribute ttyACM_device mlstrustedobject",
+                    "allow untrusted_app agui_device chr_file { open read getattr }",       // /dev/stmcu: reception start / end
+                    "typeattribute agui_device mlstrustedobject" },
+            null, true, false);
+    static {
+        ATOM_XL.id = "unihertz-atomxl"; ATOM_XL.revision = 1; ATOM_XL.protocol = "agold";
+        ATOM_XL.bandsHz = new long[] { 400_000_000L, 480_000_000L };          // the UHF module (DMR006.U4A); to be measured
+        // the bridge's USB Audio Class card: S16_LE, 2 channels, 32 kHz both ways, no mixer controls (the HAL's pcm_open)
+        ATOM_XL.directAudio = new DirectAudio(1, 0, 0, new String[0], new String[0], new String[0], new String[0]);
+        ATOM_XL.directAudio.rate = 32000;
+    }
+
     public static final DeviceProfile UNKNOWN = new DeviceProfile(
             Build.MANUFACTURER + " " + Build.MODEL + " (not supported yet)", "/dev/ttyS0", 57600, Audio.TINY_SERVICE, null, 0,
             null, null, "1", null, "", new String[0], null, false, false);
@@ -258,6 +288,7 @@ public final class DeviceProfile {
     static DeviceProfile detectBuiltIn(String m, boolean dmr009, boolean intercom) {
         if (m.contains("armor 20wt") || m.contains("armor_20wt")) return ARMOR_20WT;
         if (m.contains("w6+") && m.contains("sl8541e")) return ANYSECU_W6;          // "UNISOC W6+ sl8541e_3h10_32b"
+        if (m.contains("unihertz atom_xl")) return ATOM_XL;                         // "Unihertz Atom_XL Atom_XL"
         if (dmr009 || m.contains("armor 26")) return ARMOR_26_ULTRA;
         if (intercom || m.contains("xplore")) return XPLORE_1;
         return UNKNOWN;

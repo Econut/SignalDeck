@@ -687,7 +687,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 engine.ptt(true);
                 log("TX " + label + " (" + ms + " ms)");
                 try { Thread.sleep(200); if (audio != null) log(audio.playPcm(pcm)); }
-                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null) audio.startRx(true); holdAfterTx(); }
+                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); holdAfterTx(); }
                 if (ms > ThermalGuard.LONG_MS) history("tx", "\uD83D\uDCFB Long transmission " + Math.round(ms / 1000.0) + " s (" + label + "); " + thermal.state());
                 if (onDone != null) onDone.run();
             } catch (Throwable t) { log("TX " + label + ": " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
@@ -853,9 +853,13 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- lifecycle of the link --------------------------------------------------------------------
 
+    private final java.util.concurrent.atomic.AtomicBoolean bringUpRunning = new java.util.concurrent.atomic.AtomicBoolean();
     /** Bring the radio up: policy (root), stock app off, UART, power, channel, RX audio. Runs on a worker. */
     public void bringUp() {
         if (!profile.supported) { setLink("unsupported"); log("This phone has no device profile yet. Device tab → Generate device report, then share it on the project's GitHub issues."); return; }
+        final boolean agold = "agold".equals(profile.protocol);                          // the Atom XL: the radio behind a USB bridge
+        if (agold && "ready".equals(link)) { log("bring-up skipped: the radio is already up (a second one would power-cycle the USB bridge)"); return; }
+        if (!bringUpRunning.compareAndSet(false, true)) { log("bring-up skipped: one is already running"); return; }
         new Thread(() -> {
             boolean pausedStock = false;
             try {
@@ -871,16 +875,24 @@ public class RadioService extends Service implements RadioEngine.Events {
                     log("No root granted, but the UART is reachable and the stock app is not running — continuing");
                 } else {
                     log("sepolicy: " + RootSetup.applySepolicy(getFilesDir(), profile));
-                    if (!VendorSerial.load(this, profile.serialLib)) log("tty (stty fallback): " + RootSetup.ensureTty(profile));
+                    if (agold) {
+                        log("tty: set at the bridge's power-up (the port exists only then)");
+                        android.content.SharedPreferences rp = getSharedPreferences("radio", MODE_PRIVATE);
+                        String prev = AgoldUsb.usbRoutingOff();                  // kept across a crash: the next release restores it
+                        if (!rp.contains("agoldUsbRouting")) rp.edit().putString("agoldUsbRouting", prev).apply();
+                        log("USB audio routing off while SignalDeck has the radio (was " + prev + ")");
+                    }
+                    else if (!VendorSerial.load(this, profile.serialLib)) log("tty (stty fallback): " + RootSetup.ensureTty(profile));
                     if (RootSetup.stockAppEnabled(profile)) { log("stock app paused (its icon disappears while this app owns the radio; Device → Release brings it back): " + RootSetup.stockApp(profile, false)); pausedStock = true; Thread.sleep(1500); }
                 }
                 final boolean sa818 = "sa818".equals(profile.protocol);                      // the W6: no DMR, its own channel table
                 final boolean quickChat = "com.chamsion.quickchat".equals(profile.stockApp);      // Xplore 1: a Room database, no module side tables
-                if (store.count() == 0 && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("stockImportDeclined", false)) {   // no channels: ask before importing the stock app's (owner, 2026-10-28)
+                final boolean prizeStock = !sa818 && !quickChat && !agold;                        // the Armors' stock app: DMR ID and TG lists to read
+                if (!agold && store.count() == 0 && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("stockImportDeclined", false)) {   // no channels: ask before importing the stock app's (owner, 2026-10-28)
                     stockImportPending = true; log("no channels: asking whether to import the stock app's");
                     ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onStockImportOffer(); });
                 }
-                if (!sa818 && !quickChat && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) {     // seed our DMR ID from the stock app's setting
+                if (prizeStock && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) {     // seed our DMR ID from the stock app's setting
                     String xml = RootSetup.run("cat /data/data/" + profile.stockApp + "/shared_prefs/com.pri.prizeinterphone.data.person.xml");
                     java.util.regex.Matcher m = java.util.regex.Pattern.compile("name=\"pref_person_device_id\" value=\"([0-9]+)\"").matcher(xml);
                     if (m.find()) { setLocalIdQuiet(Integer.parseInt(m.group(1))); log("DMR ID from the stock app: " + m.group(1)); }
@@ -889,7 +901,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     int k = store.purgeGarbledPacketHistory(); log("removed " + k + " garbled packet lines from the history");
                     getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("garbledPktPurged", true).apply();
                 }
-                if (!sa818 && !quickChat && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("tgListsImported", false)) {   // installs imported before TG lists were read
+                if (prizeStock && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("tgListsImported", false)) {   // installs imported before TG lists were read
                     StringBuilder err = new StringBuilder();
                     int k = store.repairModuleTgLists(this, profile.stockApp, "default_uhf", err);
                     log(k >= 0 ? "module TG lists imported; " + k + " channels got their list" : "TG list import failed: " + err);
@@ -906,18 +918,33 @@ public class RadioService extends Service implements RadioEngine.Events {
                 selectChannel(store.activeNumber());
                 startRxAudio();
                 setLink("ready");
+                if (agold) {                                  // Agold's App block would stop SignalDeck a few minutes after the screen goes off
+                    String blocked = AgoldUsb.appBlockProblem(getPackageName());
+                    if (blocked != null) {
+                        history("warn", "⚠ Agold App block will stop SignalDeck with the screen off (" + blocked + " on): switch them off in Settings → App block → SignalDeck");
+                        if (!getSharedPreferences("radio", MODE_PRIVATE).getBoolean("appBlockOpened", false)) {
+                            getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("appBlockOpened", true).apply();
+                            log("App block page: " + AgoldUsb.openAppBlock(getPackageName()));
+                        }
+                    }
+                }
+                if (agold) { lineFallback = false; synthRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
                 ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
                 if (roaming()) ui.post(() -> startRoaming());
             } catch (Throwable t) {
                 log("bring-up failed: " + t);
-                if (pausedStock) {                            // never leave the phone with no working radio app
+                if (agold) {                                  // the bridge: never leave it powered, and check it before the stock app runs
+                    try { engine.close(); } catch (Throwable ignored) { }
+                    restoreUsbRouting();
+                    log("hand-back after the failed bring-up: " + AgoldUsb.giveBack(profile, getFilesDir()).replace('\n', ' '));
+                } else if (pausedStock) {                     // never leave the phone with no working radio app
                     try { engine.close(); } catch (Throwable ignored) { }
                     log("stock app on again: " + RootSetup.stockApp(profile, true));
                 }
                 setLink("error: " + t.getMessage());
-            }
+            } finally { bringUpRunning.set(false); }
         }, "radio-bringup").start();
     }
 
@@ -942,7 +969,15 @@ public class RadioService extends Service implements RadioEngine.Events {
             try { if (foxTxOn()) setFoxTx(false); } catch (Throwable ignored) { }
             try { stopSatTrack(); } catch (Throwable ignored) { }
             try { if (audio != null) { audio.stopRx(); rxAudioOn = false; if (restoreStock) audio.releaseForStockApp(); } } catch (Throwable ignored) { }
-            if (restoreStock) r.append("stock app: ").append(RootSetup.stockApp(profile, true)).append("; ");
+            if ("agold".equals(profile.protocol)) {      // both buttons give the USB port back (owner, 2026-10-28); Hand back checks the bridge first
+                try { engine.close(); } catch (Throwable ignored) { }
+                restoreUsbRouting();
+                if (restoreStock) {
+                    String g = AgoldUsb.giveBack(profile, getFilesDir()); r.append(g.replace('\n', ' ')).append("; ");
+                    if (!AgoldUsb.bridgeAnswered(g)) history("warn", "\u26A0 The radio's USB bridge did not answer: restart the phone before opening the stock radio app");
+                    if (g.contains(AgoldUsb.STOCK_FIRMWARE_WARNING)) history("warn", "\u26A0 " + AgoldUsb.STOCK_FIRMWARE_DIR + " holds radio firmware files: the stock app loads them into the module when it starts. Remove them unless you mean to.");
+                } else r.append(AgoldUsb.bridgeDown()).append("; ");
+            } else if (restoreStock) r.append("stock app: ").append(RootSetup.stockApp(profile, true)).append("; ");
             else {
                 try { engine.powerOff(); r.append("radio module power off (").append(engine.powerState()).append("); "); }
                 catch (Throwable t) { r.append("power off failed: ").append(t.getMessage()).append("; "); }
@@ -961,9 +996,12 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public void shutDown(final boolean restoreStock) {
         new Thread(() -> {
-            if (restoreStock) log("stock app on: " + RootSetup.stockApp(profile, true));
+            final boolean agold = "agold".equals(profile.protocol);
+            if (restoreStock && !agold) log("stock app on: " + RootSetup.stockApp(profile, true));
             try { if (audio != null) { audio.stopRx(); audio.releaseForStockApp(); } } catch (Throwable ignored) { }
             engine.close();
+            if (agold) restoreUsbRouting();
+            if (agold) log(restoreStock ? "hand-back: " + AgoldUsb.giveBack(profile, getFilesDir()).replace('\n', ' ') : AgoldUsb.bridgeDown());
             setLink("stopped");
         }, "radio-shutdown").start();
     }
@@ -994,7 +1032,10 @@ public class RadioService extends Service implements RadioEngine.Events {
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
                 audio.setGate(() -> squelchOpen && !muted && !rawHeld() && !(profile.appPlayback && pttDown) && !dataQuiet());   // M17 in play, a data mode without MON, or app playback while keyed: the raw FM stays off the speaker; decoded M17 voice has its own track
             }
-            String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
+            if (agoldBridge() && audio instanceof AlsaDirectAudio)        // the bridge's stream stops after 20-70 s of capture: open it per reception, as the stock app does
+                ((AlsaDirectAudio) audio).setOnCaptureEnded(err -> recoverBridgeAudio("the USB capture ended by itself (" + err + ")"));   // a dead stream stays dead until the bridge restarts, reception or not
+            String r = agoldBridge() ? "USB capture opens at each reception" : audio.startRx(true);
+            audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
     }
 
@@ -1748,7 +1789,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     public String reimportFromStock() { return reimportFromStock("default_uhf"); }
     /** The stock app keeps its channels in areas (the DMR phones' app); the W6's and the Xplore 1's have one list. */
-    public boolean stockHasAreas() { return !"sa818".equals(profile.protocol) && !"com.chamsion.quickchat".equals(profile.stockApp); }
+    public boolean stockHasAreas() { return !"sa818".equals(profile.protocol) && !"agold".equals(profile.protocol) && !"com.chamsion.quickchat".equals(profile.stockApp); }
     /** Replace the channel list with the stock app's: the W6's table, QuickChat's database, or one area of the DMR phones' app. */
     public String reimportFromStock(String areaKey) {
         StringBuilder err = new StringBuilder(); int n;
@@ -1860,7 +1901,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         short[] id = tc != null && !tc.isDigital() && amateurBand(tc.txFreq) && packet != null && System.currentTimeMillis() - txStartedAt < 25_000 ? packet.cwIdIfDue(System.currentTimeMillis()) : null;
                         if (id != null && audio != null) { log("Morse ID after the transmission"); audio.playPcm(id); history("pkt", "\uD83D\uDD24 Morse ID " + packet.callsign()); }   // the station identification every ten minutes
                     } finally { engine.ptt(false); }
-                    if (rxAudioOn && audio != null) audio.startRx(true);
+                    if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true);
                     if (dataReceive) scheduleDataHold(true);   // the unkey path rewrites the voice filter; put the hold back
                 }
             } catch (Throwable t) { log("ptt: " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
@@ -2414,7 +2455,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         finally {
             if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } holdAfterTx(); }
             pttDown = false; thermal.after(ms); refreshControls();
-            if (rxAudioOn && audio != null) audio.startRx(true);
+            if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true);
         }
     }
 
@@ -2493,7 +2534,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         log("sym unkey");
         holdAfterTx();
     }
-    public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
+    public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
     /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
     public String diagTxWav(java.io.File f) {
         try {
@@ -2580,18 +2621,21 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void status(int code, String name) {
         switch (code) {
-            case 1: receiving = true; dmrEvent("start", 0, 0, 0);
+            case 1: if (agoldBridge() && receiving) { if (synthRx) { synthRx = false; log("reception line caught up with the signal"); } break; }   // already open: an edge after a signal-started reception
+                receiving = true; dmrEvent("start", 0, 0, 0);
                 if (current != null && current.isDigital()) {           // a DMR call: forget the last talker, ask who this is now and again a second later
                     lastCaller = 0; callLogged = false;
-                    for (long ms : new long[] { 300, 1200 }) ui.postDelayed(() -> { if (receiving) worker.execute(() -> { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }); }, ms);
+                    if (!agoldBridge()) for (long ms : new long[] { 300, 1200 }) ui.postDelayed(() -> { if (receiving) worker.execute(() -> { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }); }, ms);
                 }
+                bridgeCapture(true);
                 refreshControls(); rxStart = System.currentTimeMillis(); rxCounts = rxReportsReception(); softSq.rxStarted(); ui.post(() -> { for (Listener l : listeners) l.onRx(true); }); pollRssi(); break;
             case 2: {
+                synthRx = false;
                 dmrEvent("stop", 0, 0, 0);
-                receiving = false; refreshControls(); long len = rxStart > 0 ? System.currentTimeMillis() - rxStart : 0; rxStart = 0;
+                receiving = false; bridgeCapture(false); refreshControls(); long len = rxStart > 0 ? System.currentTimeMillis() - rxStart : 0; rxStart = 0;
                 if (softSq.isEnabled() && squelchOpen) { softSq.closeNow(); softGateHistory(false); squelchOpen = false; log("soft squelch closed (carrier gone)"); }
                 softSq.awaitRxStart();                                   // with the module squelch held open a RECEIVE_STOP only happens while the receiver re-settles
-                if (current != null && current.isDigital()) { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }   // who was that (0x2B)
+                if (current != null && current.isDigital() && !agoldBridge()) { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }   // who was that (0x2B); the Atom XL asks after its capture closes
                 if (current != null && !current.isDigital() && !softSq.isEnabled() && rxCounts && len >= 700) history("rx", "📻 Received " + Math.round(len / 1000.0) + " s");   // with Soft SQ on the soft gate writes this line
                 finishRecording();
                 toneBank.reset(); toneAnnounced = -1;
@@ -2611,9 +2655,114 @@ public class RadioService extends Service implements RadioEngine.Events {
         }
     }
 
+    /**
+     * Atom XL: the capture follows each reception, as the stock app's openPcmIn / closePcmIn do, and the caller is asked
+     * around it. A capture held open from take-over stopped with an I/O error after 3-17 s on the bench (2026-10-28, cause
+     * still open; by hand the same capture runs for minutes). Other phones: nothing.
+     */
+    private void bridgeCapture(boolean on) {
+        if (!agoldBridge()) return;
+        final AudioBackend a = rxAudioOn && audio instanceof AlsaDirectAudio ? audio : null;
+        final boolean dmr = current != null && current.isDigital();
+        worker.execute(() -> {
+            try {
+                // while the bridge streams audio it cuts every frame on the port after 12 bytes (measured 2026-10-28), so
+                // the caller (a 20-byte 0x2B reply) is asked before the capture opens and after it closes, as the stock app does
+                if (on) { if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); }
+                    if (a != null) { String r = a.startRx(true); log(r); if (r != null && r.contains("no audio block yet")) recoverBridgeAudio("the USB capture delivered nothing"); } }
+                else { if (a != null) a.stopRx(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
+            } catch (Throwable t) { log("bridge capture: " + t); }
+        });
+    }
+
+    @Override public void bridgeFault(String why) { recoverBridgeAudio(why); }
+
+    // ---- Atom XL: a reception line that never reports (measured 2026-10-28, the stock app misses every call then too) ----
+    static final long LINE_CHECK_MS = 5000;
+    private volatile boolean lineFallback; private int lineCheckTries;
+    /**
+     * After a bring-up the bridge's /dev/stmcu delivers its power-up toggle within a second or two. When nothing at all has
+     * arrived after 5 s the line is stuck in its power-up state and will report no reception: power-cycle the bridge once;
+     * if it stays silent, receptions come from the signal reading ({@link #rxWatchdog}) until it reports again.
+     */
+    private final Runnable lineCheck = new Runnable() { @Override public void run() {
+        if (!agoldBridge() || exiting || !isReady() || engine.receptionLineBytes() != 0) return;
+        if (lineCheckTries++ == 0) {
+            log("reception line silent " + (LINE_CHECK_MS / 1000) + " s after bring-up: power-cycling the bridge once");
+            worker.execute(() -> { try { engine.powerCycle(); if (current != null) applyChannelNow(current, current.id > 0); } catch (Throwable t) { log("reception line: " + t); } });
+            ui.postDelayed(this, LINE_CHECK_MS + 6000);
+            return;
+        }
+        log("reception line still silent: receptions come from the signal reading (RSSI) until it reports again");
+        history("warn", "\u26A0 The radio's reception signal is not working: SignalDeck detects calls from the signal strength (a little later)");
+        lineFallback = true;
+    } };
+
+    /**
+     * Atom XL reception watchdog, always on: the bridge's line also misses receptions now and then after a long one (and the
+     * stock app then misses them too). Idle, the signal is read every second; a signal above -95 dBm twice with no reception
+     * reported starts one ({@link #synthRx}), two readings below -100 dBm end it and rewrite the channel, which brought the
+     * line back on the bench (2026-10-28). An edge that arrives meanwhile is merged.
+     */
+    private volatile boolean synthRx; private volatile int strongCount, lowCount;
+    private final Runnable rxWatchdog = new Runnable() { @Override public void run() {
+        if (!agoldBridge() || exiting) return;
+        if (isReady() && !isTransmitting() && (!receiving || synthRx)) pollRssi();
+        ui.postDelayed(this, synthRx || lineFallback ? 500 : 1000);
+    } };
+    private void agoldRssi(double dbm) {
+        if (!agoldBridge() || isTransmitting()) return;
+        if (!receiving) {
+            if (dbm > -95) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
+            else strongCount = 0;
+        } else if (synthRx) {
+            if (dbm < -100) { if (++lowCount >= 2) { lowCount = 0; synthRx = false; status(2, RadioEngine.statusName(2));
+                if (current != null) worker.execute(() -> { try { applyChannelNow(current, current.id > 0); log("channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
+            else lowCount = 0;
+        }
+    }
+
+    /** Atom XL: put "Disable USB audio routing" back as take-over found it. */
+    private void restoreUsbRouting() {
+        android.content.SharedPreferences rp = getSharedPreferences("radio", MODE_PRIVATE);
+        String prev = rp.getString("agoldUsbRouting", null);
+        if (prev == null) return;
+        AgoldUsb.usbRoutingRestore(prev); rp.edit().remove("agoldUsbRouting").apply();
+        log("USB audio routing restored (" + prev + ")");
+    }
+
+    private volatile long lastBridgeRecoverAt;
+    /**
+     * Atom XL: the bridge stops streaming capture audio after 20-70 s of one capture (measured 2026-10-28, also with no
+     * SignalDeck involved) and reports "pcm error"; its stock app then resets it. Power-cycle the bridge, put the channel
+     * back and reopen the capture if a reception is still on. At most once every 20 s, never while transmitting.
+     */
+    void recoverBridgeAudio(String why) {
+        if (!agoldBridge() || exiting || isTransmitting() || System.currentTimeMillis() - lastBridgeRecoverAt < 20_000) { log("bridge recovery skipped: " + why); return; }
+        lastBridgeRecoverAt = System.currentTimeMillis();
+        worker.execute(() -> {
+            try {
+                log("bridge recovery: " + why);
+                if (audio != null) audio.stopRx();
+                engine.powerCycle();
+                if (current != null) applyChannelNow(current, current.id > 0);
+                if (receiving && rxAudioOn && audio != null) log(audio.startRx(true));
+            } catch (Throwable t) { log("bridge recovery: " + t); }
+        });
+    }
+
+    /** Run all checks' trial: open (or close) the Atom XL's USB capture outside a reception, waiting for it. Other phones: nothing. */
+    public void benchCapture(boolean on) {
+        if (!agoldBridge() || !rxAudioOn || !(audio instanceof AlsaDirectAudio)) return;
+        try { audio.stopRx(); if (on) log("bench capture: " + audio.startRx(true)); } catch (Throwable t) { log("bench capture: " + t); }
+    }
+
+    /** The Atom XL's USB bridge (protocol agold). */
+    private boolean agoldBridge() { return "agold".equals(profile.protocol); }
+
     @Override public void rssi(int raw, double dbm) { if (scope.running()) { scope.onRssi(raw); return; }   // a sweep step's reading: not the channel's signal, not for the coverage log
         rssi0(raw, dbm); }
-    private void rssi0(int raw, double dbm) { rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
+    private void rssi0(int raw, double dbm) { agoldRssi(dbm); rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     private volatile String moduleVersion = "";
     private volatile long versionAt;
     @Override public void version(int v, String text) {
@@ -2682,7 +2831,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 boolean ok = versionHandshake(3000);
                 if (current != null) applyChannelNow(current, current.id > 0);
                 if (monitorOn) { sendMonitor(true); if (promiscuousCapable()) sendPromiscuous(true); }
-                if (rxAudioOn && audio != null) audio.startRx(true);
+                if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true);   // the Atom XL opens its capture per reception
                 setLink("ready");
                 history("warn", ok ? "\u2714 The radio module was restarted and answers again" : "\u26A0 The radio module still does not answer after a restart. Restarting the phone usually fixes this; please send a device report");
         } catch (Throwable t) { log("module restart: " + t); setLink("ready"); }

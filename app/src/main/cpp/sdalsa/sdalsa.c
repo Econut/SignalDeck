@@ -11,7 +11,8 @@
  *
  *   sdalsa list [card]                                    every mixer control and its value (read-only)
  *   sdalsa ctl  [-c card] NAME=VALUE ...                  set mixer controls
- *   sdalsa cap  [-c card] -d dev [-r rate] [-n ch] [-p period] [-k periods] [NAME=VALUE ...] [-- NAME=VALUE ...]
+ *   sdalsa cap  [-c card] -d dev [-r rate] [-n ch] [-p period] [-k periods] [-q 1] [NAME=VALUE ...] [-- NAME=VALUE ...]
+ *                (-q 1: drop whole periods while the pipe is full, rather than stall the capture)
  *   sdalsa play [-c card] -d dev [-r rate] [-n ch] [-p period] [-k periods] [NAME=VALUE ...] [-- NAME=VALUE ...]
  *
  * cap writes interleaved S16_LE frames to stdout until stdout closes or the process is told to stop; play reads them
@@ -172,19 +173,31 @@ static int write_all(int fd, const char *b, size_t n) {
     return 0;
 }
 
-static int capture_loop(int pcm, unsigned ch, unsigned period) {
+/* Free bytes in the pipe on fd, or -1 when fd is not a pipe (then nothing is dropped). */
+static long pipe_free(int fd) {
+    int cap = fcntl(fd, F_GETPIPE_SZ), queued = 0;
+    if (cap <= 0 || ioctl(fd, FIONREAD, &queued) < 0) return -1;
+    return (long) cap - queued;
+}
+
+/* drop: when the reader falls behind, drop whole periods instead of waiting on the pipe, so the card is always read in time
+   (the Atom XL's USB bridge stops streaming for good after one overrun, 2026-10-28). */
+static int capture_loop(int pcm, unsigned ch, unsigned period, int drop) {
     size_t fb = 2u * ch; char *buf = malloc(period * fb); if (!buf) return 4;
-    unsigned long overruns = 0;
+    unsigned long overruns = 0, dropped = 0;
     while (!stop) {
         struct snd_xferi x; memset(&x, 0, sizeof x); x.buf = buf; x.frames = period;
         if (ioctl(pcm, SNDRV_PCM_IOCTL_READI_FRAMES, &x) < 0) {
             if (errno == EINTR) continue;
             if (errno == EPIPE) { overruns++; if (ioctl(pcm, SNDRV_PCM_IOCTL_PREPARE) < 0 || ioctl(pcm, SNDRV_PCM_IOCTL_START) < 0) break; continue; }
-            fprintf(stderr, "sdalsa: read: %s\n", strerror(errno)); free(buf); return 4;
+            fprintf(stderr, "sdalsa: read: %s (after %lu overruns, %lu periods dropped)\n", strerror(errno), overruns, dropped); free(buf); return 4;
         }
-        if (x.result > 0 && write_all(1, buf, (size_t) x.result * fb) != 0) break;   /* SignalDeck closed the pipe: stop */
+        if (x.result <= 0) continue;
+        size_t n = (size_t) x.result * fb;
+        if (drop) { long f = pipe_free(1); if (f >= 0 && (size_t) f < n) { dropped++; continue; } }
+        if (write_all(1, buf, n) != 0) break;   /* SignalDeck closed the pipe: stop */
     }
-    if (overruns) fprintf(stderr, "sdalsa: %lu capture overruns\n", overruns);
+    if (overruns || dropped) fprintf(stderr, "sdalsa: %lu capture overruns, %lu periods dropped\n", overruns, dropped);
     free(buf); return 0;
 }
 
@@ -220,7 +233,7 @@ int main(int argc, char **argv) {
     sigaction(SIGTERM, &sa, NULL); sigaction(SIGHUP, &sa, NULL); sigaction(SIGINT, &sa, NULL);
     const char *mode = argv[1];
     if (strcmp(mode, "list") == 0) return list(argc > 2 ? atoi(argv[2]) : 0);
-    int card = 0, dev = -1; unsigned rate = 8000, ch = 2, period = 256, periods = 4;
+    int card = 0, dev = -1, drop = 0; unsigned rate = 8000, ch = 2, period = 256, periods = 4;
     char **pre = calloc((size_t) argc, sizeof *pre), **post = calloc((size_t) argc, sizeof *post); int npre = 0, npost = 0, after = 0;
     if (!pre || !post) return 4;
     for (int i = 2; i < argc; i++) {
@@ -229,7 +242,7 @@ int main(int argc, char **argv) {
         if (!after && a[0] == '-' && a[1] && !a[2] && i + 1 < argc) {
             long v = strtol(argv[++i], NULL, 10);
             switch (a[1]) { case 'c': card = (int) v; break; case 'd': dev = (int) v; break; case 'r': rate = (unsigned) v; break;
-                            case 'n': ch = (unsigned) v; break; case 'p': period = (unsigned) v; break; case 'k': periods = (unsigned) v; break; default: return usage(); }
+                            case 'n': ch = (unsigned) v; break; case 'p': period = (unsigned) v; break; case 'k': periods = (unsigned) v; break; case 'q': drop = v != 0; break; default: return usage(); }
             continue;
         }
         if (after) post[npost++] = argv[i]; else pre[npre++] = argv[i];
@@ -239,7 +252,7 @@ int main(int argc, char **argv) {
     if ((!capture && strcmp(mode, "play") != 0) || dev < 0 || ch < 1 || ch > 8 || period < 16 || periods < 2) return usage();
     if (ctl_set_all(card, pre, npre) != 0) { ctl_set_all(card, post, npost); return 3; }
     int pcm = pcm_open(card, dev, capture, rate, ch, period, periods);
-    int rc = pcm < 0 ? 4 : capture ? capture_loop(pcm, ch, period) : play_loop(pcm, ch, period);
+    int rc = pcm < 0 ? 4 : capture ? capture_loop(pcm, ch, period, drop) : play_loop(pcm, ch, period);
     if (pcm >= 0) close(pcm);
     if (ctl_set_all(card, post, npost) != 0 && rc == 0) rc = 3;
     return rc;

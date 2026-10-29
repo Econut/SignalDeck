@@ -23,10 +23,15 @@ public final class UartPort {
         void onFrame(Frame f);
         void onRaw(byte[] b, int n);      // non-frame bytes (boot banner)
         void onLog(String s);
+        /** A report from the phone's USB bridge (route 00). The Armor port never calls this. */
+        default void onBridge(int cmd, byte[] body) {
+            onLog(String.format(java.util.Locale.US, "bridge cmd=0x%02X len=%d", cmd, body == null ? 0 : body.length));
+        }
     }
 
     private final String path;
     private final Listener listener;
+    private final FrameCodec codec;
     private FileInputStream in;
     private FileOutputStream out;
     private VendorSerial.Port native_;
@@ -38,7 +43,15 @@ public final class UartPort {
     private byte[] divertCur;
     private int divertPos;
 
-    public UartPort(String path, Listener l) { this.path = path; this.listener = l; }
+    public UartPort(String path, Listener l) { this(path, l, FrameCodec.armor()); }
+
+    /** {@code codec} null keeps the Armor framing. The codec's bridge reports are delivered to {@link Listener#onBridge}. */
+    public UartPort(String path, Listener l, FrameCodec codec) {
+        this.path = path; this.listener = l;
+        this.codec = codec == null ? FrameCodec.armor() : codec;
+        this.codec.setBridge(l::onBridge);
+        this.codec.setLog(l::onLog);
+    }
 
     public synchronized void open() throws IOException { open(0); }
 
@@ -107,7 +120,7 @@ public final class UartPort {
 
     public synchronized void send(Frame f) throws IOException {
         if (out == null) throw new IOException("port closed");
-        byte[] b = f.encode();
+        byte[] b = codec.encode(f);
         out.write(b); out.flush();
         listener.onLog("TX " + f + "  <" + Frame.hex(b, b.length) + ">");
     }
@@ -131,10 +144,11 @@ public final class UartPort {
             System.arraycopy(chunk, 0, buf, n, r); n += r;
             int off = 0, rawStart = -1;
             while (off < n) {
-                int used = Frame.tryDecode(buf, off, n - off, one);
+                int used = codec.tryDecode(buf, off, n - off, one);
                 if (used > 0) {
                     if (rawStart >= 0) { flushRaw(buf, rawStart, off - rawStart); rawStart = -1; }
-                    listener.onFrame(one[0]); off += used;
+                    if (one[0] != null) listener.onFrame(one[0]);
+                    off += used;
                 } else if (used == 0) {
                     break;                                     // need more bytes for this frame
                 } else {

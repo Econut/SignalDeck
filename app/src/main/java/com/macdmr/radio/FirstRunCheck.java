@@ -65,6 +65,8 @@ public final class FirstRunCheck {
                 sum.append("its serial traffic (stock_serial.txt): ").append(proto).append('\n');
             }
             stockAnswers = stockAnswers(w);
+            String rel = releaseNote(w);
+            if (rel != null) sum.append("USB bridge: ").append(AgoldUsb.WARNING).append("\n  ").append(rel).append('\n');
         } else sum.append("stock app not watched: ").append(watchPkg == null ? "skipped (no app chosen)" : svc.isReady() ? "SignalDeck owns the radio" : "no root").append('\n');
 
         if (!svc.isReady() && !dp.stockApp.isEmpty() && RootSetup.haveRoot() && !RootSetup.run("pidof " + dp.stockApp + " || true").replaceAll("[^0-9]", "").isEmpty())
@@ -74,19 +76,36 @@ public final class FirstRunCheck {
         } else {
             File dir = DeviceReport.newestDir();
             java.util.Set<String> named = RadioProbe.namedPorts(dir == null ? "" : DeviceReport.readReport(dir), watchText, dp.supported ? dp.controlPort : null);
-            String r = RadioProbe.run(c, s -> p.step("Probe: " + s), false, named);
-            DeviceReport.append("Radio probe", r);
-            boolean answered = r.contains("answered");
-            if (!answered && dp.supported && dp.powerNode != null) {             // the stock app switches the module off when it closes
-                String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true, named);
-                DeviceReport.append("Radio probe (module power switched on first)", r2);
-                answered = r2.contains("answered"); r = r2;
+            String r = "";
+            boolean answered = false;
+            if (AgoldUsb.bridged()) {                                          // Atom XL: the module is behind a USB bridge, not on a UART: ask there first, the HAL stopped meanwhile
+                p.step("Probe: asking the radio through its USB bridge (USB to a computer is off for about 10 s)");
+                String b = AgoldUsb.identityProbe(c.getCacheDir(), watchPkg != null ? watchPkg : dp.stockApp.isEmpty() ? "com.agold.intercom" : dp.stockApp);
+                DeviceReport.append("Radio probe through the USB bridge", b);
+                int k = b.indexOf(AgoldUsb.MODULE_ANSWERED);
+                if (k >= 0) { answered = true; sum.append("radio module answered through the USB bridge: ").append(b.substring(k + AgoldUsb.MODULE_ANSWERED.length(), b.indexOf('\n', k)).trim()).append('\n'); }
+                if (b.contains(AgoldUsb.BRIDGE_SILENT)) sum.append("WARNING: ").append(b.substring(b.indexOf(AgoldUsb.BRIDGE_SILENT), b.indexOf('\n', b.indexOf(AgoldUsb.BRIDGE_SILENT)))).append('\n');
+            }
+            if (answered) DeviceReport.append("Radio probe", SWEEP_SKIPPED);   // no reason to send version queries to the phone's other UARTs
+            else {
+                r = RadioProbe.run(c, s -> p.step("Probe: " + s), false, named);
+                DeviceReport.append("Radio probe", r);
+                answered = r.contains("answered");
+                if (!answered && dp.supported && dp.powerNode != null) {         // the stock app switches the module off when it closes
+                    String r2 = RadioProbe.run(c, s -> p.step("Probe with power on: " + s), true, named);
+                    DeviceReport.append("Radio probe (module power switched on first)", r2);
+                    answered = r2.contains("answered"); r = r2;
+                }
             }
             if (r.contains(RadioProbe.AT_MARK))
                 sum.append("radio module answered: yes, with AT commands (SA818 class)").append(atWhere(r)).append(": SignalDeck has no engine for this module family yet\n");
             else sum.append("radio module answered the version query: ").append(answered ? "yes" : "no").append('\n');
             if (!named.isEmpty()) sum.append("ports probed: only those the stock app or the profile name (").append(String.join(" ", named)).append(")\n");
-            if (!answered && stockAnswers != null)
+            String[] bridge = AgoldUsb.port(watchText);
+            if (!answered && stockAnswers != null && bridge != null)
+                sum.append("  the module sits behind a USB bridge on ").append(bridge[0]).append(", held by ").append(bridge[2]).append(" while the radio is on; ")
+                   .append(stockAnswers).append(": the module works; SignalDeck's probe does not ask through the bridge yet\n");
+            else if (!answered && stockAnswers != null)
                 sum.append("  but ").append(stockAnswers).append(": the module works; SignalDeck's probe did not reach the port it is on\n");
         }
 
@@ -97,7 +116,17 @@ public final class FirstRunCheck {
         } else if (trial) sum.append("trial take-over skipped: ").append(!dp.supported ? "no profile for this phone yet" : "SignalDeck already owns the radio").append('\n');
 
         DeviceReport.append("SignalDeck log (personal details removed)", DeviceReport.redactAppLog(svc.recentLog()));
+        { File d = DeviceReport.newestDir();                                  // the draft reads the finished report and this summary
+          String draft = DraftProfile.text((d == null ? "" : DeviceReport.readReport(d)) + "\n==== Summary ====\n" + sum);
+          DeviceReport.append("Draft profile", draft); sum.append(draft); }
         DeviceReport.append("Summary", sum.toString());
+        { File d = DeviceReport.newestDir();                                  // report.json: the same facts as data, for scripts/report_diff.py
+          if (d != null) try (java.io.FileOutputStream o = new java.io.FileOutputStream(new File(d, "report.json"))) {
+              java.util.Map<String, String> ph = new java.util.LinkedHashMap<>();
+              ph.put("manufacturer", android.os.Build.MANUFACTURER); ph.put("model", android.os.Build.MODEL); ph.put("device", android.os.Build.DEVICE);
+              ph.put("android", android.os.Build.VERSION.RELEASE); ph.put("build", android.os.Build.DISPLAY);
+              o.write(ReportJson.build(DeviceReport.readReport(d), ph).toString(2).getBytes("UTF-8"));
+          } catch (Throwable t) { android.util.Log.w("BenchChecks", "report.json: " + t); } }
         p.step("Zipping");
         return DeviceReport.zipNewest(c, true);
     }
@@ -215,7 +244,9 @@ public final class FirstRunCheck {
         if (tracer != null) r.append("stopped first, so its start-up is seen: ").append(stopFully(pkg)).append('\n');   // a running app is only brought to the front
         String kBefore = RootSetup.run(KMSG);
         RootSetup.run("logcat -c");
-        p.step("The stock walkie-talkie app is open for 15 s — please do not press PTT");
+        boolean bridged = AgoldUsb.bridged();                                  // Atom XL: the radio takes the USB port while it is on
+        if (bridged) r.append("note: ").append(AgoldUsb.WARNING).append('\n');
+        p.step("The stock walkie-talkie app is open for 15 s — please do not press PTT" + (bridged ? " (USB to a computer is off meanwhile)" : ""));
         final String[] started = { "" };
         Thread sniff = null;
         if (tracer != null) {                                                   // the sniffer waits for the process, then the app is started
@@ -231,6 +262,7 @@ public final class FirstRunCheck {
             for (String dev : fds.split("\\s+")) if (dev.matches("/dev/tty\\w+"))
                 r.append("  ").append(dev).append(": ").append(RootSetup.run("stty -F " + dev + " -a 2>&1 | head -2").replace('\n', ' ')).append('\n');
         } else r.append("not running after 8 s (pid: ").append(pid).append(")\n");
+        if (bridged) r.append("USB devices and USB sound cards while the radio is on (root):\n").append(AgoldUsb.whileOn());
         Thread.sleep(7000);
         if (pid.matches("\\d+")) {                                            // again at the end: a daemon-backed app (Armor 3WT) connects only after start-up
             r.append("at the end of the watch it holds: ").append(RootSetup.run("ls -l /proc/" + pid + "/fd 2>/dev/null | grep -o '/dev/[A-Za-z0-9_/]*' | sort -u").replace('\n', ' ')).append('\n');
@@ -256,11 +288,21 @@ public final class FirstRunCheck {
             for (String l : trace.split("\n")) if (l.contains("sdtrace:") && (l.contains("attach") || l.contains("not found") || l.contains("not listed"))) r.append("  ").append(l.trim()).append('\n');
         }
         r.append("\nstart ").append(comp).append(": ").append(started[0].trim()).append('\n');
+        if (bridged) r.append(RELEASED).append(AgoldUsb.release(pkg).replace("\n", "\n  ").trim()).append('\n');   // a force-stop alone leaves the radio on and USB off
         r.append("closed: ").append(stopFully(pkg)).append('\n');
         return r.toString();
     }
 
     private static final String TRACE_FILE = "/data/local/tmp/signaldeck_sdtrace.txt";
+    static final String SWEEP_SKIPPED = "serial ports not swept: the module answered through its USB bridge (see the section before)\n";
+    static final String RELEASED = "radio released before closing: ";
+
+    /** The release lines of a watch, for the summary, or null when the watch did not release a USB-bridged radio. */
+    static String releaseNote(String watch) {
+        int a = watch == null ? -1 : watch.indexOf(RELEASED); if (a < 0) return null;
+        int end = watch.indexOf("\nclosed: ", a);
+        return watch.substring(a + RELEASED.length(), end < 0 ? watch.length() : end).trim();
+    }
     /** The last watch's raw serial trace (null without the sniffer); written redacted beside the report. */
     static volatile String lastTrace;
 
@@ -315,7 +357,9 @@ public final class FirstRunCheck {
             p.step("Trial: reading signal strength and audio");
             File dir = DeviceReport.newestDir();
             File raw = dir != null ? new File(dir, "rx_audio_raw.bin") : null;
+            svc.benchCapture(true);                                     // the Atom XL opens its USB capture per reception: open it for the listen
             String cap = raw != null ? svc.captureRxAudio(raw, 5000) : "no report folder";
+            svc.benchCapture(false);
             StringBuilder rs = new StringBuilder();
             for (int i = 0; i < 5; i++) { svc.pollRssi(); Thread.sleep(1200); rs.append(svc.lastRssi()).append(' '); }
             Thread.sleep(1000);
@@ -333,6 +377,7 @@ public final class FirstRunCheck {
         p.step("Trial: handing the radio back");
         svc.shutDown(true);
         Thread.sleep(3000);
+        for (int w = 0; w < 30 && "agold".equals(svc.profile().protocol) && !RootSetup.stockAppEnabled(svc.profile()); w++) Thread.sleep(1000);   // its hand-back checks the bridge first (~20 s)
         r.append("handed back; stock app enabled: ").append(RootSetup.stockAppEnabled(svc.profile())).append('\n');
         r.append("radio driver kernel messages during the trial:\n").append(newLines(kBefore, RootSetup.run(KMSG)));
         r.append(String.format(Locale.US, "(trial ran %d s)\n", (System.currentTimeMillis() - t0) / 1000));

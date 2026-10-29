@@ -62,6 +62,8 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip
             case "txwav": { String nm = i.getStringExtra("name"); if (nm != null && nm.matches("[A-Za-z0-9_-]{1,40}")) Log.i("DiagReceiver", "txwav: " + s.diagTxWav(new java.io.File(c.getCacheDir(), "tx_" + nm + ".wav"))); break; }   // bench: transmit cache/tx_<name>.wav (low power VFO)
             case "rxvol": s.diagAnalogVolume(Math.max(0, Math.min(255, i.getIntExtra("v", 8)))); break;   // bench: the module volume byte of the current analog channel
+            case "bringup": s.bringUp(); break;                             // bench: Device -> Take over without a tap (also for an untested profile)
+            case "exit": s.exit(i.getBooleanExtra("stock", false), r -> Log.i("DiagReceiver", "exit: " + r)); break;   // bench: Exit (stock false) or Hand back (true) without a tap
             case "restartmodule": s.diagRestartModule(); break;              // bench: the stuck-module watchdog's restart (power cycle, channel, MON, audio back)
             case "raw40": s.diagRaw40(new java.io.File(i.getStringExtra("path"))); break;  // bench: one 0x40 body from a file, reply in cache/raw40.bin, does not key
             case "fwload": s.diagFwLoad(new java.io.File(i.getStringExtra("file")), i.getBooleanExtra("abort50", false), i.hasExtra("pause") ? i.getIntExtra("pause", 300) : -1); break;  // bench: YModem-1K into the module. abort50 closes the port halfway. --ei pause sets the gap before each data block.
@@ -262,7 +264,8 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "audiocheck": case "dmrcheck": { final int sec = i.getIntExtra("seconds", 10); final Context ctx = c.getApplicationContext();
                 new Thread(() -> { try { for (String l : DmrAudioCheck.run(ctx, s, sec, t -> { }).split("\n")) Log.i("DmrAudioCheck", l); } catch (Throwable t) { Log.w("DmrAudioCheck", t); } }, "dmrcheck").start(); break; }
             case "profileclear": Log.i("DiagReceiver", "profileclear: " + ProfileRegistry.clearForTest()); break;
-            case "web": Log.i("DiagReceiver", "web: " + (s.web() == null ? "no host" : String.valueOf(s.web().setEnabled(i.getBooleanExtra("on", true))) + " running=" + s.web().running() + " " + s.web().urls())); break;
+            case "web": if (s.web() != null && i.hasExtra("tx")) s.web().setAllowTx(i.getBooleanExtra("tx", false));   // bench: --ez tx = Device -> SignalDeck Web -> Transmit from the web
+                Log.i("DiagReceiver", "web: " + (s.web() == null ? "no host" : String.valueOf(s.web().setEnabled(i.getBooleanExtra("on", true))) + " running=" + s.web().running() + " " + s.web().urls())); break;
             case "aprs144": Log.i("DiagReceiver", "aprs144: " + s.aprsMonitor(i.getBooleanExtra("on", true))); break;      // standard APRS monitoring on/off (receive)
             case "issaprs": {                                                   // ISS APRS: track the next pass and every one after it
                 String e = s.startIssMode(com.macdmr.radio.ham.Satellites.APRS);

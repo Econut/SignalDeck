@@ -10,6 +10,8 @@
 #   -k  keep the copied stock APKs (left out by default: they are the manufacturer's software)
 #   -m  give up after this many seconds (default 600)
 #
+# On a phone whose radio takes the USB port while it is on (Unihertz Atom XL), pass a Wi-Fi ADB serial (ip:5555):
+# over the cable the phone is gone during the stock-app watch and comes back after the checks release the radio.
 # Needs SignalDeck installed with root granted. The app is started if it is not running (the bench receiver lives in
 # its service). The phone's clock may be wrong: the host's time is passed along, so the folder carries the host's date.
 # Progress comes from the app's log tag BenchChecks; a run ends with "done <folder> <zip>" or "failed …".
