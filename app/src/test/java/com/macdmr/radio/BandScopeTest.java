@@ -50,4 +50,12 @@ public class BandScopeTest {
         assertEquals("2.0 h", BandScope.duration(7_200_000));
         assertEquals(0, s.currentHz());
     }
+    @Test public void aUhfOnlyRadioSweepsInsideItsBandOnly() {
+        com.macdmr.radio.DeviceProfile atom = com.macdmr.radio.DeviceProfile.ATOM_XL;   // 400-480 MHz (DMR006.U4A)
+        assertTrue("the bench sweep of 2026-10-29", BandScope.oneBand(atom, 400_000_000L, 401_200_000L));
+        assertTrue(BandScope.oneBand(atom, 470_000_000L, 480_000_000L));
+        assertFalse("the 2 m preset: refused on the Atom XL", BandScope.oneBand(atom, 146_400_000L, 146_640_000L));
+        assertFalse("past the top of the band", BandScope.oneBand(atom, 479_000_000L, 481_000_000L));
+        assertTrue("the Armor tunes 2 m", BandScope.oneBand(com.macdmr.radio.DeviceProfile.ARMOR_26_ULTRA, 146_400_000L, 146_640_000L));
+    }
 }
