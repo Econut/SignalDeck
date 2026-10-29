@@ -2808,7 +2808,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         } else if (synthRx && !monRx) {                                  // a MON reception ends with MON
             if (dbm < AgoldUsb.rssiEndDbm(idleFloor)) { if (++lowCount >= 2) { lowCount = 0;
                 long held = System.currentTimeMillis() - synthStartAt;
-                final boolean counts = AgoldUsb.countsAsLineMiss(held);       // a short blip is energy from elsewhere (a 446 MHz HackRF in the cage read -87 dBm here), not a reception the line missed
+                final boolean counts = AgoldUsb.countsAsLineMiss(held);       // a short off-channel blip (source in the cage not identified) read -87 dBm here: not a reception the line missed
                 if (!counts) log("signal reception of " + held + " ms with no line edge: too short to count against the reception line");
                 final boolean restart = counts && lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
                 if (current != null) worker.execute(() -> { try { boolean cycled = restart && autoCycle("stuck reception line"); if (restart && !cycled) lineRestarts--; /* held back: the restart is still owed */ if (cycled) powerCycleOrGiveUp(); applyChannelNow(current, current.id > 0); log(cycled ? "bridge restarted and channel rewritten: the reception line looked stuck" : "channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
