@@ -10,6 +10,12 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | Atom XL feature sweep (managing agent, 2026-10-29) | The phone hides POCSAG paging on a radio without the HR-C7000 symbol engine (the Atom XL, the W6+), but SignalDeck Web still listed the Pager page, whose Send and Monitor only came back with errors. The web now hides it when the status says `symbolEngine: false`, and an open Pager page goes to the intercom, like Messages and Contacts on a radio without DMR. | `assets/web/app.js` | Host suite. Device: pending (Atom XL web check after Grok's lease). |
+## 2026-10-29 — Atom XL: a stuck reception line is found, the bridge restarted once, then the user told
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL stuck reception line (managing agent, 2026-10-29) | The start-up check only caught a line that sent nothing at all. Tonight's stuck line sent its power-up byte, then no edge for a whole session (Grok's hotspot carrier read −71 dBm with no reception, MON gave none). A reception the line never reported (one the signal watchdog started, or one MON opened) that ends without an edge now counts as a miss; a real edge resets the count. Two in a row restart the bridge once per bring-up (and rewrite the channel); two more after that put receptions on the signal reading for good, and the history asks for a phone restart. A line that reports again clears that state. The Device report summary gets a `reception line:` row (reporting or stuck, bytes since the bridge came up, unreported in a row, restarts for it). Help (Unihertz Atom XL) says so. | `AgoldUsb.java`, `RadioService.java`, `DeviceReport.java`, `ui/HelpView.java`, `AgoldUsbTest.java` | Host suite 498/0 (`aStuckReceptionLineIsRestartedOnceThenNotTrusted`). Device: see the PR. |
+
 ## 2026-10-29 — Atom XL: MON opens the sound on an analog channel without waiting for the reception line
 
 | Backlog | Change | Files | Test |

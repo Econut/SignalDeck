@@ -102,6 +102,14 @@ public class AgoldUsbTest {
         assertEquals(-1, AgoldUsb.receiveStatus(2));
     }
 
+    @Test public void aStuckReceptionLineIsRestartedOnceThenNotTrusted() {
+        assertEquals("one unreported reception: the line misses one now and then", 0, AgoldUsb.stuckLineAction(1, 0, false));
+        assertEquals("two in a row: restart the bridge", 1, AgoldUsb.stuckLineAction(2, 0, false));
+        assertEquals("one after the restart: wait", 0, AgoldUsb.stuckLineAction(1, 1, false));
+        assertEquals("two more after the restart: give up on the line", 2, AgoldUsb.stuckLineAction(2, 1, false));
+        assertEquals("already on the signal reading: nothing more to do", 0, AgoldUsb.stuckLineAction(5, 1, true));
+    }
+
     @Test public void powerScriptsFollowTheHalsOrder() {
         String up = AgoldUsb.POWER_UP;
         assertTrue("the stale port node is waited out first", up.indexOf("while [ -e /dev/ttyACM0 ]") < up.indexOf("usb_path"));
