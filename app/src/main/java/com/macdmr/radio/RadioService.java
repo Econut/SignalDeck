@@ -1052,7 +1052,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 audio.setGate(() -> squelchOpen && !muted && !rawHeld() && !(profile.appPlayback && pttDown) && !dataQuiet());   // M17 in play, a data mode without MON, or app playback while keyed: the raw FM stays off the speaker; decoded M17 voice has its own track
             }
             if (agoldBridge() && audio instanceof AlsaDirectAudio)        // the bridge's stream stops after 20-70 s of capture: open it per reception, as the stock app does
-                ((AlsaDirectAudio) audio).setOnCaptureEnded(err -> recoverBridgeAudio("the USB capture ended by itself (" + err + ")"));   // a dead stream stays dead until the bridge restarts, reception or not
+                ((AlsaDirectAudio) audio).setOnCaptureEnded(this::captureEnded);
             String r = agoldBridge() ? "USB capture opens at each reception" : audio.startRx(true);
             audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -2793,6 +2793,7 @@ public class RadioService extends Service implements RadioEngine.Events {
      * ({@link AgoldUsb#rssiStartDbm}). An edge that arrives meanwhile is merged.
      */
     private volatile boolean synthRx; private volatile int strongCount, lowCount;
+    private volatile long synthStartAt;
     private volatile double idleFloor = Double.NaN;                     // dBm, while nothing is received; reset on a channel write
     private final Runnable rxWatchdog = new Runnable() { @Override public void run() {
         if (!agoldBridge() || exiting) return;
@@ -2803,11 +2804,15 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!agoldBridge() || isTransmitting()) return;
         if (!receiving) {
             idleFloor = AgoldUsb.nextFloor(idleFloor, dbm);
-            if (dbm > AgoldUsb.rssiStartDbm(idleFloor)) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
+            if (dbm > AgoldUsb.rssiStartDbm(idleFloor)) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; synthStartAt = System.currentTimeMillis(); log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
             else strongCount = 0;
         } else if (synthRx && !monRx) {                                  // a MON reception ends with MON
-            if (dbm < AgoldUsb.rssiEndDbm(idleFloor)) { if (++lowCount >= 2) { lowCount = 0; final boolean restart = lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
-                if (current != null) worker.execute(() -> { try { if (restart) powerCycleOrGiveUp(); applyChannelNow(current, current.id > 0); log(restart ? "bridge restarted and channel rewritten: the reception line looked stuck" : "channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
+            if (dbm < AgoldUsb.rssiEndDbm(idleFloor)) { if (++lowCount >= 2) { lowCount = 0;
+                long held = System.currentTimeMillis() - synthStartAt;
+                final boolean counts = AgoldUsb.countsAsLineMiss(held);       // a short off-channel blip (source in the cage not identified) read -87 dBm here: not a reception the line missed
+                if (!counts) log("signal reception of " + held + " ms with no line edge: too short to count against the reception line");
+                final boolean restart = counts && lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
+                if (current != null) worker.execute(() -> { try { boolean cycled = restart && autoCycle("stuck reception line"); if (restart && !cycled) lineRestarts--; /* held back: the restart is still owed */ if (cycled) powerCycleOrGiveUp(); applyChannelNow(current, current.id > 0); log(cycled ? "bridge restarted and channel rewritten: the reception line looked stuck" : "channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
             else lowCount = 0;
         }
     }
@@ -2856,7 +2861,35 @@ public class RadioService extends Service implements RadioEngine.Events {
      * then the radio is let go the way a failed bring-up does it (USB routing back, the bridge checked before the stock
      * app returns) and the link shows the error, instead of "ready" with the radio off.
      */
+    /**
+     * Our own bridge power-cycles end the capture too: that end is not a fault and must not queue a recovery of its own
+     * (2026-10-29 17:06: a stuck-line restart killed the capture that had just opened, its "File descriptor in bad state"
+     * queued a second power-cycle, and the two back to back left the module silent for a third).
+     */
+    private volatile long ownCycleUntil;
+    // one minimum gap between automatic bridge power-cycles (stuck line, capture recovery, module watchdog): back to back
+    // they left the module silent (2026-10-29 17:07); the user's own Exit / Take over does not go through these paths
+    private volatile long lastAutoCycleAt; private volatile boolean moduleWatchDeferred;
+    private long autoCycleWait() { return agoldBridge() ? Math.max(0, AgoldUsb.AUTO_CYCLE_GAP_MS - (System.currentTimeMillis() - lastAutoCycleAt)) : 0; }
+    /** True (and the gap starts) when an automatic power-cycle may run now; logs and returns false inside the gap. */
+    private boolean autoCycle(String why) {
+        long w = autoCycleWait();
+        if (w > 0) { log("bridge restart for the " + why + " held back: another automatic restart ran " + (AgoldUsb.AUTO_CYCLE_GAP_MS - w) / 1000 + " s ago"); return false; }
+        lastAutoCycleAt = System.currentTimeMillis(); return true;
+    }
+    private void captureEnded(String err) {
+        if (agoldBridge() && System.currentTimeMillis() < ownCycleUntil) { log("the capture ended with our own bridge restart: no recovery (" + err + ")"); return; }
+        recoverBridgeAudio("the USB capture ended by itself (" + err + ")");
+    }
     private void powerCycleOrGiveUp() throws IOException {
+        if (agoldBridge()) {
+            ownCycleUntil = System.currentTimeMillis() + 30_000;            // until the cycle is done (cleared to a short grace below)
+            try { if (audio != null) audio.stopRx(); } catch (Throwable ignored) { }
+        }
+        try { powerCycleOrGiveUp0(); }
+        finally { if (agoldBridge()) ownCycleUntil = System.currentTimeMillis() + 1500; }
+    }
+    private void powerCycleOrGiveUp0() throws IOException {
         long settle = agoldBridge() ? AgoldUsb.plugSettleWait(System.currentTimeMillis(), lastPlugChangeAt) : 0;
         if (settle > 0) {                                                    // the stock app leaves the bridge alone for 4 s after a charger change
             log("bridge power-up held " + settle + " ms after a charger or USB change");
@@ -2922,7 +2955,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         recoverBridgeAudio(heldWhy);
     };
     void recoverBridgeAudio(String why) {
-        long wait = 20_000 - (System.currentTimeMillis() - lastBridgeRecoverAt);
+        long wait = Math.max(20_000 - (System.currentTimeMillis() - lastBridgeRecoverAt), autoCycleWait());
         if (agoldBridge() && !exiting && !isTransmitting() && wait > 0 && receiving && !bridgeRecoverDeferred) {
             // inside the 20 s window: try once more when it ends if the reception is still on, instead of leaving the capture dead (MON on a stuck line, 2026-10-29)
             bridgeRecoverDeferred = true;
@@ -2942,7 +2975,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             return;
         }
         recoverHeld = false; captureDeadAt = 0; ui.removeCallbacks(heldRecovery);
-        lastBridgeRecoverAt = System.currentTimeMillis();
+        lastBridgeRecoverAt = System.currentTimeMillis(); lastAutoCycleAt = lastBridgeRecoverAt;
         worker.execute(() -> {
             try {
                 log("bridge recovery: " + why);
@@ -3013,6 +3046,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         ui.postDelayed(this, 2000);
         boolean stalled = agoldBridge() && engine.writeStalled();          // the bridge stopped taking data: writes fail after their deadline
         if (exiting || engine.rawSession() || !isReady() || recovering || isTransmitting() || (!stalled && engine.unansweredForMs() < 6000) || System.currentTimeMillis() - lastRecoverAt < 120_000) return;
+        if (agoldBridge() && autoCycleWait() > 0) { if (!moduleWatchDeferred) { moduleWatchDeferred = true; log("module restart held " + autoCycleWait() + " ms: another automatic bridge restart ran just before"); } return; }   // re-checked every 2 s
+        moduleWatchDeferred = false;
         recovering = true;
         worker.execute(() -> {
             try {
@@ -3026,7 +3061,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Restart the module for real and put the channel, MON and receive audio back (on the worker thread). */
     void restartModule(String why) {
         try {
-                lastRecoverAt = System.currentTimeMillis();
+                lastRecoverAt = System.currentTimeMillis(); lastAutoCycleAt = lastRecoverAt;
                 log(why + ": restarting it");
                 history("warn", "\u26A0 The radio module stopped answering commands: restarting it (a few seconds without reception)");
                 setLink("booting");
