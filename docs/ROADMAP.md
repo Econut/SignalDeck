@@ -22,6 +22,14 @@ entry and a device test.
 
 - **Winlink gateway list, automatic**: ask Winlink for an API access key so SignalDeck can refresh the gateway list itself (today: the user downloads the CSV in the browser and imports it; winlink.org is behind a Cloudflare bot check, which SignalDeck never works around).
 
+- **Translations** (owner, 2026-10-28; a tester asked for German first): move every user-facing string (screens, dialogs, the in-app guide `HelpView.TOPICS`, the web pages) into string resources with an English base, then German; follow the phone's language with an override in Device. The guide is large, so plan the export so translators work from one file per language.
+- **DMR position data shown as text** (tester report 2026-10-28): a DMR radio's position report (its "APRS over DMR" / GPS data, from ID 22 on TG 1, 7 times) arrived as a `0x2D` text and was shown as CJK garbage (binary bytes read as UTF-16LE). Wanted: recognise data that is not text (do not file it as a message; show "data from …" or decode it), then decode the common DMR position formats (ETSI LIP, Motorola LRRP, Hytera, the NMEA sentences some radios send) onto the map and Last heard, and offer forwarding to APRS-IS. Needs the raw bytes: a debug dump of non-text `0x2D` bodies first.
+- **Tester requests, channels and zones** (2026-10-28):
+  - Nearby repeaters: when a DMR repeater has no known talkgroup list, let the user enter one or more talkgroups in the details sheet (today it only says to add them later in the channel editor).
+  - Clone a channel: duplicate it into the editor, to change one or two fields.
+  - The channel pop-up (tap a channel): an "Add to zone" button with a zone picker.
+  - The channel editor: a zone picker for the zones the channel belongs to.
+
 ## Research, later
 
 - **M17 and other digital voice**: after deeper work on the radio module's firmware and on other phones. Today the
