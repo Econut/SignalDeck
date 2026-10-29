@@ -59,7 +59,10 @@ public class MainActivity extends AppCompatActivity {
         @Override public void onServiceConnected(ComponentName n, IBinder b) {
             svc = ((RadioService.LocalBinder) b).get();
             intercom.attach(svc); diagnostics.attach(svc); channels.attach(svc); contacts.attach(svc); messages.attach(svc); device.attach(svc);
-            if (!svc.isReady() && svc.profile().verified) svc.bringUp();          // an untested profile waits for Device → Take over
+            // an untested profile waits for Device → Take over; the bench's run_checks.sh -r opens the app with noTakeOver so a
+            // verified phone's checks see the radio with the stock app (only stops the automatic take-over)
+            boolean noTakeOver = getIntent() != null && getIntent().getBooleanExtra("noTakeOver", false);
+            if (!svc.isReady() && svc.profile().verified && !noTakeOver) svc.bringUp();
             ui.post(rssiTick); ui.removeCallbacks(modeTick); ui.post(modeTick);
             applyPendingLocation(); applyOpenNets(); applyCodeplug();
             ui.postDelayed(MainActivity.this::announceCoverage, 3000);
