@@ -842,10 +842,13 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- lifecycle of the link --------------------------------------------------------------------
 
+    private final java.util.concurrent.atomic.AtomicBoolean bringUpRunning = new java.util.concurrent.atomic.AtomicBoolean();
     /** Bring the radio up: policy (root), stock app off, UART, power, channel, RX audio. Runs on a worker. */
     public void bringUp() {
         if (!profile.supported) { setLink("unsupported"); log("This phone has no device profile yet. Device tab → Generate device report, then share it on the project's GitHub issues."); return; }
         final boolean agold = "agold".equals(profile.protocol);                          // the Atom XL: the radio behind a USB bridge
+        if (agold && "ready".equals(link)) { log("bring-up skipped: the radio is already up (a second one would power-cycle the USB bridge)"); return; }
+        if (!bringUpRunning.compareAndSet(false, true)) { log("bring-up skipped: one is already running"); return; }
         new Thread(() -> {
             boolean pausedStock = false;
             try {
@@ -929,7 +932,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     log("stock app on again: " + RootSetup.stockApp(profile, true));
                 }
                 setLink("error: " + t.getMessage());
-            }
+            } finally { bringUpRunning.set(false); }
         }, "radio-bringup").start();
     }
 
