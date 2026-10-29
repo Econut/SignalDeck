@@ -29,15 +29,20 @@ public final class P8RadioControls extends LinearLayout {
             case 4:service.p8CancelTransmitTest();toast("PTT release requested");break;
             case 5:buttons();break;
             case 6:new android.app.AlertDialog.Builder(c).setTitle("Connection details").setMessage((service.txInhibited()?"Receive only / not connected":"Analogue hold-to-talk")+"\n\n"+service.p8Status()).setPositiveButton("Close",null).show();break;
-            case 8:toast("Recovering radio connection…");service.p8Recover(message->{
-                android.app.AlertDialog.Builder result=new android.app.AlertDialog.Builder(c).setTitle("Radio recovery").setMessage(message).setNegativeButton("Close",null);
-                if(message.startsWith("Recovered:"))result.setPositiveButton("Open Intercom",(a,b)->com.macdmr.radio.P8MainRadio.restoreIntercom(c));
-                else if(message.contains("Intercom is running"))result.setPositiveButton("Intercom App info",(a,b)->c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr"))));
-                result.show();});break;
+            case 8:recover(c,service);break;
             case 9:new android.app.AlertDialog.Builder(c).setTitle("Saved radio log").setMessage(service.p8RecoveryLog()).setPositiveButton("Share",(a,b)->{Intent share=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT,"P8 radio recovery log").putExtra(Intent.EXTRA_TEXT,service.p8RecoveryLog());c.startActivity(Intent.createChooser(share,"Share recovery log"));}).setNegativeButton("Close",null).show();break;
             case 7:if(service.isReady()){toast("Hand back first");return;}c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr")));break;
         }
     }).show();}
+    public static void recover(Context c,RadioService service){
+        Toast.makeText(c,"Recovering radio connection…",Toast.LENGTH_SHORT).show();
+        service.p8Recover(message->{
+            android.app.AlertDialog.Builder result=new android.app.AlertDialog.Builder(c).setTitle("Radio recovery").setMessage(message).setNegativeButton("Close",null);
+            if(message.startsWith("Recovered:"))result.setPositiveButton("Open Intercom",(a,b)->com.macdmr.radio.P8MainRadio.restoreIntercom(c));
+            else if(message.contains("Intercom is running"))result.setPositiveButton("Intercom App info",(a,b)->c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr"))));
+            result.show();
+        });
+    }
     private void transmitSettings(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("Analogue transmit")
             .setItems(new String[]{"Allow transmit on selected channel","Make selected channel receive-only","Transmit timeout ("+(service.p8TransmitTimeout()/1000)+" seconds)"},(d,which)->{
                 if(which<2){toast(service.p8ChannelTransmit(which==0));return;}

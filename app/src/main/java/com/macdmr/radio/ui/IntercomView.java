@@ -45,6 +45,37 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     private LinearLayout neoHeader, chipRow;
     private TextView bigNum, smeterText, p8ChannelName;
     private FrameLayout p8MenuSlot;
+    private ImageView p8ConnectionIcon;
+    private com.macdmr.radio.P8ConnectionState p8ConnectionState;
+    private android.app.AlertDialog p8ConnectionDialog;
+    private final android.os.Handler p8StatusUi=new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable p8StatusTick=new Runnable(){public void run(){refreshP8Connection();p8StatusUi.postDelayed(this,500);}};
+    @Override protected void onAttachedToWindow(){super.onAttachedToWindow();if(p8Layout())p8StatusUi.post(p8StatusTick);}
+    @Override protected void onDetachedFromWindow(){p8StatusUi.removeCallbacks(p8StatusTick);if(p8ConnectionDialog!=null)p8ConnectionDialog.dismiss();super.onDetachedFromWindow();}
+    private String p8ConnectionDetails(){
+        if(svc==null)return "Not connected. Open P8 MENU to connect.";
+        String label=svc.p8Recovering()?"Recovering connection":svc.isReady()?"Connected — selected channel tuning acknowledged":"Not connected — "+svc.link();
+        String activity=tx?"Transmitting":receivingNow()?"Receiving":"Idle";
+        return label+"\nActivity: "+activity+"\n\n"+svc.p8Status()+"\n\nReady confirms the connection, not RF performance.\n\n"+historyText.getText();
+    }
+    private void showP8Connection(){
+        android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(getContext()).setTitle("Radio status").setMessage(p8ConnectionDetails()).setPositiveButton("Close",null);
+        if(svc!=null && !svc.isReady())dialog.setNeutralButton("Recover connection",(a,b)->P8RadioControls.recover(getContext(),svc));
+        p8ConnectionDialog=dialog.create();p8ConnectionDialog.show();
+    }
+    private void refreshP8Connection(){
+        if(p8ConnectionIcon==null)return;
+        com.macdmr.radio.P8ConnectionState state=com.macdmr.radio.P8ConnectionState.of(svc!=null && svc.isReady(),svc!=null?svc.link():null,svc!=null && svc.p8Recovering());
+        if(state!=p8ConnectionState){
+            p8ConnectionState=state;boolean ready=state==com.macdmr.radio.P8ConnectionState.READY,busy=state==com.macdmr.radio.P8ConnectionState.CONNECTING;
+            int colour=ready?Neo.GREEN:busy?Neo.AMBER:Neo.RED;
+            p8ConnectionIcon.setImageDrawable(new Neo.IconDrawable(ready?"check":busy?"scan":"alert",colour));
+            p8ConnectionIcon.setBackground(Neo.card(getContext(),colour,12));
+            p8ConnectionIcon.setContentDescription("Radio status: "+(ready?"ready":busy?"connecting or recovering":state==com.macdmr.radio.P8ConnectionState.DISCONNECTED?"not connected":"fault")+". Tap for details");
+        }
+        if(p8ConnectionDialog!=null && p8ConnectionDialog.isShowing())p8ConnectionDialog.setMessage(p8ConnectionDetails());
+    }
+
     private boolean p8Layout(){return neo && com.macdmr.radio.BuildConfig.P8_OFFLINE;}
     private int contentInsetDp(){return p8Layout()?8:16;}
     private TextView[] readLabel;
@@ -94,7 +125,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
 
     /** The activity box's cross: empty its list and hide it; it comes back on the next reception or transmission (Last heard keeps everything). */
     private ImageView restoreBox;
-    private void closePanel() { panelClosed = true; history.clear(); renderHistory(); infoPanel.setVisibility(GONE); restoreBox.setVisibility(VISIBLE); }
+    private void closePanel() { panelClosed = true; history.clear(); renderHistory(); infoPanel.setVisibility(GONE); restoreBox.setVisibility(p8Layout()?GONE:VISIBLE); }
     /** The small button left behind: bring the box back now, with this channel's recent events. */
     private void restorePanel() {
         if (!panelClosed) return;
@@ -280,7 +311,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         }
         LayoutParams btl = new LayoutParams(LayoutParams.MATCH_PARENT, (int) (182 * d)); btl.topMargin = dp4;   // PTT + satellites need 182 dp (classic offsets 4/58/112 dp + 70 dp)
         if(p8Layout()){
-            panelClosed=true;infoPanel.setVisibility(GONE);restoreBox.setVisibility(VISIBLE);
+            panelClosed=true;infoPanel.setVisibility(GONE);restoreBox.setVisibility(GONE);
             restoreBox.setImageDrawable(new Neo.IconDrawable("menu",Neo.CYAN));restoreBox.setContentDescription("Show radio activity");
             LinearLayout shortcuts=new LinearLayout(c);shortcuts.setBaselineAligned(false);
             inlineShortcut(softSq);inlineShortcut(vfo);
@@ -382,6 +413,10 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         menu.setOnClickListener(v -> new android.app.AlertDialog.Builder(c).setItems(new String[] { "Choose zone", "Last heard", "Nets near you", "Map & coverage", "Fox hunt", "Emergency", "Classic intercom look" }, (dd, w) -> {
             if (w == 0) pickZone(); else if (w == 1) { if (svc != null) LastHeardDialog.show(c, svc); } else if (w == 2) NetsDialog.show(c, svc); else if (w == 3) MapDialog.show(c, svc); else if (w == 4) FoxHuntDialog.show(c, svc); else if (w == 5) EmergencyDialog.show(c, svc); else offerLook(false);
         }).show());
+        if(p8Layout()){
+            p8ConnectionIcon=Neo.iconButton(c,"alert",Neo.RED,"Radio status: not connected. Tap for details");
+            p8ConnectionIcon.setOnClickListener(v->showP8Connection());Neo.addAction(neoHeader,p8ConnectionIcon);refreshP8Connection();
+        }
         Neo.addAction(neoHeader, menu);
         addView(neoHeader);
 
@@ -541,6 +576,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     }
 
     private void refreshNeoHeadline() {
+        refreshP8Connection();
         String t; int col;
         if (svc != null && svc.firmwareLoading()) { t = "RADIO BUSY, LOADING FIRMWARE"; col = Neo.AMBER; }
         else if (tx) { t = "TRANSMITTING"; col = Neo.RED; }

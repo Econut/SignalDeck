@@ -871,6 +871,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile boolean p8Recovering;
     private volatile String p8Status="Release Intercom in App info, then Connect";
     public String p8Status(){return p8Status;}
+    public boolean p8Recovering(){return p8Recovering;}
     private java.io.File p8LogDirectory(){java.io.File root=getExternalFilesDir(null);return new java.io.File(root!=null?root:getFilesDir(),"p8-recovery");}
     public String p8RecoveryLog(){try{return P8RecoveryJournal.tail(p8LogDirectory());}catch(Exception e){return "Log read failed: "+e.getMessage();}}
     public void p8Recover(java.util.function.Consumer<String> done){
