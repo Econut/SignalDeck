@@ -328,6 +328,7 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
      * UTF-16LE text. Success/failure comes back as status 8/9.
      */
     public void sendSms(int msgType, int callNumber, int groupNumber, String text) throws IOException {
+        if (agold()) { send(Frame.request(CMD_SEND_SMS, agoldSmsBody(msgType, callNumber, text))); return; }
         byte[] t = text.getBytes(java.nio.charset.StandardCharsets.UTF_16LE);
         // Body: type, callNumber, [second id], UTF-16LE text. The stock app writes the second int only for
         // group texts, but the firmware reads a 9-byte header for private texts too: a private text sent with the
@@ -339,6 +340,17 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
         if (msgType == 3) b.putInt(groupNumber); else if (msgType == 1) b.putInt(callNumber);
         b.put(t);
         send(Frame.request(CMD_SEND_SMS, b.array()));
+    }
+
+    /**
+     * The Agold stock app's text body (ExtModuleProtocol.sendDmr09Msg, for the Atom XL's module): type, the call number
+     * (talkgroup or radio ID) little-endian, the text in UTF-16LE, then four zero bytes; no second ID.
+     */
+    static byte[] agoldSmsBody(int msgType, int callNumber, String text) {
+        byte[] t = text.getBytes(java.nio.charset.StandardCharsets.UTF_16LE);
+        ByteBuffer b = ByteBuffer.allocate(5 + t.length + 4).order(ByteOrder.LITTLE_ENDIAN);
+        b.put((byte) msgType).putInt(callNumber).put(t).putInt(0);
+        return b.array();
     }
 
     public void fetchSms() throws IOException { send(Frame.request(CMD_FETCH_SMS, (byte) 1)); }

@@ -165,6 +165,12 @@ public class AgoldEnvelopeTest {
         assertEquals(0x1B, out[0].body[0] & 0xFF);
     }
 
+    @Test public void agoldTextBodyIsTheStockAppsLayout() {
+        // ExtModuleProtocol.sendDmr09Msg: type, call number LE, UTF-16LE text, four zero bytes
+        assertArrayEquals(hex("03 01 00 00 00 48 00 69 00 00 00 00 00"), RadioEngine.agoldSmsBody(3, 1, "Hi"));
+        assertArrayEquals(hex("01 39 30 00 00 41 00 00 00 00 00"), RadioEngine.agoldSmsBody(1, 12345, "A"));
+    }
+
     @Test public void armorCodecMatchesFrame() {
         FrameCodec codec = FrameCodec.armor();
         Frame f = Frame.request(0x23, (byte) 1, (byte) 2);

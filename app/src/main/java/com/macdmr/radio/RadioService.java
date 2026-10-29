@@ -677,7 +677,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 engine.ptt(true);
                 log("TX " + label + " (" + ms + " ms)");
                 try { Thread.sleep(200); if (audio != null) log(audio.playPcm(pcm)); }
-                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null) audio.startRx(true); }
+                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); }
                 if (ms > ThermalGuard.LONG_MS) history("tx", "\uD83D\uDCFB Long transmission " + Math.round(ms / 1000.0) + " s (" + label + "); " + thermal.state());
                 if (onDone != null) onDone.run();
             } catch (Throwable t) { log("TX " + label + ": " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
@@ -1866,7 +1866,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         short[] id = tc != null && !tc.isDigital() && amateurBand(tc.txFreq) && packet != null && System.currentTimeMillis() - txStartedAt < 25_000 ? packet.cwIdIfDue(System.currentTimeMillis()) : null;
                         if (id != null && audio != null) { log("Morse ID after the transmission"); audio.playPcm(id); history("pkt", "\uD83D\uDD24 Morse ID " + packet.callsign()); }   // the station identification every ten minutes
                     } finally { engine.ptt(false); }
-                    if (rxAudioOn && audio != null) audio.startRx(true);
+                    if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true);
                     if (dataReceive) scheduleDataHold(true);   // the unkey path rewrites the voice filter; put the hold back
                 }
             } catch (Throwable t) { log("ptt: " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
@@ -2387,7 +2387,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         finally {
             if (keyed) { try { engine.ptt(false); } catch (Throwable ignored) { } }
             pttDown = false; thermal.after(ms); refreshControls();
-            if (rxAudioOn && audio != null) audio.startRx(true);
+            if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true);
         }
     }
 
@@ -2464,7 +2464,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         engine.ptt(false);
         log("sym unkey");
     }
-    public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
+    public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
     /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
     public String diagTxWav(java.io.File f) {
         try {
@@ -2707,7 +2707,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 boolean ok = versionHandshake(3000);
                 if (current != null) applyChannelNow(current, current.id > 0);
                 if (monitorOn) { sendMonitor(true); if (promiscuousCapable()) sendPromiscuous(true); }
-                if (rxAudioOn && audio != null) audio.startRx(true);
+                if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true);   // the Atom XL opens its capture per reception
                 setLink("ready");
                 history("warn", ok ? "\u2714 The radio module was restarted and answers again" : "\u26A0 The radio module still does not answer after a restart. Restarting the phone usually fixes this; please send a device report");
         } catch (Throwable t) { log("module restart: " + t); setLink("ready"); }
