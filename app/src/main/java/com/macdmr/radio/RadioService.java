@@ -3815,7 +3815,15 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** The first bench image that clears the module's own receive mute after a symbol key (FW31, phonedmrapp
      *  radio_firmware/reviews.md 2026-10-28): there a channel write would put the mute back, so only the hold is re-sent. */
     static final int SYM_UNMUTE_FW = 31;
-    static boolean rewriteAfterSym(String moduleVersion) { return !(Firmware.stubTag(moduleVersion) && Firmware.tagNumber(moduleVersion) >= SYM_UNMUTE_FW); }
+    /** The first bench image without that clear again (FW37 restores the symbol key's RF_MODE itself, FW38 also WORK_MODE and the
+     *  FM bandwidth): from there the unkey and one channel write are as on FW30 and earlier. On FW38 the FW31-era path (no 0x26 off)
+     *  left the next FM key unanswered for about a minute (bench 2026-10-29 12:00). */
+    static final int SYM_UNMUTE_END_FW = 37;
+    static boolean rewriteAfterSym(String moduleVersion) {
+        if (!Firmware.stubTag(moduleVersion)) return true;
+        int n = Firmware.tagNumber(moduleVersion);
+        return n < SYM_UNMUTE_FW || n >= SYM_UNMUTE_END_FW;
+    }
     private void rxAfterSym() {
         ChannelStore.Channel c = current;
         if (c == null) return;
