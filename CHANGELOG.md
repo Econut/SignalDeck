@@ -10,6 +10,11 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | Atom XL feature sweep (managing agent, 2026-10-29) | The phone hides POCSAG paging on a radio without the HR-C7000 symbol engine (the Atom XL, the W6+), but SignalDeck Web still listed the Pager page, whose Send and Monitor only came back with errors. The web now hides it when the status says `symbolEngine: false`, and an open Pager page goes to the intercom, like Messages and Contacts on a radio without DMR. | `assets/web/app.js` | Host suite. Device: pending (Atom XL web check after Grok's lease). |
+## 2026-10-29 — Atom XL: MON opens the sound on an analog channel without waiting for the reception line
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL feature sweep (managing agent, 2026-10-29) | On the Atom XL the capture opens when the bridge's reception line reports a reception. In some sessions the line stays in its power-up state and reports nothing (03:18 on the bench: one power-up byte, then no edge through MON, a channel rewrite or MON off/on), so MON gave no sound on the phone and SignalDeck Web's LISTEN sent 0 bytes. MON on an analog channel now opens the reception itself; an edge that comes meanwhile is merged, the signal watchdog does not end it, and MON off ends it when the line never reported one. DMR channels are unchanged (MON there admits calls, it opens no audio). Help (Unihertz Atom XL) says so. | `RadioService.java`, `ui/HelpView.java` | Host suite. Device (Atom XL, stuck-line session): see the PR. |
 
 ## 2026-10-29 — Atom XL: its own help section, no firmware loader, boot and long-receive checks
 
