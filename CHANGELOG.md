@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: a reception found from the signal reading ends again on a noisier channel
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture-stall investigation (managing agent, 2026-10-29) | When the radio's reception line is stuck, the Atom XL finds receptions from the signal reading: one starts above -95 dBm and ended only below -100 dBm. With a charger on the USB socket the bench channel idled at -98 dBm (-101 to -103 without it), so a reception that started never ended: SignalDeck showed it receiving for ten minutes with no sound and no further receptions. The thresholds now follow the channel's idle floor (a slow mean of the readings while nothing is received): start above the higher of -95 dBm and floor + 6 dB, end below the higher of -100 dBm and floor + 2 dB; a quiet channel keeps the old values. | `AgoldUsb`, `RadioService` | Host: `AgoldUsbTest.theReceptionWatchdogFollowsTheIdleFloor`; full suite 506 / 0. Device: pending (needs a stuck line and the HackRF) |
+
 ## 2026-10-29 — APRS decoding uses about half the processor time on a quiet channel
 
 | Backlog | Change | Files | Test |
