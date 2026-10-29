@@ -455,11 +455,15 @@ public class RadioService extends Service implements RadioEngine.Events {
     // wait and the decoders are plain threads and timers, which stop in deep sleep (screen off in the car). Until
     // 2026-10-20 the phone only stayed awake by accident, through the audio mixer's wake lock while RX audio played.
     private android.os.PowerManager.WakeLock modeWake;
+    // On the Atom XL the CPU is kept awake while SignalDeck owns the radio: with the reception line stuck, receptions come
+    // from timed signal readings, which stop in deep sleep (2026-10-29: a 10 s timer ran 5 minutes late with the screen
+    // off, and 6 of 10 test transmissions were never heard).
     void updateModeWake() {
-        boolean want = packetActive() || satState != null;
+        boolean owned = agoldBridge() && isReady();
+        boolean want = packetActive() || satState != null || owned;
         try {
             if (modeWake == null) { android.os.PowerManager pm = (android.os.PowerManager) getSystemService(POWER_SERVICE); modeWake = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "signaldeck:mode"); modeWake.setReferenceCounted(false); }
-            if (want && !modeWake.isHeld()) { modeWake.acquire(); log("wake lock on (a mode is running)"); exemptFromDoze(); }
+            if (want && !modeWake.isHeld()) { modeWake.acquire(); log(owned ? "wake lock on (the radio is owned)" : "wake lock on (a mode is running)"); exemptFromDoze(); }
             else if (!want && modeWake.isHeld()) { modeWake.release(); log("wake lock off"); }
         } catch (Throwable t) { log("wake lock: " + t); }
     }
@@ -2614,7 +2618,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void noChannel() { ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onNoChannel(); }); }
     private final Runnable channelsChanged = () -> { for (Listener l : new ArrayList<>(listeners)) l.onChannels(); };
 
-    private void setLink(String s) { link = s; ui.post(() -> { for (Listener l : listeners) l.onLink(s); }); updateNotification(); }
+    private void setLink(String s) { link = s; ui.post(() -> { for (Listener l : listeners) l.onLink(s); updateModeWake(); }); updateNotification(); }
 
     private volatile long softOpenAt;
     private long lastSqDiag;
