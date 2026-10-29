@@ -901,7 +901,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
                 final boolean sa818 = "sa818".equals(profile.protocol);                      // the W6: no DMR, its own channel table
                 final boolean quickChat = "com.chamsion.quickchat".equals(profile.stockApp);      // Xplore 1: a Room database, no module side tables
-                final boolean prizeStock = !sa818 && !quickChat && !agold;                        // the Armors' stock app: DMR ID and TG lists to read
+                final boolean prizeStock = !sa818 && !quickChat && !agold && !flyscaleDmr();                        // the Armors' stock app: DMR ID and TG lists to read
                 if (store.count() == 0 && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("stockImportDeclined", false)) {   // no channels: ask before importing the stock app's (owner, 2026-10-28)
                     stockImportPending = true; log("no channels: asking whether to import the stock app's");
                     ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onStockImportOffer(); });
@@ -1047,7 +1047,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         try {
             if (audio == null) {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
-                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback) : vendorOrDirectAudio();
+                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback, profile.camcorderGain) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
                 audio.setGate(() -> squelchOpen && !muted && !rawHeld() && !(profile.appPlayback && pttDown) && !dataQuiet());   // M17 in play, a data mode without MON, or app playback while keyed: the raw FM stays off the speaker; decoded M17 voice has its own track
             }
@@ -1834,7 +1834,9 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     public String reimportFromStock() { return reimportFromStock("default_uhf"); }
     /** The stock app keeps its channels in areas (the DMR phones' app); the W6's and the Xplore 1's have one list. */
-    public boolean stockHasAreas() { return !"sa818".equals(profile.protocol) && !"com.chamsion.quickchat".equals(profile.stockApp); }
+    public boolean stockHasAreas() { return !"sa818".equals(profile.protocol) && !"com.chamsion.quickchat".equals(profile.stockApp) && !flyscaleDmr(); }
+    /** The W6Plus DMR's stock app: one channel database (128 slots), the DMR ID in its in-use slot. */
+    private boolean flyscaleDmr() { return "com.flyscale.dmr".equals(profile.stockApp); }
     /** The Atom XL's stock app has channels only (no contacts, history or messages SignalDeck imports). */
     public boolean stockImportsChannelsOnly() { return "agold".equals(profile.protocol); }
     /** The area the Atom XL's stock app is on (its curr_area setting, 1 when unset). */
@@ -1847,6 +1849,12 @@ public class RadioService extends Service implements RadioEngine.Events {
         StringBuilder err = new StringBuilder(); int n;
         if ("sa818".equals(profile.protocol)) n = store.importFromFlyscale(this, profile.stockApp, err);
         else if ("com.chamsion.quickchat".equals(profile.stockApp)) n = store.importFromQuickChat(this, profile.stockApp, err);
+        else if (flyscaleDmr()) {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("name=\"channel_index\" value=\"([0-9]+)\"").matcher(RootSetup.run("cat /data/data/" + profile.stockApp + "/shared_prefs/config.xml 2>/dev/null"));
+            int[] id = new int[1];
+            n = store.importFromFlyscaleDmr(this, profile.stockApp, m.find() ? Integer.parseInt(m.group(1)) : 0, id, err);
+            if (n >= 0 && id[0] > 0 && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) { setLocalIdQuiet(id[0]); log("DMR ID from the stock app: " + id[0]); }
+        }
         else if ("agold".equals(profile.protocol)) {                     // areaKey "3 USA FRS (14 channels)", or null for the stock app's current area
             java.util.regex.Matcher m = areaKey == null ? null : java.util.regex.Pattern.compile("^(\\d+)").matcher(areaKey.trim());
             n = store.importFromAgold(this, profile.stockApp, m != null && m.find() ? Integer.parseInt(m.group(1)) : agoldCurrentArea(), err);

@@ -39,6 +39,7 @@ public class DeviceProfileTest {
         assertFalse(p.tunable(146_520_000L)); assertFalse(p.tunable(480_005_000L));
         assertEquals(DeviceProfile.Audio.CAMCORDER, p.audio);
         assertTrue(p.appPlayback);
+        assertEquals(4, p.camcorderGain); assertEquals(12, DeviceProfile.ANYSECU_W6.camcorderGain); assertEquals(4, p.copy(true, false).camcorderGain);
         assertNotNull(p.rxLinesOn); assertNotNull(p.txLinesOn);
         assertEquals("/sys/class/gpio/gpio188/value", p.txLinesOn[p.txLinesOn.length - 1][0]);   // the PTT line goes last
         for (String[][] ls : new String[][][] { p.rxLinesOn, p.rxLinesOff, p.txLinesOn, p.txLinesOff, p.muteLines })

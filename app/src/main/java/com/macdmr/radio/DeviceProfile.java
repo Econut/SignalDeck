@@ -86,6 +86,8 @@ public final class DeviceProfile {
      * is off. The W6Plus DMR's module is outside the loader safety contract (no dmr009 knock, an undiffed image).
      */
     public boolean moduleLoader = true;
+    /** Audio.CAMCORDER: the fixed gain on the camcorder input (the W6+'s module is ~21 dB quieter than the W6Plus DMR's). */
+    public int camcorderGain = 12;
     /** sa818: the module's receive line, a GPIO input that reads 1 while the squelch is open (null = none). */
     public String rxDetectNode;
     /** sa818: {node, value} written in order when reception starts / ends and when the transmitter keys / unkeys (the stock app's audio and PTT lines). */
@@ -273,8 +275,17 @@ public final class DeviceProfile {
             null, true, false);
     static {
         ANYSECU_W6_DMR.id = "anysecu-w6plus-dmr"; ANYSECU_W6_DMR.revision = 1;
+        // 0x23 writes 2026-10-29 (nothing keyed): 400.000-480.000 acknowledged; 399.995, 395, 136 and 174 MHz never answered
+        // (UHF only, whatever "dual band" in the listing means); 480.005 and 485 acknowledged too, receive there unmeasured,
+        // so the band stays the stock app's 400.000-480.000.
         ANYSECU_W6_DMR.bandsHz = new long[] { 400_000_000L, 480_000_000L };
         ANYSECU_W6_DMR.appPlayback = true; ANYSECU_W6_DMR.moduleLoader = false;
+        // HackRF on 446.000 MHz, 2026-10-29: a 1 kHz tone at 2.5 kHz deviation reaches the camcorder input at -32 dBFS (module
+        // volume 8), 12 dB louder than the W6+'s; gain 4 puts it at about -20 dBFS and static near the Armor's scale for the
+        // noise squelch: static (smoothed high band 128-231) never opens, speech low-passed at 3 kHz like a transmitter's
+        // (2.5-6.7) opens at every level, so the built-in Soft SQ table stands. 62.5 Hz CTCSS arrives ~40 dB down, 44 dB
+        // above the floor, like the Armor's.
+        ANYSECU_W6_DMR.camcorderGain = 4;
         // the stock app's startGroup / stopGroup (the W6+'s receive lines) and startSpeaker / stopSpeaker (mic, built-in mic, PTT)
         ANYSECU_W6_DMR.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
         ANYSECU_W6_DMR.muteLines = new String[][] { { "/sys/class/gpio/gpio183/value", "0" } };
@@ -391,7 +402,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.moduleLoader = moduleLoader; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.moduleLoader = moduleLoader; p.camcorderGain = camcorderGain; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -412,7 +423,7 @@ public final class DeviceProfile {
             for (int i = 0; i < bands.length(); i++) p.bandsHz[i] = bands.getLong(i);
             for (int i = 0; i < bands.length(); i += 2) if (p.bandsHz[i] >= p.bandsHz[i + 1]) throw new org.json.JSONException("bandsHz: low below high");
         }
-        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false); p.appPlayback = o.optBoolean("appPlayback", false); p.subaudible = o.optBoolean("subaudible", true); p.dataSquelch = Math.max(0, Math.min(8, o.optInt("dataSquelch", 0))); p.moduleLoader = o.optBoolean("moduleLoader", true);
+        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false); p.appPlayback = o.optBoolean("appPlayback", false); p.subaudible = o.optBoolean("subaudible", true); p.dataSquelch = Math.max(0, Math.min(8, o.optInt("dataSquelch", 0))); p.moduleLoader = o.optBoolean("moduleLoader", true); p.camcorderGain = Math.max(1, Math.min(32, o.optInt("camcorderGain", 12)));
         org.json.JSONArray sst = o.optJSONArray("softSqThresholds");
         if (sst != null && sst.length() == 9) { p.softSqThresholds = new double[9]; for (int i = 0; i < 9; i++) p.softSqThresholds[i] = sst.optDouble(i, 0); p.softSqCloseCap = o.optDouble("softSqCloseCap", 0); } p.fixedModuleVolume = Math.max(1, Math.min(8, o.optInt("fixedModuleVolume", 4)));
         p.rxLinesOn = pairs(o.optJSONArray("rxLinesOn")); p.rxLinesOff = pairs(o.optJSONArray("rxLinesOff")); p.muteLines = pairs(o.optJSONArray("muteLines"));

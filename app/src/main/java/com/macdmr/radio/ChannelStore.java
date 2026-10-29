@@ -903,6 +903,90 @@ public final class ChannelStore extends SQLiteOpenHelper {
         } catch (RuntimeException e) { return null; }
     }
 
+    /**
+     * The W6Plus DMR's stock app (com.flyscale.dmr): channel_list_detial.db holds 128 slots, each with an analog row
+     * (ANALOG_CHANNEL_INFO) and a digital row (DIGITAL_CHANNEL_INFO) and a CHANNEL_LIST type saying which one the slot
+     * uses (1 analog, 0 digital, the module's own). The rows keep the module's bytes as hex strings, the same layout as
+     * the 0x23 and 0x22 bodies; channel_index in its config.xml is the slot in use. Returns the count, or -1.
+     * {@code dmrIdOut[0]} gets the in-use slot's DMR ID (0 when there is none).
+     */
+    public int importFromFlyscaleDmr(Context ctx, String stockPackage, int activeSlot, int[] dmrIdOut, StringBuilder err) {
+        SQLiteDatabase sdb = copyRoom(ctx, stockPackage, new String[] { "channel_list_detial.db" }, "fsd_channels.db");
+        if (sdb == null) { err.append("stock channels not readable: ").append(RootSetup.run("ls /data/data/" + stockPackage + "/databases/ 2>&1 | head -8")); return -1; }
+        int n = 0;
+        java.util.Map<Integer, Integer> types = new java.util.TreeMap<>();
+        java.util.Map<Integer, java.util.Map<String, String>> analog = new java.util.HashMap<>(), digital = new java.util.HashMap<>();
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            try (Cursor c = sdb.query("CHANNEL_LIST", null, null, null, null, null, "CHANNEL_ID")) { while (c.moveToNext()) types.put(coli(c, "CHANNEL_ID", -1), coli(c, "CHANNEL_TYPE", 1)); }
+            for (String[] t : new String[][] { { "ANALOG_CHANNEL_INFO", "CHANNEL_ID" }, { "DIGITAL_CHANNEL_INFO", "ID" } })
+                try (Cursor c = sdb.query(t[0], null, null, null, null, null, t[1])) {
+                    while (c.moveToNext()) {
+                        java.util.Map<String, String> r = new java.util.HashMap<>();
+                        for (int i = 0; i < c.getColumnCount(); i++) r.put(c.getColumnName(i), c.isNull(i) ? null : c.getString(i));
+                        (t[0].startsWith("ANALOG") ? analog : digital).put(coli(c, t[1], -1), r);
+                    }
+                }
+            db.delete("channels", null, null);
+            for (java.util.Map.Entry<Integer, Integer> e : types.entrySet()) {
+                int slot = e.getKey();
+                Channel ch = flyscaleDmrChannel(slot, e.getValue(), analog.get(slot), digital.get(slot));
+                if (ch == null) continue;
+                ch.number = ++n; ch.active = slot == activeSlot;
+                if (ch.active && dmrIdOut != null && dmrIdOut.length > 0) { java.util.Map<String, String> d = digital.get(slot); dmrIdOut[0] = d == null ? 0 : leInt(d.get("LOCAL_ID")); }
+                db.insert("channels", null, values(ch));
+            }
+            db.setTransactionSuccessful();
+        } catch (Throwable t) { err.append("channels: ").append(t.getMessage()); n = -1; }
+        finally { db.endTransaction(); sdb.close(); }
+        changed();
+        return n;
+    }
+
+    /**
+     * One slot of the W6Plus DMR's stock app as a SignalDeck channel: type 0 takes the digital row, else the analog row;
+     * frequencies are MHz text, the rest the module's bytes in hex (sub-audio 0 none, 1 CTCSS, 2/3 DCS; encryption 1 on,
+     * 2 off; relay 2 normal); the DMR ID, the call number and the 32 receive talkgroups are little-endian 32-bit hex.
+     * Null when the row is missing or its frequency does not parse.
+     */
+    static Channel flyscaleDmrChannel(int slot, int type, java.util.Map<String, String> a, java.util.Map<String, String> d) {
+        java.util.Map<String, String> r = type == 0 ? d : a;
+        if (r == null || r.get("RX_FREQ") == null) return null;
+        try {
+            Channel ch = new Channel();
+            ch.name = "CH " + (slot + 1);
+            ch.rxFreq = (int) Math.round(Double.parseDouble(r.get("RX_FREQ").trim()) * 1e6);
+            String tx = r.get("TX_FREQ");
+            ch.txFreq = tx == null || tx.trim().isEmpty() ? ch.rxFreq : (int) Math.round(Double.parseDouble(tx.trim()) * 1e6);
+            if (ch.rxFreq <= 0) return null;
+            ch.power = hx(r.get("POWER"), 1); ch.relay = hx(r.get("RELAY"), 2); if (ch.relay == 0) ch.relay = 2;
+            if (type == 0) {
+                ch.type = Channel.TYPE_DMR;
+                ch.cc = hx(r.get("CC"), 1); ch.inSlot = hx(r.get("INBOUND_SLOT"), 0); ch.outSlot = hx(r.get("OUTBOUND_SLOT"), 0);
+                ch.mode = hx(r.get("CHANNEL_MODE"), 0); ch.contactType = hx(r.get("CONTACT_TYPE"), 1); ch.txContact = leInt(r.get("TX_CONTACT"));
+                ch.encryptSw = hx(r.get("ENCRYPT_SW"), 2) == 1 ? 1 : 2; ch.encryptKey = r.get("ENCRYPT_KEY") == null ? "" : r.get("ENCRYPT_KEY");
+                List<Integer> gl = new ArrayList<>();
+                String g = r.get("GROUP_LIST");
+                if (g != null) for (int i = 0; i + 8 <= g.length() && gl.size() < 32; i += 8) { int v = leInt(g.substring(i, i + 8)); if (v > 0 && !gl.contains(v)) gl.add(v); }
+                ch.groups = new int[gl.size()]; for (int i = 0; i < gl.size(); i++) ch.groups[i] = gl.get(i);
+            } else {
+                ch.type = Channel.TYPE_FM;
+                ch.band = hx(r.get("BAND"), 1); ch.sq = Math.max(0, Math.min(9, hx(r.get("SQ"), 2)));
+                ch.rxType = hx(r.get("RX_TYPE"), 0); ch.rxSubCode = ch.rxType == 0 ? 0 : hx(r.get("RX_SUBCODE"), 0);
+                ch.txType = hx(r.get("TX_TYPE"), 0); ch.txSubCode = ch.txType == 0 ? 0 : hx(r.get("TX_SUBCODE"), 0);
+            }
+            return ch;
+        } catch (RuntimeException e) { return null; }
+    }
+    private static int hx(String s, int d) { if (s == null || s.trim().isEmpty()) return d; try { return Integer.parseInt(s.trim(), 16); } catch (NumberFormatException e) { return d; } }
+    /** Little-endian 32-bit hex ("01000000" = 1), 0 when it does not parse. */
+    static int leInt(String s) {
+        if (s == null || s.trim().length() != 8) return 0;
+        try { long v = Long.parseLong(s.trim(), 16); return (int) (((v & 0xFF) << 24) | ((v & 0xFF00) << 8) | ((v >> 8) & 0xFF00) | ((v >> 24) & 0xFF)); }
+        catch (NumberFormatException e) { return 0; }
+    }
+
     public int importFromQuickChat(Context ctx, String stockPackage, StringBuilder err) {
         SQLiteDatabase sdb = copyRoom(ctx, stockPackage, new String[] { "channel_database", "channel.db" }, "qc_channels.db");
         if (sdb == null) { err.append("QuickChat channels not readable: ").append(RootSetup.run("ls /data/data/" + stockPackage + "/databases/ 2>&1 | head -8")); return -1; }
