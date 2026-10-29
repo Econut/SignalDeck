@@ -57,6 +57,7 @@ public final class DiagReceiver extends BroadcastReceiver {
                 break;
             }
             case "checks": FirstRunCheck.benchRun(c.getApplicationContext(), s, i.getStringExtra("watch"), i.getBooleanExtra("trial", false), i.getLongExtra("hosttime", 0)); break;   // bench: Run all checks with no screen (--es watch auto|none|<pkg>, --ez trial, --el hosttime ms); scripts/w6/run_checks.sh
+            case "reimport": { final String area = i.getStringExtra("area"); new Thread(() -> android.util.Log.i("SignalDeck", "reimport: " + s.reimportFromStock(area)), "diag-reimport").start(); break; }   // bench: Device → Re-import without the dialog (--es area "3 …"; none = the default/current area). Replaces the channel list
             case "audioprobe": { final int ms = i.getIntExtra("ms", 2000); final double hz = i.getIntExtra("hz", 1000); final String tag = String.valueOf(i.getStringExtra("tag"));   // bench: does the receive audio reach Android's recorder? one line per source to the log
                 new Thread(() -> { for (String l : AudioSourceProbe.run(ms, hz).split("\n")) Log.i("AudioProbe", tag + " " + l); Log.i("AudioProbe", tag + " done"); }, "audioprobe").start(); break; }
             case "reportzip": new Thread(() -> { try { Log.i("DiagReceiver", "reportzip: " + DeviceReport.zipNewest(c, false, false)); } catch (Throwable t) { Log.w("DiagReceiver", "reportzip: " + t); } }, "diag-zip").start(); break;   // bench: the summary + zip

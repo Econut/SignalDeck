@@ -958,6 +958,89 @@ public final class ChannelStore extends SQLiteOpenHelper {
         return n;
     }
 
+    /**
+     * The Unihertz Atom XL's stock app (com.agold.intercom): intercom.db, table channel, one row per channel with its area
+     * (1 = "Default", the others regional FRS/PMR lists). Replaces SignalDeck's channels with one area's.
+     */
+    public int importFromAgold(Context ctx, String stockPackage, int area, StringBuilder err) {
+        SQLiteDatabase sdb = copyStock(ctx, stockPackage, "intercom.db", "agold_intercom.db");
+        if (sdb == null) { err.append("the stock app's channels are not readable: ").append(RootSetup.run("ls /data/data/" + stockPackage + "/databases/ 2>&1 | head -4")); return -1; }
+        String areaName = null;
+        try (Cursor a = sdb.rawQuery("SELECT name FROM area WHERE num=?", new String[] { String.valueOf(area) })) { if (a.moveToFirst()) areaName = a.getString(0); } catch (Throwable ignored) { }
+        int n = 0;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try (Cursor c = sdb.rawQuery("SELECT * FROM channel WHERE area=? ORDER BY num, _id", new String[] { String.valueOf(area) })) {
+            db.delete("channels", null, null);
+            while (c.moveToNext()) {
+                java.util.Map<String, String> row = new java.util.HashMap<>();
+                for (int i = 0; i < c.getColumnCount(); i++) row.put(c.getColumnName(i), c.isNull(i) ? null : c.getString(i));
+                Channel ch = agoldChannel(row, ++n, areaName);
+                if (ch == null) { n--; continue; }
+                ch.active = n == 1;
+                db.insert("channels", null, values(ch));
+            }
+            db.setTransactionSuccessful();
+        } catch (Throwable t) { err.append("channels: ").append(t.getMessage()); n = -1; }
+        finally { db.endTransaction(); sdb.close(); }
+        if (n == 0) err.append("area ").append(area).append(" has no channels");
+        changed();
+        return n;
+    }
+
+    /**
+     * One row of the Atom XL stock app's channel table as a SignalDeck channel, with the stock app's own encoding
+     * (ExtModuleProtocol.setDmr09AnalogGroup / setDmr09DigitalGroup): type 0 DMR, 1 analog; band 128 = wide; sub-audio
+     * type stored +1 (1 = none); contactType stored +1 (2 = group, 1 = private, 4 = all call, sent as 0xFFFFFA); contactList
+     * "tg:tg:…"; encryptSwitch 1 = on. Null when the row has no usable frequency.
+     */
+    static Channel agoldChannel(java.util.Map<String, String> r, int number, String areaName) {
+        int rx = agoldInt(r.get("recvfreq"), 0), tx = agoldInt(r.get("sendfreq"), rx);
+        if (rx <= 0) return null;
+        Channel ch = new Channel();
+        ch.number = number;
+        ch.type = agoldInt(r.get("type"), 1) == 0 ? Channel.TYPE_DMR : 1;
+        ch.rxFreq = rx; ch.txFreq = tx > 0 ? tx : rx;
+        ch.power = agoldInt(r.get("power"), 1);
+        String name = r.get("name");
+        ch.name = name != null && !name.trim().isEmpty() ? name.trim() : (areaName != null && !areaName.trim().isEmpty() ? areaName.trim() : "Channel") + " " + agoldInt(r.get("num"), number);
+        if (ch.type == Channel.TYPE_DMR) {
+            ch.cc = agoldInt(r.get("colorCode"), 1);
+            ch.inSlot = agoldInt(r.get("inboundSlot"), 0); ch.outSlot = agoldInt(r.get("outboundSlot"), 0);
+            ch.mode = agoldInt(r.get("channelMode"), 0);
+            int ct = agoldInt(r.get("contactType"), 2), num = agoldInt(r.get("contactNum"), 1);
+            ch.contactType = Math.max(0, ct - 1);
+            ch.txContact = ct == 4 ? 0xFFFFFA : num;
+            ch.encryptSw = agoldInt(r.get("encryptSwitch"), 2) == 1 ? 1 : 2;
+            List<Integer> gl = new ArrayList<>();
+            String list = r.get("contactList");
+            if (list != null) for (String s : list.split(":")) { int v = agoldInt(s, 0); if (v > 0 && !gl.contains(v) && gl.size() < 32) gl.add(v); }
+            else if (ct == 2 && num > 0) gl.add(num);
+            ch.groups = new int[gl.size()]; for (int i = 0; i < gl.size(); i++) ch.groups[i] = gl.get(i);
+        } else {
+            ch.band = agoldInt(r.get("band"), 128) == 128 ? 1 : 0;
+            ch.sq = agoldInt(r.get("squelchLevel"), 2);
+            ch.rxType = Math.max(0, agoldInt(r.get("recvSubAudioType"), 1) - 1);
+            ch.rxSubCode = ch.rxType == 0 ? 0 : agoldInt(r.get("recvCtcssFreq"), 0);
+            ch.txType = Math.max(0, agoldInt(r.get("sendAubAudioType"), 1) - 1);
+            ch.txSubCode = ch.txType == 0 ? 0 : agoldInt(r.get("sendCtcssFreq"), 0);
+        }
+        return ch;
+    }
+    private static int agoldInt(String s, int d) { if (s == null) return d; try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return d; } }
+
+    /** The Atom XL stock app's areas ("num name"), or empty when its database is not readable. */
+    public static List<String> agoldAreas(Context ctx, String stockPackage) {
+        List<String> out = new ArrayList<>();
+        SQLiteDatabase sdb = copyStock(ctx, stockPackage, "intercom.db", "agold_intercom.db");
+        if (sdb == null) return out;
+        try (Cursor c = sdb.rawQuery("SELECT a.num, a.name, COUNT(c._id) FROM area a LEFT JOIN channel c ON c.area = a.num GROUP BY a.num ORDER BY a.num", null)) {
+            while (c.moveToNext()) out.add(c.getInt(0) + " " + (c.isNull(1) ? "" : c.getString(1)) + " (" + c.getInt(2) + " channels)");
+        } catch (Throwable ignored) { }
+        finally { sdb.close(); }
+        return out;
+    }
+
     /** Copy the first Room database found (with its -wal/-shm) into the cache and open the copy. */
     private static SQLiteDatabase copyRoom(Context ctx, String stockPackage, String[] names, String localName) {
         File dst = new File(ctx.getCacheDir(), localName);

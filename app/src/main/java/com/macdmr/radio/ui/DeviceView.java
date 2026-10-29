@@ -365,8 +365,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         new Thread(() -> {
             final java.util.List<String> areas = svc.stockAreas();
             post(() -> {
-                String[] names = new String[areas.size()]; for (int i = 0; i < names.length; i++) names[i] = areas.get(i).replace('_', ' ').toUpperCase(java.util.Locale.US);
-                new android.app.AlertDialog.Builder(c).setTitle("Import which stock area?").setItems(names, (d1, w1) -> new android.app.AlertDialog.Builder(c).setTitle("Re-import " + names[w1] + "?").setMessage("Replaces all channels, contacts, history and messages in this app with that area's current data from the stock app.")
+                String[] names = new String[areas.size()]; for (int i = 0; i < names.length; i++) names[i] = svc.stockImportsChannelsOnly() ? areas.get(i) : areas.get(i).replace('_', ' ').toUpperCase(java.util.Locale.US);
+                new android.app.AlertDialog.Builder(c).setTitle("Import which stock area?").setItems(names, (d1, w1) -> new android.app.AlertDialog.Builder(c).setTitle("Re-import " + names[w1] + "?").setMessage(svc.stockImportsChannelsOnly() ? "Replaces all channels in SignalDeck with that area's channels from the stock app." : "Replaces all channels, contacts, history and messages in this app with that area's current data from the stock app.")
                         .setPositiveButton("Import", (dd, w) -> new Thread(() -> { final String r = svc.reimportFromStock(areas.get(w1)); post(() -> android.widget.Toast.makeText(c, r, android.widget.Toast.LENGTH_LONG).show()); }).start()).setNegativeButton("Cancel", null).show()).show();
             });
         }).start();
