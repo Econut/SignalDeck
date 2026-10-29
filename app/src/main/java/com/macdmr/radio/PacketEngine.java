@@ -839,22 +839,42 @@ public final class PacketEngine {
                 sstv.processAudio(sstvBytes, n * 2);
             }
             if (!sstvRx && (monitor || kiss.isActive() || terminalActive() || finderTap != null || (passiveWanted() && !weatherBand))) {
-                for (int i = 0; i + 1 < n && fill < WINDOW; i += 2) window[fill++] = (short) ((mono[i] & 0xFF) | (mono[i + 1] << 8));
-                if (fill >= WINDOW) {
-                    long now = System.currentTimeMillis();
-                    if (now - lastWindowMs > 5000) overlapTail = null;
-                    lastWindowMs = now;
-                    short[] tail = overlapTail; int tl = tail == null ? 0 : tail.length;
-                    final short[] samples = new short[tl + WINDOW];
-                    if (tl > 0) System.arraycopy(tail, 0, samples, 0, tl);
-                    System.arraycopy(window, 0, samples, tl, WINDOW);
-                    overlapTail = Arrays.copyOfRange(window, WINDOW - OVERLAP, WINDOW);
-                    fill = 0;
-                    final boolean hasTail = tl > 0;
-                    decoder.execute(() -> decodeWindow(samples, hasTail));
+                synchronized (window) {
+                    for (int i = 0; i + 1 < n && fill < WINDOW; i += 2) window[fill++] = (short) ((mono[i] & 0xFF) | (mono[i + 1] << 8));
+                    if (fill >= WINDOW) dispatchWindow();
                 }
             }
         } catch (Throwable t) { Log.w(TAG, "feed: " + t); }
+    }
+
+    /** Hands the full window (with the last window's overlap in front) to the decoder thread. Holds the window lock. */
+    private void dispatchWindow() {
+        long now = System.currentTimeMillis();
+        if (now - lastWindowMs > 5000) overlapTail = null;
+        lastWindowMs = now;
+        short[] tail = overlapTail; int tl = tail == null ? 0 : tail.length;
+        final short[] samples = new short[tl + WINDOW];
+        if (tl > 0) System.arraycopy(tail, 0, samples, 0, tl);
+        System.arraycopy(window, 0, samples, tl, WINDOW);
+        overlapTail = Arrays.copyOfRange(window, WINDOW - OVERLAP, WINDOW);
+        fill = 0;
+        final boolean hasTail = tl > 0;
+        decoder.execute(() -> decodeWindow(samples, hasTail));
+    }
+
+    /**
+     * The audio stream ended (a phone whose capture runs only during a reception, the Atom XL): decode the part-filled
+     * window now, padded with silence. Without it the end of a reception, where an APRS packet sits, waited for the next
+     * reception to fill the window, and a gap over 5 s dropped the overlap that held a split frame (2026-10-29).
+     */
+    public void streamEnded() {
+        synchronized (window) {
+            if (fill == 0) return;
+            Arrays.fill(window, fill, WINDOW, (short) 0);
+            fill = WINDOW;
+            dispatchWindow();
+            overlapTail = null;                                              // the next reception starts a fresh stream
+        }
     }
 
     /** The AFSK decoder works at 48 kHz: 6x linear upsample of the 8 kHz window. */

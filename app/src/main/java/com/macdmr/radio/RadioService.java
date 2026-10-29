@@ -860,6 +860,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         final boolean agold = "agold".equals(profile.protocol);                          // the Atom XL: the radio behind a USB bridge
         if (agold && "ready".equals(link)) { log("bring-up skipped: the radio is already up (a second one would power-cycle the USB bridge)"); return; }
         if (!bringUpRunning.compareAndSet(false, true)) { log("bring-up skipped: one is already running"); return; }
+        exiting = false;                                                // a bring-up wants the radio: an earlier Exit no longer blocks bridge recovery
         new Thread(() -> {
             boolean pausedStock = false;
             try {
@@ -2627,12 +2628,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                     lastCaller = 0; callLogged = false;
                     if (!agoldBridge()) for (long ms : new long[] { 300, 1200 }) ui.postDelayed(() -> { if (receiving) worker.execute(() -> { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }); }, ms);
                 }
-                bridgeCapture(true);
+                bridgeReception(true);
                 refreshControls(); rxStart = System.currentTimeMillis(); rxCounts = rxReportsReception(); softSq.rxStarted(); ui.post(() -> { for (Listener l : listeners) l.onRx(true); }); pollRssi(); break;
             case 2: {
                 synthRx = false;
                 dmrEvent("stop", 0, 0, 0);
-                receiving = false; bridgeCapture(false); refreshControls(); long len = rxStart > 0 ? System.currentTimeMillis() - rxStart : 0; rxStart = 0;
+                receiving = false; bridgeReception(false); refreshControls(); long len = rxStart > 0 ? System.currentTimeMillis() - rxStart : 0; rxStart = 0;
                 if (softSq.isEnabled() && squelchOpen) { softSq.closeNow(); softGateHistory(false); squelchOpen = false; log("soft squelch closed (carrier gone)"); }
                 softSq.awaitRxStart();                                   // with the module squelch held open a RECEIVE_STOP only happens while the receiver re-settles
                 if (current != null && current.isDigital() && !agoldBridge()) { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }   // who was that (0x2B); the Atom XL asks after its capture closes
@@ -2668,11 +2669,31 @@ public class RadioService extends Service implements RadioEngine.Events {
             try {
                 // while the bridge streams audio it cuts every frame on the port after 12 bytes (measured 2026-10-28), so
                 // the caller (a 20-byte 0x2B reply) is asked before the capture opens and after it closes, as the stock app does
-                if (on) { if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); }
-                    if (a != null) { String r = a.startRx(true); log(r); if (r != null && r.contains("no audio block yet")) recoverBridgeAudio("the USB capture delivered nothing"); } }
-                else { if (a != null) a.stopRx(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
+                if (on) {
+                    // analog, still open from the last reception's tail: keep it running (a quick reopen can come back empty)
+                    if (!dmr && a != null && ((AlsaDirectAudio) a).capturing()) return;
+                    if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); }
+                    if (a != null) {
+                        String r = a.startRx(true); log(r);
+                        if (r != null && r.contains("no audio block yet")) recoverBridgeAudio("the USB capture delivered nothing");
+                    } }
+                else { if (a != null) a.stopRx(); if (packet != null && !dmr) packet.streamEnded(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
             } catch (Throwable t) { log("bridge capture: " + t); }
         });
+    }
+
+    /**
+     * The Atom XL's capture holds up to half a second of audio behind the radio (16 periods of 32 ms), and an APRS packet
+     * sits at the end of its transmission: closing at the module's reception end dropped the packet (2026-10-28). So the
+     * close waits this long, and a reception that starts meanwhile cancels it.
+     */
+    static final long BRIDGE_TAIL_MS = 700;
+    private final java.util.concurrent.atomic.AtomicInteger captureGen = new java.util.concurrent.atomic.AtomicInteger();
+    private void bridgeReception(boolean on) {
+        if (!agoldBridge()) return;
+        final int g = captureGen.incrementAndGet();
+        if (on) { bridgeCapture(true); return; }
+        ui.postDelayed(() -> { if (captureGen.get() == g) bridgeCapture(false); }, BRIDGE_TAIL_MS);
     }
 
     @Override public void bridgeFault(String why) { recoverBridgeAudio(why); }

@@ -186,13 +186,19 @@ public final class AlsaDirectAudio implements AudioBackend {
             }, "sdalsa-rx");                                             // leaving closes the pipe: the helper's next write fails and it puts the controls back
             rxThread.start();
             long t0 = System.currentTimeMillis();                        // the first block, or the helper's refusal (busy device, missing control)
-            while (rxBlocks == before && System.currentTimeMillis() - t0 < 2000) {
+            // the Atom XL's USB card delivers its first block in 105–170 ms, and an open that stays empty only recovers with a
+            // bridge power-cycle (2026-10-29): give up sooner there, so a missed open costs the next reception less
+            final long firstBlockMs = f > 1 ? 800 : 2000;
+            while (rxBlocks == before && System.currentTimeMillis() - t0 < firstBlockMs) {
                 if (!p.isAlive()) { rxProc = null; rxRunning = false; return "startRx failed: sdalsa capture ended (exit " + p.exitValue() + ") " + takeErrors(); }
                 Thread.sleep(20);
             }
             return rxBlocks == before ? "sdalsa capture started, no audio block yet " + takeErrors() : "sdalsa capture on device " + da.captureDevice;
         } catch (Throwable t) { rxProc = null; rxRunning = false; return "startRx failed: " + t; }
     }
+
+    /** True while the capture helper runs. */
+    boolean capturing() { return rxProc != null; }
 
     @Override public synchronized String stopRx() {
         playing = false; rxRunning = false;
