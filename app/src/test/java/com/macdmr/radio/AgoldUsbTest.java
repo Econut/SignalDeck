@@ -151,6 +151,14 @@ public class AgoldUsbTest {
         assertTrue("then host mode is left", r.indexOf("echo 0 > " + AgoldUsb.USB_PATH) > offAgain);
     }
 
+    @Test public void onlyALongUnreportedReceptionCountsAgainstTheLine() {
+        assertFalse("a 1 s blip from a transmitter on another band", AgoldUsb.countsAsLineMiss(220));
+        assertFalse(AgoldUsb.countsAsLineMiss(2999));
+        assertTrue("a carrier the line never reported (the stuck-line repro's 12 s carriers)", AgoldUsb.countsAsLineMiss(12000));
+        assertTrue(AgoldUsb.countsAsLineMiss(3000));
+        assertEquals("two counted misses still restart the bridge", 1, AgoldUsb.stuckLineAction(AgoldUsb.STUCK_LINE_MISSES, 0, false));
+    }
+
     @Test public void powerScriptsFollowTheHalsOrder() {
         String up = AgoldUsb.POWER_UP;
         assertTrue("the stale port node is waited out first", up.indexOf("while [ -e /dev/ttyACM0 ]") < up.indexOf("usb_path"));

@@ -2792,6 +2792,7 @@ public class RadioService extends Service implements RadioEngine.Events {
      * ({@link AgoldUsb#rssiStartDbm}). An edge that arrives meanwhile is merged.
      */
     private volatile boolean synthRx; private volatile int strongCount, lowCount;
+    private volatile long synthStartAt;
     private volatile double idleFloor = Double.NaN;                     // dBm, while nothing is received; reset on a channel write
     private final Runnable rxWatchdog = new Runnable() { @Override public void run() {
         if (!agoldBridge() || exiting) return;
@@ -2802,10 +2803,14 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!agoldBridge() || isTransmitting()) return;
         if (!receiving) {
             idleFloor = AgoldUsb.nextFloor(idleFloor, dbm);
-            if (dbm > AgoldUsb.rssiStartDbm(idleFloor)) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
+            if (dbm > AgoldUsb.rssiStartDbm(idleFloor)) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; synthStartAt = System.currentTimeMillis(); log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
             else strongCount = 0;
         } else if (synthRx && !monRx) {                                  // a MON reception ends with MON
-            if (dbm < AgoldUsb.rssiEndDbm(idleFloor)) { if (++lowCount >= 2) { lowCount = 0; final boolean restart = lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
+            if (dbm < AgoldUsb.rssiEndDbm(idleFloor)) { if (++lowCount >= 2) { lowCount = 0;
+                long held = System.currentTimeMillis() - synthStartAt;
+                final boolean counts = AgoldUsb.countsAsLineMiss(held);       // a short blip is energy from elsewhere (a 446 MHz HackRF in the cage read -87 dBm here), not a reception the line missed
+                if (!counts) log("signal reception of " + held + " ms with no line edge: too short to count against the reception line");
+                final boolean restart = counts && lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
                 if (current != null) worker.execute(() -> { try { if (restart) powerCycleOrGiveUp(); applyChannelNow(current, current.id > 0); log(restart ? "bridge restarted and channel rewritten: the reception line looked stuck" : "channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
             else lowCount = 0;
         }

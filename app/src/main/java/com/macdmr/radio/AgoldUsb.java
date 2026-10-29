@@ -152,6 +152,13 @@ final class AgoldUsb {
     /** Receptions in a row that the line never reported (found from the signal, or opened by MON) before the line counts as stuck. */
     static final int STUCK_LINE_MISSES = 2;
     /**
+     * A reception found from the signal reading counts against the reception line only when it lasted this long: on
+     * 2026-10-29 another agent's HackRF on 446 MHz in the cage read -87 dBm on the Atom XL's 401.025 MHz for about a second,
+     * the line rightly stayed silent, and that blip was counted as a missed reception and restarted the bridge.
+     */
+    static final long LINE_MISS_MIN_MS = 3000;
+    static boolean countsAsLineMiss(long heldMs) { return heldMs >= LINE_MISS_MIN_MS; }
+    /**
      * What to do after {@code missed} receptions in a row that the reception line never reported: 0 nothing (yet), 1 restart
      * the bridge (once per bring-up), 2 stop trusting the line (receptions come from the signal; the phone needs a restart).
      * The line can stay in its power-up state for a whole session (2026-10-29: one power-up byte, then no edge through MON
