@@ -30,6 +30,7 @@ public final class Scanner {
         /** Listening time per channel (the phone's profile). */
         default long dwellMs() { return DWELL_MS; }
         default long dwellMs(ChannelStore.Channel ch){return dwellMs();}
+        default long settleMs(ChannelStore.Channel ch){return SETTLE_MS;}
         default boolean waitForTuneAck(){return false;}
     }
 
@@ -102,7 +103,7 @@ public final class Scanner {
             if(awaitingTune){handler.postDelayed(this,TICK_MS);return;}
             long now = android.os.SystemClock.elapsedRealtime();
             boolean rx = host.receiving();
-            if ((idx >= 0 || onPriority) && now - landedAt > SETTLE_MS && rx) {              // activity on this channel: hold
+            if ((idx >= 0 || onPriority) && now - landedAt > host.settleMs(here()) && rx) {              // activity on this channel: hold
                 lastActivityAt = now;
                 if (!holding) { holding = true; if (onPriority) peeking = false; host.status(true, true, here()); }
             }

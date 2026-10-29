@@ -6,12 +6,12 @@ import java.util.*;
 final class P8ScanChecks {
     private static void check(boolean ok,String why){if(!ok)throw new AssertionError(why);}
     private static final class Host implements Scanner.Host {
-        volatile boolean rx;volatile int tunes,number;final List<ChannelStore.Channel> channels=new ArrayList<>();
+        volatile boolean rx;volatile int tunes,number;int dwell=800,settle=700;final List<ChannelStore.Channel> channels=new ArrayList<>();
         Host(){for(int i=1;i<=3;i++){ChannelStore.Channel c=new ChannelStore.Channel();c.number=i;c.type=1;channels.add(c);}}
         public List<ChannelStore.Channel> candidates(){return channels;}
         public void tune(ChannelStore.Channel c){number=c.number;tunes++;}
         public boolean receiving(){return rx;}public boolean softGated(){return false;}
-        public ChannelStore.Channel priority(){return null;}public long dwellMs(){return 800;}
+        public ChannelStore.Channel priority(){return null;}public long dwellMs(){return dwell;}public long settleMs(ChannelStore.Channel ch){return settle;}
         public boolean waitForTuneAck(){return true;}
         public void status(boolean scanning,boolean holding,ChannelStore.Channel on){}
     }
@@ -26,5 +26,14 @@ final class P8ScanChecks {
             SystemClock.sleep(1000);check(host.tunes==2,"Second channel advanced without ACK");
             test.runOnMainSync(()->{scanner[0].stop();scanner[0].acknowledged(2);});SystemClock.sleep(200);check(host.tunes==2 && !scanner[0].isScanning(),"Late ACK restarted stopped scan");
         }finally{test.runOnMainSync(()->scanner[0].stop());}
+        Host fast=new Host();fast.dwell=400;fast.settle=200;Scanner[] trial=new Scanner[1];
+        test.runOnMainSync(()->{trial[0]=new Scanner(fast);trial[0].start();});
+        try{
+            SystemClock.sleep(550);check(fast.tunes==1,"Extreme scan advanced without ACK");fast.rx=true;
+            test.runOnMainSync(()->trial[0].acknowledged(1));SystemClock.sleep(750);
+            check(trial[0].isHolding() && fast.tunes==1,"Extreme scan stepped before recognizing activity");
+            fast.rx=false;SystemClock.sleep(2800);check(fast.tunes==2,"Extreme scan hang failed");
+            test.runOnMainSync(()->trial[0].acknowledged(2));SystemClock.sleep(650);check(fast.tunes==3,"Quiet extreme channel did not advance");
+        }finally{test.runOnMainSync(()->trial[0].stop());}
     }
 }

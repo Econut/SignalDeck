@@ -34,7 +34,7 @@ public final class ScanListsDialog {
         int[] values=com.macdmr.radio.P8ScanTiming.OPTIONS;String[] labels=new String[values.length];int selected=0;
         for(int i=0;i<values.length;i++){labels[i]=com.macdmr.radio.P8ScanTiming.label(values[i]);if(values[i]==svc.p8ScanDwell())selected=i;}
         new AlertDialog.Builder(c).setTitle("FM scan speed (after tune ACK)").setSingleChoiceItems(labels,selected,(d,w)->{
-            svc.setP8ScanDwell(values[w]);Toast.makeText(c,"Saved: "+labels[w]+". DMR keeps 1.5 s; signal hold is unchanged.",Toast.LENGTH_LONG).show();d.dismiss();
+            svc.setP8ScanDwell(values[w]);Toast.makeText(c,"Saved: "+labels[w]+". DMR keeps 1.5 s; signal hold is unchanged."+(values[w]<800?" Experimental: weak or short calls may be missed.":""),Toast.LENGTH_LONG).show();d.dismiss();
         }).setNegativeButton("Cancel",null).show();
     }
     public static void manage(Context c,RadioService svc){

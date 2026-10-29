@@ -84,6 +84,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         @Override public boolean softGated() { return !p8Main() && softSq.isEnabled(); }
         @Override public long dwellMs() { return profile.scanDwellMs; }
         @Override public long dwellMs(ChannelStore.Channel ch){return p8Main()?P8ScanTiming.dwell(p8ScanDwell(),ch!=null && ch.isDigital()):profile.scanDwellMs;}
+        @Override public long settleMs(ChannelStore.Channel ch){return p8Main()?P8ScanTiming.settle(p8ScanDwell(),ch!=null && ch.isDigital()):Scanner.SETTLE_MS;}
         @Override public boolean waitForTuneAck(){return p8Main();}
         @Override public ChannelStore.Channel priority() { int n=scanPriority();ChannelStore.Channel c=n>0?store.byNumber(n):null;if(p8Main() && c!=null){boolean included=false;for(ChannelStore.Channel member:scanCandidates())if(member.id==c.id)included=true;if(!included)return null;try{P8MainRadio.channel(c,false,p8ModuleVolume(),localId());}catch(IllegalArgumentException e){return null;}}return c; }
         @Override public void status(boolean s, boolean h, ChannelStore.Channel on) {
