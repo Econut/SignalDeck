@@ -3515,9 +3515,10 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** The first bench image that clears the module's own receive mute after a symbol key (FW31, phonedmrapp
      *  radio_firmware/reviews.md 2026-10-28): there a channel write would put the mute back, so only the hold is re-sent. */
     static final int SYM_UNMUTE_FW = 31;
-    /** From FW32 the firmware clears its transmit-time receive mute itself after a symbol key, so one channel write is enough. */
     static final int SYM_MUTE_FIXED_FW = 32;
-    static int writesAfterSym(String moduleVersion) { return Firmware.tagNumber(moduleVersion) >= SYM_MUTE_FIXED_FW ? 1 : 2; }
+    /** FW32 clears the receive mute itself after the key, and a channel write right after a symbol key mutes it again
+     *  (bench 2026-10-29: 0x30 bit 7 clear until the write, set after it), so FW32 only re-sends the hold; FW31 needs two writes. */
+    static int writesAfterSym(String moduleVersion) { return Firmware.tagNumber(moduleVersion) >= SYM_MUTE_FIXED_FW ? 0 : 2; }
     static boolean rewriteAfterSym(String moduleVersion) { return !(Firmware.stubTag(moduleVersion) && Firmware.tagNumber(moduleVersion) >= SYM_UNMUTE_FW); }
     private void rxAfterSym() {
         ChannelStore.Channel c = current;
@@ -3529,7 +3530,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             quietRewrite = true;
             try {
                 int n = writesAfterSym(moduleVersion);
-                if (n == 1) Thread.sleep(1000);   // FW32: the module's close re-mutes the receiver about half a second after status 4; a write before that is undone (bench 2026-10-29)
+                if (n == 0) { log("rx after sym: FW" + Firmware.tagNumber(moduleVersion) + " unmutes itself, hold only (no channel write)"); holdAfterTx(); return; }
                 boolean a = applyChannelNow(c, c != vfo), b = true;
                 if (n > 1) { Thread.sleep(700); b = applyChannelNow(c, c != vfo); }
                 log("rx after sym: FW" + Firmware.tagNumber(moduleVersion) + ", channel " + c.number + " rewritten " + (n > 1 ? "twice " + a + "/" + b : "once " + a));
