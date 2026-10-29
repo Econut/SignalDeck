@@ -32,7 +32,7 @@ public final class ScheduleDialog {
     public static void show(Context c, RadioService svc) {
         float d = Theme.dp(c);
         LinearLayout body = Neo.sheetBody(c, "Scheduled operations");
-        body.addView(Neo.sheetHint(c, "Start something at a set time, once or every week: listen to a channel (and record it), scan the zone, APRS monitoring, SSTV receive, or send an APRS beacon. When the time is up the radio goes back to what it was doing. It runs with the screen off; a satellite pass being tracked always comes first."));
+        body.addView(Neo.sheetHint(c, "Start something at a set time, once or every week: listen to a channel (and record it), scan the zone, " + (com.macdmr.radio.DeviceProfile.inBands(com.macdmr.radio.PacketEngine.APRS_FREQ_HZ) ? "APRS monitoring, " : "") + "SSTV receive, or send an APRS beacon. When the time is up the radio goes back to what it was doing. It runs with the screen off; a satellite pass being tracked always comes first."));
         final AlertDialog[] self = { null };
         List<Scheduler.Entry> l = Scheduler.list(c);
         SimpleDateFormat f = new SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault());
