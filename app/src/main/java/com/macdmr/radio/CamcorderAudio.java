@@ -27,6 +27,7 @@ public final class CamcorderAudio implements AudioBackend {
      * The camcorder input carries the radio about 21 dB lower than the other phones' audio (W6, 2026-10-27: a 1 kHz tone
      * at 2.5 kHz deviation arrived at -44 dBFS with the module volume at 4 of 8, and the SSTV decoder skipped a Robot 36
      * picture as "likely noise"). A fixed gain of 12 brings it to about -22 dBFS; samples are clipped, never wrapped.
+     * The default; a profile with a louder module sets its own ({@link DeviceProfile#camcorderGain}).
      */
     static final int GAIN = 12;
     private volatile Sink sink;
@@ -36,9 +37,11 @@ public final class CamcorderAudio implements AudioBackend {
     private AudioRecord rec;
     private AudioTrack track;
     private final boolean play;
+    private final int gain;
 
     public CamcorderAudio() { this(false); }
-    public CamcorderAudio(boolean play) { this.play = play; }
+    public CamcorderAudio(boolean play) { this(play, GAIN); }
+    public CamcorderAudio(boolean play, int gain) { this.play = play; this.gain = Math.max(1, gain); }
 
     @Override public void setSink(Sink s) { sink = s; }
     @Override public void setGate(Gate g) { gate = g; }   // only used when this backend plays the audio itself
@@ -77,10 +80,10 @@ public final class CamcorderAudio implements AudioBackend {
             while (running) {
                 int n = r.read(mono, 0, BLOCK);
                 if (n <= 0) continue;
-                Sink s = sink; if (s != null) s.onPcm(st, toStereo(mono, n, st));
+                Sink s = sink; if (s != null) s.onPcm(st, toStereo(mono, n, st, gain));
                 if (t != null) {                                                   // after the sink: the gate reflects this block's squelch
                     Gate g = gate; boolean open = g == null || g.open();
-                    for (int i = 0; i < n; i++) out[i] = open ? (short) Math.max(-32768, Math.min(32767, mono[i] * GAIN)) : 0;
+                    for (int i = 0; i < n; i++) out[i] = open ? (short) Math.max(-32768, Math.min(32767, mono[i] * gain)) : 0;
                     t.write(out, 0, n);
                 }
             }
