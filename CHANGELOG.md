@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-28 — Unihertz Atom XL supported (receive and transmit); texts obey the transmit lock
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL stack (PRs 60–76), owner 2026-10-28 | The Atom XL profile is verified (revision 2): take-over, receive with per-reception audio and bridge recovery, reception watchdog, DMR texts, APRS, FM and DMR transmit, all bench-tested on module V067. DMR texts now also refuse to send on a phone or channel where transmitting is off (they bypassed the lock before). The `--mount-master` su is used only for USB sound cards, so the Armor's built-in card path is unchanged | `DeviceProfile.java`, `RadioService.java`, `AlsaDirectAudio.java`, `HelpView.java` | Host suite; Atom XL bench (Atom XL agent, 2026-10-28) |
+
 ## 2026-10-28 — M17 receive after a symbol key on FW31: hold only, no channel rewrite
 
 | Backlog | Change | Files | Test |

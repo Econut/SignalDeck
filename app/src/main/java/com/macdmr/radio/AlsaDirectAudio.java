@@ -104,7 +104,9 @@ public final class AlsaDirectAudio implements AudioBackend {
     private Process start(boolean capture) throws java.io.IOException {
         // --mount-master: an app's su otherwise runs in the app's own mount namespace; there the Atom XL's USB card capture
         // failed with an I/O error while the same helper from a root shell ran for minutes (2026-10-28)
-        Process p = new ProcessBuilder("su", "--mount-master", "--context", "u:r:magisk:s0", "-c", command(helper, capture, da)).start();
+        // only for the USB sound cards (rate above 8 kHz: the Atom XL); the 8 kHz built-in card path keeps its proven plain su
+        Process p = (da.rate > 8000 ? new ProcessBuilder("su", "--mount-master", "--context", "u:r:magisk:s0", "-c", command(helper, capture, da))
+                                    : new ProcessBuilder("su", "-c", command(helper, capture, da))).start();
         final InputStream es = p.getErrorStream();
         Thread t = new Thread(() -> {                                    // the helper's own messages: busy device, a missing control, xruns
             try (BufferedReader r = new BufferedReader(new InputStreamReader(es))) {

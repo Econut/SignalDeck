@@ -2927,6 +2927,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     /** Send a DMR text to a contact (private / group / all) over the current digital channel. */
     public void sendSms(final ChannelStore.Contact to, final String text) {
+        if (txInhibited()) { history("warn", "⛔ Text not sent: transmitting is off on this phone or channel"); ui.post(() -> { for (Listener l : listeners) l.onSmsResult(false); }); return; }   // an untested profile never transmits, texts included
         final long id = store.addMessage(to.number, to.type, true, text, 0);
         try { ChannelStore.Contact pc = to.id > 0 ? to : store.contactByNumber(to.number, to.type); if (pc != null) store.contactSent(pc.id, System.currentTimeMillis(), "DMR text", text); } catch (Throwable e) { }
         worker.execute(() -> {

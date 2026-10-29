@@ -27,7 +27,7 @@ public class DeviceProfileTest {
         assertSame(DeviceProfile.ATOM_XL, p);
         assertEquals("agold", p.protocol);
         assertEquals("/dev/ttyACM0", p.controlPort);
-        assertFalse("transmit stays off until the owner's on-air test", p.verified);
+        assertTrue("verified 2026-10-28: transmit tested in the cage", p.verified);
         assertTrue(p.dmr());
         assertFalse("the symbol engine is the Armor firmware's", p.symbolEngine());
         assertEquals(32000, p.directAudio.rate);

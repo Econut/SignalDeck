@@ -250,7 +250,7 @@ public final class DeviceProfile {
      * command port {@code /dev/ttyACM0} and the radio's USB sound card exist only while the bridge is powered, and a
      * computer on the cable loses the phone meanwhile. SignalDeck stops the vendor HAL and powers the bridge itself
      * ({@link AgoldUsb#bridgeUp}); Exit and Hand back power it off and give the USB port back. Measured on the bench
-     * Atom XL 2026-10-28 (docs/atomxl in phonedmrapp); unverified until the owner's on-air test, so transmit stays off.
+     * Atom XL 2026-10-28 (docs/atomxl in phonedmrapp). Revision 2 (owner, 2026-10-28): verified; transmit tested in the cage (FM, DMR voice, DMR text, APRS decoded) on module DMR006.U4A.V067.
      */
     public static final DeviceProfile ATOM_XL = new DeviceProfile(
             "Unihertz Atom XL", AgoldUsb.BRIDGE_PORT, 115200, Audio.TINY_SERVICE, null, 0,
@@ -262,9 +262,9 @@ public final class DeviceProfile {
                     "typeattribute ttyACM_device mlstrustedobject",
                     "allow untrusted_app agui_device chr_file { open read getattr }",       // /dev/stmcu: reception start / end
                     "typeattribute agui_device mlstrustedobject" },
-            null, true, false);
+            null, true, true);
     static {
-        ATOM_XL.id = "unihertz-atomxl"; ATOM_XL.revision = 1; ATOM_XL.protocol = "agold";
+        ATOM_XL.id = "unihertz-atomxl"; ATOM_XL.revision = 2; ATOM_XL.protocol = "agold";
         ATOM_XL.bandsHz = new long[] { 400_000_000L, 480_000_000L };          // the UHF module (DMR006.U4A); to be measured
         // the bridge's USB Audio Class card: S16_LE, 2 channels, 32 kHz both ways, no mixer controls (the HAL's pcm_open)
         ATOM_XL.directAudio = new DirectAudio(1, 0, 0, new String[0], new String[0], new String[0], new String[0]);
