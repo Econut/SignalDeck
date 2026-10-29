@@ -2765,7 +2765,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             return;
         }
         log("reception line still silent: receptions come from the signal reading (RSSI) until it reports again");
-        history("warn", "\u26A0 The radio's reception signal is not working: SignalDeck detects calls from the signal strength (a little later)");
+        history("warn", "\u26A0 The radio's reception signal is not working: SignalDeck detects calls from the signal strength (a little later), and the sound may drop out. Restart the phone to fix it");
         lineFallback = true;
     } };
 
