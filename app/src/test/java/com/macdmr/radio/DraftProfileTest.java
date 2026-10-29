@@ -32,7 +32,7 @@ public class DraftProfileTest {
     @Test public void atomXl() throws Exception {
         Map<String, DraftProfile.Field> d = draft(res("atomxl_excerpt.txt"));
         assertEquals("com.agold.intercom", d.get("stockApp").value);
-        assertTrue(d.get("protocol").value.startsWith("mcu68 inside the Agold 7E 96 69 envelope"));
+        assertTrue(d.get("protocol").value.startsWith("agold: mcu68 inside the Agold 7E 96 69 envelope"));
         assertEquals(DraftProfile.HIGH, d.get("protocol").confidence);
         assertTrue(d.get("protocol").evidence.contains("DMR006.U4A.V067"));
         assertEquals("/dev/ttyACM0 (USB serial to a bridge MCU)", d.get("controlPort").value);
