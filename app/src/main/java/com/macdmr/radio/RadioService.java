@@ -2830,6 +2830,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 if (audio != null) audio.stopRx();
                 powerCycleOrGiveUp();
                 if (current != null) applyChannelNow(current, current.id > 0);
+                if (monitorOn) engine.setMonitor(true);                  // the power-cycle left the module's monitor off: the squelch closed, the reopened capture stayed empty
                 if (receiving && rxAudioOn && audio != null) log(audio.startRx(true));
             } catch (Throwable t) { log("bridge recovery: " + t); }
         });
