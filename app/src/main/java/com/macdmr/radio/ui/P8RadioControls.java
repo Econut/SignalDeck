@@ -20,7 +20,7 @@ public final class P8RadioControls extends LinearLayout {
         menu=Neo.button(c,"P8 MENU","menu",Neo.CYAN);menu.setTextSize(11);menu.setSingleLine(true);menu.setMinHeight(0);menu.setPadding(Theme.dp(c,8),0,Theme.dp(c,8),0);menu.setCompoundDrawablePadding(Theme.dp(c,5));
         addView(menu,new LayoutParams(LayoutParams.MATCH_PARENT,Theme.dp(c,40)));menu.setOnClickListener(v->controls());
     }
-    private void controls(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("P8 radio").setItems(new String[]{"Connect","Hand back to Intercom","Receive volume","Transmit settings","Stop transmitting","Programmable buttons","Connection details","Intercom App info / release"},(d,index)->{
+    private void controls(){Context c=getContext();new android.app.AlertDialog.Builder(c).setTitle("P8 radio").setItems(new String[]{"Connect","Hand back to Intercom","Receive volume","Transmit settings","Stop transmitting","Programmable buttons","Connection details","Intercom App info / release","Recover radio connection","Recovery log"},(d,index)->{
         switch(index){
             case 0:com.macdmr.radio.P8MainRadio.takeOver(c,service);break;
             case 1:service.shutDown(true);break;
@@ -29,6 +29,12 @@ public final class P8RadioControls extends LinearLayout {
             case 4:service.p8CancelTransmitTest();toast("PTT release requested");break;
             case 5:buttons();break;
             case 6:new android.app.AlertDialog.Builder(c).setTitle("Connection details").setMessage((service.txInhibited()?"Receive only / not connected":"Analogue hold-to-talk")+"\n\n"+service.p8Status()).setPositiveButton("Close",null).show();break;
+            case 8:toast("Recovering radio connection…");service.p8Recover(message->{
+                android.app.AlertDialog.Builder result=new android.app.AlertDialog.Builder(c).setTitle("Radio recovery").setMessage(message).setNegativeButton("Close",null);
+                if(message.startsWith("Recovered:"))result.setPositiveButton("Open Intercom",(a,b)->com.macdmr.radio.P8MainRadio.restoreIntercom(c));
+                else if(message.contains("Intercom is running"))result.setPositiveButton("Intercom App info",(a,b)->c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr"))));
+                result.show();});break;
+            case 9:new android.app.AlertDialog.Builder(c).setTitle("Saved radio log").setMessage(service.p8RecoveryLog()).setPositiveButton("Share",(a,b)->{Intent share=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT,"P8 radio recovery log").putExtra(Intent.EXTRA_TEXT,service.p8RecoveryLog());c.startActivity(Intent.createChooser(share,"Share recovery log"));}).setNegativeButton("Close",null).show();break;
             case 7:if(service.isReady()){toast("Hand back first");return;}c.startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,Uri.parse("package:com.wtwd.ucee.dmr")));break;
         }
     }).show();}

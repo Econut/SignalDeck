@@ -277,3 +277,17 @@ JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_close(JNIEnv *e,jcl
     (void)e;
 #endif
 }
+
+/* User-requested, release-only recovery. No UART, power or calibration access. */
+JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_recoverReleased(JNIEnv *e,jclass c){
+    (void)c;
+#if P8_OPEN_PROBE_REVIEWED && P8_TX_TEST_REVIEWED
+    pthread_mutex_lock(&tx_lock);
+    int error=control>=0 || pcm>=0 || watch_running;
+    if(!error){if(ptt_write(1))error=1;else{tx_owned=0;tx_error=0;tx_ready=0;tuned_hz=0;tuned_command=0;}}
+    pthread_mutex_unlock(&tx_lock);
+    if(error)fail(e,"Release-only recovery failed or UART session is still open");
+#else
+    fail(e,"Recovery disabled in this build");
+#endif
+}

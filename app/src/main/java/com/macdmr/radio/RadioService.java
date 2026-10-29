@@ -752,6 +752,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void onCreate() {
         super.onCreate();
+        if(p8Main())P8RecoveryJournal.installCrashHandler(p8LogDirectory());
         startForegroundTyped(false);
         running = this;
         watchCar();
@@ -867,8 +868,39 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile boolean p8TxArmed;
     private long p8ArmGeneration;
     private volatile boolean p8Unsafe;
+    private volatile boolean p8Recovering;
     private volatile String p8Status="Release Intercom in App info, then Connect";
     public String p8Status(){return p8Status;}
+    private java.io.File p8LogDirectory(){java.io.File root=getExternalFilesDir(null);return new java.io.File(root!=null?root:getFilesDir(),"p8-recovery");}
+    public String p8RecoveryLog(){try{return P8RecoveryJournal.tail(p8LogDirectory());}catch(Exception e){return "Log read failed: "+e.getMessage();}}
+    public void p8Recover(java.util.function.Consumer<String> done){
+        if(p8Recovering){done.accept("Recovery is already running");return;}
+        p8Recovering=true;log("RECOVERY requested; prior="+p8Status);scanner.stop();p8Scanning=false;p8CancelTransmitTest();
+        p8RestoreOnClose=false;if(p8Receiver!=null)p8Receiver.stop();
+        long deadline=android.os.SystemClock.elapsedRealtime()+8000;
+        ui.post(new Runnable(){public void run(){
+            if(p8Receiver!=null || p8Closing || P8Receiver.active()){
+                if(android.os.SystemClock.elapsedRealtime()<deadline){ui.postDelayed(this,100);return;}
+                p8Recovering=false;log("RECOVERY failed: session did not close");done.accept("Radio session did not close. Restart Android; saved channels are unchanged.");return;
+            }
+            final String prior=p8Status;
+            new Thread(()->{
+                String result;
+                try{
+                    boolean restoreFailed=prior.contains("restoration") || prior.contains("close/restore failed") || prior.contains("close error");
+                    P8Recovery.recover(new P8Recovery.Backend(){
+                        public boolean active(){return P8Receiver.active();}
+                        public boolean stockStopped() throws Exception{return (getPackageManager().getApplicationInfo("com.wtwd.ucee.dmr",0).flags&android.content.pm.ApplicationInfo.FLAG_STOPPED)!=0;}
+                        public void release() throws Exception{P8ReceiveNative.load();P8ReceiveNative.recoverReleased();}
+                        public int state(String path) throws Exception{return P8Receiver.readState(path);}
+                    },restoreFailed);
+                    result="Recovered: PTT released and connection faults cleared. Channels and settings kept. Open Intercom and wait for its normal channel screen to initialize the module. Then return to SignalDeck, choose Connect and follow the Intercom Force stop step.";
+                }catch(Exception | LinkageError e){result="Recovery stopped: "+e.getMessage();}
+                final String message=result;
+                ui.post(()->{boolean ok=message.startsWith("Recovered:");if(ok){p8Unsafe=false;p8Tunes.clear();transmitting=false;receiving=false;setLink("stopped");}p8Status=message;p8Recovering=false;log("RECOVERY "+message);refreshControls();done.accept(message);});
+            },"P8-recovery").start();
+        }});
+    }
     public boolean p8TxArmed(){return p8TxArmed;}
     public void p8CancelTransmitTest(){p8ArmGeneration++;p8TxArmed=false;if(p8Receiver!=null)p8Receiver.cancelTransmitTest();refreshControls();}
     public String p8ArmTransmitTest(){
@@ -898,6 +930,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         return "Saved "+key+" = "+value;
     }
     private synchronized void bringUpP8(){
+        if(p8Recovering)return;
         if(p8Unsafe){log("P8 stopped after unsafe response; inspect radio state before manual recovery");return;}
         if(p8Receiver!=null || p8Closing)return;
         try{
@@ -1796,7 +1829,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     // ---- PTT ----------------------------------------------------------------------------------------
 
     public boolean txInhibited() {
-        if(p8Main())return !BuildConfig.P8_TX_TEST_REVIEWED || !isReady() || p8Closing || p8Unsafe || !p8Tunes.isEmpty() || current==null || current.type!=1 || ChannelStore.receiveOnly(current);
+        if(p8Main())return p8Recovering || !BuildConfig.P8_TX_TEST_REVIEWED || !isReady() || p8Closing || p8Unsafe || !p8Tunes.isEmpty() || current==null || current.type!=1 || ChannelStore.receiveOnly(current);
         if (!profile.verified || ProfileRegistry.transmitBlocked()) return true;   // an untested profile never transmits; an advisory can switch it off (the Xplore 1 keys through a GPIO line)
         ChannelStore.Channel ch = current;
         if (ch == null) return true;
@@ -1813,7 +1846,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public void ptt(final boolean down) {
         if(down && csvImporting)return;
-        if(p8Main()){if(down && P8ButtonBindings.learning!=null)return;if(p8Receiver!=null && (!down || !txInhibited())){if(down){scanner.stop();p8Scanning=false;}p8Receiver.ptt(down);}else if(down)history("warn","P8 TX blocked: connect an analogue channel with Transmit allowed");return;}
+        if(p8Main()){if(p8Recovering)return;if(down && P8ButtonBindings.learning!=null)return;if(p8Receiver!=null && (!down || !txInhibited())){if(down){scanner.stop();p8Scanning=false;}p8Receiver.ptt(down);}else if(down)history("warn","P8 TX blocked: connect an analogue channel with Transmit allowed");return;}
         worker.execute(() -> {
             try {
                 if (down) {
@@ -2551,6 +2584,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void log(String s) {
         Log.i(TAG, s);
+        if(p8Main())try{P8RecoveryJournal.append(p8LogDirectory(),s);}catch(java.io.IOException e){Log.w(TAG,"P8 persistent log unavailable",e);}
         synchronized (logRing) { logRing.addLast(logTf.format(new java.util.Date()) + " " + s); while (logRing.size() > 300) logRing.removeFirst(); }
         if (uiLog) ui.post(() -> { for (Listener l : listeners) l.onLog(s); });
     }

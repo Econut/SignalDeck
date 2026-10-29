@@ -8,6 +8,7 @@ final class P8ReceiveNative {
         if(!BuildConfig.P8_OFFLINE || !BuildConfig.P8_OPEN_PROBE_REVIEWED)throw new IOException("RX development build required");
         System.loadLibrary("p8rxjni");
     }
+    static native void recoverReleased() throws IOException;
     static native void open() throws IOException;
     static native void prepareTransmit() throws IOException;
     static native void acknowledgeStatus() throws IOException;
