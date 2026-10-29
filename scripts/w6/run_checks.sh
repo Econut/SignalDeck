@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Run all checks on a bench phone with no screen taps, wait for the end, pull the report folder.
 #
-#   scripts/w6/run_checks.sh -s <adb serial> [-w auto|none|<package>] [-t] [-o <out dir>] [-k] [-m <max seconds>]
+#   scripts/w6/run_checks.sh -s <adb serial> [-w auto|none|<package>] [-t] [-r] [-o <out dir>] [-k] [-m <max seconds>]
 #
 #   -s  adb serial (required: never run this against a phone you did not name)
 #   -w  the app the 15 s watch opens: auto (default: the profile's stock app, else the best-ranked candidate), none, or a package
 #   -t  add the 30 s trial take-over (receive only; phones with a profile)
+#   -r  hand the radio back first and open SignalDeck without taking it over (a verified phone's app takes the radio when
+#       it opens; the watch, the probe and the trial then all skip with "SignalDeck owns the radio")
 #   -o  where the folder goes (default docs/w6/reports/<host date>_checks)
 #   -k  keep the copied stock APKs (left out by default: they are the manufacturer's software)
 #   -m  give up after this many seconds (default 600)
@@ -18,11 +20,11 @@
 set -euo pipefail
 export MSYS_NO_PATHCONV=1                       # Git Bash on Windows: keep /sdcard/… paths as they are
 
-serial="" watch="auto" trial=false out="" keep=false max=600
-while getopts "s:w:to:km:" o; do
+serial="" watch="auto" trial=false out="" keep=false max=600 release=false
+while getopts "s:w:tro:km:" o; do
   case "$o" in
-    s) serial="$OPTARG" ;; w) watch="$OPTARG" ;; t) trial=true ;; o) out="$OPTARG" ;; k) keep=true ;; m) max="$OPTARG" ;;
-    *) sed -n '2,12p' "$0"; exit 2 ;;
+    s) serial="$OPTARG" ;; w) watch="$OPTARG" ;; t) trial=true ;; r) release=true ;; o) out="$OPTARG" ;; k) keep=true ;; m) max="$OPTARG" ;;
+    *) sed -n '2,14p' "$0"; exit 2 ;;
   esac
 done
 [ -n "$serial" ] || { echo "-s <adb serial> is required" >&2; exit 2; }
@@ -36,7 +38,16 @@ fi
 a() { "$ADB" -s "$serial" "$@"; }
 
 a get-state >/dev/null || { echo "phone $serial not reachable" >&2; exit 1; }
-if [ -z "$(a shell pidof com.macdmr.radio | tr -d '\r')" ]; then
+if $release; then
+  if [ -n "$(a shell pidof com.macdmr.radio | tr -d '\r')" ]; then
+    echo "handing the radio back to the stock app"
+    a shell am broadcast -a com.macdmr.radio.DIAG --es cmd exit --ez stock true >/dev/null
+    sleep 30                                     # the Atom XL's hand-back checks the bridge first (~20 s)
+  fi
+  echo "starting SignalDeck without taking the radio over"
+  a shell am start -n com.macdmr.radio/.MainActivity --ez noTakeOver true >/dev/null
+  sleep 8
+elif [ -z "$(a shell pidof com.macdmr.radio | tr -d '\r')" ]; then
   echo "starting SignalDeck"
   a shell am start -n com.macdmr.radio/.MainActivity >/dev/null
   sleep 6
