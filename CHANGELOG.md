@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: the phone stays awake while SignalDeck owns the radio
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture-stall investigation (managing agent, 2026-10-29) | With the screen off the Atom XL went into deep sleep while SignalDeck owned the radio: a 10 s recovery timer ran 5 minutes late and 6 of 10 test transmissions were never heard (bench 10:06–10:11). When the reception line is stuck, receptions come from timed signal readings, which stop in deep sleep. SignalDeck now holds its partial wake lock (the one it already holds while a packet mode runs) while it owns the Atom XL's radio, and lets go on Exit and Hand back. Other phones are unchanged (they wake on the radio's own serial and audio path). The Atom XL help says so, with the battery cost. | `RadioService`, `HelpView` | Device (Atom XL 10:38): "wake lock on (the radio is owned)" at take-over; 10 receptions and six recoveries with the screen on a 30 min timeout, none missed. Host suite unchanged |
+
 ## 2026-10-29 — FT8: a slot heard only during a reception is decoded (Atom XL)
 
 | Backlog | Change | Files | Test |
