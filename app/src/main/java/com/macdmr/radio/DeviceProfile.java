@@ -313,6 +313,12 @@ public final class DeviceProfile {
      */
     public boolean firmwareCatalogued() { return dmr(); }
 
+    /**
+     * Whether SignalDeck's firmware loader can reach this module: the dmr009 knock and YModem on the module's own UART.
+     * The Atom XL's module sits behind a USB bridge whose update path is the bridge's own (route 00 cmd 0x09), so no.
+     */
+    public boolean firmwareLoader() { return "mcu68".equals(protocol); }
+
     /** Whether the module family has the bench firmware's symbol engine (POCSAG pages, M17 voice out): the HR-C7000 family, never an SA818 module. */
     public boolean symbolEngine() { return "mcu68".equals(protocol); }
 

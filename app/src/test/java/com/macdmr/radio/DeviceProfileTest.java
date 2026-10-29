@@ -30,6 +30,8 @@ public class DeviceProfileTest {
         assertTrue("verified 2026-10-28: transmit tested in the cage", p.verified);
         assertTrue(p.dmr());
         assertFalse("the symbol engine is the Armor firmware's", p.symbolEngine());
+        assertFalse("the module is loaded through the bridge's own path, not our YModem knock", p.firmwareLoader());
+        assertTrue(DeviceProfile.ARMOR_26_ULTRA.firmwareLoader());
         assertEquals(32000, p.directAudio.rate);
         assertTrue(p.directAudio.valid());
         assertTrue(p.power().node().endsWith("/mcu_power"));

@@ -2055,7 +2055,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void diagFwLoad(java.io.File f, boolean abort50, int pauseMs) {
         Thread old = fwThread;
         if (old != null && old.isAlive()) { log("fwload busy"); return; }
-        if (f == null) { log("fwload refused"); return; }
+        if (f == null || profile == null || !profile.firmwareLoader()) { log("fwload refused"); return; }
         String path = f.getAbsolutePath();
         boolean allowed = path.startsWith("/sdcard/Download/DMR/Firmware/")
                 || path.startsWith("/storage/emulated/0/Download/DMR/Firmware/");
@@ -2114,6 +2114,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void loadFirmware(com.macdmr.radio.fw.ImageTable.Row row, byte[] image, com.macdmr.radio.fw.FirmwareSession.Ui ui, boolean treatTagAsWrong) {
         Thread old = fwThread;
         if (old != null && old.isAlive()) { ui.finished("A load is already running"); return; }
+        if (profile == null || !profile.firmwareLoader()) { ui.finished("This phone's radio module cannot be loaded from SignalDeck"); return; }
         fwHalt.set(false);
         setFirmwareBusy(true);
         Thread job = new Thread(() -> {
