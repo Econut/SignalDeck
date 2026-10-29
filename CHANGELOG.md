@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — SignalDeck Web: no Pager page on a radio that cannot page
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL feature sweep (managing agent, 2026-10-29) | The phone hides POCSAG paging on a radio without the HR-C7000 symbol engine (the Atom XL, the W6+), but SignalDeck Web still listed the Pager page, whose Send and Monitor only came back with errors. The web now hides it when the status says `symbolEngine: false`, and an open Pager page goes to the intercom, like Messages and Contacts on a radio without DMR. | `assets/web/app.js` | Host suite. Device: pending (Atom XL web check after Grok's lease). |
+
 ## 2026-10-29 — Atom XL: its own help section, no firmware loader, boot and long-receive checks
 
 | Backlog | Change | Files | Test |
