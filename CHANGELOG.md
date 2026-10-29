@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: a stuck reception signal cleared without restarting the phone; no bridge restart in the middle of a call
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL stuck reception line (managing agent, 2026-10-29) | Sometimes the radio's "reception started / ended" signal stopped for the rest of the session, and only restarting the phone brought it back. SignalDeck now powers the radio's bridge off the way the stock app's driver layer does (a 0.2 s power pulse after the power-off, disassembled from the vendor HAL): taking the radio again then brought a stuck signal back without a phone restart, and SignalDeck's own automatic bridge restart for a stuck signal goes the same way. After any bridge restart the radio driver's own flag now settles a call that began or ended during the restart (its start or end was ignored before, and SignalDeck could stay "receiving" until the next call ended), and when the sound stops during a call the bridge restart waits for the call to end (5 s at most) instead of cutting it. | `AgoldUsb`, `RadioService` | Host: `AgoldUsbTest.powerOffPulsesTheBridgeLikeTheStockHal`, `aPowerUpWindowIsSettledByTheDriversFlag`; full suite 510 / 0. Device (Atom XL, HackRF on 401.025 MHz): the stuck signal reproduced on the previous build (1 of 3 replays of a bridge restart and a forced stop during calls, plus once at 12:53); taking the radio again with this build cleared it, 1 of 1 (a carrier then gave 2 interrupts and a real reception); 7 forced stops during calls with this build left the signal working every time (4 controls on the previous build also did, so a stop alone is not the cause); a restart in the middle of a call: "reception ended during the bridge power-up", and a later dead capture restarted the bridge after the call ended |
+
 ## 2026-10-29 — M17 receive on the Unihertz Atom XL: its own calibration
 
 | Backlog | Change | Files | Test |
