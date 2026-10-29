@@ -60,6 +60,12 @@ public class AgoldUsbTest {
         assertFalse(d.contains(AgoldUsb.MODULE_ANSWERED));
     }
 
+    @Test public void stockFirmwareFolderIsReported() {
+        assertNull(AgoldUsb.pendingStockFirmware(""));
+        assertNull(AgoldUsb.pendingStockFirmware("notes.txt\n"));
+        assertEquals("DMR006.U4A.V082.bin", AgoldUsb.pendingStockFirmware("DMR006.U4A.V082.bin\nreadme.txt\n"));
+    }
+
     @Test public void giveBackNeedsTheBridgesAnswer() {
         String ok = AgoldUsb.describe("port: after 10 tenths of a second\nbridge: " + BRIDGE + "\nmodule: " + MODULE + "\nafter: power on = 0, HAL running\n");
         assertTrue(AgoldUsb.bridgeAnswered(ok));

@@ -179,9 +179,26 @@ final class AgoldUsb {
         StringBuilder r = new StringBuilder(bridgeDown()).append('\n');
         String probe = identityProbe(dir, p.stockApp);
         r.append(probe);
+        String pending = pendingStockFirmware(RootSetup.run("ls " + STOCK_FIRMWARE_DIR + " 2>/dev/null"));
+        if (pending != null) r.append(STOCK_FIRMWARE_WARNING).append(pending).append('\n');
         if (bridgeAnswered(probe)) r.append("stock app: ").append(RootSetup.stockApp(p, true)).append('\n');
         else r.append(GIVE_BACK_HELD).append('\n');
         return r.toString();
+    }
+
+    /**
+     * The stock app loads any .bin in this folder into the radio module by itself when the file's name differs from the
+     * module's version reply, or when the version query goes unanswered (the V076 analysis, phonedmrapp
+     * docs/atomxl-v076-firmware-analysis.md §9). SignalDeck never writes there; Hand back warns when something is in it.
+     */
+    static final String STOCK_FIRMWARE_DIR = "/sdcard/intercom/dmr";
+    static final String STOCK_FIRMWARE_WARNING = "WARNING: the stock app would load these files into the radio module at its start: ";
+
+    /** The .bin names in a listing of {@link #STOCK_FIRMWARE_DIR}, comma-separated, or null when there are none. */
+    static String pendingStockFirmware(String listing) {
+        StringBuilder b = new StringBuilder();
+        for (String l : (listing == null ? "" : listing).split("\\s+")) if (l.toLowerCase(java.util.Locale.US).endsWith(".bin")) b.append(b.length() > 0 ? ", " : "").append(l);
+        return b.length() == 0 ? null : b.toString();
     }
 
     /**

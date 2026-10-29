@@ -963,6 +963,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 if (restoreStock) {
                     String g = AgoldUsb.giveBack(profile, getFilesDir()); r.append(g.replace('\n', ' ')).append("; ");
                     if (!AgoldUsb.bridgeAnswered(g)) history("warn", "\u26A0 The radio's USB bridge did not answer: restart the phone before opening the stock radio app");
+                    if (g.contains(AgoldUsb.STOCK_FIRMWARE_WARNING)) history("warn", "\u26A0 " + AgoldUsb.STOCK_FIRMWARE_DIR + " holds radio firmware files: the stock app loads them into the module when it starts. Remove them unless you mean to.");
                 } else r.append(AgoldUsb.bridgeDown()).append("; ");
             } else if (restoreStock) r.append("stock app: ").append(RootSetup.stockApp(profile, true)).append("; ");
             else {
