@@ -199,8 +199,18 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
                 }
                 final java.io.InputStream src = in; final Process proc = p;
                 rxSource = () -> { try { src.close(); } finally { if (proc != null) proc.destroy(); } };
-                int b; final long started = System.currentTimeMillis();
-                while (rxWatch == Thread.currentThread() && (b = in.read()) >= 0) {
+                int b; final long started = System.currentTimeMillis(); int empty = 0;
+                while (rxWatch == Thread.currentThread()) {
+                    b = in.read();
+                    if (b < 0) {                               // the driver sometimes returns an empty read (seen at a power-up): open it again
+                        if (p != null || rxWatch != Thread.currentThread()) break;
+                        if (empty++ == 0) ev.log("reception line: empty read, reopening " + AgoldUsb.STMCU);
+                        try { in.close(); } catch (IOException ignored) { }
+                        try { Thread.sleep(50); } catch (InterruptedException ie) { break; }
+                        in = new java.io.FileInputStream(AgoldUsb.STMCU);
+                        final java.io.InputStream again = in; rxSource = again::close;
+                        continue;
+                    }
                     // the bridge toggles the line at power-up (00 00 01 within ~1.7 s; read late, only a 00 is left): not a reception
                     if (System.currentTimeMillis() - started < AgoldUsb.POWER_UP_EDGES_MS) { ev.log(String.format(Locale.US, "reception line: 0x%02X at start, ignored", b)); continue; }
                     int code = AgoldUsb.receiveStatus(b);
