@@ -2896,7 +2896,11 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile boolean bridgeRecoverDeferred;
     private boolean captureRunning() { return audio instanceof AlsaDirectAudio && ((AlsaDirectAudio) audio).capturing(); }
     private volatile long captureDeadAt; private volatile boolean recoverHeld; private volatile String heldWhy;
-    private final Runnable heldRecovery = () -> { if (recoverHeld && !exiting) recoverBridgeAudio(heldWhy); };   // re-checked every 0.5 s
+    private final Runnable heldRecovery = () -> {                       // re-checked every 0.5 s
+        if (!recoverHeld || exiting) return;
+        if (captureRunning()) { recoverHeld = false; captureDeadAt = 0; log("the capture is running again: no bridge restart"); return; }   // healed by itself: no restart, and no stale start time for the next one
+        recoverBridgeAudio(heldWhy);
+    };
     void recoverBridgeAudio(String why) {
         long wait = 20_000 - (System.currentTimeMillis() - lastBridgeRecoverAt);
         if (agoldBridge() && !exiting && !isTransmitting() && wait > 0 && receiving && !bridgeRecoverDeferred) {
