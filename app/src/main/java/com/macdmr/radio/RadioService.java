@@ -3515,6 +3515,9 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** The first bench image that clears the module's own receive mute after a symbol key (FW31, phonedmrapp
      *  radio_firmware/reviews.md 2026-10-28): there a channel write would put the mute back, so only the hold is re-sent. */
     static final int SYM_UNMUTE_FW = 31;
+    /** From FW32 the firmware clears its transmit-time receive mute itself after a symbol key, so one channel write is enough. */
+    static final int SYM_MUTE_FIXED_FW = 32;
+    static int writesAfterSym(String moduleVersion) { return Firmware.tagNumber(moduleVersion) >= SYM_MUTE_FIXED_FW ? 1 : 2; }
     static boolean rewriteAfterSym(String moduleVersion) { return !(Firmware.stubTag(moduleVersion) && Firmware.tagNumber(moduleVersion) >= SYM_UNMUTE_FW); }
     private void rxAfterSym() {
         ChannelStore.Channel c = current;
@@ -3525,8 +3528,10 @@ public class RadioService extends Service implements RadioEngine.Events {
             // firmware restores that state itself.
             quietRewrite = true;
             try {
-                boolean a = applyChannelNow(c, c != vfo); Thread.sleep(700); boolean b = applyChannelNow(c, c != vfo);
-                log("rx after sym: FW31, channel " + c.number + " rewritten twice " + a + "/" + b);
+                int n = writesAfterSym(moduleVersion);
+                boolean a = applyChannelNow(c, c != vfo), b = true;
+                if (n > 1) { Thread.sleep(700); b = applyChannelNow(c, c != vfo); }
+                log("rx after sym: FW" + Firmware.tagNumber(moduleVersion) + ", channel " + c.number + " rewritten " + (n > 1 ? "twice " + a + "/" + b : "once " + a));
             } catch (Throwable t) { log("rx after sym: " + t); }
             finally { quietRewrite = false; }
             return;

@@ -21,4 +21,9 @@ public class SymUnmuteTest {
         assertFalse(RadioService.rewriteAfterSym("DMR003.FW32.V022"));
         assertTrue("stock", RadioService.rewriteAfterSym("DMR003.UV4T.V022"));
     }
+
+    @Test public void fw31WritesTwiceFw32Once() {
+        org.junit.Assert.assertEquals(2, RadioService.writesAfterSym("DMR003.FW31.V022"));
+        org.junit.Assert.assertEquals(1, RadioService.writesAfterSym("DMR003.FW32.V022"));
+    }
 }
