@@ -3530,7 +3530,16 @@ public class RadioService extends Service implements RadioEngine.Events {
             quietRewrite = true;
             try {
                 int n = writesAfterSym(moduleVersion);
-                if (n == 0) { log("rx after sym: FW" + Firmware.tagNumber(moduleVersion) + " unmutes itself, hold only (no channel write)"); holdAfterTx(); return; }
+                if (n == 0) {
+                    // FW32: the radio is open again (0x30 bit 7 clear, 0x58 held) but the M17 receiver kept the state of our own
+                    // transmission and does not lock (bench 2026-10-29); a channel write used to restart it via followM17Channel
+                    boolean m17On = m17Running(), hold = dataReceive;
+                    if (m17On) setM17(false);
+                    holdAfterTx();
+                    if (m17On) { String e = setM17(true, hold); if (e != null) log("m17 restart: " + e); }
+                    log("rx after sym: FW" + Firmware.tagNumber(moduleVersion) + " unmutes itself, hold only (no channel write)" + (m17On ? ", M17 receiver restarted" : ""));
+                    return;
+                }
                 boolean a = applyChannelNow(c, c != vfo), b = true;
                 if (n > 1) { Thread.sleep(700); b = applyChannelNow(c, c != vfo); }
                 log("rx after sym: FW" + Firmware.tagNumber(moduleVersion) + ", channel " + c.number + " rewritten " + (n > 1 ? "twice " + a + "/" + b : "once " + a));
