@@ -84,6 +84,29 @@ final class AgoldUsb {
      */
     static final String STMCU = "/dev/stmcu";
 
+    /**
+     * Android treats the bridge as a USB headset: at every enumeration its audio policy connects the card and the USB audio
+     * HAL opens it, beside SignalDeck's capture (measured 2026-10-28). The developer setting "Disable USB audio routing"
+     * stops that; it is switched on while SignalDeck owns the radio and put back when it lets go.
+     */
+    static final String USB_ROUTING_OFF = "usb_audio_automatic_routing_disabled";
+
+    /** Switch USB audio routing off; returns the previous value ("null" when unset) to restore later. */
+    static String usbRoutingOff() {
+        String prev = RootSetup.run("settings get secure " + USB_ROUTING_OFF).trim();
+        if (!"1".equals(prev)) RootSetup.run("settings put secure " + USB_ROUTING_OFF + " 1");
+        return prev.isEmpty() ? "null" : prev;
+    }
+
+    /** Put the setting back as {@link #usbRoutingOff} found it. */
+    static void usbRoutingRestore(String prev) {
+        if (prev == null || "1".equals(prev)) return;
+        RootSetup.run("null".equals(prev) ? "settings delete secure " + USB_ROUTING_OFF : "settings put secure " + USB_ROUTING_OFF + " " + prev);
+    }
+
+    /** Edges read in this long after the reader starts are the bridge's power-up toggles, not receptions. */
+    static final long POWER_UP_EDGES_MS = 2000;
+
     /** The engine's 0x36 status code for a {@link #STMCU} byte: 1 RECEIVE_START, 2 RECEIVE_STOP, -1 for anything else. */
     static int receiveStatus(int b) { return b == 0 ? 1 : b == 1 ? 2 : -1; }
 

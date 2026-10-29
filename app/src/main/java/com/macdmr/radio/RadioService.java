@@ -861,7 +861,13 @@ public class RadioService extends Service implements RadioEngine.Events {
                     log("No root granted, but the UART is reachable and the stock app is not running — continuing");
                 } else {
                     log("sepolicy: " + RootSetup.applySepolicy(getFilesDir(), profile));
-                    if (agold) log("tty: set at the bridge's power-up (the port exists only then)");
+                    if (agold) {
+                        log("tty: set at the bridge's power-up (the port exists only then)");
+                        android.content.SharedPreferences rp = getSharedPreferences("radio", MODE_PRIVATE);
+                        String prev = AgoldUsb.usbRoutingOff();                  // kept across a crash: the next release restores it
+                        if (!rp.contains("agoldUsbRouting")) rp.edit().putString("agoldUsbRouting", prev).apply();
+                        log("USB audio routing off while SignalDeck has the radio (was " + prev + ")");
+                    }
                     else if (!VendorSerial.load(this, profile.serialLib)) log("tty (stty fallback): " + RootSetup.ensureTty(profile));
                     if (RootSetup.stockAppEnabled(profile)) { log("stock app paused (its icon disappears while this app owns the radio; Device → Release brings it back): " + RootSetup.stockApp(profile, false)); pausedStock = true; Thread.sleep(1500); }
                 }
@@ -916,6 +922,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 log("bring-up failed: " + t);
                 if (agold) {                                  // the bridge: never leave it powered, and check it before the stock app runs
                     try { engine.close(); } catch (Throwable ignored) { }
+                    restoreUsbRouting();
                     log("hand-back after the failed bring-up: " + AgoldUsb.giveBack(profile, getFilesDir()).replace('\n', ' '));
                 } else if (pausedStock) {                     // never leave the phone with no working radio app
                     try { engine.close(); } catch (Throwable ignored) { }
@@ -949,6 +956,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             try { if (audio != null) { audio.stopRx(); rxAudioOn = false; if (restoreStock) audio.releaseForStockApp(); } } catch (Throwable ignored) { }
             if ("agold".equals(profile.protocol)) {      // both buttons give the USB port back (owner, 2026-10-28); Hand back checks the bridge first
                 try { engine.close(); } catch (Throwable ignored) { }
+                restoreUsbRouting();
                 if (restoreStock) {
                     String g = AgoldUsb.giveBack(profile, getFilesDir()); r.append(g.replace('\n', ' ')).append("; ");
                     if (!AgoldUsb.bridgeAnswered(g)) history("warn", "\u26A0 The radio's USB bridge did not answer: restart the phone before opening the stock radio app");
@@ -976,6 +984,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (restoreStock && !agold) log("stock app on: " + RootSetup.stockApp(profile, true));
             try { if (audio != null) { audio.stopRx(); audio.releaseForStockApp(); } } catch (Throwable ignored) { }
             engine.close();
+            if (agold) restoreUsbRouting();
             if (agold) log(restoreStock ? "hand-back: " + AgoldUsb.giveBack(profile, getFilesDir()).replace('\n', ' ') : AgoldUsb.bridgeDown());
             setLink("stopped");
         }, "radio-shutdown").start();
@@ -1007,7 +1016,10 @@ public class RadioService extends Service implements RadioEngine.Events {
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
                 audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()));   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
             }
-            String r = audio.startRx(true); audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
+            if (agoldBridge() && audio instanceof AlsaDirectAudio)        // the bridge's stream stops after 20-70 s of capture: open it per reception, as the stock app does
+                ((AlsaDirectAudio) audio).setOnCaptureEnded(err -> { if (receiving) recoverBridgeAudio("the USB capture ended during a reception (" + err + ")"); });
+            String r = agoldBridge() ? "USB capture opens at each reception" : audio.startRx(true);
+            audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
     }
 
@@ -2587,6 +2599,37 @@ public class RadioService extends Service implements RadioEngine.Events {
                 if (on) { if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); } if (a != null) log(a.startRx(true)); }
                 else { if (a != null) a.stopRx(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
             } catch (Throwable t) { log("bridge capture: " + t); }
+        });
+    }
+
+    @Override public void bridgeFault(String why) { recoverBridgeAudio(why); }
+
+    /** Atom XL: put "Disable USB audio routing" back as take-over found it. */
+    private void restoreUsbRouting() {
+        android.content.SharedPreferences rp = getSharedPreferences("radio", MODE_PRIVATE);
+        String prev = rp.getString("agoldUsbRouting", null);
+        if (prev == null) return;
+        AgoldUsb.usbRoutingRestore(prev); rp.edit().remove("agoldUsbRouting").apply();
+        log("USB audio routing restored (" + prev + ")");
+    }
+
+    private volatile long lastBridgeRecoverAt;
+    /**
+     * Atom XL: the bridge stops streaming capture audio after 20-70 s of one capture (measured 2026-10-28, also with no
+     * SignalDeck involved) and reports "pcm error"; its stock app then resets it. Power-cycle the bridge, put the channel
+     * back and reopen the capture if a reception is still on. At most once every 20 s, never while transmitting.
+     */
+    void recoverBridgeAudio(String why) {
+        if (!agoldBridge() || exiting || isTransmitting() || System.currentTimeMillis() - lastBridgeRecoverAt < 20_000) { log("bridge recovery skipped: " + why); return; }
+        lastBridgeRecoverAt = System.currentTimeMillis();
+        worker.execute(() -> {
+            try {
+                log("bridge recovery: " + why);
+                if (audio != null) audio.stopRx();
+                engine.powerCycle();
+                if (current != null) applyChannelNow(current, current.id > 0);
+                if (receiving && rxAudioOn && audio != null) log(audio.startRx(true));
+            } catch (Throwable t) { log("bridge recovery: " + t); }
         });
     }
 

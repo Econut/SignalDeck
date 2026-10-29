@@ -121,6 +121,10 @@ public final class AlsaDirectAudio implements AudioBackend {
         try { if (!p.waitFor(ms, TimeUnit.MILLISECONDS)) p.destroy(); } catch (InterruptedException e) { p.destroy(); }
     }
 
+    /** Called (on the reader thread) when the capture helper ends while capture should still be running. */
+    private volatile java.util.function.Consumer<String> onCaptureEnded;
+    void setOnCaptureEnded(java.util.function.Consumer<String> c) { onCaptureEnded = c; }
+
     @Override public void setSink(Sink s) { sink = s; }
     @Override public void setGate(Gate g) { gate = g; }
 
@@ -175,6 +179,8 @@ public final class AlsaDirectAudio implements AudioBackend {
                         if (playing && track != null) track.write(g == null || g.open() ? buf : zero, 0, BLOCK);   // keep the stream timing, play silence
                     }
                 } catch (Throwable t) { Log.w(TAG, "capture: " + t); }
+                java.util.function.Consumer<String> ended = onCaptureEnded;
+                if (rxRunning && rxProc == p && ended != null) { try { p.waitFor(300, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) { } ended.accept(takeErrors()); }
             }, "sdalsa-rx");                                             // leaving closes the pipe: the helper's next write fails and it puts the controls back
             rxThread.start();
             long t0 = System.currentTimeMillis();                        // the first block, or the helper's refusal (busy device, missing control)

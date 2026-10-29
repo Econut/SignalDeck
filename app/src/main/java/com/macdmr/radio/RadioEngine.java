@@ -33,6 +33,8 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
         void ack(int cmd, boolean ok);
         void booted(String banner);
         void sms(int type, int fromId, String text);          // 0x2D reply
+        /** The Agold USB bridge reported a fault that its stock app answers with a bridge reset (state report 03, "pcm error"). */
+        default void bridgeFault(String why) { }
     }
 
     private final DeviceProfile profile;
@@ -173,6 +175,12 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
         if (agold()) startReceiveWatch();
     }
 
+    /** Route 00 reports from the Agold bridge: logged; state report 03 ("pcm error, reset mcu" in its stock app) is a fault. */
+    @Override public void onBridge(int cmd, byte[] body) {
+        ev.log(String.format(Locale.US, "bridge cmd=0x%02X body=%s", cmd, body == null ? "-" : java.util.Arrays.toString(body)));
+        if (cmd == 0x08 && body != null && body.length >= 1 && body[0] == 3) ev.bridgeFault("bridge state report 03 (pcm error)");
+    }
+
     // ---- Agold: receptions come from the bridge driver's /dev/stmcu, not from the port ----
     private volatile Thread rxWatch;
     private volatile java.io.Closeable rxSource;
@@ -191,8 +199,10 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
                 }
                 final java.io.InputStream src = in; final Process proc = p;
                 rxSource = () -> { try { src.close(); } finally { if (proc != null) proc.destroy(); } };
-                int b;
+                int b; final long started = System.currentTimeMillis();
                 while (rxWatch == Thread.currentThread() && (b = in.read()) >= 0) {
+                    // the bridge toggles the line at power-up (00 00 01 within ~1.7 s; read late, only a 00 is left): not a reception
+                    if (System.currentTimeMillis() - started < AgoldUsb.POWER_UP_EDGES_MS) { ev.log(String.format(Locale.US, "reception line: 0x%02X at start, ignored", b)); continue; }
                     int code = AgoldUsb.receiveStatus(b);
                     if (code > 0) { ev.log("reception line: " + statusName(code)); ev.status(code, statusName(code)); } else ev.log(String.format(Locale.US, "reception line: byte 0x%02X", b));
                 }
