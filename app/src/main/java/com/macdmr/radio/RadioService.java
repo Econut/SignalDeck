@@ -946,7 +946,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         }
                     }
                 }
-                if (agold) { lineFallback = false; synthRx = false; lineMissed = 0; lineRestarts = 0; monRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
+                if (agold) { lineFallback = false; synthRx = false; lineMissed = 0; lineRestarts = 0; monRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); ui.removeCallbacks(windowCheck); ui.postDelayed(windowCheck, AgoldUsb.POWER_UP_EDGES_MS + 300); }
                 ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
@@ -2855,7 +2855,21 @@ public class RadioService extends Service implements RadioEngine.Events {
         }
         try { engine.powerCycle(); }
         catch (IOException e) { if (agoldBridge()) bridgeLost(e); throw e; }
+        if (agoldBridge()) { ui.removeCallbacks(windowCheck); ui.postDelayed(windowCheck, AgoldUsb.POWER_UP_EDGES_MS + 300); }
     }
+    /**
+     * After a bridge power-up the line's edges are ignored for {@link AgoldUsb#POWER_UP_EDGES_MS} (the bridge toggles it),
+     * so a reception that began or ended meanwhile was missed: a restart in the middle of a carrier swallowed its end and
+     * SignalDeck stayed "receiving" until the next carrier stopped (2026-10-29). When the window ends, the driver's own flag
+     * settles it; a start also needs the signal reading to agree (the flag can be stale on a stuck line).
+     */
+    private final Runnable windowCheck = () -> worker.execute(() -> {
+        if (!agoldBridge() || exiting || !isReady() || isTransmitting()) return;
+        String v = RootSetup.run("cat " + AgoldUsb.CALL_IN).trim();
+        int act = AgoldUsb.windowAction(receiving, v, rssi, AgoldUsb.rssiStartDbm(idleFloor));
+        if (act == 2) ui.post(() -> { if (receiving && !monRx) { /* MON holds its own reception open without the line */ log("reception ended during the bridge power-up (call_in " + v + ")"); synthRx = false; status(2, RadioEngine.statusName(2)); } });
+        else if (act == 1) ui.post(() -> { if (!receiving) { log("reception in progress after the bridge power-up (call_in " + v + ", " + rssi + " dBm)"); synthRx = true; status(1, RadioEngine.statusName(1)); } });
+    });
     private void bridgeLost(Throwable t) {
         log("the USB bridge did not come back: " + t);
         ui.removeCallbacks(rxWatchdog); ui.removeCallbacks(lineCheck); ui.removeCallbacks(moduleWatch);

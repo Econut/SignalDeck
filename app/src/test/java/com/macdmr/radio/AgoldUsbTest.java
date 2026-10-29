@@ -130,6 +130,16 @@ public class AgoldUsbTest {
         assertEquals("a carrier is not idle: the floor stays", f, AgoldUsb.nextFloor(f, -74), 0);
     }
 
+    @Test public void aPowerUpWindowIsSettledByTheDriversFlag() {
+        assertEquals("open, the driver says idle: the end was hidden in the window", 2, AgoldUsb.windowAction(true, "1\n", -102, -95));
+        assertEquals("idle, the driver says a reception holds the line and the signal agrees", 1, AgoldUsb.windowAction(false, "0", -74, -95));
+        assertEquals("a stale flag on a stuck line without a signal opens nothing", 0, AgoldUsb.windowAction(false, "0", -102, -95));
+        assertEquals("both agree", 0, AgoldUsb.windowAction(true, "0", -74, -95));
+        assertEquals(0, AgoldUsb.windowAction(false, "1", -74, -95));
+        assertEquals("an unreadable flag decides nothing", 0, AgoldUsb.windowAction(true, "cat: Permission denied", -102, -95));
+        assertEquals(0, AgoldUsb.windowAction(true, null, -102, -95));
+    }
+
     @Test public void powerOffPulsesTheBridgeLikeTheStockHal() {
         String r = AgoldUsb.RESET;
         int off = r.indexOf("echo 0 > " + AgoldUsb.MCU_POWER), pulse = r.indexOf("echo 1 > " + AgoldUsb.MCU_POWER), offAgain = r.indexOf("echo 0 > " + AgoldUsb.MCU_POWER, pulse);

@@ -83,6 +83,21 @@ final class AgoldUsb {
      * (measured on the Atom XL 2026-10-28 with DMR calls from a HackRF). The sysfs call_in node is not reliable.
      */
     static final String STMCU = "/dev/stmcu";
+    /** The driver's reception flag: "0" while a reception holds the line, "1" otherwise. */
+    static final String CALL_IN = "/sys/bus/platform/drivers/mcu/call_in";
+    /** call_in read back: exactly "0" is a reception in progress (anything else, an error included, is not). */
+    static boolean receptionInProgress(String callIn) { return callIn != null && callIn.trim().equals("0"); }
+    /**
+     * At the end of a power-up window: 2 = end the reception SignalDeck has open (the driver says idle), 1 = open one (the
+     * driver says a reception holds the line and the signal reading is above the start threshold), 0 = nothing.
+     */
+    static int windowAction(boolean receiving, String callIn, double dbm, double startDbm) {
+        if (callIn == null || !(callIn.trim().equals("0") || callIn.trim().equals("1"))) return 0;
+        boolean line = receptionInProgress(callIn);
+        if (receiving && !line) return 2;
+        if (!receiving && line && dbm > startDbm) return 1;
+        return 0;
+    }
 
     /**
      * Android treats the bridge as a USB headset: at every enumeration its audio policy connects the card and the USB audio
