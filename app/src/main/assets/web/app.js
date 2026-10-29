@@ -128,7 +128,8 @@ function applyRadio(rd) {
   const nav = p => document.querySelector('a[data-page="' + p + '"]');
   if (nav('messages')) nav('messages').classList.toggle('hidden', rd.messages === false);
   if (nav('contacts')) nav('contacts').classList.toggle('hidden', rd.contacts === false);
-  if ((S.page === 'messages' && rd.messages === false) || (S.page === 'contacts' && rd.contacts === false)) location.hash = '#intercom';
+  if (nav('pager')) nav('pager').classList.toggle('hidden', rd.symbolEngine === false);   // pages go out and in through the bench firmware's symbol engine only
+  if ((S.page === 'messages' && rd.messages === false) || (S.page === 'contacts' && rd.contacts === false) || (S.page === 'pager' && rd.symbolEngine === false)) location.hash = '#intercom';
   if (!S.dmr && S.chFilter >= 2) { S.chFilter = 0; $('chFilter').querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.f === '0')); }
 }
 function renderStatus() {

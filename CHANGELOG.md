@@ -5,6 +5,11 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | Atom XL feature sweep (managing agent, 2026-10-29) | FT8 decoded a slot only when audio arrived 14.7 s or more into it, which a continuous capture always does. The Atom XL opens its capture per reception and closes it 0.7 s after the signal (FT8 ends at 13.1 s), so no slot was ever decoded there. The 250 ms scheduler now decodes a slot that had audio once it is over; a slot without audio is not decoded, and a slot decoded from the audio is not decoded twice. | `ham/Ft8Station.java`, `ham/Ft8StationTest.java` | Host: a new test feeds a CQ from 0.25 to 13.75 s only, then ticks: one decode at the slot's end, none in the next two empty slots (fails without the fix). Device: pending on the Atom XL (the HackRF needs a power-cycle). |
+## 2026-10-29 — SignalDeck Web: no Pager page on a radio that cannot page
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL feature sweep (managing agent, 2026-10-29) | The phone hides POCSAG paging on a radio without the HR-C7000 symbol engine (the Atom XL, the W6+), but SignalDeck Web still listed the Pager page, whose Send and Monitor only came back with errors. The web now hides it when the status says `symbolEngine: false`, and an open Pager page goes to the intercom, like Messages and Contacts on a radio without DMR. | `assets/web/app.js` | Host suite. Device: pending (Atom XL web check after Grok's lease). |
 
 ## 2026-10-29 — Atom XL: its own help section, no firmware loader, boot and long-receive checks
 
