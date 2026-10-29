@@ -3529,6 +3529,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             quietRewrite = true;
             try {
                 int n = writesAfterSym(moduleVersion);
+                if (n == 1) Thread.sleep(1000);   // FW32: the module's close re-mutes the receiver about half a second after status 4; a write before that is undone (bench 2026-10-29)
                 boolean a = applyChannelNow(c, c != vfo), b = true;
                 if (n > 1) { Thread.sleep(700); b = applyChannelNow(c, c != vfo); }
                 log("rx after sym: FW" + Firmware.tagNumber(moduleVersion) + ", channel " + c.number + " rewritten " + (n > 1 ? "twice " + a + "/" + b : "once " + a));

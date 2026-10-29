@@ -4,7 +4,7 @@
 
 | Backlog | Change | Files | Test |
 |---|---|---|---|
-| phonedmrapp `radio_firmware/reviews.md` 22:50 | FW32 clears the module's transmit-time receive mute (AT1846S `0x30` bit 7) itself after a symbol key, so SignalDeck writes the channel once instead of twice there; FW31 keeps the double write | `RadioService.java`, `SymUnmuteTest.java` | Host suite; bench with Grok on FW32 |
+| phonedmrapp `radio_firmware/reviews.md` 22:50 | FW32 clears the module's transmit-time receive mute (AT1846S `0x30` bit 7) itself after a symbol key, so SignalDeck writes the channel once, 1 s after the module's end-of-key report (a write sooner is undone by the module's own close), instead of twice; FW31 keeps the double write | `RadioService.java`, `SymUnmuteTest.java` | Host suite; bench with Grok on FW32 |
 
 ## 2026-10-28 — M17 receive after a symbol key on FW31: hold only, no channel rewrite
 
