@@ -1022,7 +1022,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 audio.setGate(() -> squelchOpen && !muted && (current == null || !current.isM17()));   // an M17 channel: raw FM stays off the speaker; decoded voice has its own track
             }
             if (agoldBridge() && audio instanceof AlsaDirectAudio)        // the bridge's stream stops after 20-70 s of capture: open it per reception, as the stock app does
-                ((AlsaDirectAudio) audio).setOnCaptureEnded(err -> { if (receiving) recoverBridgeAudio("the USB capture ended during a reception (" + err + ")"); });
+                ((AlsaDirectAudio) audio).setOnCaptureEnded(err -> recoverBridgeAudio("the USB capture ended by itself (" + err + ")"));   // a dead stream stays dead until the bridge restarts, reception or not
             String r = agoldBridge() ? "USB capture opens at each reception" : audio.startRx(true);
             audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -2603,7 +2603,8 @@ public class RadioService extends Service implements RadioEngine.Events {
             try {
                 // while the bridge streams audio it cuts every frame on the port after 12 bytes (measured 2026-10-28), so
                 // the caller (a 20-byte 0x2B reply) is asked before the capture opens and after it closes, as the stock app does
-                if (on) { if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); } if (a != null) log(a.startRx(true)); }
+                if (on) { if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); }
+                    if (a != null) { String r = a.startRx(true); log(r); if (r != null && r.contains("no audio block yet")) recoverBridgeAudio("the USB capture delivered nothing"); } }
                 else { if (a != null) a.stopRx(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
             } catch (Throwable t) { log("bridge capture: " + t); }
         });

@@ -441,7 +441,7 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
         switch (f.cmd) {
             case CMD_STATUS: {
                 int code = b.length > 0 ? b[0] & 0xFF : -1;
-                try { send(new Frame(CMD_STATUS, 1, 1, new byte[] { 1 })); } catch (IOException ignored) { }   // the OEM acks every push
+                if (!agold()) try { send(new Frame(CMD_STATUS, 1, 1, new byte[] { 1 })); } catch (IOException ignored) { }   // the OEM acks every push; the Agold stock app does not
                 ev.status(code, statusName(code));
                 break;
             }
@@ -459,7 +459,7 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
             case CMD_FETCH_SMS:
                 if (b.length >= 5) {
                     ByteBuffer bb = ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN);
-                    int type = bb.get() & 0xFF; int from = bb.getInt();
+                    int type = bb.get() & 0xFF; int from = bb.getInt() & 0xFFFFFF;   // a DMR ID is 24 bits (the Agold stock app reads three bytes)
                     String text = new String(b, 5, b.length - 5, java.nio.charset.StandardCharsets.UTF_16LE).replace("\u0000", "").trim();
                     ev.sms(type, from, text);
                 }

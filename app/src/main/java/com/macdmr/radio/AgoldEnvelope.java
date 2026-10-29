@@ -25,9 +25,11 @@ import java.util.function.Consumer;
  */
 public final class AgoldEnvelope implements FrameCodec {
     /** Module replies whose body is the data (version, RSSI, caller, text, read-back, the symbol engine). */
-    private static final int[] DATA = { 0x24, 0x25, 0x2B, 0x2D, 0x32, 0x34, 0x40 };
+    // 0x36 is the module's status push and keeps its code in the body: a real push (a text arriving, code 5) carries rw 00,
+    // measured on the Atom XL 2026-10-28, so rw cannot tell it from a reply; SignalDeck never sends a 0x36 request here
+    private static final int[] DATA = { 0x24, 0x25, 0x2B, 0x2D, 0x32, 0x34, 0x36, 0x40 };
     /** Module replies whose one body byte is the result. */
-    private static final int[] SET = { 0x22, 0x23, 0x2E, 0x30, 0x31, 0x36 };
+    private static final int[] SET = { 0x22, 0x23, 0x2E, 0x30, 0x31 };
     /** Route 02: the bridge's audio stream opened / closed by the host. */
     static final int AUDIO_ON = 0x67, AUDIO_OFF = 0x66;
 

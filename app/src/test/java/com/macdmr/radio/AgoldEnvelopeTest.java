@@ -97,22 +97,18 @@ public class AgoldEnvelopeTest {
         assertEquals(0, got.sr);
     }
 
-    @Test public void statusPushKeepsItsBodyAndTheReplyFoldsTheResult() {
+    @Test public void statusPushKeepsItsBodyWhateverItsRw() {
+        // a real push captured on the Atom XL 2026-10-28 (a DMR text arriving): 0x36, rw 00, body 05 (SMS received)
         AgoldEnvelope env = new AgoldEnvelope();
         Frame[] out = new Frame[1];
-        byte[] push = AgoldFramesTest.frame(1, 0x36, 1, new byte[] { 3 });
+        byte[] push = AgoldFramesTest.frame(1, 0x36, 0, new byte[] { 5 });
         assertEquals(push.length, env.tryDecode(push, 0, push.length, out));
         assertEquals(0x36, out[0].cmd);
         assertEquals(0, out[0].sr);
+        assertArrayEquals(new byte[] { 5 }, out[0].body);
+        byte[] other = AgoldFramesTest.frame(1, 0x36, 1, new byte[] { 3 });
+        env.tryDecode(other, 0, other.length, out);
         assertArrayEquals(new byte[] { 3 }, out[0].body);
-        byte[] reply = AgoldFramesTest.frame(1, 0x36, 0, new byte[] { 0 });
-        assertEquals(reply.length, env.tryDecode(reply, 0, reply.length, out));
-        assertEquals(0, out[0].sr);
-        assertEquals(0, out[0].body.length);
-        byte[] refused = AgoldFramesTest.frame(1, 0x36, 0, new byte[] { 1 });
-        env.tryDecode(refused, 0, refused.length, out);
-        assertEquals(1, out[0].sr);
-        assertEquals(0, out[0].body.length);
     }
 
     @Test public void unlistedRepliesAreMappedAndLoggedOnce() {
