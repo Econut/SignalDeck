@@ -854,12 +854,19 @@ public class RadioService extends Service implements RadioEngine.Events {
     // ---- lifecycle of the link --------------------------------------------------------------------
 
     private final java.util.concurrent.atomic.AtomicBoolean bringUpRunning = new java.util.concurrent.atomic.AtomicBoolean();
+    private volatile long bringUpAt;
+    static final long BRING_UP_STALE_MS = 90_000;
     /** Bring the radio up: policy (root), stock app off, UART, power, channel, RX audio. Runs on a worker. */
     public void bringUp() {
         if (!profile.supported) { setLink("unsupported"); log("This phone has no device profile yet. Device tab → Generate device report, then share it on the project's GitHub issues."); return; }
         final boolean agold = "agold".equals(profile.protocol);                          // the Atom XL: the radio behind a USB bridge
         if (agold && "ready".equals(link)) { log("bring-up skipped: the radio is already up (a second one would power-cycle the USB bridge)"); return; }
-        if (!bringUpRunning.compareAndSet(false, true)) { log("bring-up skipped: one is already running"); return; }
+        if (!bringUpRunning.compareAndSet(false, true)) {
+            long age = System.currentTimeMillis() - bringUpAt;
+            if (age < BRING_UP_STALE_MS) { log("bring-up skipped: one is already running"); return; }
+            log("an earlier bring-up has hung for " + age / 1000 + " s: starting a new one");   // one stuck bring-up must not refuse every later Take over
+        }
+        bringUpAt = System.currentTimeMillis();
         exiting = false;                                                // a bring-up wants the radio: an earlier Exit no longer blocks bridge recovery
         new Thread(() -> {
             boolean pausedStock = false;
@@ -963,6 +970,7 @@ public class RadioService extends Service implements RadioEngine.Events {
      */
     public void exit(final boolean restoreStock, final ExitDone done) {
         exiting = true;
+        bringUpRunning.set(false);                                       // a Take over after this Exit starts afresh
         new Thread(() -> {
             StringBuilder r = new StringBuilder();
             try { if (pttDown) { if (audio != null) audio.stopTx(); engine.ptt(false); pttDown = false; r.append("transmission ended; "); } } catch (Throwable t) { r.append("unkey: ").append(t.getMessage()).append("; "); }
@@ -2555,7 +2563,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         log("sym unkey");
         holdAfterTx();
     }
-    public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); engine.powerCycle(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
+    public void diagPowerCycle() { worker.execute(() -> { try { if (audio != null) audio.stopRx(); log("power-cycling the module"); powerCycleOrGiveUp(); if (!engine.waitBooted(12000)) log("no banner after power-cycle"); engine.queryVersion(); if (current != null) applyChannelNow(current, current.id > 0); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); } catch (Throwable t) { log("power-cycle: " + t); } }); }
     /** Bench (DiagReceiver): transmit an 8 kHz mono 16-bit WAV from the app's cache on the current channel/VFO (at most 28 s). */
     public String diagTxWav(java.io.File f) {
         try {
@@ -2730,7 +2738,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!agoldBridge() || exiting || !isReady() || engine.receptionLineBytes() != 0) return;
         if (lineCheckTries++ == 0) {
             log("reception line silent " + (LINE_CHECK_MS / 1000) + " s after bring-up: power-cycling the bridge once");
-            worker.execute(() -> { try { engine.powerCycle(); if (current != null) applyChannelNow(current, current.id > 0); } catch (Throwable t) { log("reception line: " + t); } });
+            worker.execute(() -> { try { powerCycleOrGiveUp(); if (current != null) applyChannelNow(current, current.id > 0); } catch (Throwable t) { log("reception line: " + t); } });
             ui.postDelayed(this, LINE_CHECK_MS + 6000);
             return;
         }
@@ -2778,6 +2786,26 @@ public class RadioService extends Service implements RadioEngine.Events {
      * SignalDeck involved) and reports "pcm error"; its stock app then resets it. Power-cycle the bridge, put the channel
      * back and reopen the capture if a reception is still on. At most once every 20 s, never while transmitting.
      */
+    /**
+     * A module restart while SignalDeck owns the radio. On the Atom XL a failed one leaves the bridge off and the port gone:
+     * then the radio is let go the way a failed bring-up does it (USB routing back, the bridge checked before the stock
+     * app returns) and the link shows the error, instead of "ready" with the radio off.
+     */
+    private void powerCycleOrGiveUp() throws IOException {
+        try { engine.powerCycle(); }
+        catch (IOException e) { if (agoldBridge()) bridgeLost(e); throw e; }
+    }
+    private void bridgeLost(Throwable t) {
+        log("the USB bridge did not come back: " + t);
+        ui.removeCallbacks(rxWatchdog); ui.removeCallbacks(lineCheck); ui.removeCallbacks(moduleWatch);
+        try { if (audio != null) audio.stopRx(); } catch (Throwable ignored) { }
+        try { engine.close(); } catch (Throwable ignored) { }
+        restoreUsbRouting();
+        log("hand-back after the lost bridge: " + AgoldUsb.giveBack(profile, getFilesDir()).replace('\n', ' '));
+        history("warn", "⚠ The radio's USB bridge did not come back after a restart: the radio is off and back with the stock app. Take over again, or restart the phone if it keeps happening");
+        setLink("error: the USB bridge did not come back (" + t.getMessage() + ")");
+    }
+
     void recoverBridgeAudio(String why) {
         if (!agoldBridge() || exiting || isTransmitting() || System.currentTimeMillis() - lastBridgeRecoverAt < 20_000) { log("bridge recovery skipped: " + why); return; }
         lastBridgeRecoverAt = System.currentTimeMillis();
@@ -2785,7 +2813,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             try {
                 log("bridge recovery: " + why);
                 if (audio != null) audio.stopRx();
-                engine.powerCycle();
+                powerCycleOrGiveUp();
                 if (current != null) applyChannelNow(current, current.id > 0);
                 if (receiving && rxAudioOn && audio != null) log(audio.startRx(true));
             } catch (Throwable t) { log("bridge recovery: " + t); }
@@ -2866,7 +2894,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 history("warn", "\u26A0 The radio module stopped answering commands: restarting it (a few seconds without reception)");
                 setLink("booting");
                 if (audio != null) audio.stopRx();
-                engine.powerCycle();
+                powerCycleOrGiveUp();
                 if (!engine.waitBooted(12000)) log("no boot banner after the restart");
                 Thread.sleep(300);
                 boolean ok = versionHandshake(3000);

@@ -201,7 +201,10 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
                     ev.log("reception line: " + AgoldUsb.STMCU + " through root (" + e.getMessage() + ")");
                 }
                 final java.io.InputStream src = in; final Process proc = p;
-                rxSource = () -> { try { src.close(); } finally { if (proc != null) proc.destroy(); } };
+                synchronized (rxLock) {
+                    if (rxWatch != Thread.currentThread()) return;     // stopped before the line was open (finally closes it)
+                    rxSource = () -> { try { src.close(); } finally { if (proc != null) proc.destroy(); } };
+                }
                 int b; final long started = System.currentTimeMillis(); int empty = 0;
                 while (rxWatch == Thread.currentThread()) {
                     b = in.read();
@@ -211,7 +214,11 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
                         try { in.close(); } catch (IOException ignored) { }
                         try { Thread.sleep(50); } catch (InterruptedException ie) { break; }
                         in = new java.io.FileInputStream(AgoldUsb.STMCU);
-                        final java.io.InputStream again = in; rxSource = again::close;
+                        final java.io.InputStream again = in;
+                        synchronized (rxLock) {                    // a stop between the reopen and here closed the old stream only
+                            if (rxWatch != Thread.currentThread()) break;
+                            rxSource = again::close;
+                        }
                         continue;
                     }
                     rxLineBytes++;
@@ -232,9 +239,10 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
         t.start();
     }
 
+    private final Object rxLock = new Object();
     private void stopReceiveWatch() {
-        rxWatch = null;
-        java.io.Closeable c = rxSource; rxSource = null;
+        java.io.Closeable c;
+        synchronized (rxLock) { rxWatch = null; c = rxSource; rxSource = null; }
         if (c != null) try { c.close(); } catch (IOException ignored) { }
     }
     public void close() { stopReceiveWatch(); port.close(); }

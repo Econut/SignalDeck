@@ -12,6 +12,16 @@ import org.junit.Test;
 
 /** The Atom XL's USB bridge: which phones have it, where the USB controller's cable mode lives, the summary line. */
 public class AgoldUsbTest {
+    @Test public void stockWatchSkippedWhenTheStockAppWouldLoadFirmware() {
+        String answered = "bridge version (route 00, cmd 0x01): \"20201016161541\", checksum ok\n";
+        assertNull(AgoldUsb.stockWatchBlocked("", answered));                                       // nothing pending, bridge answers
+        assertNull(AgoldUsb.stockWatchBlocked("notes.txt\n", "not run: com.agold.intercom is running\n"));   // a probe that did not run blocks nothing
+        String f = AgoldUsb.stockWatchBlocked("DMR006.U4A.V076.bin\n", answered);
+        assertNotNull(f); assertTrue(f.contains("DMR006.U4A.V076.bin"));                             // a firmware file in /sdcard/intercom/dmr
+        String b = AgoldUsb.stockWatchBlocked("", "bridge version (route 00, cmd 0x01): no reply; " + AgoldUsb.BRIDGE_SILENT + "\n");
+        assertNotNull(b); assertTrue(b.contains("did not answer"));                                  // the stock app would update the bridge
+    }
+
     @Test public void bridgedOnlyWithTheHalProperty() {
         assertTrue(AgoldUsb.bridged("yes\n"));                     // Atom XL: ro.agold.extmodule.hal=yes
         assertFalse(AgoldUsb.bridged(""));                         // Armor 26 Ultra, W6: no such property

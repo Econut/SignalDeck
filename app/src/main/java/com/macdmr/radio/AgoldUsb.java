@@ -237,6 +237,23 @@ final class AgoldUsb {
     static final String GIVE_BACK_HELD = "the stock app stays paused: restart the phone, then open it (it would otherwise update the bridge's firmware)";
 
     /** True when an {@link #identityProbe} result shows the bridge's version reply. */
+    /**
+     * Run all checks opens the stock app for its 15 s watch; on this phone that start can load firmware into the radio: any
+     * .bin in {@link #STOCK_FIRMWARE_DIR}, or the bridge's own image when the bridge does not answer. Returns why the watch
+     * must be skipped, or null. {@code probe} is {@link #identityProbe}'s output (a probe that did not run blocks nothing).
+     */
+    static String stockWatchBlocked(String listing, String probe) {
+        String pending = pendingStockFirmware(listing);
+        if (pending != null) return "the stock app would load firmware files from " + STOCK_FIRMWARE_DIR + " into the radio at its start (" + pending + ")";
+        if (probe != null && !probe.startsWith("not run") && !bridgeAnswered(probe)) return "the radio's USB bridge did not answer, so the stock app would try to update its firmware: restart the phone first";
+        return null;
+    }
+    static String stockWatchBlocked(java.io.File dir, String pkg) {
+        String listing = RootSetup.run("ls " + STOCK_FIRMWARE_DIR + " 2>/dev/null");
+        if (pendingStockFirmware(listing) != null) return stockWatchBlocked(listing, null);
+        return stockWatchBlocked(listing, identityProbe(dir, pkg));
+    }
+
     static boolean bridgeAnswered(String probe) {
         return probe != null && !probe.startsWith("not run") && probe.contains("bridge version (route 00, cmd 0x01): \"") && !probe.contains(BRIDGE_SILENT);
     }
