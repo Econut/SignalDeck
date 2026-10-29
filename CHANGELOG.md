@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: a short burst from another band no longer restarts the radio, and one restart no longer sets off the next
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL false starts (managing agent, 2026-10-29) | Another transmitter nearby (a HackRF on 446 MHz in the same cage) showed up for about a second as a strong signal on the Atom XL's 401.025 MHz. SignalDeck took it for a call the radio had missed, decided the radio's reception signal was stuck and restarted the radio's bridge; that restart cut the sound stream it had just opened, which started a second restart, and the two back to back left the module silent for a third. A call found from the signal now counts against the reception signal only when it lasted at least 3 s (a real call the radio never reports still does); SignalDeck's own bridge restarts stop the sound first and do not count the end they cause as a fault; and automatic bridge restarts (stuck reception signal, sound recovery, silent module) keep at least 20 s apart, with a log line when one waits. Exit and Take over are never held. | `AgoldUsb`, `RadioService` | Host: `AgoldUsbTest.onlyALongUnreportedReceptionCountsAgainstTheLine` (a 220 ms or 2999 ms blip does not count, 3 s and 12 s do, two counted misses still restart); full suite 521 / 0. Device: pending (a 1 s burst, the stuck-line repro with 12 s carriers, a capture that dies on its own, two triggers within 20 s) |
+
 ## 2026-10-29 — ANYSECU W6Plus DMR (V69): receive on an untested profile
 
 | Backlog | Change | Files | Test |
