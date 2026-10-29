@@ -917,7 +917,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         }
                     }
                 }
-                if (agold) { lineFallback = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); }
+                if (agold) { lineFallback = false; synthRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
                 ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
@@ -2556,7 +2556,8 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void status(int code, String name) {
         switch (code) {
-            case 1: receiving = true; dmrEvent("start", 0, 0, 0);
+            case 1: if (agoldBridge() && receiving) { if (synthRx) { synthRx = false; log("reception line caught up with the signal"); } break; }   // already open: an edge after a signal-started reception
+                receiving = true; dmrEvent("start", 0, 0, 0);
                 if (current != null && current.isDigital()) {           // a DMR call: forget the last talker, ask who this is now and again a second later
                     lastCaller = 0; callLogged = false;
                     if (!agoldBridge()) for (long ms : new long[] { 300, 1200 }) ui.postDelayed(() -> { if (receiving) worker.execute(() -> { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }); }, ms);
@@ -2564,6 +2565,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 bridgeCapture(true);
                 refreshControls(); rxStart = System.currentTimeMillis(); rxCounts = rxReportsReception(); softSq.rxStarted(); ui.post(() -> { for (Listener l : listeners) l.onRx(true); }); pollRssi(); break;
             case 2: {
+                synthRx = false;
                 dmrEvent("stop", 0, 0, 0);
                 receiving = false; bridgeCapture(false); refreshControls(); long len = rxStart > 0 ? System.currentTimeMillis() - rxStart : 0; rxStart = 0;
                 if (softSq.isEnabled() && squelchOpen) { softSq.closeNow(); softGateHistory(false); squelchOpen = false; log("soft squelch closed (carrier gone)"); }
@@ -2615,7 +2617,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /**
      * After a bring-up the bridge's /dev/stmcu delivers its power-up toggle within a second or two. When nothing at all has
      * arrived after 5 s the line is stuck in its power-up state and will report no reception: power-cycle the bridge once;
-     * if it stays silent, detect receptions from the signal reading instead ({@link #lineFallbackPoll}).
+     * if it stays silent, receptions come from the signal reading ({@link #rxWatchdog}) until it reports again.
      */
     private final Runnable lineCheck = new Runnable() { @Override public void run() {
         if (!agoldBridge() || exiting || !isReady() || engine.receptionLineBytes() != 0) return;
@@ -2625,23 +2627,33 @@ public class RadioService extends Service implements RadioEngine.Events {
             ui.postDelayed(this, LINE_CHECK_MS + 6000);
             return;
         }
-        log("reception line still silent: receptions are detected from the signal reading (RSSI) instead");
+        log("reception line still silent: receptions come from the signal reading (RSSI) until it reports again");
         history("warn", "\u26A0 The radio's reception signal is not working: SignalDeck detects calls from the signal strength (a little later)");
-        lineFallback = true; ui.removeCallbacks(lineFallbackPoll); ui.post(lineFallbackPoll);
+        lineFallback = true;
     } };
-    private volatile int fallbackLow;
-    private final Runnable lineFallbackPoll = new Runnable() { @Override public void run() {
-        if (!lineFallback || exiting || !isReady()) return;
-        if (engine.receptionLineBytes() > 0) { lineFallback = false; log("reception line works again: RSSI detection off"); return; }
-        if (!isTransmitting()) pollRssi();
-        ui.postDelayed(this, 500);
+
+    /**
+     * Atom XL reception watchdog, always on: the bridge's line also misses receptions now and then after a long one (and the
+     * stock app then misses them too). Idle, the signal is read every second; a signal above -95 dBm twice with no reception
+     * reported starts one ({@link #synthRx}), two readings below -100 dBm end it and rewrite the channel, which brought the
+     * line back on the bench (2026-10-28). An edge that arrives meanwhile is merged.
+     */
+    private volatile boolean synthRx; private volatile int strongCount, lowCount;
+    private final Runnable rxWatchdog = new Runnable() { @Override public void run() {
+        if (!agoldBridge() || exiting) return;
+        if (isReady() && !isTransmitting() && (!receiving || synthRx)) pollRssi();
+        ui.postDelayed(this, synthRx || lineFallback ? 500 : 1000);
     } };
-    /** In fallback, a signal above -97 dBm starts a reception and two readings below -100 dBm end it. */
-    private void fallbackRssi(double dbm) {
-        if (!lineFallback || isTransmitting()) return;
-        if (!receiving && dbm > -97) { fallbackLow = 0; log("reception (signal " + Math.round(dbm) + " dBm)"); status(1, RadioEngine.statusName(1)); }
-        else if (receiving && dbm < -100 && ++fallbackLow >= 2) { fallbackLow = 0; status(2, RadioEngine.statusName(2)); }
-        else if (dbm >= -100) fallbackLow = 0;
+    private void agoldRssi(double dbm) {
+        if (!agoldBridge() || isTransmitting()) return;
+        if (!receiving) {
+            if (dbm > -95) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
+            else strongCount = 0;
+        } else if (synthRx) {
+            if (dbm < -100) { if (++lowCount >= 2) { lowCount = 0; synthRx = false; status(2, RadioEngine.statusName(2));
+                if (current != null) worker.execute(() -> { try { applyChannelNow(current, current.id > 0); log("channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
+            else lowCount = 0;
+        }
     }
 
     /** Atom XL: put "Disable USB audio routing" back as take-over found it. */
@@ -2678,7 +2690,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void rssi(int raw, double dbm) { if (scope.running()) { scope.onRssi(raw); return; }   // a sweep step's reading: not the channel's signal, not for the coverage log
         rssi0(raw, dbm); }
-    private void rssi0(int raw, double dbm) { if (lineFallback) fallbackRssi(dbm); rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
+    private void rssi0(int raw, double dbm) { agoldRssi(dbm); rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     private volatile String moduleVersion = "";
     private volatile long versionAt;
     @Override public void version(int v, String text) {
