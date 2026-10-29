@@ -940,7 +940,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         }
                     }
                 }
-                if (agold) { lineFallback = false; synthRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
+                if (agold) { lineFallback = false; synthRx = false; monRx = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); ui.removeCallbacks(rxWatchdog); ui.postDelayed(rxWatchdog, 3000); }
                 ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
@@ -1237,8 +1237,22 @@ public class RadioService extends Service implements RadioEngine.Events {
     public void setMonitor(final boolean on) {
         monitorOn = on; monRetries = 0;
         sendMonitor(on);
+        monitorReception(on);
         if (promiscuousCapable()) sendPromiscuous(on);
         pushModes();
+    }
+
+    /**
+     * Atom XL, analog channels: MON holds the squelch open, so there is always something to hear, but the bridge's reception line reports it
+     * only when the line works (in some sessions it stays in its power-up state and reports nothing, 2026-10-28/29). So MON
+     * opens the reception itself; an edge that arrives meanwhile is merged ({@link #status}), the signal watchdog leaves it
+     * open, and MON off ends it when the line never reported one.
+     */
+    private volatile boolean monRx;
+    private void monitorReception(boolean on) {
+        if (!agoldBridge()) return;                                      // on a DMR channel MON admits calls; it opens no audio
+        if (on && !receiving && !isTransmitting() && isReady() && current != null && !current.isDigital()) { monRx = true; synthRx = true; log("MON: reception opened without waiting for the reception line"); status(1, RadioEngine.statusName(1)); }
+        else if (!on && monRx) { monRx = false; if (receiving && synthRx) status(2, RadioEngine.statusName(2)); }
     }
 
     /** The first bench image whose receive handler admits every call while the flag is on (promiscuous receive, phonedmrapp docs/promiscuous-rx-patch-spec-2026-10-24.md). */
@@ -2660,7 +2674,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 bridgeReception(true);
                 refreshControls(); rxStart = System.currentTimeMillis(); rxCounts = rxReportsReception(); softSq.rxStarted(); ui.post(() -> { for (Listener l : listeners) l.onRx(true); }); pollRssi(); break;
             case 2: {
-                synthRx = false;
+                synthRx = false; monRx = false;
                 dmrEvent("stop", 0, 0, 0);
                 receiving = false; bridgeReception(false); refreshControls(); long len = rxStart > 0 ? System.currentTimeMillis() - rxStart : 0; rxStart = 0;
                 if (softSq.isEnabled() && squelchOpen) { softSq.closeNow(); softGateHistory(false); squelchOpen = false; log("soft squelch closed (carrier gone)"); }
@@ -2765,7 +2779,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!receiving) {
             if (dbm > -95) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
             else strongCount = 0;
-        } else if (synthRx) {
+        } else if (synthRx && !monRx) {                                  // a MON reception ends with MON
             if (dbm < -100) { if (++lowCount >= 2) { lowCount = 0; synthRx = false; status(2, RadioEngine.statusName(2));
                 if (current != null) worker.execute(() -> { try { applyChannelNow(current, current.id > 0); log("channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
             else lowCount = 0;
