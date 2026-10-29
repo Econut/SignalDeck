@@ -1052,7 +1052,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 audio.setGate(() -> squelchOpen && !muted && !rawHeld() && !(profile.appPlayback && pttDown) && !dataQuiet());   // M17 in play, a data mode without MON, or app playback while keyed: the raw FM stays off the speaker; decoded M17 voice has its own track
             }
             if (agoldBridge() && audio instanceof AlsaDirectAudio)        // the bridge's stream stops after 20-70 s of capture: open it per reception, as the stock app does
-                ((AlsaDirectAudio) audio).setOnCaptureEnded(err -> recoverBridgeAudio("the USB capture ended by itself (" + err + ")"));   // a dead stream stays dead until the bridge restarts, reception or not
+                ((AlsaDirectAudio) audio).setOnCaptureEnded(this::captureEnded);
             String r = agoldBridge() ? "USB capture opens at each reception" : audio.startRx(true);
             audioStart = r; log(r); rxAudioOn = true; audioError = r != null && r.startsWith("startRx failed") ? r : null;
         } catch (Throwable t) { audioError = String.valueOf(t) + (t.getCause() != null ? " / " + t.getCause() : ""); log("audio: " + t); }
@@ -2860,7 +2860,25 @@ public class RadioService extends Service implements RadioEngine.Events {
      * then the radio is let go the way a failed bring-up does it (USB routing back, the bridge checked before the stock
      * app returns) and the link shows the error, instead of "ready" with the radio off.
      */
+    /**
+     * Our own bridge power-cycles end the capture too: that end is not a fault and must not queue a recovery of its own
+     * (2026-10-29 17:06: a stuck-line restart killed the capture that had just opened, its "File descriptor in bad state"
+     * queued a second power-cycle, and the two back to back left the module silent for a third).
+     */
+    private volatile long ownCycleUntil;
+    private void captureEnded(String err) {
+        if (agoldBridge() && System.currentTimeMillis() < ownCycleUntil) { log("the capture ended with our own bridge restart: no recovery (" + err + ")"); return; }
+        recoverBridgeAudio("the USB capture ended by itself (" + err + ")");
+    }
     private void powerCycleOrGiveUp() throws IOException {
+        if (agoldBridge()) {
+            ownCycleUntil = System.currentTimeMillis() + 30_000;            // until the cycle is done (cleared to a short grace below)
+            try { if (audio != null) audio.stopRx(); } catch (Throwable ignored) { }
+        }
+        try { powerCycleOrGiveUp0(); }
+        finally { if (agoldBridge()) ownCycleUntil = System.currentTimeMillis() + 1500; }
+    }
+    private void powerCycleOrGiveUp0() throws IOException {
         long settle = agoldBridge() ? AgoldUsb.plugSettleWait(System.currentTimeMillis(), lastPlugChangeAt) : 0;
         if (settle > 0) {                                                    // the stock app leaves the bridge alone for 4 s after a charger change
             log("bridge power-up held " + settle + " ms after a charger or USB change");
