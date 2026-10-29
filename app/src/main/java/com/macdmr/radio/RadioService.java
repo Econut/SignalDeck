@@ -2869,6 +2869,10 @@ public class RadioService extends Service implements RadioEngine.Events {
         int act = AgoldUsb.windowAction(receiving, v, rssi, AgoldUsb.rssiStartDbm(idleFloor));
         if (act == 2) ui.post(() -> { if (receiving && !monRx) { /* MON holds its own reception open without the line */ log("reception ended during the bridge power-up (call_in " + v + ")"); synthRx = false; status(2, RadioEngine.statusName(2)); } });
         else if (act == 1) ui.post(() -> { if (!receiving) { log("reception in progress after the bridge power-up (call_in " + v + ", " + rssi + " dBm)"); synthRx = true; status(1, RadioEngine.statusName(1)); } });
+        // a bridge recovery leaves the capture closed until this check has settled whether a reception is still on (a
+        // capture it reopened at once met a reception whose end the power-up had hidden, got nothing and ended with EIO
+        // 2 s later, which started the next recovery: 2026-10-29 14:47); a reception that starts here opens its own
+        if (act != 1) ui.post(() -> { if (receiving && rxAudioOn && audio != null && !captureRunning()) worker.execute(() -> { try { log(audio.startRx(true)); } catch (Throwable t) { log("capture after the power-up: " + t); } }); });
     }, "agold-window-check").start();
     private void bridgeLost(Throwable t) {
         log("the USB bridge did not come back: " + t);
@@ -2930,7 +2934,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 powerCycleOrGiveUp();
                 if (current != null) applyChannelNow(current, current.id > 0);
                 if (monitorOn) engine.setMonitor(true);                  // the power-cycle left the module's monitor off: the squelch closed, the reopened capture stayed empty
-                if (receiving && rxAudioOn && audio != null) log(audio.startRx(true));
+                // the capture is reopened by windowCheck once the power-up window has settled whether a reception is still on
             } catch (Throwable t) { log("bridge recovery: " + t); }
         });
     }
