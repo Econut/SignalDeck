@@ -88,6 +88,7 @@ public class AgoldUsbTest {
 
     @Test public void powerScriptsFollowTheHalsOrder() {
         String up = AgoldUsb.POWER_UP;
+        assertTrue("the stale port node is waited out first", up.indexOf("while [ -e /dev/ttyACM0 ]") < up.indexOf("usb_path"));
         assertTrue(up.indexOf("usb_path") < up.indexOf("mcu_power"));
         assertTrue(up.indexOf("mcu_power") < up.indexOf("rstmcu"));
         String down = AgoldUsb.POWER_DOWN;

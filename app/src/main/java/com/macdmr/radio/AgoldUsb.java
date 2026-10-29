@@ -96,8 +96,15 @@ final class AgoldUsb {
      * sits in reset and never enumerates without it), then the port within 3 s; when the controller refuses device ->
      * host it goes through "none" (power off, usb_path 0) and tries once more for 10 s. Leaves $i set.
      */
+    /**
+     * The port node outlives a power-off while a holder (the HAL, just restarted) keeps it open, so a power-up waits up
+     * to 5 s for the old node to go first; otherwise the next step would take the stale node for the new port (a hand-back
+     * check that way asked nothing and found the bridge "silent", 2026-10-28).
+     */
+    private static final String STALE_PORT_GONE = "k=0; while [ -e " + BRIDGE_PORT + " ] && [ $k -lt 25 ]; do sleep 0.2; k=$((k+1)); done; "
+            + "[ -e " + BRIDGE_PORT + " ] && echo 'stale port still there'; ";
     private static final String ONE_POWER_UP = "echo 1 > " + USB_PATH + "; echo 1 > " + MCU_POWER + "; sleep 0.75; echo 0 > " + RSTMCU + "; ";
-    static final String POWER_UP = ONE_POWER_UP
+    static final String POWER_UP = STALE_PORT_GONE + ONE_POWER_UP
             + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 6 ]; do sleep 0.5; i=$((i+1)); done; "
             + "if [ ! -e " + BRIDGE_PORT + " ]; then echo 'retry: through none'; echo 0 > " + MCU_POWER + "; sleep 1; echo 0 > " + USB_PATH + "; sleep 0.5; " + ONE_POWER_UP
             + "i=0; while [ ! -e " + BRIDGE_PORT + " ] && [ $i -lt 20 ]; do sleep 0.5; i=$((i+1)); done; fi; ";
