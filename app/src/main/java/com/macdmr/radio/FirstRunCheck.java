@@ -245,7 +245,11 @@ public final class FirstRunCheck {
         String kBefore = RootSetup.run(KMSG);
         RootSetup.run("logcat -c");
         boolean bridged = AgoldUsb.bridged();                                  // Atom XL: the radio takes the USB port while it is on
-        if (bridged) r.append("note: ").append(AgoldUsb.WARNING).append('\n');
+        if (bridged) {
+            r.append("note: ").append(AgoldUsb.WARNING).append('\n');
+            String why = AgoldUsb.stockWatchBlocked(c.getCacheDir(), pkg);
+            if (why != null) return r.append("watch skipped: ").append(why).append('\n').toString();
+        }
         p.step("The stock walkie-talkie app is open for 15 s — please do not press PTT" + (bridged ? " (USB to a computer is off meanwhile)" : ""));
         final String[] started = { "" };
         Thread sniff = null;

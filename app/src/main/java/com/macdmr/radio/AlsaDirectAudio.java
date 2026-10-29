@@ -43,6 +43,8 @@ public final class AlsaDirectAudio implements AudioBackend {
     private AudioTrack track;
     private volatile boolean playing;
     private Process rxProc; private Thread rxThread; private volatile boolean rxRunning;
+    // one flag per capture session: a stopRx() then startRx() must not leave the last session's threads looping on the shared rxRunning
+    private volatile java.util.concurrent.atomic.AtomicBoolean rxLive = new java.util.concurrent.atomic.AtomicBoolean(false);
     private volatile long rxBlocks, rxDropped;   // rxDropped: USB-card blocks the processing thread could not take in time
     private Process txProc; private Thread txThread; private volatile boolean txRunning;
     private AudioRecord rec;
@@ -145,6 +147,7 @@ public final class AlsaDirectAudio implements AudioBackend {
             }
             takeErrors();
             final Process p = start(true); rxProc = p; rxRunning = true; playing = true;
+            final java.util.concurrent.atomic.AtomicBoolean live = new java.util.concurrent.atomic.AtomicBoolean(true); rxLive = live;
             final long before = rxBlocks;
             final int f = da.rate / 8000;                                // a faster card (the Atom XL's USB card, 32 kHz) is brought down to 8 kHz here
             final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
@@ -156,7 +159,7 @@ public final class AlsaDirectAudio implements AudioBackend {
                 Thread proc = new Thread(() -> {
                     byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK];
                     try {
-                        while (rxRunning || !q.isEmpty()) {
+                        while (live.get() || !q.isEmpty()) {
                             byte[] raw = q.poll(200, TimeUnit.MILLISECONDS); if (raw == null) continue;
                             rc.decimate(raw, raw.length, buf);
                             Sink s = sink; if (s != null) s.onPcm(buf, BLOCK);
@@ -170,7 +173,7 @@ public final class AlsaDirectAudio implements AudioBackend {
             rxThread = new Thread(() -> {
                 byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK]; byte[] raw = f > 1 ? new byte[BLOCK * f] : buf;
                 try (InputStream in = p.getInputStream()) {
-                    while (rxRunning) {
+                    while (live.get()) {
                         int got = 0;
                         while (got < raw.length) { int n = in.read(raw, got, raw.length - got); if (n < 0) break; got += n; }
                         if (got < raw.length) break;                     // the helper ended
@@ -190,24 +193,25 @@ public final class AlsaDirectAudio implements AudioBackend {
             // bridge power-cycle (2026-10-29): give up sooner there, so a missed open costs the next reception less
             final long firstBlockMs = f > 1 ? 800 : 2000;
             while (rxBlocks == before && System.currentTimeMillis() - t0 < firstBlockMs) {
-                if (!p.isAlive()) { rxProc = null; rxRunning = false; return "startRx failed: sdalsa capture ended (exit " + p.exitValue() + ") " + takeErrors(); }
+                if (!p.isAlive()) { rxProc = null; rxRunning = false; live.set(false); return "startRx failed: sdalsa capture ended (exit " + p.exitValue() + ") " + takeErrors(); }
                 Thread.sleep(20);
             }
             return rxBlocks == before ? "sdalsa capture started, no audio block yet " + takeErrors() : "sdalsa capture on device " + da.captureDevice;
-        } catch (Throwable t) { rxProc = null; rxRunning = false; return "startRx failed: " + t; }
+        } catch (Throwable t) { rxProc = null; rxRunning = false; rxLive.set(false); return "startRx failed: " + t; }
     }
 
     /** True while the capture helper runs. */
     boolean capturing() { return rxProc != null; }
 
     @Override public synchronized String stopRx() {
-        playing = false; rxRunning = false;
+        playing = false; rxRunning = false; rxLive.set(false);
         Process p = rxProc; rxProc = null;
         if (p == null) return "capture not running";
         try { if (rxThread != null) rxThread.join(500); } catch (InterruptedException ignored) { }
         finish(p, 1500);
         String e = takeErrors();
-        return "sdalsa capture stopped" + (e.isEmpty() ? "" : ": " + e);
+        long dropped = rxDropped;
+        return "sdalsa capture stopped" + (dropped > 0 ? " (" + dropped + " blocks dropped so far: the processing fell behind)" : "") + (e.isEmpty() ? "" : ": " + e);
     }
 
     private volatile int txSource = MediaRecorder.AudioSource.MIC;
