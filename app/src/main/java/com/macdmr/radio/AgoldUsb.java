@@ -158,6 +158,8 @@ final class AgoldUsb {
      */
     static final long LINE_MISS_MIN_MS = 3000;
     static boolean countsAsLineMiss(long heldMs) { return heldMs >= LINE_MISS_MIN_MS; }
+    /** At least this long between two automatic bridge power-cycles of any kind. */
+    static final long AUTO_CYCLE_GAP_MS = 20_000;
     /**
      * What to do after {@code missed} receptions in a row that the reception line never reported: 0 nothing (yet), 1 restart
      * the bridge (once per bring-up), 2 stop trusting the line (receptions come from the signal; the phone needs a restart).
