@@ -2821,8 +2821,17 @@ public class RadioService extends Service implements RadioEngine.Events {
         setLink("error: the USB bridge did not come back (" + t.getMessage() + ")");
     }
 
+    private volatile boolean bridgeRecoverDeferred;
     void recoverBridgeAudio(String why) {
-        if (!agoldBridge() || exiting || isTransmitting() || System.currentTimeMillis() - lastBridgeRecoverAt < 20_000) { log("bridge recovery skipped: " + why); return; }
+        long wait = 20_000 - (System.currentTimeMillis() - lastBridgeRecoverAt);
+        if (agoldBridge() && !exiting && !isTransmitting() && wait > 0 && receiving && !bridgeRecoverDeferred) {
+            // inside the 20 s window: try once more when it ends if the reception is still on, instead of leaving the capture dead (MON on a stuck line, 2026-10-29)
+            bridgeRecoverDeferred = true;
+            log("bridge recovery in " + (wait / 1000 + 1) + " s: " + why);
+            ui.postDelayed(() -> { bridgeRecoverDeferred = false; if (receiving && !exiting) recoverBridgeAudio(why); }, wait + 100);
+            return;
+        }
+        if (!agoldBridge() || exiting || isTransmitting() || wait > 0) { log("bridge recovery skipped: " + why); return; }
         lastBridgeRecoverAt = System.currentTimeMillis();
         worker.execute(() -> {
             try {
