@@ -917,6 +917,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         }
                     }
                 }
+                if (agold) { lineFallback = false; ui.removeCallbacks(lineCheck); lineCheckTries = 0; ui.postDelayed(lineCheck, LINE_CHECK_MS); }
                 ui.removeCallbacks(moduleWatch); ui.postDelayed(moduleWatch, 2000);
                 resumeIssRepeat();
                 Scheduler.arm(this);                                          // scheduled operations (also ends one that ran out while SignalDeck was down)
@@ -2608,6 +2609,41 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void bridgeFault(String why) { recoverBridgeAudio(why); }
 
+    // ---- Atom XL: a reception line that never reports (measured 2026-10-28, the stock app misses every call then too) ----
+    static final long LINE_CHECK_MS = 5000;
+    private volatile boolean lineFallback; private int lineCheckTries;
+    /**
+     * After a bring-up the bridge's /dev/stmcu delivers its power-up toggle within a second or two. When nothing at all has
+     * arrived after 5 s the line is stuck in its power-up state and will report no reception: power-cycle the bridge once;
+     * if it stays silent, detect receptions from the signal reading instead ({@link #lineFallbackPoll}).
+     */
+    private final Runnable lineCheck = new Runnable() { @Override public void run() {
+        if (!agoldBridge() || exiting || !isReady() || engine.receptionLineBytes() != 0) return;
+        if (lineCheckTries++ == 0) {
+            log("reception line silent " + (LINE_CHECK_MS / 1000) + " s after bring-up: power-cycling the bridge once");
+            worker.execute(() -> { try { engine.powerCycle(); if (current != null) applyChannelNow(current, current.id > 0); } catch (Throwable t) { log("reception line: " + t); } });
+            ui.postDelayed(this, LINE_CHECK_MS + 6000);
+            return;
+        }
+        log("reception line still silent: receptions are detected from the signal reading (RSSI) instead");
+        history("warn", "\u26A0 The radio's reception signal is not working: SignalDeck detects calls from the signal strength (a little later)");
+        lineFallback = true; ui.removeCallbacks(lineFallbackPoll); ui.post(lineFallbackPoll);
+    } };
+    private volatile int fallbackLow;
+    private final Runnable lineFallbackPoll = new Runnable() { @Override public void run() {
+        if (!lineFallback || exiting || !isReady()) return;
+        if (engine.receptionLineBytes() > 0) { lineFallback = false; log("reception line works again: RSSI detection off"); return; }
+        if (!isTransmitting()) pollRssi();
+        ui.postDelayed(this, 500);
+    } };
+    /** In fallback, a signal above -97 dBm starts a reception and two readings below -100 dBm end it. */
+    private void fallbackRssi(double dbm) {
+        if (!lineFallback || isTransmitting()) return;
+        if (!receiving && dbm > -97) { fallbackLow = 0; log("reception (signal " + Math.round(dbm) + " dBm)"); status(1, RadioEngine.statusName(1)); }
+        else if (receiving && dbm < -100 && ++fallbackLow >= 2) { fallbackLow = 0; status(2, RadioEngine.statusName(2)); }
+        else if (dbm >= -100) fallbackLow = 0;
+    }
+
     /** Atom XL: put "Disable USB audio routing" back as take-over found it. */
     private void restoreUsbRouting() {
         android.content.SharedPreferences rp = getSharedPreferences("radio", MODE_PRIVATE);
@@ -2642,7 +2678,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void rssi(int raw, double dbm) { if (scope.running()) { scope.onRssi(raw); return; }   // a sweep step's reading: not the channel's signal, not for the coverage log
         rssi0(raw, dbm); }
-    private void rssi0(int raw, double dbm) { rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
+    private void rssi0(int raw, double dbm) { if (lineFallback) fallbackRssi(dbm); rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     private volatile String moduleVersion = "";
     private volatile long versionAt;
     @Override public void version(int v, String text) {

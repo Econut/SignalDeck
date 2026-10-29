@@ -183,11 +183,14 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
 
     // ---- Agold: receptions come from the bridge driver's /dev/stmcu, not from the port ----
     private volatile Thread rxWatch;
+    private volatile long rxLineBytes;
+    @Override public long receptionLineBytes() { return agold() ? rxLineBytes : -1; }
     private volatile java.io.Closeable rxSource;
 
     /** One reader on {@link AgoldUsb#STMCU}: the app's own file when policy allows it, else a root cat; each byte is an edge. */
     private void startReceiveWatch() {
         stopReceiveWatch();
+        rxLineBytes = 0;
         Thread t = new Thread(() -> {
             java.io.InputStream in = null; Process p = null;
             try {
@@ -211,6 +214,7 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
                         final java.io.InputStream again = in; rxSource = again::close;
                         continue;
                     }
+                    rxLineBytes++;
                     // the bridge toggles the line at power-up (00 00 01 within ~1.7 s; read late, only a 00 is left): not a reception
                     if (System.currentTimeMillis() - started < AgoldUsb.POWER_UP_EDGES_MS) { ev.log(String.format(Locale.US, "reception line: 0x%02X at start, ignored", b)); continue; }
                     int code = AgoldUsb.receiveStatus(b);
