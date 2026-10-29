@@ -33,6 +33,10 @@ public class BootReceiver extends BroadcastReceiver {
             try {
                 DeviceProfile p = DeviceProfile.detect();
                 if (p != null && !RootSetup.stockAppEnabled(p)) RootSetup.stockApp(p, true);
+                // the Atom XL: a restart while SignalDeck had the radio left "Disable USB audio routing" switched on
+                android.content.SharedPreferences rp = ctx.getSharedPreferences("radio", Context.MODE_PRIVATE);
+                String prev = rp.getString("agoldUsbRouting", null);
+                if (p != null && "agold".equals(p.protocol) && prev != null) { AgoldUsb.usbRoutingRestore(prev); rp.edit().remove("agoldUsbRouting").apply(); }
             } catch (Throwable ignored) { }
             finally { pr.finish(); }
         }, "boot-restore").start();
