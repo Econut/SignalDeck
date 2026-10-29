@@ -2488,6 +2488,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         long seen = status4At;
         long t0 = System.currentTimeMillis();
         while (status4At == seen && System.currentTimeMillis() - t0 < 2500) Thread.sleep(20);
+        if (status4At != seen && !rewriteAfterSym(moduleVersion)) { log("sym unkey: the module ended the key itself (FW31+), no 0x26 off"); holdAfterTx(); return; }   // a second close would mute the receiver again (bench 2026-10-28)
         engine.ptt(false);
         log("sym unkey");
         holdAfterTx();

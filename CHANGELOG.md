@@ -4,7 +4,7 @@
 
 | Backlog | Change | Files | Test |
 |---|---|---|---|
-| phonedmrapp `radio_firmware/results.md` (F30C hold pass, 2026-10-28) | From FW31 the module clears its own receive mute after a symbol transmission, and the channel rewrite SignalDeck sends afterwards (for older images) put the mute back (receive RMS 1.3). On FW31 and later only the voice-filter hold is re-sent; older images keep the rewrite | `RadioService.java`, `SymUnmuteTest.java` | Host suite; bench with Grok on FW31 |
+| phonedmrapp `radio_firmware/results.md` (F30C hold pass, 2026-10-28) | From FW31 the module clears its own receive mute after a symbol transmission, and the channel rewrite SignalDeck sends afterwards (for older images) put the mute back (receive RMS 1.3). On FW31 and later only the voice-filter hold is re-sent, and when the module has ended the key itself (status 4) no extra PTT-off is sent, because that second close muted the receiver again; older images keep the rewrite and the PTT-off | `RadioService.java`, `SymUnmuteTest.java` | Host suite; bench with Grok on FW31 |
 
 ## 2026-10-27 — POCSAG receive
 
