@@ -860,6 +860,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         final boolean agold = "agold".equals(profile.protocol);                          // the Atom XL: the radio behind a USB bridge
         if (agold && "ready".equals(link)) { log("bring-up skipped: the radio is already up (a second one would power-cycle the USB bridge)"); return; }
         if (!bringUpRunning.compareAndSet(false, true)) { log("bring-up skipped: one is already running"); return; }
+        exiting = false;                                                // a bring-up wants the radio: an earlier Exit no longer blocks bridge recovery
         new Thread(() -> {
             boolean pausedStock = false;
             try {
