@@ -81,6 +81,11 @@ public final class DeviceProfile {
      * APRS 38 of 48 packets against 23 of 24 at squelch 2, HackRF 2026-10-28), so there data modes keep at least this.
      */
     public int dataSquelch;
+    /**
+     * False when the module's image must stay the vendor's: SignalDeck's loader (and so the bench firmware's symbol engine)
+     * is off. The W6Plus DMR's module is outside the loader safety contract (no dmr009 knock, an undiffed image).
+     */
+    public boolean moduleLoader = true;
     /** sa818: the module's receive line, a GPIO input that reads 1 while the squelch is open (null = none). */
     public String rxDetectNode;
     /** sa818: {node, value} written in order when reception starts / ends and when the transmitter keys / unkeys (the stock app's audio and PTT lines). */
@@ -246,6 +251,38 @@ public final class DeviceProfile {
         ANYSECU_W6.scanDwellMs = 1500;
     }
 
+    /**
+     * ANYSECU W6Plus with DMR (model string V69, UNISOC sl8541e, UHF, 32-bit Android 12): the W6+'s phone body with a DMR
+     * module of the Armor family on /dev/ttyS2 at 57600 (it answers DMR006.U4A.V140, the Atom XL's module family without
+     * the USB bridge; the stock app carries image DMR-006-HHT-400M-V140 and the 68 … 10 command set, CMD 0x22-0x39 name for
+     * name), from the device report of 2026-10-29 and the stock app com.flyscale.dmr (FlyscaleDmr400). The phone side is
+     * the W6+'s: power gpio322; the receive audio reaches Android on the camcorder input behind the speaker route
+     * (dmr_state, ext_pa_en, gpio183), which the stock app switches on the module's RECEIVE_START / RECEIVE_STOP pushes
+     * (SpeakUtil.startGroup / stopGroup); it keys with the PTT line gpio188 and the mic lines and never sends 0x26. The
+     * module keeps the vendor's image (no loader). Never read the flyscale_misc attributes. Not verified yet: no automatic
+     * take-over, no transmit.
+     */
+    public static final DeviceProfile ANYSECU_W6_DMR = new DeviceProfile(
+            "ANYSECU W6Plus DMR", "/dev/ttyS2", 57600, Audio.CAMCORDER, null, 0,
+            "/sys/class/gpio/gpio322/value", "/sys/class/gpio/gpio188/value", "1",
+            new String[] { "fly.privkey.poc.down", "fly.privkey.poc.up" },
+            "com.flyscale.dmr",
+            new String[] {
+                    "allow untrusted_app console_device chr_file { open read write ioctl getattr lock }",
+                    "typeattribute console_device mlstrustedobject" },
+            null, true, false);
+    static {
+        ANYSECU_W6_DMR.id = "anysecu-w6plus-dmr"; ANYSECU_W6_DMR.revision = 1;
+        ANYSECU_W6_DMR.bandsHz = new long[] { 400_000_000L, 480_000_000L };
+        ANYSECU_W6_DMR.appPlayback = true; ANYSECU_W6_DMR.moduleLoader = false;
+        // the stock app's startGroup / stopGroup (the W6+'s receive lines) and startSpeaker / stopSpeaker (mic, built-in mic, PTT)
+        ANYSECU_W6_DMR.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
+        ANYSECU_W6_DMR.muteLines = new String[][] { { "/sys/class/gpio/gpio183/value", "0" } };
+        ANYSECU_W6_DMR.rxLinesOff = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "0" } };
+        ANYSECU_W6_DMR.txLinesOn = new String[][] { { "/sys/class/gpio/gpio222/value", "1" }, { "/sys/class/gpio/gpio179/value", "0" }, { "/sys/class/gpio/gpio188/value", "1" } };
+        ANYSECU_W6_DMR.txLinesOff = new String[][] { { "/sys/class/gpio/gpio188/value", "0" }, { "/sys/class/gpio/gpio222/value", "0" } };
+    }
+
     /** Any other phone: nothing is touched until a device report has been made and a profile written. */
     /**
      * Unihertz Atom XL (Agold): the module sits behind a USB bridge MCU on the phone's only USB controller, so the
@@ -291,6 +328,7 @@ public final class DeviceProfile {
     static DeviceProfile detectBuiltIn(String m, boolean dmr009, boolean intercom) {
         if (m.contains("armor 20wt") || m.contains("armor_20wt")) return ARMOR_20WT;
         if (m.contains("w6+") && m.contains("sl8541e")) return ANYSECU_W6;          // "UNISOC W6+ sl8541e_3h10_32b"
+        if (m.contains(" v69 ") && m.contains("sl8541e")) return ANYSECU_W6_DMR;     // "UNISOC V69 sl8541e_3h10_32b"
         if (m.contains("unihertz atom_xl")) return ATOM_XL;                         // "Unihertz Atom_XL Atom_XL"
         if (dmr009 || m.contains("armor 26")) return ARMOR_26_ULTRA;
         if (intercom || m.contains("xplore")) return XPLORE_1;
@@ -320,10 +358,10 @@ public final class DeviceProfile {
      * Whether SignalDeck's firmware loader can reach this module: the dmr009 knock and YModem on the module's own UART.
      * The Atom XL's module sits behind a USB bridge whose update path is the bridge's own (route 00 cmd 0x09), so no.
      */
-    public boolean firmwareLoader() { return "mcu68".equals(protocol); }
+    public boolean firmwareLoader() { return "mcu68".equals(protocol) && moduleLoader; }
 
     /** Whether the module family has the bench firmware's symbol engine (POCSAG pages, M17 voice out): the HR-C7000 family, never an SA818 module. */
-    public boolean symbolEngine() { return "mcu68".equals(protocol); }
+    public boolean symbolEngine() { return "mcu68".equals(protocol) && moduleLoader; }
 
     /** Whether the module tunes {@code hz}. */
     public boolean tunable(long hz) { for (int i = 0; i + 1 < bandsHz.length; i += 2) if (hz >= bandsHz[i] && hz <= bandsHz[i + 1]) return true; return false; }
@@ -353,7 +391,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.moduleLoader = moduleLoader; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -374,7 +412,7 @@ public final class DeviceProfile {
             for (int i = 0; i < bands.length(); i++) p.bandsHz[i] = bands.getLong(i);
             for (int i = 0; i < bands.length(); i += 2) if (p.bandsHz[i] >= p.bandsHz[i + 1]) throw new org.json.JSONException("bandsHz: low below high");
         }
-        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false); p.appPlayback = o.optBoolean("appPlayback", false); p.subaudible = o.optBoolean("subaudible", true); p.dataSquelch = Math.max(0, Math.min(8, o.optInt("dataSquelch", 0)));
+        p.rssi = o.optBoolean("rssi", true); p.softSqInModule = o.optBoolean("softSqInModule", false); p.appPlayback = o.optBoolean("appPlayback", false); p.subaudible = o.optBoolean("subaudible", true); p.dataSquelch = Math.max(0, Math.min(8, o.optInt("dataSquelch", 0))); p.moduleLoader = o.optBoolean("moduleLoader", true);
         org.json.JSONArray sst = o.optJSONArray("softSqThresholds");
         if (sst != null && sst.length() == 9) { p.softSqThresholds = new double[9]; for (int i = 0; i < 9; i++) p.softSqThresholds[i] = sst.optDouble(i, 0); p.softSqCloseCap = o.optDouble("softSqCloseCap", 0); } p.fixedModuleVolume = Math.max(1, Math.min(8, o.optInt("fixedModuleVolume", 4)));
         p.rxLinesOn = pairs(o.optJSONArray("rxLinesOn")); p.rxLinesOff = pairs(o.optJSONArray("rxLinesOff")); p.muteLines = pairs(o.optJSONArray("muteLines"));

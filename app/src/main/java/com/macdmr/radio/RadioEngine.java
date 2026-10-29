@@ -249,7 +249,22 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
         synchronized (rxLock) { rxWatch = null; c = rxSource; rxSource = null; }
         if (c != null) try { c.close(); } catch (IOException ignored) { }
     }
-    public void close() { stopReceiveWatch(); port.close(); }
+    public void close() { stopReceiveWatch(); port.close(); lineShell.close(); }
+
+    /**
+     * A phone whose speaker route and PTT are its own lines around the module (the W6Plus DMR): the receive lines follow the
+     * module's RECEIVE_START / RECEIVE_STOP, and PTT is the line, not 0x26 (its stock app never sends 0x26). One root shell
+     * for them, not an su (and a Magisk toast) at every reception.
+     */
+    private boolean phoneLines() { return profile.rxLinesOn != null && !agold(); }
+    private final RootShell lineShell = new RootShell();
+    private void lines(String[][] l) {
+        if (l == null || l.length == 0) return;
+        StringBuilder c = new StringBuilder();
+        for (String[] p : l) c.append("echo ").append(p[1]).append(" > ").append(p[0]).append("; ");
+        String r = lineShell.run(c.toString());
+        if (!r.isEmpty()) ev.log("lines: " + r);
+    }
 
     /** Pause framing so a firmware load can use the same port. Ordinary commands are held until {@link #stopDivert}. */
     public void startDivert() { rawHold = true; firstUnansweredAt = 0; port.startDivert(); }
@@ -388,6 +403,7 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
             RootSetup.run("setprop vendor.agui.extmodule.start " + (down ? 1 : 0));
             return;
         }
+        if (phoneLines()) { lines(down ? profile.txLinesOn : profile.txLinesOff); return; }
         send(Frame.request(CMD_LAUNCH, (byte) (down ? 1 : 2)));
     }
 
@@ -454,6 +470,8 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
             case CMD_STATUS: {
                 int code = b.length > 0 ? b[0] & 0xFF : -1;
                 if (!agold()) try { send(new Frame(CMD_STATUS, 1, 1, new byte[] { 1 })); } catch (IOException ignored) { }   // the OEM acks every push; the Agold stock app does not
+                if (phoneLines() && code == 1) { lines(profile.rxLinesOn); if (profile.appPlayback) lines(profile.muteLines); }   // app playback: the module's speaker route stays off
+                else if (phoneLines() && code == 2) lines(profile.rxLinesOff);
                 ev.status(code, statusName(code));
                 break;
             }
