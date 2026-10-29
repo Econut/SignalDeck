@@ -65,6 +65,8 @@ public class AfskBenchTest {
     @Test public void noFalsePacketsFromNoise() {
         short[] a = new short[8000 * 60]; java.util.Random r = new java.util.Random(5);
         for (int i = 0; i < a.length; i++) a[i] = (short) (r.nextGaussian() * 6000);
+        long t0 = System.nanoTime();
         assertEquals("plausible frames from 60 s of noise", 0, count(a, true, true));
+        System.out.printf("60 s of noise decoded in %d ms%n", (System.nanoTime() - t0) / 1_000_000);
     }
 }

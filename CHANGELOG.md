@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — APRS decoding uses about half the processor time on a quiet channel
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture-stall investigation (managing agent, 2026-10-29) | The passive APRS decoder runs on every analog channel. On the Atom XL its thread had used about 175 s of processor time in 20 minutes on open noise (a thread dump), most of it in the one-bit repair: every candidate a slicer could not decode was retried with each of up to 2800 bits flipped, by each of the five slicers, and each try rebuilt the frame through a list of boxed bits. The repair now runs once per position and only where no slicer decoded a frame, skips candidates whose length cannot be one bit away from whole bytes, and the de-stuffing uses a plain array. Every phone gets the same decodes for less heat and battery. | `AFSKDecoder` | Host: `AfskBenchTest` decodes unchanged at 32 / 35 / 33 of 100 (direwolf 24 / 23 / 24); 60 s of noise 1253 ms before, 572 ms after; the 100-packet vectors about 1.35 s before, 0.71 s after; new `AfskRepairTest` (a frame with one wrong bit is put right with the repair on and fails with it off); full suite 505 / 0 |
+
 ## 2026-10-29 — Atom XL: the radio's sound is read the way the stock app's audio layer reads it, so drop-outs no longer pile up
 
 | Backlog | Change | Files | Test |

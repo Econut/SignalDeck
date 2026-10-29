@@ -83,6 +83,7 @@ public class AFSKDecoder {
             java.util.HashSet<String> seen = new java.util.HashSet<>();
             float[] gains = !MULTI_SLICER ? new float[] { 1.0f } : slicerGainsOverride != null ? slicerGainsOverride : SLICER_GAINS;
             List<Object[]> found = new ArrayList<>();                         // {bit position, frame}: one slicer may find a later frame that another missed
+            List<Object[]> failed = new ArrayList<>();                        // {bit position, raw bits}: candidates no slicer decoded as they were
             for (float g : gains) {
                 boolean[] nrzi = decodeNRZI(AFSKDecoderIQ.slice(tones[0], tones[1], g));
                 List<Integer> starts = new ArrayList<>();
@@ -90,9 +91,19 @@ public class AFSKDecoder {
                 for (int k = 0; k < raws.size(); k++) {
                     boolean[] raw = raws.get(k);
                     byte[] frame = frameFromRaw(raw);
-                    if (frame == null && BIT_FIX && raw.length <= 2800) frame = repairOneBit(raw);
-                    if (frame != null && seen.add(java.util.Arrays.toString(frame))) found.add(new Object[] { starts.get(k), frame });
+                    if (frame == null) { if (BIT_FIX && raw.length <= 2800) failed.add(new Object[] { starts.get(k), raw }); continue; }
+                    if (seen.add(java.util.Arrays.toString(frame))) found.add(new Object[] { starts.get(k), frame });
                 }
+            }
+            // the one-bit repair, after all slicers: once per position, and only where no slicer decoded a frame (it used
+            // to run for every slicer's failure, up to five times for one spot, and was most of the decoder's CPU on noise)
+            List<Integer> tried = new ArrayList<>();
+            for (Object[] c : failed) {
+                int at = (Integer) c[0];
+                if (near(found, at) || nearInt(tried, at)) continue;
+                tried.add(at);
+                byte[] frame = repairOneBit((boolean[]) c[1]);
+                if (frame != null && seen.add(java.util.Arrays.toString(frame))) found.add(new Object[] { at, frame });
             }
             found.sort((a, b) -> Integer.compare((Integer) a[0], (Integer) b[0]));   // the order they were on the air (connected mode depends on it)
             packets.addAll(found);
@@ -101,6 +112,11 @@ public class AFSKDecoder {
         }
         return packets;
     }
+
+    /** Candidates from different slicers start within a few bits of each other: the same frame. */
+    private static final int SAME_SPOT_BITS = 16;
+    private static boolean near(List<Object[]> found, int at) { for (Object[] f : found) if (Math.abs((Integer) f[0] - at) <= SAME_SPOT_BITS) return true; return false; }
+    private static boolean nearInt(List<Integer> l, int at) { for (int v : l) if (Math.abs(v - at) <= SAME_SPOT_BITS) return true; return false; }
 
     /** Raw (stuffed) frame bits to the frame without FCS, or null when too short or the checksum fails. */
     private static byte[] frameFromRaw(boolean[] raw) {
@@ -118,6 +134,9 @@ public class AFSKDecoder {
     /** Flip each raw bit in turn (before de-stuffing, as direwolf's FIX_BITS 1); the first flip that passes the checksum
      *  and still looks like AX.25 is accepted. */
     private static byte[] repairOneBit(boolean[] raw) {
+        boolean[] u = removeBitStuffingFromBits(raw);                       // one flipped bit moves the de-stuffed length by at most one bit
+        int r = u.length % 8;
+        if (u.length < 135 || (r != 0 && r != 1 && r != 7)) return null;
         for (int i = 0; i < raw.length; i++) {
             raw[i] = !raw[i];
             byte[] f = frameFromRaw(raw);
@@ -351,33 +370,18 @@ public class AFSKDecoder {
      * (remove 0 after five consecutive 1s)
      */
     private static boolean[] removeBitStuffingFromBits(boolean[] stuffedBits) {
-        List<Boolean> unstuffed = new ArrayList<>();
-        int consecutiveOnes = 0;
-        
-        for (int i = 0; i < stuffedBits.length; i++) {
-            boolean bit = stuffedBits[i];
-            
-            if (bit) {
-                consecutiveOnes++;
-                unstuffed.add(bit);
-            } else {
-                if (consecutiveOnes == 5) {
-                    // This is a stuffed bit, skip it
-                    consecutiveOnes = 0;
-                } else {
-                    unstuffed.add(bit);
-                    consecutiveOnes = 0;
-                }
+        // a plain array, not a List<Boolean>: the one-bit repair calls this once per flipped bit (up to 2800 a frame),
+        // and boxing every bit made the passive decoder the phone's busiest thread on open noise (2026-10-29)
+        boolean[] out = new boolean[stuffedBits.length];
+        int n = 0, consecutiveOnes = 0;
+        for (boolean bit : stuffedBits) {
+            if (bit) { consecutiveOnes++; out[n++] = true; }
+            else {
+                if (consecutiveOnes != 5) out[n++] = false;                     // a 0 after five 1s is a stuffed bit: skipped
+                consecutiveOnes = 0;
             }
         }
-        
-        // Convert to array
-        boolean[] result = new boolean[unstuffed.size()];
-        for (int i = 0; i < result.length; i++) {
-            result[i] = unstuffed.get(i);
-        }
-        
-        return result;
+        return n == out.length ? out : java.util.Arrays.copyOf(out, n);
     }
     
     /**
