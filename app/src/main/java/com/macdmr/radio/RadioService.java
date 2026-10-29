@@ -889,9 +889,13 @@ public class RadioService extends Service implements RadioEngine.Events {
                 final boolean sa818 = "sa818".equals(profile.protocol);                      // the W6: no DMR, its own channel table
                 final boolean quickChat = "com.chamsion.quickchat".equals(profile.stockApp);      // Xplore 1: a Room database, no module side tables
                 final boolean prizeStock = !sa818 && !quickChat && !agold;                        // the Armors' stock app: DMR ID and TG lists to read
-                if (!agold && store.count() == 0 && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("stockImportDeclined", false)) {   // no channels: ask before importing the stock app's (owner, 2026-10-28)
+                if (store.count() == 0 && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("stockImportDeclined", false)) {   // no channels: ask before importing the stock app's (owner, 2026-10-28)
                     stockImportPending = true; log("no channels: asking whether to import the stock app's");
                     ui.post(() -> { for (Listener l : new ArrayList<>(listeners)) l.onStockImportOffer(); });
+                }
+                if (agold && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) {         // the Atom XL's stock app keeps its DMR ID as device_id (unset = 1)
+                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("name=\"device_id\" value=\"([0-9]+)\"").matcher(RootSetup.run("cat /data/data/" + profile.stockApp + "/shared_prefs/intercom_prefs.xml 2>/dev/null"));
+                    if (m.find() && Integer.parseInt(m.group(1)) > 1) { setLocalIdQuiet(Integer.parseInt(m.group(1))); log("DMR ID from the stock app: " + m.group(1)); }
                 }
                 if (prizeStock && !getSharedPreferences("radio", MODE_PRIVATE).contains("dmrId")) {     // seed our DMR ID from the stock app's setting
                     String xml = RootSetup.run("cat /data/data/" + profile.stockApp + "/shared_prefs/com.pri.prizeinterphone.data.person.xml");
@@ -1783,6 +1787,11 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     /** Stock "areas" (one channel database each): keys like default_uhf, usa, eu … */
     public java.util.List<String> stockAreas() {
+        if ("agold".equals(profile.protocol)) {                         // the Atom XL: areas in the stock app's intercom.db ("1 Default (16 channels)")
+            java.util.List<String> a = ChannelStore.agoldAreas(this, profile.stockApp);
+            if (a.isEmpty()) a.add("1 Default");
+            return a;
+        }
         java.util.List<String> out = new java.util.ArrayList<>();
         for (String l : RootSetup.run("ls /data/data/" + profile.stockApp + "/databases/ 2>/dev/null").split("\\s+")) { java.util.regex.Matcher m = java.util.regex.Pattern.compile("database_channel_area_(\\w+)\\.db").matcher(l); if (m.matches()) out.add(m.group(1)); }
         if (out.isEmpty()) out.add("default_uhf");
@@ -1790,12 +1799,23 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     public String reimportFromStock() { return reimportFromStock("default_uhf"); }
     /** The stock app keeps its channels in areas (the DMR phones' app); the W6's and the Xplore 1's have one list. */
-    public boolean stockHasAreas() { return !"sa818".equals(profile.protocol) && !"agold".equals(profile.protocol) && !"com.chamsion.quickchat".equals(profile.stockApp); }
+    public boolean stockHasAreas() { return !"sa818".equals(profile.protocol) && !"com.chamsion.quickchat".equals(profile.stockApp); }
+    /** The Atom XL's stock app has channels only (no contacts, history or messages SignalDeck imports). */
+    public boolean stockImportsChannelsOnly() { return "agold".equals(profile.protocol); }
+    /** The area the Atom XL's stock app is on (its curr_area setting, 1 when unset). */
+    int agoldCurrentArea() {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("name=\"curr_area\" value=\"([0-9]+)\"").matcher(RootSetup.run("cat /data/data/" + profile.stockApp + "/shared_prefs/intercom_prefs.xml 2>/dev/null"));
+        return m.find() ? Integer.parseInt(m.group(1)) : 1;
+    }
     /** Replace the channel list with the stock app's: the W6's table, QuickChat's database, or one area of the DMR phones' app. */
     public String reimportFromStock(String areaKey) {
         StringBuilder err = new StringBuilder(); int n;
         if ("sa818".equals(profile.protocol)) n = store.importFromFlyscale(this, profile.stockApp, err);
         else if ("com.chamsion.quickchat".equals(profile.stockApp)) n = store.importFromQuickChat(this, profile.stockApp, err);
+        else if ("agold".equals(profile.protocol)) {                     // areaKey "3 USA FRS (14 channels)", or null for the stock app's current area
+            java.util.regex.Matcher m = areaKey == null ? null : java.util.regex.Pattern.compile("^(\\d+)").matcher(areaKey.trim());
+            n = store.importFromAgold(this, profile.stockApp, m != null && m.find() ? Integer.parseInt(m.group(1)) : agoldCurrentArea(), err);
+        }
         else n = store.importFromStock(this, profile.stockApp, areaKey == null ? "default_uhf" : areaKey, err);
         if (n >= 0) {
             getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("tgListsImported", true).putBoolean("stockImportDeclined", false).apply();   // imported: an empty list asks again later
