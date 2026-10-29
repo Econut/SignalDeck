@@ -78,7 +78,7 @@ public class RateConverterTest {
     @Test public void commandLineCarriesTheRate() {
         DeviceProfile.DirectAudio usb = new DeviceProfile.DirectAudio(1, 0, 0, new String[0], new String[0], new String[0], new String[0]);
         usb.rate = 32000;
-        assertTrue(AlsaDirectAudio.command("/x/sdalsa", true, usb).contains(" cap -c 1 -d 0 -r 32000 -n 2 -p 1024 -k 4 --"));
+        assertTrue(AlsaDirectAudio.command("/x/sdalsa", true, usb).contains(" cap -c 1 -d 0 -r 32000 -n 2 -p 1024 -k 16 -q 1 --"));   // 512 ms of buffer on the USB card
         DeviceProfile.DirectAudio codec = new DeviceProfile.DirectAudio(0, 11, 8, new String[0], new String[0], new String[0], new String[0]);
         assertTrue(AlsaDirectAudio.command("/x/sdalsa", true, codec).contains(" -r 8000 -n 2 -p 256 -k 4"));   // the Armor's recipe as before
         assertTrue(usb.valid());

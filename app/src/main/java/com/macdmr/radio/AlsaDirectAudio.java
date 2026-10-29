@@ -43,7 +43,7 @@ public final class AlsaDirectAudio implements AudioBackend {
     private AudioTrack track;
     private volatile boolean playing;
     private Process rxProc; private Thread rxThread; private volatile boolean rxRunning;
-    private volatile long rxBlocks;
+    private volatile long rxBlocks, rxDropped;   // rxDropped: USB-card blocks the processing thread could not take in time
     private Process txProc; private Thread txThread; private volatile boolean txRunning;
     private AudioRecord rec;
     private final StringBuilder err = new StringBuilder();
@@ -93,7 +93,7 @@ public final class AlsaDirectAudio implements AudioBackend {
     static String command(String helper, boolean capture, DeviceProfile.DirectAudio d) {
         StringBuilder b = new StringBuilder("exec ").append(quote(helper)).append(capture ? " cap" : " play")
                 .append(" -c ").append(d.card).append(" -d ").append(capture ? d.captureDevice : d.playbackDevice)
-                .append(" -r ").append(d.rate).append(" -n 2 -p ").append(256 * (d.rate / 8000)).append(" -k 4");
+                .append(" -r ").append(d.rate).append(" -n 2 -p ").append(256 * (d.rate / 8000)).append(" -k ").append(d.rate > 8000 ? 16 : 4).append(capture && d.rate > 8000 ? " -q 1" : "");   // a USB card (Atom XL) gets 512 ms: one overrun stops its stream until the bridge is power-cycled
         for (String c : capture ? d.rxOn : d.txOn) b.append(' ').append(quote(c));
         b.append(" --");
         for (String c : capture ? d.rxOff : d.txOff) b.append(' ').append(quote(c));
@@ -142,6 +142,25 @@ public final class AlsaDirectAudio implements AudioBackend {
             final long before = rxBlocks;
             final int f = da.rate / 8000;                                // a faster card (the Atom XL's USB card, 32 kHz) is brought down to 8 kHz here
             final RateConverter rc = f > 1 ? new RateConverter(f, da.rate) : null;
+            // a USB card (f > 1, the Atom XL): the reader only reads; conversion, the sink (decoders) and the speaker run on their
+            // own thread behind a bounded queue that drops when full. A stalled reader lets the card overrun, and one overrun stops
+            // the Atom XL bridge's stream until it is power-cycled (2026-10-28). The 8 kHz codec path (Armor) is unchanged.
+            final java.util.concurrent.ArrayBlockingQueue<byte[]> q = f > 1 ? new java.util.concurrent.ArrayBlockingQueue<>(32) : null;
+            if (q != null) {
+                Thread proc = new Thread(() -> {
+                    byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK];
+                    try {
+                        while (rxRunning || !q.isEmpty()) {
+                            byte[] raw = q.poll(200, TimeUnit.MILLISECONDS); if (raw == null) continue;
+                            rc.decimate(raw, raw.length, buf);
+                            Sink s = sink; if (s != null) s.onPcm(buf, BLOCK);
+                            Gate g = gate;
+                            if (playing && track != null) track.write(g == null || g.open() ? buf : zero, 0, BLOCK, AudioTrack.WRITE_NON_BLOCKING);
+                        }
+                    } catch (Throwable t) { Log.w(TAG, "capture processing: " + t); }
+                }, "sdalsa-rx-proc");
+                proc.start();
+            }
             rxThread = new Thread(() -> {
                 byte[] buf = new byte[BLOCK]; byte[] zero = new byte[BLOCK]; byte[] raw = f > 1 ? new byte[BLOCK * f] : buf;
                 try (InputStream in = p.getInputStream()) {
@@ -149,8 +168,8 @@ public final class AlsaDirectAudio implements AudioBackend {
                         int got = 0;
                         while (got < raw.length) { int n = in.read(raw, got, raw.length - got); if (n < 0) break; got += n; }
                         if (got < raw.length) break;                     // the helper ended
-                        if (rc != null) rc.decimate(raw, raw.length, buf);
                         rxBlocks++;
+                        if (q != null) { if (!q.offer(raw)) rxDropped++; raw = new byte[BLOCK * f]; continue; }
                         Sink s = sink; if (s != null) s.onPcm(buf, BLOCK);  // squelch decision first
                         Gate g = gate;
                         if (playing && track != null) track.write(g == null || g.open() ? buf : zero, 0, BLOCK);   // keep the stream timing, play silence
