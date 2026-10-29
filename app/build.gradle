@@ -76,6 +76,11 @@ dependencies {
     implementation 'net.java.dev.jna:jna:5.13.0@aar'
 }
 
+// -PexportHelp=true makes HelpExportTest write docs/help from the in-app guide instead of checking it
+tasks.withType(Test).configureEach {
+    systemProperty 'signaldeck.exportHelp', (project.findProperty('exportHelp') ?: 'false').toString()
+}
+
 configurations.all {
     exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
     exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'

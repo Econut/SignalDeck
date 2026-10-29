@@ -11,6 +11,8 @@ before touching radio behaviour; it wins over guesses.
 - Install the **release** build on the owner's phone: `adb install -r app/build/outputs/apk/release/app-release.apk`.
   Never `adb uninstall` (loses the Magisk grant and the app data).
 - Update the in-app help in the same change (`ui/HelpView.java` TOPICS, `ChannelEditorView` `H_*` texts).
+  After changing TOPICS, regenerate the guide the website shows: `./gradlew testReleaseUnitTest --tests
+  '*HelpExportTest' -PexportHelp=true` (writes `docs/help/`; `HelpExportTest` fails while it is out of date).
 - Log it in `CHANGELOG.md` (newest first, dated section, `| Backlog | Change | Files | Test |` row, say whether it was
   device-tested).
 - Never commit signing keys or their passwords (`local.properties` holds them), the profile-signing key
