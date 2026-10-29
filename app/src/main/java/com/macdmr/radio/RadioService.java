@@ -1724,7 +1724,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!isNew && current != null && current.id == ch.id) selectChannel(ch.number);
     }
 
-    private void setLocalIdQuiet(int id) { getSharedPreferences("radio", MODE_PRIVATE).edit().putInt("dmrId", id).apply(); }
+    private void setLocalIdQuiet(int id) { if (id >= 1 && id <= ChannelStore.MAX_DMR_ID) getSharedPreferences("radio", MODE_PRIVATE).edit().putInt("dmrId", id).apply(); }
 
     public void setLocalId(int id) { getSharedPreferences("radio", MODE_PRIVATE).edit().putInt("dmrId", id).apply(); if (current != null && current.isDigital()) selectChannel(current.number); }
 
@@ -1885,7 +1885,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         return reimportFromStock(null);
     }
 
-    public int localId() { return getSharedPreferences("radio", MODE_PRIVATE).getInt("dmrId", 1); }
+    /** This radio's DMR ID; 1 (the stock default) when none is set or the stored one is out of range, which the module refuses and then stops answering (W6Plus DMR, 2026-10-29). */
+    public int localId() { int id = getSharedPreferences("radio", MODE_PRIVATE).getInt("dmrId", 1); return id >= 1 && id <= ChannelStore.MAX_DMR_ID ? id : 1; }
 
     // ---- PTT ----------------------------------------------------------------------------------------
 

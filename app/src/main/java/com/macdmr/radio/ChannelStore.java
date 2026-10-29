@@ -934,7 +934,7 @@ public final class ChannelStore extends SQLiteOpenHelper {
                 Channel ch = flyscaleDmrChannel(slot, e.getValue(), analog.get(slot), digital.get(slot));
                 if (ch == null) continue;
                 ch.number = ++n; ch.active = slot == activeSlot;
-                if (ch.active && dmrIdOut != null && dmrIdOut.length > 0) { java.util.Map<String, String> d = digital.get(slot); dmrIdOut[0] = d == null ? 0 : leInt(d.get("LOCAL_ID")); }
+                if (ch.active && dmrIdOut != null && dmrIdOut.length > 0) { java.util.Map<String, String> d = digital.get(slot); dmrIdOut[0] = d == null ? 0 : flyscaleDmrId(d.get("LOCAL_ID")); }
                 db.insert("channels", null, values(ch));
             }
             db.setTransactionSuccessful();
@@ -980,6 +980,21 @@ public final class ChannelStore extends SQLiteOpenHelper {
         } catch (RuntimeException e) { return null; }
     }
     private static int hx(String s, int d) { if (s == null || s.trim().isEmpty()) return d; try { return Integer.parseInt(s.trim(), 16); } catch (NumberFormatException e) { return d; } }
+    /** The highest DMR ID the module takes (the stock apps' MAX_ID); the W6Plus DMR's module refuses a channel with a higher one and stops answering. */
+    public static final int MAX_DMR_ID = 16776415;
+    /**
+     * The stock app's LOCAL_ID: unlike its call number and talkgroups it is stored most significant byte first (the factory
+     * value "00000001" is ID 1). Read that way, the other way only if that is out of range; 0 for the factory 1 (no ID set)
+     * or anything outside 2..{@link #MAX_DMR_ID}.
+     */
+    static int flyscaleDmrId(String hex) {
+        if (hex == null || hex.trim().length() != 8) return 0;
+        int be;
+        try { be = (int) Long.parseLong(hex.trim(), 16); } catch (NumberFormatException e) { return 0; }
+        if (be >= 1 && be <= MAX_DMR_ID) return be > 1 ? be : 0;
+        int le = leInt(hex);
+        return le > 1 && le <= MAX_DMR_ID ? le : 0;
+    }
     /** Little-endian 32-bit hex ("01000000" = 1), 0 when it does not parse. */
     static int leInt(String s) {
         if (s == null || s.trim().length() != 8) return 0;

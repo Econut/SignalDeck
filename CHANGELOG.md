@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — W6Plus DMR: the stock app's DMR ID read the right way round; an out-of-range ID never reaches the module
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6Plus DMR DMR receive check (2026-10-29) | The W6Plus DMR's stock app stores its DMR ID most significant byte first (its factory "00000001" is ID 1), unlike its call number and talkgroups, so the channel import made it 16777216. The module answered the next DMR channel write with a refusal and stopped answering until SignalDeck's watchdog restarted it. The import now reads it the right way (the other order only if that is out of range) and keeps no ID for the factory 1; SignalDeck's DMR ID is used only within 1-16776415 (the stock apps' MAX_ID), falling back to 1, and SignalDeck Web's DMR ID field takes the same range (it allowed up to 16777215). | ChannelStore, RadioService, Station, WebHost | Host suite (`FlyscaleDmrImportTest`). **Device (W6Plus DMR):** with ID 16777216 the 0x22 write got a refusal and the module went silent for 9 s (watchdog restart), twice; with a valid ID it was acknowledged and the module stayed up. A HackRF replay of a recorded DMR key on 446.000 MHz then gave RECEIVE_START, the caller (group call, TG 9) and RECEIVE_STOP. |
+
 ## 2026-10-29 — ANYSECU W6Plus DMR (V69): receive on an untested profile
 
 | Backlog | Change | Files | Test |
