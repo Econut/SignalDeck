@@ -1552,6 +1552,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     /** Program the radio with a channel; {@code fromStore} = a real channel (remembered as active), else the VFO. */
     private synchronized boolean applyChannelNow(ChannelStore.Channel ch, boolean fromStore) {
+        { ChannelStore.Channel was = current; if (was == null || was.rxFreq != ch.rxFreq) idleFloor = Double.NaN; }   // another frequency: its own idle floor
         if (!ChannelStore.inBand(ch.rxFreq) || !ChannelStore.inBand(ch.txFreq)) {         // the module refuses these and stays where it is: never show them as tuned
             ChannelStore.Channel on = current;
             history("warn", "⚠ " + ch.name + " (" + ch.freqText(ch.rxFreq) + (ch.txFreq != ch.rxFreq ? " / " + ch.freqText(ch.txFreq) : "") + " MHz) is outside what this radio can tune (" + com.macdmr.radio.DeviceProfile.detect().bandsText() + ")"
@@ -2777,11 +2778,13 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     /**
      * Atom XL reception watchdog, always on: the bridge's line also misses receptions now and then after a long one (and the
-     * stock app then misses them too). Idle, the signal is read every second; a signal above -95 dBm twice with no reception
-     * reported starts one ({@link #synthRx}), two readings below -100 dBm end it and rewrite the channel, which brought the
-     * line back on the bench (2026-10-28). An edge that arrives meanwhile is merged.
+     * stock app then misses them too). Idle, the signal is read every second; a signal above the start threshold twice with
+     * no reception reported starts one ({@link #synthRx}), two readings below the end threshold end it and rewrite the
+     * channel, which brought the line back on the bench (2026-10-28). The thresholds follow the channel's idle floor
+     * ({@link AgoldUsb#rssiStartDbm}). An edge that arrives meanwhile is merged.
      */
     private volatile boolean synthRx; private volatile int strongCount, lowCount;
+    private volatile double idleFloor = Double.NaN;                     // dBm, while nothing is received; reset on a channel write
     private final Runnable rxWatchdog = new Runnable() { @Override public void run() {
         if (!agoldBridge() || exiting) return;
         if (isReady() && !isTransmitting() && (!receiving || synthRx)) pollRssi();
@@ -2790,10 +2793,11 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void agoldRssi(double dbm) {
         if (!agoldBridge() || isTransmitting()) return;
         if (!receiving) {
-            if (dbm > -95) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
+            idleFloor = AgoldUsb.nextFloor(idleFloor, dbm);
+            if (dbm > AgoldUsb.rssiStartDbm(idleFloor)) { if (++strongCount >= (lineFallback ? 1 : 2)) { strongCount = 0; lowCount = 0; synthRx = true; log("signal " + Math.round(dbm) + " dBm with no reception reported: treated as a reception"); status(1, RadioEngine.statusName(1)); } }
             else strongCount = 0;
         } else if (synthRx && !monRx) {                                  // a MON reception ends with MON
-            if (dbm < -100) { if (++lowCount >= 2) { lowCount = 0; final boolean restart = lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
+            if (dbm < AgoldUsb.rssiEndDbm(idleFloor)) { if (++lowCount >= 2) { lowCount = 0; final boolean restart = lineMissedOne(); synthRx = false; status(2, RadioEngine.statusName(2));
                 if (current != null) worker.execute(() -> { try { if (restart) powerCycleOrGiveUp(); applyChannelNow(current, current.id > 0); log(restart ? "bridge restarted and channel rewritten: the reception line looked stuck" : "channel rewritten after a reception the line did not report"); } catch (Throwable t) { log("channel rewrite: " + t); } }); } }
             else lowCount = 0;
         }

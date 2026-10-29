@@ -116,6 +116,20 @@ final class AgoldUsb {
         return lastPlugChangeAt == 0 ? 0 : Math.max(0, lastPlugChangeAt + PLUG_SETTLE_MS - now);
     }
 
+    /**
+     * Signal-reading thresholds of the reception watchdog, given the channel's idle noise floor (NaN until it is known):
+     * a reception starts above the higher of -95 dBm and floor + 6 dB and ends below the higher of -100 dBm and
+     * floor + 2 dB. With a charger on the USB socket the bench channel idled at -98 dBm (2026-10-29, -101 to -103 without
+     * it), so a fixed -100 dBm end never came and a reception the watchdog had opened stayed open for good.
+     */
+    static double rssiStartDbm(double floor) { return Double.isNaN(floor) ? -95 : Math.max(-95, floor + 6); }
+    static double rssiEndDbm(double floor) { return Double.isNaN(floor) ? -100 : Math.max(-100, floor + 2); }
+    /** The idle floor: a slow running mean of readings taken while nothing is received (a reading above the start threshold is not idle). */
+    static double nextFloor(double floor, double dbm) {
+        if (dbm > rssiStartDbm(floor)) return floor;
+        return Double.isNaN(floor) ? dbm : floor + (dbm - floor) * 0.1;
+    }
+
     /** Receptions in a row that the line never reported (found from the signal, or opened by MON) before the line counts as stuck. */
     static final int STUCK_LINE_MISSES = 2;
     /**

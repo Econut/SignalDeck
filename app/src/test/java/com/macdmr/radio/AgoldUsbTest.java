@@ -117,6 +117,19 @@ public class AgoldUsbTest {
         assertEquals("long after", 0, AgoldUsb.plugSettleWait(200_000, 100_000));
     }
 
+    @Test public void theReceptionWatchdogFollowsTheIdleFloor() {
+        assertEquals("floor unknown: the fixed thresholds", -95, AgoldUsb.rssiStartDbm(Double.NaN), 0);
+        assertEquals(-100, AgoldUsb.rssiEndDbm(Double.NaN), 0);
+        assertEquals("a quiet channel (-102) keeps them", -95, AgoldUsb.rssiStartDbm(-102), 0);
+        assertEquals(-100, AgoldUsb.rssiEndDbm(-102), 0);
+        double f = Double.NaN;                                               // the bench channel with the charger in idled at -98 (2026-10-29)
+        for (int i = 0; i < 30; i++) f = AgoldUsb.nextFloor(f, -98);
+        assertEquals(-98, f, 0.01);
+        assertTrue("a reception can end again at -98: end above the floor", AgoldUsb.rssiEndDbm(f) > -98);
+        assertTrue("and the floor alone does not start one", AgoldUsb.rssiStartDbm(f) > -98);
+        assertEquals("a carrier is not idle: the floor stays", f, AgoldUsb.nextFloor(f, -74), 0);
+    }
+
     @Test public void powerScriptsFollowTheHalsOrder() {
         String up = AgoldUsb.POWER_UP;
         assertTrue("the stale port node is waited out first", up.indexOf("while [ -e /dev/ttyACM0 ]") < up.indexOf("usb_path"));
