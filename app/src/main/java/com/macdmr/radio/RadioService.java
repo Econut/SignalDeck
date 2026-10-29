@@ -3519,7 +3519,18 @@ public class RadioService extends Service implements RadioEngine.Events {
     private void rxAfterSym() {
         ChannelStore.Channel c = current;
         if (c == null) return;
-        if (!rewriteAfterSym(moduleVersion)) { log("rx after sym: firmware unmutes itself, hold only"); holdAfterTx(); return; }
+        if (!rewriteAfterSym(moduleVersion)) {
+            // FW31 unmutes itself, but a symbol key still leaves the receive path unable to lock until two channel writes
+            // (bench 2026-10-28: key then one write = silent, two writes = 75 frames listed, 3 of 3). Stopgap until the
+            // firmware restores that state itself.
+            quietRewrite = true;
+            try {
+                boolean a = applyChannelNow(c, c != vfo); Thread.sleep(700); boolean b = applyChannelNow(c, c != vfo);
+                log("rx after sym: FW31, channel " + c.number + " rewritten twice " + a + "/" + b);
+            } catch (Throwable t) { log("rx after sym: " + t); }
+            finally { quietRewrite = false; }
+            return;
+        }
         quietRewrite = true;                                   // the same channel again: no spoken announcement
         try { log("rx after sym: channel " + c.number + " rewritten " + applyChannelNow(c, c != vfo)); } catch (Throwable t) { log("rx after sym: " + t); }
         finally { quietRewrite = false; }
