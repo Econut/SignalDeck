@@ -135,7 +135,8 @@ public final class AlsaDirectAudio implements AudioBackend {
     /** Start RX: the helper captures, this side plays the blocks through an AudioTrack (through the gate). */
     @Override public synchronized String startRx(boolean speaker) {
         try {
-            if (rxProc != null) return "capture already running";
+            if (capturing()) return "capture already running";
+            rxProc = null;                                                   // a helper that ended by itself is not in the way
             if (track == null) {
                 int min = AudioTrack.getMinBufferSize(8000, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT);
                 track = new AudioTrack(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
@@ -201,7 +202,9 @@ public final class AlsaDirectAudio implements AudioBackend {
     }
 
     /** True while the capture helper runs. */
-    boolean capturing() { return rxProc != null; }
+    /** True while the capture helper is still running: one that ended on its own (EIO) keeps its Process object, and counted
+     *  as running it was kept for the next reception (no sound) and cancelled the bridge restart that would have fixed it (2026-10-29). */
+    boolean capturing() { Process p = rxProc; return p != null && p.isAlive(); }
 
     @Override public synchronized String stopRx() {
         playing = false; rxRunning = false; rxLive.set(false);
