@@ -754,6 +754,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         running = this;
         watchCar();
         watchUsbDuringTx();
+        watchPlugChanges();
         ProfileRegistry.init(this);
         profile = DeviceProfile.detect();
         softSq.toneDetect = profile.subaudible; softSq.setNoiseTable(profile.softSqThresholds, profile.softSqCloseCap);   // the W6: noise only, on its own scale
@@ -844,6 +845,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         try { unregisterReceiver(diag); } catch (Throwable ignored) { }
         if (profile != null && profile.muteLines != null) try { unregisterReceiver(mediaVolume); } catch (Throwable ignored) { }
         try { if (powerOff != null) unregisterReceiver(powerOff); } catch (Throwable ignored) { }
+        try { if (plugSettle != null) unregisterReceiver(plugSettle); } catch (Throwable ignored) { }
         try { if (pttDown) { if (audio != null) audio.stopTx(); engine.ptt(false); } } catch (Throwable ignored) { }
         try { if (audio != null) { audio.stopRx(); } } catch (Throwable ignored) { }
         engine.close();
@@ -2838,6 +2840,11 @@ public class RadioService extends Service implements RadioEngine.Events {
      * app returns) and the link shows the error, instead of "ready" with the radio off.
      */
     private void powerCycleOrGiveUp() throws IOException {
+        long settle = agoldBridge() ? AgoldUsb.plugSettleWait(System.currentTimeMillis(), lastPlugChangeAt) : 0;
+        if (settle > 0) {                                                    // the stock app leaves the bridge alone for 4 s after a charger change
+            log("bridge power-up held " + settle + " ms after a charger or USB change");
+            try { Thread.sleep(settle); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+        }
         try { engine.powerCycle(); }
         catch (IOException e) { if (agoldBridge()) bridgeLost(e); throw e; }
     }
@@ -2850,6 +2857,18 @@ public class RadioService extends Service implements RadioEngine.Events {
         log("hand-back after the lost bridge: " + AgoldUsb.giveBack(profile, getFilesDir()).replace('\n', ' '));
         history("warn", "⚠ The radio's USB bridge did not come back after a restart: the radio is off and back with the stock app. Take over again, or restart the phone if it keeps happening");
         setLink("error: the USB bridge did not come back (" + t.getMessage() + ")");
+    }
+
+    // A bridge power-up right at a charger change left the Atom XL's bridge taking no serial data (2026-10-29 10:11,
+    // the cable pulled during a recovery); the stock app restarts the bridge 4 s after every charger change.
+    private volatile long lastPlugChangeAt;
+    private android.content.BroadcastReceiver plugSettle;
+    private void watchPlugChanges() {
+        plugSettle = new android.content.BroadcastReceiver() {
+            @Override public void onReceive(android.content.Context c, android.content.Intent i) { lastPlugChangeAt = System.currentTimeMillis(); }
+        };
+        android.content.IntentFilter f = new android.content.IntentFilter(android.content.Intent.ACTION_POWER_CONNECTED); f.addAction(android.content.Intent.ACTION_POWER_DISCONNECTED);
+        try { registerReceiver(plugSettle, f); } catch (Throwable t) { log("plug watch: " + t); }
     }
 
     private volatile boolean bridgeRecoverDeferred;
@@ -2932,10 +2951,12 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile long lastRecoverAt; private volatile boolean recovering;
     private final Runnable moduleWatch = new Runnable() { @Override public void run() {
         ui.postDelayed(this, 2000);
-        if (exiting || engine.rawSession() || !isReady() || recovering || isTransmitting() || engine.unansweredForMs() < 6000 || System.currentTimeMillis() - lastRecoverAt < 120_000) return;
+        boolean stalled = agoldBridge() && engine.writeStalled();          // the bridge stopped taking data: writes fail after their deadline
+        if (exiting || engine.rawSession() || !isReady() || recovering || isTransmitting() || (!stalled && engine.unansweredForMs() < 6000) || System.currentTimeMillis() - lastRecoverAt < 120_000) return;
         recovering = true;
         worker.execute(() -> {
             try {
+                if (stalled) { restartModule("the radio's USB bridge stopped taking commands (a write did not finish in " + AgoldUsb.WRITE_DEADLINE_MS / 1000 + " s)"); return; }
                 if (versionHandshake(2500)) { log("the module was slow but answered the version query"); return; }
                 restartModule("the module stopped answering commands for " + engine.unansweredForMs() / 1000 + " s");
             } catch (Throwable t) { log("module restart: " + t); setLink("ready"); }

@@ -110,6 +110,13 @@ public class AgoldUsbTest {
         assertEquals("already on the signal reading: nothing more to do", 0, AgoldUsb.stuckLineAction(5, 1, true));
     }
 
+    @Test public void aBridgePowerUpWaitsForTheChargerToSettle() {
+        assertEquals("no charger change yet", 0, AgoldUsb.plugSettleWait(100_000, 0));
+        assertEquals("right after the change: the stock app's 4 s", 4000, AgoldUsb.plugSettleWait(100_000, 100_000));
+        assertEquals(1500, AgoldUsb.plugSettleWait(102_500, 100_000));
+        assertEquals("long after", 0, AgoldUsb.plugSettleWait(200_000, 100_000));
+    }
+
     @Test public void powerScriptsFollowTheHalsOrder() {
         String up = AgoldUsb.POWER_UP;
         assertTrue("the stale port node is waited out first", up.indexOf("while [ -e /dev/ttyACM0 ]") < up.indexOf("usb_path"));

@@ -160,8 +160,12 @@ public final class RadioEngine implements UartPort.Listener, ModuleEngine {
         this.profile = p; this.ev = ev;
         FrameCodec codec = "agold".equals(p.protocol) ? new AgoldEnvelope() : FrameCodec.armor();
         this.port = new UartPort(p.controlPort, this, codec);
+        if ("agold".equals(p.protocol)) port.setWriteDeadline(AgoldUsb.WRITE_DEADLINE_MS);   // a write the bridge never takes must not freeze the engine
         this.power = p.power();
     }
+
+    /** True while a write to the port has missed its deadline (the Atom XL's bridge stopped taking data). */
+    @Override public boolean writeStalled() { return port.writeStalled(); }
 
     public DeviceProfile profile() { return profile; }
     public boolean isOpen() { return port.isOpen(); }

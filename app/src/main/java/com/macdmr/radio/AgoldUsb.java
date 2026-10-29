@@ -107,6 +107,15 @@ final class AgoldUsb {
     /** Edges read in this long after the reader starts are the bridge's power-up toggles, not receptions. */
     static final long POWER_UP_EDGES_MS = 2000;
 
+    /** A write to the bridge's serial port that takes longer than this has failed: the bridge stopped taking data. */
+    static final long WRITE_DEADLINE_MS = 2000;
+    /** After a charger or USB change, the bridge is left alone this long before it is powered up (the stock app waits 4 s). */
+    static final long PLUG_SETTLE_MS = 4000;
+    /** How long to wait before a bridge power-up, given the last charger or USB change (0 = none yet). */
+    static long plugSettleWait(long now, long lastPlugChangeAt) {
+        return lastPlugChangeAt == 0 ? 0 : Math.max(0, lastPlugChangeAt + PLUG_SETTLE_MS - now);
+    }
+
     /** Receptions in a row that the line never reported (found from the signal, or opened by MON) before the line counts as stuck. */
     static final int STUCK_LINE_MISSES = 2;
     /**

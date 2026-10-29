@@ -35,6 +35,8 @@ public final class UartPort {
     private FileInputStream in;
     private FileOutputStream out;
     private VendorSerial.Port native_;
+    private volatile long writeDeadlineMs;                  // 0: plain blocking writes; else through a TimedWriter (the Atom XL's USB bridge)
+    private TimedWriter timed;
     private Thread reader;
     private volatile boolean running;
     /** While set, received bytes are queued for the firmware loader instead of being framed. */
@@ -69,6 +71,7 @@ public final class UartPort {
             out = new FileOutputStream(path);
             listener.onLog("UART " + path + " open (plain file)");
         }
+        if (writeDeadlineMs > 0) timed = new TimedWriter(out, writeDeadlineMs, "uart-writer");
         running = true;
         reader = new Thread(this::readLoop, "uart-reader");
         reader.start();
@@ -76,6 +79,7 @@ public final class UartPort {
 
     public synchronized void close() {
         running = false;
+        if (timed != null) { timed.shutdown(); timed = null; }
         try { if (in != null) in.close(); } catch (IOException ignored) { }
         try { if (out != null) out.close(); } catch (IOException ignored) { }
         if (native_ != null) { native_.release(); native_ = null; }
@@ -83,6 +87,15 @@ public final class UartPort {
     }
 
     public boolean isOpen() { return in != null; }
+
+    /** Writes that miss this deadline fail instead of blocking (0 = plain writes). Takes effect at the next open. */
+    public void setWriteDeadline(long ms) { writeDeadlineMs = ms; }
+    /** True while a write has missed its deadline and none has finished since. */
+    public boolean writeStalled() { TimedWriter t = timed; return t != null && t.stalled(); }
+    private void put(byte[] b) throws IOException {
+        if (timed != null) timed.write(b);
+        else { out.write(b); out.flush(); }
+    }
 
     /** Hand the byte stream to {@link #readRaw} until {@link #stopDivert}. */
     public synchronized void startDivert() {
@@ -96,8 +109,7 @@ public final class UartPort {
 
     public synchronized void writeRaw(byte[] b) throws IOException {
         if (out == null) throw new IOException("port closed");
-        out.write(b);
-        out.flush();
+        put(b);
     }
 
     /** One diverted byte, or −1 when {@code timeoutMs} expires. */
@@ -121,7 +133,7 @@ public final class UartPort {
     public synchronized void send(Frame f) throws IOException {
         if (out == null) throw new IOException("port closed");
         byte[] b = codec.encode(f);
-        out.write(b); out.flush();
+        put(b);
         listener.onLog("TX " + f + "  <" + Frame.hex(b, b.length) + ">");
     }
 

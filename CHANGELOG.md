@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: a bridge that stops taking commands no longer freezes the radio
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture-stall investigation (managing agent, 2026-10-29) | On the bench the USB cable was pulled while SignalDeck was restarting the radio's bridge; the bridge then took no serial data, a write to it blocked for good, and the whole radio froze without a word: no signal readings, no receptions, a stale status, for 10 minutes. The stuck-module watchdog could not help, because its restart waited on the same thread. On the Atom XL a write to the bridge now fails after 2 s, a write that missed its deadline counts as a dead bridge for the watchdog (the history says the module is being restarted, as before), and a bridge power-up waits until 4 s after a charger or USB change, as the stock app does. Other phones keep plain writes. | `TimedWriter`, `UartPort`, `RadioEngine`, `ModuleEngine`, `RadioService`, `AgoldUsb` | Host: `TimedWriterTest` (a write that never finishes fails after the deadline, the next one fails at once, a finished write clears the stall), `AgoldUsbTest.aBridgePowerUpWaitsForTheChargerToSettle`; full suite 504 / 0. Device: regression pending |
+
 ## 2026-10-29 — FT8: a slot heard only during a reception is decoded (Atom XL)
 
 | Backlog | Change | Files | Test |

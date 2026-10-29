@@ -68,6 +68,8 @@ public interface ModuleEngine {
 
     // health and the device report
     long unansweredForMs();
+    /** True while a write to the control port has missed its deadline (only the Atom XL's bridge sets one). */
+    default boolean writeStalled() { return false; }
     java.util.Map<Integer, RadioEngine.CommandStats> stats();
     int[] rssiCounts();
 
