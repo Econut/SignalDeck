@@ -28,11 +28,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
 #include <sound/asound.h>
 
 static volatile sig_atomic_t stop;
 static void on_signal(int s) { (void) s; stop = 1; }
+static long now_ms(void) { struct timespec t; clock_gettime(CLOCK_MONOTONIC, &t); return t.tv_sec * 1000L + t.tv_nsec / 1000000L; }
 
 static int ctl_open(int card, int flags) {
     char p[64]; snprintf(p, sizeof p, "/dev/snd/controlC%d", card);
@@ -181,18 +183,24 @@ static long pipe_free(int fd) {
 }
 
 /* drop: when the reader falls behind, drop whole periods instead of waiting on the pipe, so the card is always read in time
-   (the Atom XL's USB bridge stops streaming for good after one overrun, 2026-10-28). */
+   (the Atom XL's USB bridge stops streaming for good after one overrun, 2026-10-28).
+   EIO means no period came within the kernel's wait (2 s on the Atom XL). Its bridge then streams nothing until it is
+   power-cycled (2026-10-29: re-preparing failed, and reopening the device three times gave no period either), so the
+   capture ends at once and the caller's recovery power-cycles the bridge; the message says how long the gap was. */
 static int capture_loop(int pcm, unsigned ch, unsigned period, int drop) {
     size_t fb = 2u * ch; char *buf = malloc(period * fb); if (!buf) return 4;
     unsigned long overruns = 0, dropped = 0;
+    long last = now_ms();
     while (!stop) {
         struct snd_xferi x; memset(&x, 0, sizeof x); x.buf = buf; x.frames = period;
         if (ioctl(pcm, SNDRV_PCM_IOCTL_READI_FRAMES, &x) < 0) {
             if (errno == EINTR) continue;
             if (errno == EPIPE) { overruns++; if (ioctl(pcm, SNDRV_PCM_IOCTL_PREPARE) < 0 || ioctl(pcm, SNDRV_PCM_IOCTL_START) < 0) break; continue; }
-            fprintf(stderr, "sdalsa: read: %s (after %lu overruns, %lu periods dropped)\n", strerror(errno), overruns, dropped); free(buf); return 4;
+            int e = errno;
+            fprintf(stderr, "sdalsa: read: %s after %ld ms without a period (after %lu overruns, %lu periods dropped)\n", strerror(e), now_ms() - last, overruns, dropped); free(buf); return 4;
         }
         if (x.result <= 0) continue;
+        last = now_ms();
         size_t n = (size_t) x.result * fb;
         if (drop) { long f = pipe_free(1); if (f >= 0 && (size_t) f < n) { dropped++; continue; } }
         if (write_all(1, buf, n) != 0) break;   /* SignalDeck closed the pipe: stop */
