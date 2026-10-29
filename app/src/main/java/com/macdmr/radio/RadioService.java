@@ -3511,9 +3511,14 @@ public class RadioService extends Service implements RadioEngine.Events {
      *  the signal meter still moved, and reopening the phone's audio stream did not help; only a channel write brought it back
      *  (the owner's workaround was changing channel and back). So the current channel is written again, which also puts the
      *  M17 voice-filter hold back. */
+    /** The first bench image that clears the module's own receive mute after a symbol key (FW31, phonedmrapp
+     *  radio_firmware/reviews.md 2026-10-28): there a channel write would put the mute back, so only the hold is re-sent. */
+    static final int SYM_UNMUTE_FW = 31;
+    static boolean rewriteAfterSym(String moduleVersion) { return !(Firmware.stubTag(moduleVersion) && Firmware.tagNumber(moduleVersion) >= SYM_UNMUTE_FW); }
     private void rxAfterSym() {
         ChannelStore.Channel c = current;
         if (c == null) return;
+        if (!rewriteAfterSym(moduleVersion)) { log("rx after sym: firmware unmutes itself, hold only"); holdAfterTx(); return; }
         quietRewrite = true;                                   // the same channel again: no spoken announcement
         try { log("rx after sym: channel " + c.number + " rewritten " + applyChannelNow(c, c != vfo)); } catch (Throwable t) { log("rx after sym: " + t); }
         finally { quietRewrite = false; }
