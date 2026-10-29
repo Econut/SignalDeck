@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — The in-app guide exported for the website
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Website plan §4 | The guide in Help & how-to is exported to `docs/help/`: one Markdown page per topic, an index, and `help.json`, which signaldeckradio.com reads when it builds. HelpView stays the only place the guide is written. `HelpExportTest` checks every topic has a group, summary and sections and that no two topics share a page name, and fails while `docs/help/` is out of date; `-PexportHelp=true` regenerates it. The Intercom page's example of a DMR caller now uses the demo identity (N0CALL) instead of a real operator's callsign, name and DMR ID. | `ui/HelpView.java`, `RadioService.java` (comment), `app/build.gradle`, `test/…/ui/HelpExportTest.java`, `docs/help/`, `CLAUDE.md`, `GROK.md` | Host: 514 tests pass, including the 4 new ones; a hand edit to a generated page makes `committedGuideIsCurrent` fail, and regenerating clears it. Not device-tested: the only app change is the text of one help example. |
+
 ## 2026-10-29 — Atom XL: a stuck reception signal cleared without restarting the phone; no bridge restart in the middle of a call
 
 | Backlog | Change | Files | Test |

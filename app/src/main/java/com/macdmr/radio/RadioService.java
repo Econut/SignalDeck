@@ -3460,7 +3460,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private boolean dmrCallNow() { return current != null && current.isDigital() && hearing() && lastCaller > 0; }
     /** The talker's DMR ID during a call, else 0. */
     public int currentCallerId() { return dmrCallNow() ? lastCaller : 0; }
-    /** The talker's callsign when the name starts with one ("VE3UOD Richard ..." gives "VE3UOD"), else the name or "ID n". */
+    /** The talker's callsign when the name starts with one ("N0CALL Demo ..." gives "N0CALL"), else the name or "ID n". */
     public String currentCallsign() {
         String c = currentCaller(); if (c.isEmpty()) return "";
         String first = c.split("\\s+")[0];
