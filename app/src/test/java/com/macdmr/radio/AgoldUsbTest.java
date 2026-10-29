@@ -138,6 +138,9 @@ public class AgoldUsbTest {
         assertEquals(0, AgoldUsb.windowAction(false, "1", -74, -95));
         assertEquals("an unreadable flag decides nothing", 0, AgoldUsb.windowAction(true, "cat: Permission denied", -102, -95));
         assertEquals(0, AgoldUsb.windowAction(true, null, -102, -95));
+        assertTrue(AgoldUsb.callInKnown("1\n")); assertTrue(AgoldUsb.callInKnown("0"));
+        assertFalse("an error is not the flag: the signal reading decides then", AgoldUsb.callInKnown("cat: Permission denied"));
+        assertFalse(AgoldUsb.callInKnown(null));
     }
 
     @Test public void powerOffPulsesTheBridgeLikeTheStockHal() {

@@ -2872,7 +2872,14 @@ public class RadioService extends Service implements RadioEngine.Events {
         // a bridge recovery leaves the capture closed until this check has settled whether a reception is still on (a
         // capture it reopened at once met a reception whose end the power-up had hidden, got nothing and ended with EIO
         // 2 s later, which started the next recovery: 2026-10-29 14:47); a reception that starts here opens its own
-        if (act != 1) ui.post(() -> { if (receiving && rxAudioOn && audio != null && !captureRunning()) worker.execute(() -> { try { log(audio.startRx(true)); } catch (Throwable t) { log("capture after the power-up: " + t); } }); });
+        final boolean flagKnown = AgoldUsb.callInKnown(v);
+        if (!flagKnown) log("reception line: call_in unreadable after the power-up (" + v + "): the signal reading decides whether the capture reopens");
+        final boolean signal = rssi > AgoldUsb.rssiStartDbm(idleFloor);
+        if (act != 1) ui.post(() -> {
+            if (!receiving || !rxAudioOn || audio == null || captureRunning()) return;
+            if (!flagKnown && !signal && !monitorOn) { log("no signal after the power-up and no flag: the capture stays closed"); return; }
+            worker.execute(() -> { try { log(audio.startRx(true)); } catch (Throwable t) { log("capture after the power-up: " + t); } });
+        });
     }, "agold-window-check").start();
     private void bridgeLost(Throwable t) {
         log("the USB bridge did not come back: " + t);

@@ -87,6 +87,8 @@ final class AgoldUsb {
     static final String CALL_IN = "/sys/bus/platform/drivers/mcu/call_in";
     /** call_in read back: exactly "0" is a reception in progress (anything else, an error included, is not). */
     static boolean receptionInProgress(String callIn) { return callIn != null && callIn.trim().equals("0"); }
+    /** True when call_in read back as the driver's flag ("0" or "1"), not an error. */
+    static boolean callInKnown(String callIn) { return callIn != null && (callIn.trim().equals("0") || callIn.trim().equals("1")); }
     /**
      * At the end of a power-up window: 2 = end the reception SignalDeck has open (the driver says idle), 1 = open one (the
      * driver says a reception holds the line and the signal reading is above the start threshold), 0 = nothing.
