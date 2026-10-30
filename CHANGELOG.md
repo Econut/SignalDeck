@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-30 — Bench: a transmit tone on the bench VFO
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Fox hunt tests on the W6 phones (managing agent, 2026-10-30) | DIAG `vfo` takes `--ef ctcss Hz`: the bench VFO then transmits that CTCSS tone, so a second phone can be a fox for the "Only the fox's" gate. Nothing user-facing. | DiagReceiver, RadioService | Device: the fox hunt run below |
+
 ## 2026-10-30 — Radio notes: charger buzz on both W6 phones, the W6+'s speaker during data sends
 
 | Backlog | Change | Files | Test |

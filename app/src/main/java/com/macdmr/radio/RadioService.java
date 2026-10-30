@@ -194,7 +194,13 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Stop tracking and following passes (the Stop buttons). */
     public void endSatTracking() { setIssRepeat(-1); stopSatTrack(); }
     /** Bench (DIAG vfo): listen on a frequency through the VFO, wide, low power. */
-    void diagVfo(int hz, int power) { ChannelStore.Channel a = new ChannelStore.Channel(); a.type = 1; a.rxFreq = a.txFreq = hz; a.band = 1; a.power = power; a.name = "Bench"; applyVfo(a, false); }   // power 0 = low, 1 = high
+    void diagVfo(int hz, int power) { diagVfo(hz, power, 0); }
+    /** {@code ctcssHz} > 0: the bench VFO transmits that tone (a fox for the fox hunt tests); power 0 = low, 1 = high. */
+    void diagVfo(int hz, int power, double ctcssHz) {
+        ChannelStore.Channel a = new ChannelStore.Channel(); a.type = 1; a.rxFreq = a.txFreq = hz; a.band = 1; a.power = power; a.name = "Bench";
+        int t = ctcssHz > 0 ? ChannelPresets.ctcssIndex(ctcssHz) : -1; if (t >= 0) { a.txType = 1; a.txSubCode = t; }
+        applyVfo(a, false);
+    }
     void diagVfoOff() { if (vfo != null && "Bench".equals(vfo.name)) exitVfo(); }
     /** Record whole passes (AOS to LOS, below the squelch too) as WAV in Download/DMR/Audio/<satellite>/…_pass.wav. */
     public boolean satRecord() { return getSharedPreferences("radio", MODE_PRIVATE).getBoolean("satRecord", true); }
