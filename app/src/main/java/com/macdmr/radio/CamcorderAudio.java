@@ -41,7 +41,10 @@ public final class CamcorderAudio implements AudioBackend {
 
     public CamcorderAudio() { this(false); }
     public CamcorderAudio(boolean play) { this(play, GAIN); }
-    public CamcorderAudio(boolean play, int gain) { this.play = play; this.gain = Math.max(1, gain); }
+    public CamcorderAudio(boolean play, int gain) { this(play, gain, null, null); }
+    public CamcorderAudio(boolean play, int gain, String[][] gatewayOn, String[][] gatewayOff) { this.play = play; this.gain = Math.max(1, gain); this.gatewayOn = gatewayOn; this.gatewayOff = gatewayOff; }
+    private final String[][] gatewayOn, gatewayOff;
+    private RootShell lineShell;
 
     @Override public void setSink(Sink s) { sink = s; }
     @Override public void setGate(Gate g) { gate = g; }   // only used when this backend plays the audio itself
@@ -103,5 +106,41 @@ public final class CamcorderAudio implements AudioBackend {
     private static final String NO_TX = "transmit audio is not available on this phone yet";
     @Override public String startTx() { return NO_TX; }
     @Override public String stopTx() { return NO_TX; }
-    @Override public String playPcm(short[] mono) { return NO_TX; }
+
+    private volatile boolean abortPlay;
+    @Override public void abortPlay() { abortPlay = true; }
+    /**
+     * With gateway lines (the W6Plus DMR): the module's microphone input switched to the phone's audio output for the
+     * duration, the samples played on Android's media stream (the speaker amplifier is off), then switched back. The
+     * caller has keyed the radio; this blocks until the samples have played.
+     */
+    @Override public String playPcm(short[] mono) {
+        if (gatewayOn == null) return NO_TX;
+        abortPlay = false;
+        AudioTrack t = null;
+        try {
+            lines(gatewayOn);
+            int tmin = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+            t = new AudioTrack(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build(),
+                    new AudioFormat.Builder().setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build(),
+                    Math.max(tmin, 4 * BLOCK * 2), AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE);
+            t.play();
+            int pos = 0;
+            while (pos < mono.length && !abortPlay) { int n = t.write(mono, pos, Math.min(BLOCK, mono.length - pos)); if (n <= 0) break; pos += n; }
+            long end = System.currentTimeMillis() + 2000;                       // let the buffered tail play out
+            while (!abortPlay && t.getPlaybackHeadPosition() < pos && System.currentTimeMillis() < end) Thread.sleep(10);
+            return "played " + pos * 1000 / RATE + " ms through the gateway route" + (abortPlay ? " (stopped)" : "");
+        } catch (Throwable e) { return "playPcm: " + e; }
+        finally {
+            if (t != null) { try { t.stop(); } catch (Throwable ignored) { } t.release(); }
+            lines(gatewayOff);
+        }
+    }
+    private synchronized void lines(String[][] l) {
+        if (l == null || l.length == 0) return;
+        if (lineShell == null) lineShell = new RootShell();
+        StringBuilder c = new StringBuilder();
+        for (String[] p : l) c.append("echo ").append(p[1]).append(" > ").append(p[0]).append("; ");
+        lineShell.run(c.toString());
+    }
 }
