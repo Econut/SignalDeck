@@ -118,6 +118,7 @@ public final class CamcorderAudio implements AudioBackend {
         if (gatewayOn == null) return NO_TX;
         abortPlay = false;
         AudioTrack t = null;
+        String[][] before = snapshot(gatewayOn);                               // what the gateway nodes held: put back exactly, even on an error
         try {
             lines(gatewayOn);
             int tmin = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
@@ -134,7 +135,23 @@ public final class CamcorderAudio implements AudioBackend {
         finally {
             if (t != null) { try { t.stop(); } catch (Throwable ignored) { } t.release(); }
             lines(gatewayOff);
+            if (before != null) lines(before);
         }
+    }
+    /** {node, value} of each node in {@code l} as it reads now, the relay first; null when one cannot be read. */
+    private synchronized String[][] snapshot(String[][] l) {
+        if (lineShell == null) lineShell = new RootShell();
+        java.util.List<String[]> out = new java.util.ArrayList<>();
+        for (int i = l.length - 1; i >= 0; i--) {
+            String node = l[i][0]; boolean seen = false;
+            for (String[] o : out) if (o[0].equals(node)) seen = true;
+            if (seen) continue;
+            String v = lineShell.run("cat " + node).trim();
+            if (!v.matches("-?\\d+")) return null;
+            out.add(new String[] { node, v });
+        }
+        out.sort((a, b) -> a[0].contains("relay") ? -1 : b[0].contains("relay") ? 1 : 0);
+        return out.toArray(new String[0][]);
     }
     private synchronized void lines(String[][] l) {
         if (l == null || l.length == 0) return;
