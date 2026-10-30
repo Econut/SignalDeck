@@ -47,21 +47,8 @@ public final class P8Startup {
      public int state(String path)throws Exception{return P8Receiver.readState(path);}
      public void release()throws Exception{P8ReceiveNative.load();P8ReceiveNative.recoverReleased();}
     },true);
-    service.p8StartupMessage("Cold recovery: one release verified; opening stock initialisation");
-    ui.post(()->{if(closed)return;P8ColdInitPolicy init=new P8ColdInitPolicy(SystemClock.elapsedRealtime());
-     try{P8MainRadio.restoreIntercom(activity);}catch(Exception e){error("Stock initialisation launch failed: "+e.getMessage());return;}
-     ui.post(new Runnable(){public void run(){
-      if(closed)return;
-      try{
-       int marker=android.provider.Settings.Global.getInt(activity.getContentResolver(),"dmr_init",-1);
-       boolean released=P8Receiver.readState(P8Protocol.PTT_NODE)==1 && P8Receiver.readState(P8Protocol.POWER_NODE)==1 && P8Receiver.readState(P8Protocol.AUDIO_CONTROL_NODE)==1;
-       P8ColdInitPolicy.Result result=init.observe(SystemClock.elapsedRealtime(),marker,released);
-       if(result==P8ColdInitPolicy.Result.READY){service.p8StartupMessage("Fresh stock initialisation marker 0->1 verified");ui.postDelayed(()->{if(!closed)handover();},500);}
-       else if(result==P8ColdInitPolicy.Result.FAILED){activity.startActivity(new Intent(activity,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));error("Stock initialisation did not complete with a fresh safe state; no retry");}
-       else ui.postDelayed(this,50);
-      }catch(Exception e){error("Stock initialisation observation failed: "+e.getMessage());}
-     }});
-    });
+    service.p8StartupMessage("Cold recovery: one release verified; SignalDeck will initialize the module directly");
+    ui.post(()->{if(!closed)handover();});
    }catch(Exception e){ui.post(()->error("Cold recovery stopped: "+e.getMessage()));}
   },"P8-startup-release").start();
  }

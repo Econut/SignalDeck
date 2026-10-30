@@ -19,7 +19,16 @@ import android.os.Build;
  */
 public class BootReceiver extends BroadcastReceiver {
     @Override public void onReceive(final Context ctx, Intent intent) {
-        if (intent == null || !Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) return;
+        if (intent == null) return;
+        boolean normal=Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction());
+        boolean locked=Intent.ACTION_LOCKED_BOOT_COMPLETED.equals(intent.getAction());
+        if(BuildConfig.P8_OFFLINE){
+            if((normal || locked) && P8ModulePower.preferences(ctx).getBoolean("phoneOnlyAtBoot",false)){
+                final PendingResult pending=goAsync();new Thread(()->{try{P8ModulePower.bootOff(ctx);}finally{pending.finish();}},"P8-boot-phone-only").start();
+            }
+            return; // P8 never enters the generic root/stock-package boot flow.
+        }
+        if(!normal)return;
         ProfileRegistry.init(ctx);
         final boolean own = ctx.getSharedPreferences("radio", Context.MODE_PRIVATE).getBoolean("ownAtBoot", false);
         if (!DeviceProfile.detect().supported) return;

@@ -865,7 +865,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Bring the radio up: policy (root), stock app off, UART, power, channel, RX audio. Runs on a worker. */
     private volatile P8Receiver p8Receiver;
     private android.os.PowerManager.WakeLock p8Wake;
-    private volatile boolean p8Scanning,p8Closing;
+    private volatile boolean p8Scanning,p8Closing,p8PowerChanging;
     private volatile boolean p8TxArmed;
     private long p8ArmGeneration;
     private volatile boolean p8Unsafe;
@@ -917,7 +917,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile String p8Meter="No PCM measurements yet";
     public String p8AudioMeter(){return p8Meter;}
     public void p8StartupMessage(String text){log("P8 startup: "+text);}
-    public boolean p8StartupClosed(){return !p8Unsafe && !p8Recovering && !p8Closing && p8Receiver==null && !P8Receiver.active() && !pttDown && !transmitting;}
+    public boolean p8StartupClosed(){return !p8Unsafe && !p8Recovering && !p8Closing && !p8PowerChanging && p8Receiver==null && !P8Receiver.active() && !pttDown && !transmitting;}
     private Runnable p8AfterClose;
     private boolean p8RestoreOnClose;
     private final java.util.concurrent.ConcurrentHashMap<P8RxProtocol.Channel,ChannelStore.Channel> p8Tunes=new java.util.concurrent.ConcurrentHashMap<>();
@@ -934,7 +934,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         return "Saved "+key+" = "+value;
     }
     private synchronized void bringUpP8(){
-        if(p8Recovering)return;
+        if(p8Recovering || p8PowerChanging)return;
         if(p8Unsafe){log("P8 stopped after unsafe response; inspect radio state before manual recovery");return;}
         if(p8Receiver!=null || p8Closing)return;
         try{
@@ -972,6 +972,13 @@ public class RadioService extends Service implements RadioEngine.Events {
         scanner.stop();p8Scanning=false;
         if(p8Receiver==null){if(restore)try{P8MainRadio.restoreIntercom(this);}catch(Exception e){log("Intercom: "+e);}if(done!=null)ui.post(done);return;}
         p8Closing=true;p8RestoreOnClose=restore;p8AfterClose=done;p8Receiver.stop();
+    }
+    public void p8PhoneOnly(){
+        if(!p8Main() || p8PowerChanging || p8Closing || p8Recovering || isTransmitting() || pttDown){log("Phone-only refused during PTT/transmit");return;}
+        p8PowerChanging=true;closeP8(false,()->new Thread(()->{
+            try{if(p8Unsafe)throw new Exception("Unsafe radio close");P8ModulePower.change(this,false);ui.post(()->{p8Status="Phone-only: radio module off";log(p8Status);p8PowerChanging=false;setLink("phone-only");android.widget.Toast.makeText(this,p8Status,android.widget.Toast.LENGTH_LONG).show();});}
+            catch(Exception | LinkageError e){ui.post(()->{p8Status="Phone-only stopped: "+e.getMessage();log(p8Status);p8PowerChanging=false;setLink("power fault");});}
+        },"P8-phone-only").start());
     }
     public void bringUp() {
         if(p8Main()){bringUpP8();return;}
@@ -1057,7 +1064,10 @@ public class RadioService extends Service implements RadioEngine.Events {
      * service. {@code done} gets what happened (on the main thread).
      */
     public void exit(final boolean restoreStock, final ExitDone done) {
-        if(p8Main()){exiting=true;closeP8(true,()->{stopForeground(true);stopSelf();if(done!=null)done.done(p8Status);});return;}
+        if(p8Main()){exiting=true;closeP8(restoreStock,()->new Thread(()->{
+            if(!restoreStock)try{if(p8Unsafe)throw new Exception("Unsafe close");P8ModulePower.change(this,false);p8Status="Phone-only: radio module off";}catch(Exception | LinkageError e){p8Status="Power-off stopped: "+e.getMessage();}
+            ui.post(()->{stopForeground(true);stopSelf();if(done!=null)done.done(p8Status);});
+        },"P8-exit").start());return;}
         exiting = true;
         new Thread(() -> {
             StringBuilder r = new StringBuilder();
@@ -1850,7 +1860,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public void ptt(final boolean down) {
         if(down && csvImporting)return;
-        if(p8Main()){if(p8Recovering)return;if(down && P8ButtonBindings.learning!=null)return;if(p8Receiver!=null && (!down || !txInhibited())){if(down){scanner.stop();p8Scanning=false;}p8Receiver.ptt(down);}else if(down)history("warn","P8 TX blocked: connect an analogue channel with Transmit allowed");return;}
+        if(p8Main()){if(p8Recovering || p8PowerChanging)return;if(down && P8ButtonBindings.learning!=null)return;if(p8Receiver!=null && (!down || !txInhibited())){if(down){scanner.stop();p8Scanning=false;}p8Receiver.ptt(down);}else if(down)history("warn","P8 TX blocked: connect an analogue channel with Transmit allowed");return;}
         worker.execute(() -> {
             try {
                 if (down) {

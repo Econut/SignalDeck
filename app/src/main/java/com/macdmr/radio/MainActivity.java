@@ -451,7 +451,7 @@ public class MainActivity extends AppCompatActivity {
         RadioService s = svc;
         if (s == null) { finishAndRemoveTask(); return; }
         s.exit(restoreStock, report -> {
-            android.widget.Toast.makeText(this, restoreStock ? "Radio handed back to the stock app" : "Radio switched off. Open SignalDeck to turn it on again", android.widget.Toast.LENGTH_LONG).show();
+            android.widget.Toast.makeText(this, s.p8Main() ? report : restoreStock ? "Radio handed back to the stock app" : "Radio switched off. Open SignalDeck to turn it on again", android.widget.Toast.LENGTH_LONG).show();
             try { unbindService(conn); } catch (Throwable ignored) { }
             finishAndRemoveTask();
         });

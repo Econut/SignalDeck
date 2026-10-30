@@ -27,7 +27,6 @@ Completed means the issue's bounded scope was implemented and verified on the te
 
 - [#9 — DMR003BN digital interoperability with AnyTone D878UV](https://github.com/Econut/SignalDeck/issues/9)
 - [#11 — Low-battery crash, background and lock-screen reliability](https://github.com/Econut/SignalDeck/issues/11)
-- [#12 — Phone-only mode: safely power down the radio module](https://github.com/Econut/SignalDeck/issues/12)
 - [#13 — Windows CPS: Read radio, edit channel book, Write radio](https://github.com/Econut/SignalDeck/issues/13)
 - [#19 — Small-screen secondary-menu layout polish](https://github.com/Econut/SignalDeck/issues/19)
 - [#20 — Maintainer handover: reproducible build and sanitized evidence](https://github.com/Econut/SignalDeck/issues/20)
@@ -38,10 +37,12 @@ No feature implementation is actively underway at this snapshot; startup changes
 
 ## Testing
 
-- [#3 — Startup, setup and Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.8b bundled setup/helper and opted-in cold recovery; one app-only cold reboot and missing-microphone grant path passed. Stock initialization remains a dependency; field/repetition tests pending.
+- [#3 — Startup, setup and Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.9c own enable/init/version/tune sequence, bundled setup/helper and bounded release-only recovery. One locked-boot/off/open test passed without a stock launch. See [initialization evidence](docs/p8-independent-initialization.md); field/repetition tests pending.
 - [#1 — Analogue FM radio adapter: qualify RX/TX reliability](https://github.com/Econut/SignalDeck/issues/1)
 - [#6 — FM scanning: field validation of faster dwell settings](https://github.com/Econut/SignalDeck/issues/6)
 - [#7 — Programmable physical buttons: validate both P8 keys](https://github.com/Econut/SignalDeck/issues/7)
+
+- [#12 — Phone-only module power management](https://github.com/Econut/SignalDeck/issues/12): manual off/wake and one locked-boot off/open test passed; [driver evidence and test scope](docs/p8-phone-only.md). Battery savings remain unmeasured.
 
 ## Completed
 
@@ -63,7 +64,7 @@ No feature implementation is actively underway at this snapshot; startup changes
 - [Technical contribution handover](docs/p8-contribution-handover.md): baseline, build commands and limitations.
 - [Hardware/protocol findings](docs/uniwa-p8.md), [takeover/lifecycle review](docs/p8-intercom-force-stop-review.md), [recovery tests](docs/p8-field-recovery.md).
 - [Channel/scan test milestones](docs/p8-channels-and-scan-lists.md), [CSV contract and fixtures](docs/p8-csv-format-v1.md).
-- Focused host suite re-run 30 October: **126 tests, zero failures/errors/skips** for the startup/setup policies and existing P8 scope, using the existing dependency cache. Not a clean-machine or new live RF test.
+- Focused host suite re-run 30 October: **151 tests, zero failures/errors/skips** for the startup/setup policies and existing P8 scope, using the existing dependency cache. Not a clean-machine or new live RF test.
 - Early [main-radio notes](docs/p8-main-radio.md) describe initial bounded TX failures; later peer-received voice was confirmed by the operator. Private host logs/receipts are not public fixtures. Distinguish operator observations, isolated tests and independently reproducible evidence.
 - DMR voice, fastest-scan weak/short-signal capture, calibrated RF measurements and comprehensive background reliability remain unverified.
 

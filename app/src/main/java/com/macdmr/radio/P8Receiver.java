@@ -58,6 +58,9 @@ public final class P8Receiver {
     public void muteTestPlayback(boolean mute){mutedTestPlayback=mute;}
     public void stop(){stop=true;}
     private static String responseHex(byte[] data){StringBuilder out=new StringBuilder();for(int i=0;i<Math.min(data.length,64);i++)out.append(String.format(java.util.Locale.US,"%02x",data[i]&255));return out.toString();}
+    private void ownershipReleased() throws Exception {
+        if((context.getPackageManager().getApplicationInfo("com.wtwd.ucee.dmr",0).flags&ApplicationInfo.FLAG_STOPPED)==0 || readState(P8Protocol.PTT_NODE)!=1)throw new Exception("Power initialization requires stopped Intercom and released PTT");
+    }
     private void guard() throws Exception {
         if((context.getPackageManager().getApplicationInfo("com.wtwd.ucee.dmr",0).flags&ApplicationInfo.FLAG_STOPPED)==0)throw new Exception("Intercom is running/not force-stopped; close RX first");
         for(String path:new String[]{P8Protocol.PTT_NODE,P8Protocol.POWER_NODE,P8Protocol.AUDIO_CONTROL_NODE})
@@ -84,7 +87,20 @@ public final class P8Receiver {
                 if(s==3 && !on){try{if(readState(P8Protocol.PTT_NODE)!=1)throw new IllegalStateException("PTT not released");}catch(Exception e){throw new IllegalStateException("Unexpected TX start without confirmed GPIO release",e);}listener.status("TX start reply delayed after release; remaining in receive");}
                 if(!on)pttRequested=false;listener.transmitting(on);}else if(s==1 || s==10 || s==12){radioReceiving=true;if(mainTelemetry)rssiDisplay.receiving(true);scan.signal(SystemClock.elapsedRealtime());listener.receiving(true);}else if(s==2 || s==11 || s==13){radioReceiving=false;if(mainTelemetry){rssiDisplay.receiving(false);listener.rssi(-1,P8Rssi.UNKNOWN);}listener.receiving(false);}}};
         try{
-            guard();P8ReceiveNative.load();nativeLoaded=true;P8ReceiveNative.open();if(mainTelemetry){listener.spectrum(audioSpectrum.clear());listener.rssi(-1,P8Rssi.UNKNOWN);}
+            ownershipReleased();P8ReceiveNative.load();nativeLoaded=true;
+            if(mainTelemetry){P8PowerPolicy.change(new P8PowerPolicy.Backend(){
+                public boolean closed(){return !stop;}
+                public boolean stockStopped()throws Exception{return (context.getPackageManager().getApplicationInfo("com.wtwd.ucee.dmr",0).flags&ApplicationInfo.FLAG_STOPPED)!=0;}
+                public int state(String path)throws Exception{return readState(path);}
+                public void power(boolean on)throws Exception{P8ReceiveNative.power(on);}
+            },true);listener.status("Module enable verified; waiting 4 seconds for hardware startup");}
+            guard();P8ReceiveNative.open();
+            if(mainTelemetry){long settle=SystemClock.elapsedRealtime()+4000;while(SystemClock.elapsedRealtime()<settle){if(stop)throw new Exception("Startup cancelled");guard();SystemClock.sleep(50);}}
+            if(mainTelemetry){String version=P8ModuleInit.run(new P8ModuleInit.Transport(){
+                public void guard()throws Exception{if(stop)throw new Exception("Startup cancelled");P8Receiver.this.guard();}
+                public byte[] exchange(byte[] packet)throws Exception{byte[] reply=P8ReceiveNative.tune(packet);listener.status("Module startup reply cmd=0x"+Integer.toHexString(packet[1]&255)+" hex="+responseHex(reply));return reply;}
+            },receiveStatus);listener.status("Module independent initialization ACK; version="+version+"; no stock launch");}
+            if(mainTelemetry){listener.spectrum(audioSpectrum.clear());listener.rssi(-1,P8Rssi.UNKNOWN);}
             int size=Math.max(3200,AudioTrack.getMinBufferSize(8000,AudioFormat.CHANNEL_OUT_MONO,AudioFormat.ENCODING_PCM_16BIT));
             audio=new AudioTrack.Builder().setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 .setAudioFormat(new AudioFormat.Builder().setSampleRate(8000).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())

@@ -9,6 +9,7 @@ final class P8ReceiveNative {
         System.loadLibrary("p8rxjni");
     }
     static native void recoverReleased() throws IOException;
+    static native void power(boolean on) throws IOException;
     static native void open() throws IOException;
     static native void prepareTransmit() throws IOException;
     static native void acknowledgeStatus() throws IOException;

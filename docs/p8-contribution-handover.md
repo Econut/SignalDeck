@@ -6,7 +6,7 @@ This is a development contribution for review, not an official SignalDeck releas
 
 - Branch: `uniwa-p8-support`.
 - P8 development started from upstream `a22aaed` (1.0.0-beta.20).
-- Latest device-tested edition: `1.0.0-beta.20-p8-main.8b`, version code 148.
+- Latest device-tested edition: `1.0.0-beta.20-p8-main.9c`, version code 152.
 - Tested device: UNIWA P8, MT6765, Android 14, stock build `P8_EU_U4_A14_NEU_EN_V1.0.1_20250814`, radio module `DMR003BN.UV4P.V026`.
 - Root-free access relies on this device's UART/sysfs permissions and permissive SELinux. It is not guaranteed on other P8 variants or firmware.
 - Upstream has advanced beyond this baseline. No automatic upstream merge or integration validation is claimed.
@@ -19,9 +19,9 @@ The 0.6/0.4-second FM scan options are experimental. They passed isolated scanne
 
 ## Important remaining issues
 
-1. Cold startup still uses stock Intercom initialization. The bundled opt-in Accessibility helper automates App info / Force stop, and separately opted-in bounded cold recovery passed one reboot test. See [setup evidence](p8-setup.md); field reliability is not yet established. Do not disable the stock app.
+1. SignalDeck now performs stock-compatible enable/init/version/tune directly. The bundled opt-in Accessibility helper still handles App info / Force stop for ownership, and stock Intercom remains installed as fallback. Power reads are constant1, not actual state telemetry. See [setup evidence](p8-setup.md); field reliability is not yet established. Do not disable the stock app.
 2. Post-reboot software PTT state and connection-fault recovery need further reliability work. Existing recovery only clears verified resolved faults and never flashes or resets calibration.
-3. Phone-only module power management, independent boot initialization and comprehensive background/lock-screen reliability remain unfinished.
+3. [Phone-only mode](p8-phone-only.md) is implemented and under testing. Default-off boot behavior requires its saved option and stopped Intercom; battery benefit and comprehensive background reliability remain unqualified.
 4. Existing generic root/boot access settings are not proof that those flows work on the P8 adapter.
 5. User-reported crashes after battery exhaustion have not been conclusively diagnosed; persistent recovery logging was added afterwards.
 

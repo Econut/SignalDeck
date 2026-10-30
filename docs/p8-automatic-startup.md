@@ -1,6 +1,6 @@
 # P8 automatic startup
 
-**Current: main.8b setup and opted-in cold recovery are described in [installation/setup](p8-setup.md).** The main.8 notes below are historical, including the cold-boot blocker that prompted the later release-only path. Stock initialization remains required but can now be orchestrated automatically after opt-in; broader field validation is still pending.
+**Historical main.8b setup and opted-in cold recovery are described in [installation/setup](p8-setup.md).** The main.8 notes below are historical, including the cold-boot blocker that prompted the later release-only path. This describes the old stock-assisted path. Current main.9c initializes directly; see [independent initialization](p8-independent-initialization.md) and [phone-only mode](p8-phone-only.md).
 
 
 ## Scope and setup

@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <time.h>
 #include <pthread.h>
 #ifndef P8_OPEN_PROBE_REVIEWED
@@ -31,7 +32,7 @@ static uint32_t tuned_hz;
 static int tuned_command;
 static int first_tune=1;
 static long millis(void) {struct timespec t;clock_gettime(CLOCK_MONOTONIC,&t);return t.tv_sec*1000L+t.tv_nsec/1000000L;}
-/* Only this fixed PTT node can be written; no power, audio, calibration or firmware API. */
+/* PTT edge writer. Separate fixed power transition below never asserts PTT. */
 static int ptt_write(int released){
     int fd=open("/sys/devices/platform/dmr_gpio/dmrptt",O_WRONLY|O_CLOEXEC|O_NOFOLLOW);
     if(fd<0)return -1;
@@ -138,14 +139,20 @@ JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_tune(JNIEnv *
         while(sum>>16)sum=(sum&65535)+(sum>>16);
         valid=(sum^65535)==((unsigned int)bytes[4]<<8|bytes[5]);
     }
+    /* Exact runtime init/version packets from stock p2.f and w2.b.N; no arbitrary command API. */
+    if(length==10 && bytes[0]==0x68 && (bytes[1]==0x27 || bytes[1]==0x34) && bytes[2]==1 && bytes[3]==1 && bytes[6]==0 && bytes[7]==1 && bytes[8]==1 && bytes[9]==0x10){
+        unsigned int sum=((unsigned int)bytes[0]<<8|bytes[1])+0x0101+1+0x0110;
+        while(sum>>16)sum=(sum&65535)+(sum>>16);
+        valid=(sum^65535)==((unsigned int)bytes[4]<<8|bytes[5]);
+    }
     if(!valid){fail(e,"Command rejected by receive-only native allowlist");return NULL;}
     pthread_mutex_lock(&tx_lock);int busy=tx_owned || tx_error;pthread_mutex_unlock(&tx_lock);
     if(busy){fail(e,"Cannot configure channel during TX or after PTT release failure");return NULL;}
     if(write(control,bytes,(size_t)length)!=length){fail(e,"Receive command write failure; no retry");return NULL;}
     /* Accumulate response fragments without emitting ACKs or any other command. */
     /* Initial handover may take longer than a running-session retune. One write, no retry. */
-    unsigned char reply[4096];int used=0;long end=millis()+(first_tune?2500:700);
-    first_tune=0;
+    unsigned char reply[4096];int used=0;long end=millis()+(bytes[1]==0x27?5000:(bytes[1]==0x34 || first_tune?2500:700));
+    if(bytes[1]==0x23 || bytes[1]==0x22)first_tune=0;
     while(millis()<end && used<(int)sizeof reply) {
         struct pollfd p={control,POLLIN,0};int remaining=(int)(end-millis());if(remaining<=0)break;
         int n=poll(&p,1,remaining);
@@ -154,6 +161,8 @@ JNIEXPORT jbyteArray JNICALL Java_com_macdmr_radio_P8ReceiveNative_tune(JNIEnv *
         ssize_t got=read(control,reply+used,sizeof(reply)-(size_t)used);
         if(got<0){fail(e,"Tune response read failure");return NULL;}used+=(int)got;
         int off=0,complete_ack=0;
+        const unsigned char banner[]={0xbf,0xaa,0xbb,0xfa,0xb3,0xf5,0xca,0xbc,0xbb,0xaf,0xcd,0xea,0xb3,0xc9,13,10,0};
+        if((bytes[1]==0x27 || bytes[1]==0x34) && used>=(int)sizeof banner && !memcmp(reply,banner,sizeof banner))off=sizeof banner;
         while(used-off>=9 && reply[off]==0x68){
             int size=9+((reply[off+6]<<8)|reply[off+7]);
             if(size>1033 || used-off<size)break;
@@ -289,5 +298,31 @@ JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_recoverReleased(JNI
     if(error)fail(e,"Release-only recovery failed or UART session is still open");
 #else
     fail(e,"Recovery disabled in this build");
+#endif
+}
+
+/* Fixed stock power/audio sequence; UARTs closed, PTT released. Both show callbacks return constant1, not stored values. */
+#if P8_OPEN_PROBE_REVIEWED
+static int node_read(const char *path){
+ int fd=open(path,O_RDONLY|O_CLOEXEC|O_NOFOLLOW);if(fd<0)return -1;char b[8]={0};ssize_t n=read(fd,b,sizeof b-1);int rc=close(fd);if(n<=0 || rc)return -1;
+ if(b[0]!='0' && b[0]!='1' && b[0]!='4')return -1;
+ for(ssize_t i=1;i<n;i++)if(b[i]!='\n' && b[i]!='\r' && b[i]!=' ')return -1;
+ return b[0]-'0';
+}
+static int node_write(const char *path,char value){int fd=open(path,O_WRONLY|O_CLOEXEC|O_NOFOLLOW);if(fd<0)return -1;ssize_t n=write(fd,&value,1);int rc=close(fd);return n==1 && !rc?0:-1;}
+#endif
+JNIEXPORT void JNICALL Java_com_macdmr_radio_P8ReceiveNative_power(JNIEnv *e,jclass c,jboolean on){
+ (void)c;
+#if P8_OPEN_PROBE_REVIEWED
+ const char *p="/sys/bus/platform/drivers/dmr_gpio/dmr_pwr",*a="/sys/bus/platform/drivers/dmr_gpio/auctusctl",*t="/sys/devices/platform/dmr_gpio/dmrptt";
+ pthread_mutex_lock(&tx_lock);
+ int pv=node_read(p),av=node_read(a);
+ int error=control>=0 || pcm>=0 || watch_running || tx_owned || tx_error || node_read(t)!=1 || (pv!=1 || av!=1);
+ if(!error){if(on)error=node_write(p,'1') || node_write(a,'1');else error=node_write(a,'4') || node_write(p,'0');}
+ if(!error)error=node_read(t)!=1 || node_read(p)!=1 || node_read(a)!=1;
+ pthread_mutex_unlock(&tx_lock);
+ if(error)fail(e,"Power transition verification failed; no retry");
+#else
+ (void)on;fail(e,"P8 power control disabled");
 #endif
 }

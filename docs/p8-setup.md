@@ -1,5 +1,9 @@
 # P8 installation and first-run setup
 
+**Current main.9c:** module initialization is now performed by SignalDeck, with [fixed power/phone-only controls](p8-phone-only.md) and [initialization evidence](p8-independent-initialization.md). The main.8 validation below remains historical; its stock-assisted cold path has been replaced. Power/audio node reads are constant1 in the factory kernel, not state telemetry.
+
+Setup now also offers Phone-only after reboot. Enable it once for the requested default-off behavior. It acts before unlock where supported, but skips if Intercom ownership is uncertain. P8 MENU → Radio off / Phone only closes the radio without opening stock; Connect powers/enables and initializes it again. See the linked scope before assuming battery-life or other-ROM qualification.
+
 The separate P8 development APK includes its radio adapter, native libraries, setup wizard and Intercom Accessibility helper. No separate helper APK, Magisk/root or PC-side service is required for this path. It retains the existing Android firmware and stock Intercom fallback.
 
 ## One-time user steps

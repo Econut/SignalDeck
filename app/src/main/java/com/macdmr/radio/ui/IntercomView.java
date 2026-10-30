@@ -60,7 +60,8 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
     }
     private void showP8Connection(){
         android.app.AlertDialog.Builder dialog=new android.app.AlertDialog.Builder(getContext()).setTitle("Radio status").setMessage(p8ConnectionDetails()).setPositiveButton("Close",null);
-        if(svc!=null && !svc.isReady())dialog.setNeutralButton("Recover connection",(a,b)->P8RadioControls.recover(getContext(),svc));
+        if(svc!=null && "phone-only".equals(svc.link()))dialog.setNeutralButton("Connect",(a,b)->com.macdmr.radio.P8MainRadio.takeOver(getContext(),svc));
+        else if(svc!=null && !svc.isReady())dialog.setNeutralButton("Recover connection",(a,b)->P8RadioControls.recover(getContext(),svc));
         p8ConnectionDialog=dialog.create();p8ConnectionDialog.show();
     }
     private void refreshP8Connection(){
@@ -68,10 +69,11 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         com.macdmr.radio.P8ConnectionState state=com.macdmr.radio.P8ConnectionState.of(svc!=null && svc.isReady(),svc!=null?svc.link():null,svc!=null && svc.p8Recovering());
         if(state!=p8ConnectionState){
             p8ConnectionState=state;boolean ready=state==com.macdmr.radio.P8ConnectionState.READY,busy=state==com.macdmr.radio.P8ConnectionState.CONNECTING;
-            int colour=ready?Neo.GREEN:busy?Neo.AMBER:Neo.RED;
-            p8ConnectionIcon.setImageDrawable(new Neo.IconDrawable(ready?"check":busy?"scan":"alert",colour));
+            boolean off=state==com.macdmr.radio.P8ConnectionState.OFF;
+            int colour=off?Neo.MUTED:ready?Neo.GREEN:busy?Neo.AMBER:Neo.RED;
+            p8ConnectionIcon.setImageDrawable(new Neo.IconDrawable(off?"power":ready?"check":busy?"scan":"alert",colour));
             p8ConnectionIcon.setBackground(Neo.card(getContext(),colour,12));
-            p8ConnectionIcon.setContentDescription("Radio status: "+(ready?"ready":busy?"connecting or recovering":state==com.macdmr.radio.P8ConnectionState.DISCONNECTED?"not connected":"fault")+". Tap for details");
+            p8ConnectionIcon.setContentDescription("Radio status: "+(off?"phone-only, radio off":ready?"ready":busy?"connecting or recovering":state==com.macdmr.radio.P8ConnectionState.DISCONNECTED?"not connected":"fault")+". Tap for details");
         }
         if(p8ConnectionDialog!=null && p8ConnectionDialog.isShowing())p8ConnectionDialog.setMessage(p8ConnectionDetails());
     }
@@ -588,7 +590,7 @@ public class IntercomView extends LinearLayout implements RadioService.Listener 
         headline.setText("●  " + t); headline.setTextColor(col);
         ptt.setState(tx ? PttButton.State.TX : receivingNow() ? PttButton.State.RX : (svc != null && svc.isReady() && svc.txInhibited() ? PttButton.State.BUSY : PttButton.State.IDLE));
         board.isReceiving = rx;
-        if(p8Layout()){title.setText(tx?"P8 TX":"P8 RX");title.setTextColor(tx?Neo.RED:Neo.TEXT);}
+        if(p8Layout()){title.setText(svc!=null && "phone-only".equals(svc.link())?"P8 OFF":tx?"P8 TX":"P8 RX");title.setTextColor(tx?Neo.RED:Neo.TEXT);}
     }
 
     /** New look: number, chips and the four readout cells for the channel. */
