@@ -115,6 +115,15 @@ public class FoxPredictorTest {
         assertNull(FoxPredictor.predict(new ArrayList<>(), opts(true, true)));
     }
 
+    @Test public void aPhoneWithoutACompassIsToldWhy() {
+        List<FoxHunt.Mark> two = walk(new double[][] { { 0, 0 }, { 300, 0 } }, 0, 0, false, 1);   // marks without a bearing
+        FoxPredictor.Options o = opts(true, true);
+        assertTrue(FoxPredictor.predict(two, o).note.contains("no marks with a bearing yet"));
+        o.noCompass = true;
+        String note = FoxPredictor.predict(two, o).note;
+        assertTrue(note, note.contains("no compass") && !note.contains("yet;"));
+    }
+
     @Test public void peakAtTheEdgeGrowsTheGrid() {
         double[][] spots = { { 0, 0 }, { 150, 0 }, { 300, 0 }, { 150, 150 } };    // a small patch far from the fox
         List<FoxHunt.Mark> ms = new ArrayList<>();

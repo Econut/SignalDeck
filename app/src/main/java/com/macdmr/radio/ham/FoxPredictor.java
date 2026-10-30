@@ -49,6 +49,8 @@ public final class FoxPredictor {
 
     public static final class Options {
         public boolean bearings = true, heat = true, terrain = false;
+        /** The phone has no compass: its marks never carry a bearing (the note says so instead of "not yet"). */
+        public boolean noCompass;
         /** Half the grid's side (m) at least, and its square (m); the grid grows to hold every mark and moves out when the peak sits at its edge. */
         public double halfM = 1000, cellM = 25, floorDbm = FLOOR_DBM, sigmaDb = SIGMA_DB;
         /** Terrain: ground height (null = none loaded for this area), the fox's antenna height (m), the frequency (Hz), the loss cache to reuse. */
@@ -136,7 +138,7 @@ public final class FoxPredictor {
         boolean bear = o.bearings && nb > 0;
         String block = o.heat ? heatBlocker(marks, o.floorDbm) : null;
         boolean heat = o.heat && block == null;
-        if (o.bearings && nb == 0) r.note = "no marks with a bearing yet";
+        if (o.bearings && nb == 0) r.note = o.noCompass ? "this phone has no compass, so its marks carry no bearing: the heat map works from their strength" : "no marks with a bearing yet";
         if (block != null) r.note = r.note == null ? block : r.note + "; " + block;
         boolean terr = heat && o.terrain && o.elevation != null;
         if (o.terrain && !o.heat) r.note = (r.note == null ? "" : r.note + "; ") + "terrain refines the heat map, which is off";

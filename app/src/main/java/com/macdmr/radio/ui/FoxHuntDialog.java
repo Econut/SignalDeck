@@ -203,6 +203,7 @@ public final class FoxHuntDialog {
         final Runnable recompute = () -> {
             final int g = ++gen[0]; final List<FoxHunt.Mark> ms = svc.fox().marks(); seen[0] = ms.size();
             final FoxPredictor.Options o = new FoxPredictor.Options(); o.bearings = layerOn[0]; o.heat = layerOn[1]; o.terrain = layerOn[2];
+            SensorManager smc = (SensorManager) c.getSystemService(Context.SENSOR_SERVICE); o.noCompass = smc == null || smc.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) == null;
             o.foxAgl = aglChoices[agl[0]]; o.cache = tcache;
             ChannelStore.Channel cur = svc.current(); if (cur != null && cur.rxFreq > 0) o.hz = cur.rxFreq;
             dlBtn.setVisibility(View.GONE);
@@ -327,7 +328,8 @@ public final class FoxHuntDialog {
                     float[] res = new float[2]; Location.distanceBetween(me.getLatitude(), me.getLongitude(), eLat, eLon, res);
                     String what = pr != null ? (pr.layers == 0 ? "Strongest mark" : "Fox estimate (" + pr.layerNames() + (pr.confidence() != null ? ", " + pr.confidence() : "") + ")")
                             : est.fromBearings ? "Fox estimate from " + est.used + " bearings" : "Strongest mark";
-                    sb.append(String.format(Locale.US, "\n%s: %s %s (%03.0f°)", what, com.macdmr.radio.region.Region.km() ? com.macdmr.radio.repeaters.GeoUtil.dist(res[0], true) : String.format(Locale.US, "%.2f mi", res[0] / 1609.344), compass(res[1]), (res[1] + 360) % 360));
+                    if (res[0] < 10) sb.append("\n" + what + ": here (within 10 m)");   // closer than GPS can tell: a direction would be noise
+                    else sb.append(String.format(Locale.US, "\n%s: %s %s (%03.0f°)", what, com.macdmr.radio.region.Region.km() ? com.macdmr.radio.repeaters.GeoUtil.dist(res[0], true) : String.format(Locale.US, "%.2f mi", res[0] / 1609.344), compass(res[1]), (res[1] + 360) % 360));
                 } else if (svc.fox().marks().isEmpty()) sb.append("\nNo marks yet");
                 info.setText(sb.toString());
                 plot.update(me, heading[0]);
