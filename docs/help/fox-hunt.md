@@ -2,7 +2,7 @@
 
 # Fox hunt
 
-*Pages · 22 of 33*
+*Pages · 22 of 34*
 
 Find a hidden transmitter, or be the fox.
 

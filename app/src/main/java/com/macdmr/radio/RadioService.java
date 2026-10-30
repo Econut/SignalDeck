@@ -139,21 +139,23 @@ public class RadioService extends Service implements RadioEngine.Events {
         transmitPcm(out, "voice keyer: " + nm, () -> { history("pkt", "\uD83C\uDF99 Voice keyer sent: " + nm + (sentId ? " + Morse ID" : "")); if (sentId) markIdentified(); });
         return null;
     }
-    public static final long ID_EVERY_MS = 10 * 60_000L;
+    /** The station-ID interval: the region's (Device → Region), else 10 minutes. */
+    public static long idEveryMs() { return com.macdmr.radio.region.Region.cached().idEveryMs(); }
     private volatile long idClockFrom, lastIdReminder;                       // first transmission since the last identification
     public void markIdentified() { idClockFrom = 0; }
     /** Milliseconds until the next identification is due (negative: overdue), or Long.MAX_VALUE when the timer is not running. */
-    public long idDueInMs() { long f = idClockFrom; return f == 0 ? Long.MAX_VALUE : f + ID_EVERY_MS - System.currentTimeMillis(); }
+    public long idDueInMs() { long f = idClockFrom; return f == 0 ? Long.MAX_VALUE : f + idEveryMs() - System.currentTimeMillis(); }
     private void idTimerOnKey() {
         ChannelStore.Channel c = current;
         if (c == null || !amateurBand(c.txFreq) || packet == null || !packet.callsignSet()) return;
         long now = System.currentTimeMillis();
         if (idClockFrom == 0) { idClockFrom = now; return; }
-        if (now - idClockFrom >= ID_EVERY_MS && !packet.cwIdEnabled() && now - lastIdReminder > 120_000) {
+        if (now - idClockFrom >= idEveryMs() && !packet.cwIdEnabled() && now - lastIdReminder > 120_000) {
             lastIdReminder = now;
             try { android.os.Vibrator v = (android.os.Vibrator) getSystemService(VIBRATOR_SERVICE); if (v != null) v.vibrate(android.os.VibrationEffect.createWaveform(new long[] { 0, 120, 80, 120 }, -1)); } catch (Throwable ignored) { }
-            ui.post(() -> android.widget.Toast.makeText(this, "Give your callsign: it has been 10 minutes since you identified", android.widget.Toast.LENGTH_LONG).show());
-            history("pkt", "\u23F0 Time to identify: 10 minutes since your last ID");
+            final long min = idEveryMs() / 60_000L;
+            ui.post(() -> android.widget.Toast.makeText(this, "Give your callsign: it has been " + min + " minutes since you identified", android.widget.Toast.LENGTH_LONG).show());
+            history("pkt", "\u23F0 Time to identify: " + min + " minutes since your last ID");
         }
     }
 
@@ -356,8 +358,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         pushModes();
         return "Parrot on " + ch.name + ": transmissions are repeated a second after they end";
     }
-    /** 2 m, 1.25 m and 70 cm amateur bands (US). */
-    public static boolean amateurBand(int hz) { return (hz >= 144_000_000 && hz <= 148_000_000) || (hz >= 222_000_000 && hz <= 225_000_000) || (hz >= 420_000_000 && hz <= 450_000_000); }
+    /** Inside the region's amateur bands (Device → Region; before one is chosen, the US 2 m, 1.25 m and 70 cm bands). */
+    public static boolean amateurBand(int hz) { return com.macdmr.radio.region.Region.cached().amateur(hz); }
     public PacketEngine packet() { return packet; }
     private final DiagReceiver diag = new DiagReceiver();
     private RadioIdStore radioId;
@@ -507,6 +509,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         @Override public android.content.Context context() { return RadioService.this; }
         @Override public boolean analogRx() { ChannelStore.Channel c = current; return c != null && !c.isDigital(); }
         @Override public int rxFreqHz() { ChannelStore.Channel c = current; return c == null ? 0 : c.rxFreq; }
+        @Override public int aprsHz() { return RadioService.this.aprsHz(); }
         @Override public int channelNumber() { ChannelStore.Channel c = current; return c == null ? 0 : c.number; }
         @Override public String channelName() { ChannelStore.Channel c = current; return c == null ? "" : c.name; }
         @Override public boolean txBusy() { return pttDown; }
@@ -728,8 +731,12 @@ public class RadioService extends Service implements RadioEngine.Events {
         } catch (Throwable t) { log("notify: " + t); }
     }
 
-    /** APRS monitoring: park on the APRS frequency (through the VFO, so the channel comes back) and decode. */
-    public String aprsMonitor(boolean on) { return aprsMonitorAt(on, PacketEngine.APRS_FREQ_HZ, "APRS 144.390"); }
+    /** APRS monitoring: park on the region's APRS frequency (through the VFO, so the channel comes back) and decode. */
+    public String aprsMonitor(boolean on) { int hz = aprsHz(); return aprsMonitorAt(on, hz, "APRS " + com.macdmr.radio.region.Region.mhz(hz)); }
+    /** The terrestrial APRS frequency: the region's (Device → Region) or the user's own; 144.390 before a region is chosen. */
+    public int aprsHz() { return com.macdmr.radio.region.Region.current(this).aprsHz; }
+    /** This radio tunes the region's APRS frequency (else APRS monitoring is hidden, as on a UHF-only radio). */
+    public boolean aprsTunable() { return profile != null && profile.tunable(aprsHz()); }
     private volatile int aprsMonitorHz = PacketEngine.APRS_FREQ_HZ;
     public int aprsMonitorHz() { return aprsMonitorHz; }
     /** APRS monitoring on another frequency (the ISS digipeater on 145.825). */
@@ -760,6 +767,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         watchUsbDuringTx();
         watchPlugChanges();
         ProfileRegistry.init(this);
+        com.macdmr.radio.region.Region.ensureDefault(this); com.macdmr.radio.region.Region.current(this);   // the region's defaults before anything reads them
         profile = DeviceProfile.detect();
         softSq.toneDetect = profile.subaudible; softSq.setNoiseTable(profile.softSqThresholds, profile.softSqCloseCap);   // the W6: noise only, on its own scale
         ProfileRegistry.maybeFetch();                               // a newer revision or an advisory, at most every 12 h

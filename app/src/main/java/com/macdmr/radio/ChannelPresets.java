@@ -43,7 +43,9 @@ public final class ChannelPresets {
 
     private static int hz(double mhz) { return (int) Math.round(mhz * 1e6); }
 
-    public static List<Preset> all() {
+    public static List<Preset> all() { return all(com.macdmr.radio.region.Region.cached()); }
+    /** The lists, with the region's APRS frequency (Device → Region) in the ham list. */
+    public static List<Preset> all(com.macdmr.radio.region.Region region) {
         List<Preset> out = new ArrayList<>();
 
         Preset frs = new Preset("FRS", "US", "Family Radio Service: the 22 channels of bubble-pack walkie-talkies. Narrow band, low power.", "No licence needed");
@@ -70,10 +72,11 @@ public final class ChannelPresets {
               .fm("Marine 72", 156.625, false, true).fm("Marine 78A", 156.925, false, true);
         out.add(marine);
 
-        Preset ham = new Preset("Ham simplex", "US", "Amateur FM simplex: the 2 m and 70 cm national calling channels, common simplex channels and APRS (144.390, where the radio decodes position reports).", "Amateur licence needed");
+        String aprs = com.macdmr.radio.region.Region.mhz(region.aprsHz);
+        Preset ham = new Preset("Ham simplex", "US", "Amateur FM simplex: the 2 m and 70 cm national calling channels, common simplex channels and APRS (" + aprs + ", your region's APRS frequency, where the radio decodes position reports).", "Amateur licence needed");
         ham.fm("2m Call", 146.520, true, true);
         for (double f : new double[] { 146.550, 146.580, 147.420, 147.450, 147.480, 147.510, 147.540, 147.570 }) ham.fm(String.format(Locale.US, "2m %.3f", f), f, true, true);
-        ham.fm("APRS", 144.390, true, true);
+        ham.fm("APRS", region.aprsHz / 1e6, true, true);
         ham.fm("70cm Call", 446.000, true, true);
         for (double f : new double[] { 445.950, 446.050, 446.100, 446.150 }) ham.fm(String.format(Locale.US, "70cm %.3f", f), f, true, true);
         out.add(ham);

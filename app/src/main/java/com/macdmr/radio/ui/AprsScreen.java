@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * APRS monitoring (144.390, the ISS on 145.825, or the KISS TNC): live packet feed, stations heard and messages,
+ * APRS monitoring (the region's APRS frequency, the ISS on 145.825, or the KISS TNC): live packet feed, stations heard and messages,
  * counters since monitoring started, the switches that matter while monitoring, and message / beacon / map /
  * settings / stop.
  */

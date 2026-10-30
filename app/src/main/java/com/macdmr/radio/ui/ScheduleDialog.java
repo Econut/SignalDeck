@@ -84,7 +84,7 @@ public final class ScheduleDialog {
             chV.setText((ch != null ? ch.number + "  " + ch.name : Scheduler.SSTV.equals(e.action) ? "144.500 MHz (the SSTV calling frequency)" : "The channel the radio is on") + "  ·  tap to change");
             act.setText(e.actionName() + "  ·  tap to change");
         };
-        act.setOnClickListener(v -> new AlertDialog.Builder(c).setTitle("What should happen?").setItems(Scheduler.ACTION_NAMES, (dd, w) -> { e.action = Scheduler.ACTIONS[w]; showCh.run(); }).show());
+        act.setOnClickListener(v -> new AlertDialog.Builder(c).setTitle("What should happen?").setItems(Scheduler.Entry.actionNames(svc.aprsHz()), (dd, w) -> { e.action = Scheduler.ACTIONS[w]; showCh.run(); }).show());
         chV.setOnClickListener(v -> {
             String[] names = new String[chans.size() + 1];
             names[0] = Scheduler.SSTV.equals(e.action) ? "144.500 MHz (SSTV calling frequency)" : "The channel the radio is on";

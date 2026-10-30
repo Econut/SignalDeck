@@ -2,7 +2,7 @@
 
 # Transmitting legally
 
-*Good to know · 33 of 33*
+*Good to know · 34 of 34*
 
 Licences, power and the time limit.
 

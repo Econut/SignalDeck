@@ -2,7 +2,7 @@
 
 # SignalDeck Web
 
-*Pages · 27 of 33*
+*Pages · 28 of 34*
 
 Use the radio from a browser on your Wi-Fi.
 

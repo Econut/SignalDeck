@@ -2,7 +2,7 @@
 
 # Channels
 
-*Pages · 23 of 33*
+*Pages · 23 of 34*
 
 Your channel list, favourites and repeaters.
 

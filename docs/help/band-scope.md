@@ -2,7 +2,7 @@
 
 # Band scope
 
-*Pages · 20 of 33*
+*Pages · 20 of 34*
 
 See which frequencies in a band are busy.
 
