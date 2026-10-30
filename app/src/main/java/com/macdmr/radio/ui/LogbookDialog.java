@@ -38,7 +38,7 @@ public final class LogbookDialog {
         android.location.Location me = svc.lastKnownLocation();
         java.util.Set<String> grids = lb.gridsWorked();
         body.addView(Neo.label(c, (me != null ? "You are in " + com.macdmr.radio.ham.Maidenhead.grid(me.getLatitude(), me.getLongitude(), 6) + "  \u00B7  " : "") + grids.size() + (grids.size() == 1 ? " grid square" : " grid squares") + " worked", Theme.CYAN, 14, true));
-        body.addView(Neo.sheetHint(c, lb.count(true) + " contacts, " + (lb.count(false) - lb.count(true)) + " stations heard. Heard stations are logged by themselves (DMR callers with a RadioID callsign, APRS stations, Morse IDs); tap one to fill in the reports and mark it a contact. Export ADIF for your logging program or QSL service."));
+        body.addView(Neo.sheetHint(c, lb.count(true) + (lb.count(true) == 1 ? " contact, " : " contacts, ") + (lb.count(false) - lb.count(true)) + (lb.count(false) - lb.count(true) == 1 ? " station heard." : " stations heard.") + " Heard stations are logged by themselves (DMR callers with a RadioID callsign, APRS stations, Morse IDs); tap one to fill in the reports and mark it a contact. Export ADIF for your logging program or QSL service."));
         final AlertDialog[] self = new AlertDialog[1];
         LinearLayout r1 = new LinearLayout(c); r1.setBaselineAligned(false);
         TextView add = Neo.button(c, "Add contact", "plus", Neo.GREEN), exp = Neo.button(c, "Export ADIF", "backup", Neo.CYAN);

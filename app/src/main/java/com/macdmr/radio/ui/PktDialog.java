@@ -177,7 +177,8 @@ public final class PktDialog {
         // ---- logbook ----
         body.addView(section("Logbook"));
         LinearLayout lr = row();
-        button(lr, "Logbook (" + svc.logbook().count(true) + " contacts)", Theme.SOFTSQ, x -> { dlg.dismiss(); LogbookDialog.show(c, svc); });
+        int lbn = svc.logbook().count(true);
+        button(lr, "Logbook (" + lbn + (lbn == 1 ? " contact)" : " contacts)"), Theme.SOFTSQ, x -> { dlg.dismiss(); LogbookDialog.show(c, svc); });
         com.macdmr.radio.ham.Pota.Activation act = com.macdmr.radio.ham.Pota.active(c);
         button(lr, act != null ? "Activating " + act.ref : "POTA / SOTA", Theme.SOFTSQ, x -> { dlg.dismiss(); PotaDialog.show(c, svc); });
         body.addView(lr);

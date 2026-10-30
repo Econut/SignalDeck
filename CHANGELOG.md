@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-30 — Fox hunt asks before clearing marks; logbook counts read right
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 test notes | Clear marks asks for confirmation; "1 contact" / "1 station heard" instead of plural | ui/FoxHuntDialog.java, ui/PktDialog.java, ui/LogbookDialog.java, ui/HelpView.java | host suite; not device-tested |
+
 ## 2026-10-30 — Add a zone: lists follow the radio's bands
 
 | Backlog | Change | Files | Test |

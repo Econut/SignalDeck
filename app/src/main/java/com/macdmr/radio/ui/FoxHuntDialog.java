@@ -382,7 +382,8 @@ public final class FoxHuntDialog {
             double eLat = pr != null ? pr.lat : est.lat, eLon = pr != null ? pr.lon : est.lon;
             try { c.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(String.format(Locale.US, "geo:%f,%f?q=%f,%f(Fox)", eLat, eLon, eLat, eLon)))); } catch (Throwable t) { Toast.makeText(c, "No map app", Toast.LENGTH_SHORT).show(); }
         });
-        clear.setOnClickListener(v -> { svc.fox().clear(); peak[0] = -999; recompute.run(); });
+        clear.setOnClickListener(v -> new android.app.AlertDialog.Builder(c).setTitle("Clear all marks?").setMessage("The marks, bearings and the estimate of this hunt are removed.")
+                .setPositiveButton("Clear", (dd, w) -> { svc.fox().clear(); peak[0] = -999; recompute.run(); }).setNegativeButton("Cancel", null).show());
         foxBtn.setOnClickListener(v -> { String r = svc.setFoxTx(!svc.foxTxOn()); Toast.makeText(c, r, Toast.LENGTH_LONG).show(); foxBtn.setText(svc.foxTxOn() ? "Stop the fox beacon" : "Start the fox beacon"); });
 
         AlertDialog a = Neo.showSheet(c, body);
