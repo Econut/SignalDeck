@@ -42,8 +42,12 @@ public final class CamcorderAudio implements AudioBackend {
 
     public CamcorderAudio() { this(false); }
     public CamcorderAudio(boolean play) { this(play, GAIN); }
-    public CamcorderAudio(boolean play, int gain) { this(play, gain, null, null, 1f); }
-    public CamcorderAudio(boolean play, int gain, String[][] gatewayOn, String[][] gatewayOff, float txScale) { this.play = play; this.gain = Math.max(1, gain); this.gatewayOn = gatewayOn; this.gatewayOff = gatewayOff; this.txScale = txScale; }
+    public CamcorderAudio(boolean play, int gain) { this(play, gain, null, null, 1f, null, 0.4f); }
+    public CamcorderAudio(boolean play, int gain, String[][] gatewayOn, String[][] gatewayOff, float txScale, AudioManager am, float gatewayVolume) {
+        this.play = play; this.gain = Math.max(1, gain); this.gatewayOn = gatewayOn; this.gatewayOff = gatewayOff; this.txScale = txScale; this.am = am; this.gatewayVolume = gatewayVolume;
+    }
+    private final AudioManager am;
+    private final float gatewayVolume;
     private volatile float txScale;
     String setTxScale(float v) { txScale = Math.max(0.001f, Math.min(1f, v)); return "gateway sample factor " + txScale; }
     private final String[][] gatewayOn, gatewayOff;
@@ -122,8 +126,14 @@ public final class CamcorderAudio implements AudioBackend {
         abortPlay = false;
         AudioTrack t = null;
         String[][] before = snapshot(gatewayOn);                               // what the gateway nodes held: put back exactly, even on an error
+        int userVolume = -1;
         try {
             lines(gatewayOn);
+            if (am != null) {                                                   // the samples go through the media stream: hold it at the profile's level
+                userVolume = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+                int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, Math.max(1, Math.round(max * gatewayVolume)), 0);
+            }
             int tmin = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
             t = new AudioTrack(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build(),
                     new AudioFormat.Builder().setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build(),
@@ -139,6 +149,7 @@ public final class CamcorderAudio implements AudioBackend {
         } catch (Throwable e) { return "playPcm: " + e; }
         finally {
             if (t != null) { try { t.stop(); } catch (Throwable ignored) { } t.release(); }
+            if (userVolume >= 0) try { am.setStreamVolume(AudioManager.STREAM_MUSIC, userVolume, 0); } catch (Throwable ignored) { }
             lines(gatewayOff);
             if (before != null) lines(before);
         }

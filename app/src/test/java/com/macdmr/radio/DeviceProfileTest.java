@@ -54,6 +54,7 @@ public class DeviceProfileTest {
         assertTrue(ampBack);
         for (String[][] ls : new String[][][] { p.gatewayLinesOn, p.gatewayLinesOff }) for (String[] l : ls) assertFalse("never a flyscale_misc node", l[0].contains("flyscale_misc"));
         assertEquals(0.03f, p.txAudioScale, 1e-6); assertEquals(0.03f, p.copy(true, true).txAudioScale, 1e-6);
+        assertEquals(0.4f, p.gatewayVolume, 1e-6); assertEquals(0.4f, p.copy(true, true).gatewayVolume, 1e-6);
         assertNull(DeviceProfile.ANYSECU_W6.gatewayLinesOn); assertEquals(1f, DeviceProfile.ANYSECU_W6.txAudioScale, 1e-6);
         for (String[][] ls : new String[][][] { p.rxLinesOn, p.rxLinesOff, p.txLinesOn, p.txLinesOff, p.muteLines })
             for (String[] l : ls) assertFalse("never the flyscale_misc attributes", l[0].contains("flyscale_misc"));

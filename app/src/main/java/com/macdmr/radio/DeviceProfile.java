@@ -106,6 +106,11 @@ public final class DeviceProfile {
     public String[][] gatewayLinesOn, gatewayLinesOff;
     /** Gateway route: the factor on SignalDeck's own transmit samples (its encoders write near full scale), so data tones stay below the module's limiter. */
     public float txAudioScale = 1f;
+    /**
+     * Gateway route: Android's media volume, as a share of its maximum, held while SignalDeck's own audio plays (the samples
+     * go through the media stream, so at the user's volume 0 nothing would be sent); the user's volume comes back afterwards.
+     */
+    public float gatewayVolume = 0.4f;
 
     /**
      * The radio's audio as plain ALSA streams on the phone's sound card, for a ROM without the vendor audio service
@@ -308,6 +313,9 @@ public final class DeviceProfile {
         // path lifts 2.5 kHz by ~8 dB (pre-emphasis), cuts below 300 Hz (100-250 Hz at the floor) and above 3 kHz, so no M17
         // over audio. An N0CALL APRS packet decoded at 0.04 (p99 3.8 kHz) and 0.03 (p99 2.85 kHz): 0.03 keeps AFSK off the limiter.
         ANYSECU_W6_DMR.txAudioScale = 0.03f;
+        // the media volume held during those plays: 10 of 25, at which APRS, RTTY, FT8 and SSTV from this phone all decoded on a
+        // W6+ (2026-10-29); at the user's volume 0 the route had sent a silent carrier
+        ANYSECU_W6_DMR.gatewayVolume = 0.4f;
         // ... and the idle values of what start8541ToDmr changed (speaker amplifier on, dmr_state 0, measured between receptions
         // 2026-10-29), so a play whose snapshot of the nodes failed still leaves the speaker working
         ANYSECU_W6_DMR.gatewayLinesOff = new String[][] { { "/sys/kernel/relay_state/relay_state", "0" }, { "/sys/class/gpio/gpio223/value", "0" }, { "/sys/class/gpio/gpio179/value", "0" }, { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
@@ -421,7 +429,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.moduleLoader = moduleLoader; p.camcorderGain = camcorderGain; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.gatewayLinesOn = gatewayLinesOn; p.gatewayLinesOff = gatewayLinesOff; p.txAudioScale = txAudioScale; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.moduleLoader = moduleLoader; p.camcorderGain = camcorderGain; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.gatewayLinesOn = gatewayLinesOn; p.gatewayLinesOff = gatewayLinesOff; p.txAudioScale = txAudioScale; p.gatewayVolume = gatewayVolume; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -449,6 +457,7 @@ public final class DeviceProfile {
         p.txLinesOn = pairs(o.optJSONArray("txLinesOn")); p.txLinesOff = pairs(o.optJSONArray("txLinesOff"));
         p.gatewayLinesOn = pairs(o.optJSONArray("gatewayLinesOn")); p.gatewayLinesOff = pairs(o.optJSONArray("gatewayLinesOff"));
         p.txAudioScale = (float) Math.max(0.001, Math.min(1, o.optDouble("txAudioScale", 1)));
+        p.gatewayVolume = (float) Math.max(0.05, Math.min(1, o.optDouble("gatewayVolume", 0.4)));
         org.json.JSONObject da = o.optJSONObject("directAudio");
         if (da != null) p.directAudio = DirectAudio.fromJson(da);
         return p;

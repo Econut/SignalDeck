@@ -1047,7 +1047,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         try {
             if (audio == null) {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
-                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback, profile.camcorderGain, profile.gatewayLinesOn, profile.gatewayLinesOff, profile.txAudioScale) : vendorOrDirectAudio();
+                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback, profile.camcorderGain, profile.gatewayLinesOn, profile.gatewayLinesOff, profile.txAudioScale, (android.media.AudioManager) getSystemService(AUDIO_SERVICE), profile.gatewayVolume) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
                 audio.setGate(() -> squelchOpen && !muted && !rawHeld() && !(profile.appPlayback && pttDown) && !dataQuiet());   // M17 in play, a data mode without MON, or app playback while keyed: the raw FM stays off the speaker; decoded M17 voice has its own track
             }
