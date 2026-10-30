@@ -15,6 +15,11 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | Fox hunt test on the W6Plus DMR (managing agent, 2026-10-30) | A mark (or estimate) closer than 10 m showed a distance of 0.00 mi with a compass direction that wandered with the GPS (NW 322°, then SW 247° for the same spot); it now reads "here (within 10 m)". On a phone without a compass the prediction said "no marks with a bearing yet", as if bearings would come; it now says the phone has no compass and the heat map works from the marks' strength. Help: the tone heard right now takes about 1.5 to 3 seconds and is offered only while a tone is heard. | FoxHuntDialog, FoxPredictor, HelpView, docs/help, FoxPredictorTest | Host: `aPhoneWithoutACompassIsToldWhy`. **Device (W6Plus DMR hunter, W6+ fox on 434.000 MHz low power):** the waiting mark taken at the fox's next key; 0.00 mi NW/SW seen before the fix |
+## 2026-10-30 — Bench: a transmit tone on the bench VFO
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Fox hunt tests on the W6 phones (managing agent, 2026-10-30) | DIAG `vfo` takes `--ef ctcss Hz`: the bench VFO then transmits that CTCSS tone, so a second phone can be a fox for the "Only the fox's" gate. Nothing user-facing. | DiagReceiver, RadioService | Device: the fox hunt run below |
 
 ## 2026-10-30 — Radio notes: charger buzz on both W6 phones, the W6+'s speaker during data sends
 
