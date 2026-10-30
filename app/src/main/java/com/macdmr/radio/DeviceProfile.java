@@ -107,6 +107,11 @@ public final class DeviceProfile {
     /** Gateway route: the factor on SignalDeck's own transmit samples (its encoders write near full scale), so data tones stay below the module's limiter. */
     public float txAudioScale = 1f;
     /**
+     * The CTCSS decoder's dead-air floor (per-sample energy of the receive audio): set on the Armor's loud vendor audio; a
+     * camcorder-input phone carries a carrier with only its tone ~30 dB lower, which the default never lets through.
+     */
+    public double toneEnergyMin = com.macdmr.radio.dsp.CtcssDecoderBank.ENERGY_MIN;
+    /**
      * Gateway route: Android's media volume, as a share of its maximum, held while SignalDeck's own audio plays (the samples
      * go through the media stream, so at the user's volume 0 nothing would be sent); the user's volume comes back afterwards.
      */
@@ -322,6 +327,10 @@ public final class DeviceProfile {
         // path lifts 2.5 kHz by ~8 dB (pre-emphasis), cuts below 300 Hz (100-250 Hz at the floor) and above 3 kHz, so no M17
         // over audio. An N0CALL APRS packet decoded at 0.04 (p99 3.8 kHz) and 0.03 (p99 2.85 kHz): 0.03 keeps AFSK off the limiter.
         ANYSECU_W6_DMR.txAudioScale = 0.03f;
+        // a carrier with only its CTCSS arrives at RMS ~24 on this camcorder input (100.0 Hz from a W6+, 2026-10-30): the tone
+        // stands ~300x above the other bins, but the default dead-air floor (RMS ~630) never let it count; 200 = RMS ~14, above
+        // the idle input (RMS 7-10), the ratio tests still keep noise and voice out
+        ANYSECU_W6_DMR.toneEnergyMin = 200;
         // the media volume held during those plays: 10 of 25, at which APRS, RTTY, FT8 and SSTV from this phone all decoded on a
         // W6+ (2026-10-29); at the user's volume 0 the route had sent a silent carrier
         ANYSECU_W6_DMR.gatewayVolume = 0.4f;
@@ -438,7 +447,7 @@ public final class DeviceProfile {
     /** The same profile with other support flags (an advisory's restricted copy). */
     DeviceProfile copy(boolean supported, boolean verified) {
         DeviceProfile p = new DeviceProfile(name, controlPort, baud, audio, pcmPort, pcmBaud, powerNode, pttNode, powerOnToken, pttActions, stockApp, sepolicy, serialLib, supported, verified);
-        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.moduleLoader = moduleLoader; p.camcorderGain = camcorderGain; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.gatewayLinesOn = gatewayLinesOn; p.gatewayLinesOff = gatewayLinesOff; p.txAudioScale = txAudioScale; p.gatewayVolume = gatewayVolume; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
+        p.id = id; p.revision = revision; p.source = source; p.txBlocked = txBlocked; p.restrictedBy = restrictedBy; p.globalSquelch = globalSquelch; p.lineSetup = lineSetup; p.scanDwellMs = scanDwellMs; p.protocol = protocol; p.bandsHz = bandsHz.clone(); p.rssi = rssi; p.softSqInModule = softSqInModule; p.appPlayback = appPlayback; p.fixedModuleVolume = fixedModuleVolume; p.subaudible = subaudible; p.dataSquelch = dataSquelch; p.moduleLoader = moduleLoader; p.camcorderGain = camcorderGain; p.softSqThresholds = softSqThresholds; p.softSqCloseCap = softSqCloseCap; p.rxDetectNode = rxDetectNode; p.rxLinesOn = rxLinesOn; p.muteLines = muteLines; p.rxLinesOff = rxLinesOff; p.txLinesOn = txLinesOn; p.txLinesOff = txLinesOff; p.gatewayLinesOn = gatewayLinesOn; p.gatewayLinesOff = gatewayLinesOff; p.txAudioScale = txAudioScale; p.toneEnergyMin = toneEnergyMin; p.gatewayVolume = gatewayVolume; p.minWriteGapMs = minWriteGapMs; p.directAudio = directAudio;
         return p;
     }
 
@@ -466,6 +475,7 @@ public final class DeviceProfile {
         p.txLinesOn = pairs(o.optJSONArray("txLinesOn")); p.txLinesOff = pairs(o.optJSONArray("txLinesOff"));
         p.gatewayLinesOn = pairs(o.optJSONArray("gatewayLinesOn")); p.gatewayLinesOff = pairs(o.optJSONArray("gatewayLinesOff"));
         p.txAudioScale = (float) Math.max(0.001, Math.min(1, o.optDouble("txAudioScale", 1)));
+        p.toneEnergyMin = Math.max(1, o.optDouble("toneEnergyMin", com.macdmr.radio.dsp.CtcssDecoderBank.ENERGY_MIN));
         p.gatewayVolume = (float) Math.max(0.05, Math.min(1, o.optDouble("gatewayVolume", 0.4)));
         org.json.JSONObject da = o.optJSONObject("directAudio");
         if (da != null) p.directAudio = DirectAudio.fromJson(da);
