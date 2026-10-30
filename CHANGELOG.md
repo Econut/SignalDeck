@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Bench: RTTY/PSK31 and SSTV sends from the DIAG broadcast
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone data tests (managing agent, 2026-10-29) | Bench-only DIAG commands so a data mode can be sent and received without screen taps: `text` (`--ei mode` 0 off / 1 RTTY / 2 PSK31 for listening and sending, `--es send`, `--ez dump` logs what was received, `--ez clear`) and `sstvtx` (a colour-bar test card marked N0CALL through the SSTV encoder, `--ei mode`, default Robot 24 colour). Nothing user-facing. | DiagReceiver | **Device (W6Plus DMR → W6+, 434.000 MHz low power, 2026-10-29):** `text` sent `RYRYRY N0CALL W6PLUS DMR RTTY TEST 12345`, which the W6+ decoded in full; `sstvtx` sent Robot 24 colour, which the W6+ decoded as a clean 320×240 picture |
+
 ## 2026-10-29 — W6Plus DMR gateway route: the speaker amplifier comes back even without a snapshot
 
 | Backlog | Change | Files | Test |
