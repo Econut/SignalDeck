@@ -5,6 +5,11 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | W6Plus DMR gateway route (2026-10-29) | SignalDeck's own audio (APRS, tones, SSTV, FT8, RTTY) reaches the W6Plus DMR's module through Android's media stream, so with the media volume at 0 the radio keyed a silent carrier, and the level on air followed the volume. The media volume is now held at the profile's `gatewayVolume` (W6Plus DMR: 10 of 25) for the play and put back afterwards, even on an error. | CamcorderAudio, DeviceProfile, RadioService, DeviceProfileTest | **Device (W6Plus DMR → W6+, second cage, 434.000 MHz low power, 2026-10-29):** at the user's volume 0 a W6+ recording of a 1 kHz key held only a quiet carrier (RMS 10); at 10 of 25 a steady tone (RMS 226), and APRS (N0CALL), RTTY (the full line), FT8 (`CQ DMRTST`, −8 dB) and an SSTV Robot 24 colour test card all decoded on the W6+. Pinned volume: with the user's volume at 0, the volume read 10 during the key and 0 again after it, and the W6+ recorded the steady tone (RMS 228). The deviation at 10 of 25 is still to be checked with the HackRF. |
+## 2026-10-29 — Bench: RTTY/PSK31 and SSTV sends from the DIAG broadcast
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone data tests (managing agent, 2026-10-29) | Bench-only DIAG commands so a data mode can be sent and received without screen taps: `text` (`--ei mode` 0 off / 1 RTTY / 2 PSK31 for listening and sending, `--es send`, `--ez dump` logs what was received, `--ez clear`) and `sstvtx` (a colour-bar test card marked N0CALL through the SSTV encoder, `--ei mode`, default Robot 24 colour). Nothing user-facing. | DiagReceiver | **Device (W6Plus DMR → W6+, 434.000 MHz low power, 2026-10-29):** `text` sent `RYRYRY N0CALL W6PLUS DMR RTTY TEST 12345`, which the W6+ decoded in full; `sstvtx` sent Robot 24 colour, which the W6+ decoded as a clean 320×240 picture |
 
 ## 2026-10-29 — W6Plus DMR gateway route: the speaker amplifier comes back even without a snapshot
 
