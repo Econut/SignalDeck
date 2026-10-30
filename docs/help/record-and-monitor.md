@@ -2,7 +2,7 @@
 
 # Record and monitor
 
-*On the intercom · 7 of 33*
+*On the intercom · 7 of 34*
 
 REC saves audio; MON hears every DMR call.
 

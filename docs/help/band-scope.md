@@ -2,13 +2,13 @@
 
 # Band scope
 
-*Pages · 20 of 33*
+*Pages · 20 of 34*
 
 See which frequencies in a band are busy.
 
 ## Open it
 
-PKT → Band scope (or the PKT tools button at the top of any mode page), or SignalDeck Web → Scope. Choose a band (2 m, 2 m FM simplex, 70 cm, 70 cm FM, GMRS/FRS, marine VHF, NOAA weather) or Custom range (from and to in MHz and the step in kHz, anywhere inside 136–174 or 400–480 MHz, up to 1200 steps; the sheet shows how long a sweep will take) and Start.
+PKT → Band scope (or the PKT tools button at the top of any mode page), or SignalDeck Web → Scope. Choose a band (2 m, 2 m FM simplex, 70 cm, 70 cm FM, GMRS/FRS, marine VHF, and NOAA weather where your region has weather radio; Show all bands lists it everywhere) or Custom range (from and to in MHz and the step in kHz, anywhere inside 136–174 or 400–480 MHz, up to 1200 steps; the sheet shows how long a sweep will take) and Start.
 
 ## What it shows
 

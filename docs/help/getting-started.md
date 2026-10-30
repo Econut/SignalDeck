@@ -2,7 +2,7 @@
 
 # Getting started
 
-*Start here · 1 of 33*
+*Start here · 1 of 34*
 
 Take over the radio, pick a channel, talk.
 

@@ -34,7 +34,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     private final View linkDot;
     private final ImageView heroIcon;
     private final TextView takeOver, handBack, reportNow;
-    private Neo.NeonSwitch customPttSw; private TextView customPttSub;
+    private Neo.NeonSwitch customPttSw; private TextView customPttSub, regionSub;
     private final Neo.NeonSwitch ownAtBoot, voiceSw, hwPttSw, volPttSw, scanSqSw, styleSw, animSw, covSw, carMicSw, carCovSw, wheelSw, carScreenSw, roamSw;
     private TextView nextTalkValue, wheelMicValue, voxValue;
     private final LinearLayout radioIdTile;
@@ -110,6 +110,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         // ---- radio settings ----
         LinearLayout set = card(body, "Radio settings");
         ownAtBoot = sw(); hwPttSw = sw(); volPttSw = sw(); scanSqSw = sw(); voiceSw = sw(); styleSw = sw(); animSw = sw(); covSw = sw(); carMicSw = sw(); carCovSw = sw(); wheelSw = sw(); carScreenSw = sw();
+        LinearLayout regionRow = Neo.switchRow(c, "globe", Neo.CYAN, "Region", "", null);   // the region's defaults: APRS frequency, presets, units (Device → Region)
+        regionSub = (TextView) ((LinearLayout) regionRow.getChildAt(1)).getChildAt(1);
+        regionRow.setOnClickListener(v -> RegionSheet.show(c, svc, this::updateRegion));
+        addRow(set, regionRow); updateRegion();
         addRow(set, Neo.switchRow(c, "power", Neo.GREEN, "Own the radio at boot", "Otherwise the stock app is restored after a reboot", ownAtBoot));
         addRow(set, Neo.switchRow(c, "ptt", Neo.AMBER, "Side PTT key", "The phone's hardware push-to-talk button transmits", hwPttSw));
         addRow(set, Neo.switchRow(c, "volume", Neo.AMBER, "Volume-up transmits", "While the Intercom page is open", volPttSw));
@@ -1085,7 +1089,10 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         dlg[0] = Neo.showSheet(c, box);
     }
 
+    /** The Region row's line (after a change on its sheet or the intercom card). */
+    public void updateRegion() { if (regionSub != null) regionSub.setText(RegionSheet.summary(getContext(), com.macdmr.radio.region.Region.current(getContext()))); }
     private void refresh() {
+        updateRegion();
         if (svc == null) return;
         Context c = getContext(); float d = Theme.dp(c);
         Neo.headerSubtitle(header).setText(svc.profile().name.toUpperCase(java.util.Locale.US));

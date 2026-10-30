@@ -369,6 +369,11 @@ public final class WebHost {
         JSONArray d = new JSONArray(); for (int i = 0; i < com.macdmr.radio.dsp.ToneTable.DCS_COUNT; i++) d.put("DCS D" + com.macdmr.radio.dsp.ToneTable.dcsCode(i));   // the index the MCU gets; N/I comes from the type
         return new JSONObject().put("ctcss", c).put("dcs", d);
     }
+    /** The region's values the pages use (Device → Region on the phone; it is not changed from the web). */
+    static JSONObject regionJson(com.macdmr.radio.region.Region r) throws Exception {
+        return new JSONObject().put("id", r.id).put("name", r.name).put("chosen", r.chosen).put("aprsHz", r.aprsHz).put("call2mHz", r.call2mHz).put("call70Hz", r.call70Hz)
+                .put("sstvHz", r.sstvHz).put("weatherRadio", r.weatherRadio).put("units", r.km ? "km" : "mi").put("stationIdMinutes", r.stationIdMinutes);
+    }
     private JSONObject statusJson() throws Exception {
         JSONObject o = new JSONObject();
         o.put("link", svc.link()).put("ready", svc.isReady()).put("channel", channelObj(svc.current())).put("stockImport", svc.stockImportPending());
@@ -376,7 +381,7 @@ public final class WebHost {
         JSONArray bands = new JSONArray(); for (long hz : prof.bandsHz) bands.put(hz);
         o.put("radio", new JSONObject().put("dmr", prof.dmr()).put("messages", prof.hasMessages()).put("contacts", prof.hasContacts())
                 .put("rssi", prof.rssi).put("bands", bands).put("bandsText", prof.bandsText()).put("symbolEngine", prof.symbolEngine())
-                .put("aprs144", prof.tunable(com.macdmr.radio.PacketEngine.APRS_FREQ_HZ)).put("weather", prof.tunable(162_400_000L)));
+                .put("aprsTerrestrial", svc.aprsTunable()).put("aprsHz", svc.aprsHz()).put("weather", prof.tunable(162_400_000L)).put("region", regionJson(com.macdmr.radio.region.Region.current(svc))));
         o.put("transmitting", svc.isTransmitting()).put("firmwareLoad", svc.firmwareLoading()).put("hearing", svc.hearing()).put("rssi", svc.lastRssi()).put("caller", svc.currentCaller());
         o.put("softSq", svc.softSqOn()).put("softSqLevel", svc.softSqLevel()).put("monitor", svc.monitorOn()).put("promiscuous", svc.promiscuousOn()).put("record", svc.recordOn())
                 .put("scanning", svc.scanning()).put("vfo", svc.vfoActive()).put("zone", svc.zoneName()).put("zoneId", svc.zoneId())
@@ -513,7 +518,8 @@ public final class WebHost {
         }
         return new JSONObject().put("settings", a).put("link", svc.link()).put("ready", svc.isReady()).put("profile", svc.profile() == null ? "" : svc.profile().name)
                 .put("firmware", svc.moduleVersion().trim()).put("firmwareStock", svc.stockFirmware())
-                .put("version", com.macdmr.radio.BuildConfig.VERSION_NAME).put("webTx", allowTx()).put("browsers", clients()).put("listeners", listeners());
+                .put("version", com.macdmr.radio.BuildConfig.VERSION_NAME).put("webTx", allowTx()).put("browsers", clients()).put("listeners", listeners())
+                .put("region", regionJson(com.macdmr.radio.region.Region.current(svc)));
     }
 
     // ---- the API ----

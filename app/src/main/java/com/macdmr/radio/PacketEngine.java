@@ -49,6 +49,8 @@ public final class PacketEngine {
         Context context();
         boolean analogRx();                      // current channel is FM
         int rxFreqHz();
+        /** The terrestrial APRS frequency in use (the region's, or the user's own). */
+        default int aprsHz() { return APRS_FREQ_HZ; }
         int channelNumber(); String channelName();
         boolean txBusy();
         /** Key, play the 8 kHz mono PCM, release; {@code onDone} runs after release (on the service worker). */
@@ -121,6 +123,7 @@ public final class PacketEngine {
     }
 
     public int packetLeadMs() { return Math.max(0, Math.min(3000, prefs.getInt("txLeadMs", TX_LEAD_MS))); }
+    /** The North American APRS frequency: the default before a region is chosen (Device → Region sets the one in use). */
     public static final int APRS_FREQ_HZ = 144_390_000;
     private static final String TAG = "PacketEngine";
     private static final int SR = 8000, WINDOW = SR * 2, OVERLAP = SR;
@@ -131,7 +134,7 @@ public final class PacketEngine {
     private final ExecutorService decoder = Executors.newSingleThreadExecutor(r -> { Thread t = new Thread(r, "aprs-decode"); t.setDaemon(true); return t; });
     private final KissTnc kiss = new KissTnc();
     private final LinkedBlockingQueue<byte[]> kissTxQueue = new LinkedBlockingQueue<>(32);
-    private volatile boolean monitor;                      // APRS monitoring mode (parked on 144.390 by the service)
+    private volatile boolean monitor;                      // APRS monitoring mode (parked on the region's APRS frequency by the service)
     private final short[] window = new short[WINDOW];
     private int fill;
     private short[] overlapTail;
@@ -280,8 +283,11 @@ public final class PacketEngine {
     private volatile double pressureHpa;
     private android.hardware.SensorEventListener baro;
 
-    /** On the APRS frequency (analog, 144.390) and not handing the radio to a TNC client: our own beacons may go out. */
-    public boolean onAprsFrequency() { return host.analogRx() && host.rxFreqHz() == APRS_FREQ_HZ && !kiss.isActive(); }
+    /** On the region's APRS frequency (analog) and not handing the radio to a TNC client: our own beacons may go out. */
+    public boolean onAprsFrequency() { return onAprsFrequency(host.analogRx(), host.rxFreqHz(), host.aprsHz(), kiss.isActive()); }
+    static boolean onAprsFrequency(boolean analog, int rxHz, int aprsHz, boolean kissActive) { return analog && aprsHz > 0 && rxHz == aprsHz && !kissActive; }
+    /** "144.800": the APRS frequency in use, for messages. */
+    public String aprsMhz() { return com.macdmr.radio.region.Region.mhz(host.aprsHz()); }
 
     /** Re-read the settings that need a sensor or GPS running. */
     public void applySettings() {
@@ -630,7 +636,7 @@ public final class PacketEngine {
         String key = from + ">" + p.messageTo.trim() + ":" + p.messageText + "{" + p.messageId;
         long now = System.currentTimeMillis();
         synchronized (gatedToRf) { Long t = gatedToRf.get(key); if (t != null && now - t < 30 * 60_000L) return; gatedToRf.put(key, now); if (gatedToRf.size() > 500) gatedToRf.clear(); }
-        if (!onAprsFrequency() && !benchIgate) { host.event("\uD83C\uDF10 Not gated to the radio (not on 144.390): " + from + " \u2192 " + p.messageTo.trim()); return; }
+        if (!onAprsFrequency() && !benchIgate) { host.event("\uD83C\uDF10 Not gated to the radio (not on " + aprsMhz() + "): " + from + " \u2192 " + p.messageTo.trim()); return; }
         final String tp = com.macdmr.radio.pkt.AprsExtras.thirdParty(line, myCall());
         if (tp == null) return;
         final String to = p.messageTo.trim(), text = p.messageText;
@@ -661,12 +667,12 @@ public final class PacketEngine {
     public boolean cwEnabled() { return prefs.getBoolean("cw", true); }
     public boolean remoteOn() { return prefs.getBoolean("remote", false); }
     public String remotePin() { return prefs.getString("remotePin", ""); }
-    /** Send the callsign in Morse after talking on amateur channels, at most every ten minutes. */
+    /** Send the callsign in Morse after talking on amateur channels, at most once per station-ID interval (the region's, else ten minutes). */
     public boolean cwIdEnabled() { return prefs.getBoolean("cwId", false); }
     private volatile long lastCwIdMs;
     /** Morse ID audio to append now, or null when none is due (or no callsign is set). */
     public short[] cwIdIfDue(long now) {
-        if (!cwIdEnabled() || !callsignSet() || (lastCwIdMs != 0 && now - lastCwIdMs < 10 * 60_000L)) return null;
+        if (!cwIdEnabled() || !callsignSet() || (lastCwIdMs != 0 && now - lastCwIdMs < com.macdmr.radio.region.Region.cached().idEveryMs())) return null;
         lastCwIdMs = now; host.identified();
         return com.macdmr.radio.coverage.Morse.pcm(callsign(), 20, 800);
     }
@@ -1072,7 +1078,7 @@ public final class PacketEngine {
         if (!callsignSet()) return "Set your callsign first (PKT → APRS settings)";
         if (to == null || to.trim().isEmpty() || text == null || text.trim().isEmpty()) return "Addressee and text are needed";
         if (text.length() > 67) return "APRS messages are at most 67 characters";
-        if (!host.analogRx()) return "Packet needs an analog channel: tune the APRS channel (144.390 MHz in North America)";
+        if (!host.analogRx()) return "Packet needs an analog channel: tune the APRS channel (" + aprsMhz() + " MHz in your region)";
         final int id = prefs.getInt("msgId", 0) % 999 + 1; prefs.edit().putInt("msgId", id).apply();
         final String addressee = to.trim().toUpperCase(Locale.US);
         txInfo(Ax25.messageInfo(addressee, text.trim(), id), path(), "APRS message to " + addressee, TX_REPS,
@@ -1103,7 +1109,7 @@ public final class PacketEngine {
         if (!callsignSet()) return "Set your callsign first (PKT → APRS settings)";
         Location l = host.location();
         if (l == null) return "No position fix yet (turn on location and open Maps once)";
-        if (!host.analogRx()) return "Packet needs an analog channel: tune the APRS channel (144.390 MHz in North America)";
+        if (!host.analogRx()) return "Packet needs an analog channel: tune the APRS channel (" + aprsMhz() + " MHz in your region)";
         final String info = Ax25.positionInfo(l.getLatitude(), l.getLongitude(), symTable(), symCode(), comment());
         txInfo(info, via, "position beacon", TX_REPS, () -> { store.log("beacon", myCall(), "APZDMR", info, null, false); host.event("📡 Beacon sent" + (via.length > 0 ? " via " + String.join(",", via) : "")); });
         return null;

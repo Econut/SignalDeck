@@ -2,7 +2,7 @@
 
 # Coverage maps
 
-*Pages · 29 of 33*
+*Pages · 30 of 34*
 
 Where your repeaters really work, measured as you go.
 

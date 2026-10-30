@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * APRS monitoring (144.390, the ISS on 145.825, or the KISS TNC): live packet feed, stations heard and messages,
+ * APRS monitoring (the region's APRS frequency, the ISS on 145.825, or the KISS TNC): live packet feed, stations heard and messages,
  * counters since monitoring started, the switches that matter while monitoring, and message / beacon / map /
  * settings / stop.
  */
@@ -171,8 +171,8 @@ public final class AprsScreen extends ModeScreen {
         android.location.Location me = svc.lastKnownLocation();
         for (PacketStore.Station s : st) {
             String dist = "";
-            if (me != null) { float[] r = new float[2]; android.location.Location.distanceBetween(me.getLatitude(), me.getLongitude(), s.lat, s.lon, r); dist = String.format(Locale.US, "   %.1f mi %s", r[0] / 1609.344, compass(r[1])); }
-            String extra = (s.speedKmh >= 0 ? String.format(Locale.US, " · %.0f mph", s.speedKmh * 0.621371) : "") + (s.alt != 0 ? " · " + Math.round(s.alt * 3.28084) + " ft" : "");
+            if (me != null) { float[] r = new float[2]; android.location.Location.distanceBetween(me.getLatitude(), me.getLongitude(), s.lat, s.lon, r); dist = "   " + com.macdmr.radio.repeaters.GeoUtil.dist(r[0]) + " " + compass(r[1]); }
+            String extra = (s.speedKmh >= 0 ? " · " + com.macdmr.radio.repeaters.GeoUtil.speed(s.speedKmh) : "") + (s.alt != 0 ? " · " + com.macdmr.radio.repeaters.GeoUtil.alt(s.alt) : "");
             final PacketStore.Station fs = s;
             row("📍  " + s.call + dist, ago(s.lastTs) + (s.count > 1 ? " · heard " + s.count + "×" : "") + extra + (s.via.isEmpty() ? "" : " · via " + s.via) + (s.comment.isEmpty() ? "" : "\n" + s.comment),
                     Neo.CYAN, () -> ContactEditor.open(c, svc, ContactEditor.Identity.call(fs.call).at(fs.lat, fs.lon, fs.lastTs, "APRS"), null), () -> {

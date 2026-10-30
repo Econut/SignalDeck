@@ -30,7 +30,7 @@ import java.util.Locale;
 public final class Scheduler {
     public static final String LISTEN = "listen", SCAN = "scan", APRS = "aprs", SSTV = "sstv", BEACON = "beacon", WINLINK = "winlink", WINLINK_NET = "winlinknet", FINDER = "finder";
     public static final String[] ACTIONS = { LISTEN, SCAN, APRS, SSTV, BEACON, WINLINK, WINLINK_NET, FINDER };
-    public static final String[] ACTION_NAMES = { "Listen to a channel", "Scan the zone", "APRS monitoring (144.390)", "SSTV receive", "Send an APRS beacon", "Check Winlink mail (radio gateway)", "Check Winlink mail (internet)", "Packet finder (listen for BBSs, nodes, gateways)" };
+    public static final String[] ACTION_NAMES = { "Listen to a channel", "Scan the zone", "APRS monitoring", "SSTV receive", "Send an APRS beacon", "Check Winlink mail (radio gateway)", "Check Winlink mail (internet)", "Packet finder (listen for BBSs, nodes, gateways)" };
     /** Actions that use a channel of their own (the rest work on the current one). */
     public static boolean usesChannel(String a) { return LISTEN.equals(a) || SSTV.equals(a) || WINLINK.equals(a); }
 
@@ -43,6 +43,8 @@ public final class Scheduler {
         static Entry of(JSONObject o) { Entry e = new Entry(); e.id = o.optInt("id"); e.action = o.optString("action", LISTEN); e.label = o.optString("label", ""); e.hour = o.optInt("hour", 19); e.minute = o.optInt("minute"); e.days = o.optInt("days"); e.date = o.optString("date", ""); e.minutes = o.optInt("minutes", 60); e.channel = o.optInt("channel", -1); e.record = o.optBoolean("record"); e.enabled = o.optBoolean("enabled", true); return e; }
         public boolean oneShot() { return days == 0; }
         public boolean hasDuration() { return !BEACON.equals(action) && !WINLINK.equals(action) && !WINLINK_NET.equals(action); }
+        /** The names with the APRS frequency in use, e.g. "APRS monitoring (144.800)". */
+        public static String[] actionNames(int aprsHz) { String[] n = ACTION_NAMES.clone(); n[2] = "APRS monitoring (" + com.macdmr.radio.region.Region.mhz(aprsHz) + ")"; return n; }
         public String actionName() { for (int i = 0; i < ACTIONS.length; i++) if (ACTIONS[i].equals(action)) return ACTION_NAMES[i]; return action; }
         /** "Tue, Thu 19:00 for 60 min" / "23 Oct 19:00". */
         public String when() {

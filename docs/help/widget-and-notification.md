@@ -2,7 +2,7 @@
 
 # Widget and notification
 
-*Pages · 31 of 33*
+*Pages · 32 of 34*
 
 Control the radio without opening the app.
 

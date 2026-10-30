@@ -105,11 +105,15 @@ public final class BandScopeScreen extends ModeScreen {
         if (svc.scope().running()) new Thread(() -> { svc.scopeStop(); post(this::toggle); }, "scope-restart").start();
         refresh();
     }
-    private void choosePreset() {
-        int k = BandScope.PRESETS.length; String[] n = new String[k + 1];
-        for (int i = 0; i < k; i++) { BandScope.Preset p = BandScope.PRESETS[i]; int st = BandScope.steps(p.from, p.to, p.step); n[i] = String.format(Locale.US, "%s  (%.3f–%.3f, %s kHz, %d steps, about %s)", p.name, p.from / 1e6, p.to / 1e6, khz(p.step), st, BandScope.duration((long) st * (BandScope.DEFAULT_SETTLE_MS + 300))); }
-        n[k] = "Custom range…";
-        new AlertDialog.Builder(c).setTitle("Which band?").setItems(n, (dd, w) -> { if (w == k) customRange(); else picked(w); }).show();
+    private void choosePreset() { choosePreset(false); }
+    /** The region's bands (no NOAA weather band where there is no weather radio), Custom, and Show all when some are left out. */
+    private void choosePreset(boolean all) {
+        java.util.List<Integer> idx = BandScope.offered(com.macdmr.radio.region.Region.current(c), all);
+        final boolean more = idx.size() < BandScope.PRESETS.length;
+        int k = idx.size(); String[] n = new String[k + (more ? 2 : 1)];
+        for (int j = 0; j < k; j++) { BandScope.Preset p = BandScope.PRESETS[idx.get(j)]; int st = BandScope.steps(p.from, p.to, p.step); n[j] = String.format(Locale.US, "%s  (%.3f–%.3f, %s kHz, %d steps, about %s)", p.name, p.from / 1e6, p.to / 1e6, khz(p.step), st, BandScope.duration((long) st * (BandScope.DEFAULT_SETTLE_MS + 300))); }
+        n[k] = "Custom range…"; if (more) n[k + 1] = "Show all bands…";
+        new AlertDialog.Builder(c).setTitle("Which band?").setItems(n, (dd, w) -> { if (w == k) customRange(); else if (w == k + 1) choosePreset(true); else picked(idx.get(w)); }).show();
     }
     /** From, to and step of your own; checked against what the radio can tune before it is used. */
     private void customRange() {

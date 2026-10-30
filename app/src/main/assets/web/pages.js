@@ -1173,7 +1173,7 @@ async function loadSettings() { try { renderSettings(await api('settings')); } c
 function renderSettings(j) {
   S.settings = j.settings;
   const f = (k, v) => '<div><span>' + k + '</span><b>' + esc(v) + '</b></div>';
-  $('radioCard').innerHTML = '<div class="big">' + (j.ready ? 'SIGNALDECK OWNS THE RADIO' : esc(String(j.link || '').toUpperCase())) + '</div><div class="grid">' + f('PHONE', j.profile || '—') + f('VERSION', j.version) + (j.firmwareStock ? f('RADIO FIRMWARE', j.firmware && j.firmware !== j.firmwareStock ? j.firmware + ' (stock ' + j.firmwareStock + ')' : j.firmwareStock + ' (stock)') : '') + '</div>';
+  $('radioCard').innerHTML = '<div class="big">' + (j.ready ? 'SIGNALDECK OWNS THE RADIO' : esc(String(j.link || '').toUpperCase())) + '</div><div class="grid">' + f('PHONE', j.profile || '—') + (j.region ? f('REGION', (j.region.chosen ? j.region.name : 'Not chosen') + ' · APRS ' + (j.region.aprsHz / 1e6).toFixed(3)) : '') + f('VERSION', j.version) + (j.firmwareStock ? f('RADIO FIRMWARE', j.firmware && j.firmware !== j.firmwareStock ? j.firmware + ' (stock ' + j.firmwareStock + ')' : j.firmwareStock + ' (stock)') : '') + '</div>';
   $('webCard').innerHTML = '<div class="grid">' + f('BROWSERS', j.browsers) + f('LISTENING', j.listeners) + f('TRANSMIT FROM WEB', j.webTx ? 'Allowed' : 'Off') + '</div>';
   let html = '', group = null;
   j.settings.forEach((s, i) => {
