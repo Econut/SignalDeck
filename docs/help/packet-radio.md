@@ -72,7 +72,7 @@ PKT → DTMF → Remote lets another radio control this phone: turn it on and se
 
 ## Weather alerts
 
-NOAA SAME alerts are decoded automatically on the weather frequencies and raise a notification.
+NOAA SAME alerts are decoded automatically on the weather frequencies (162.400 to 162.550 MHz) and raise a notification. Where your region has no NOAA-style weather radio (Device → Region), the PKT sheet shows only a Show NOAA weather alerts button and the weather lists sit under Show all; the decoder itself still runs.
 
 ## SSTV
 
@@ -92,7 +92,7 @@ PKT → Terminal connects to a packet bulletin board (BBS), node or another stat
 
 ## Simplex repeater (parrot)
 
-PKT → Parrot on this channel records each transmission heard on the current channel and sends it back a second after it ends, up to 26 seconds (the radio's 30-second limit). A station can check how it sounds, or two stations that cannot hear each other can talk through you. Very short key-ups are not repeated. On amateur channels, with your callsign set in APRS settings, the playback ends with your callsign in Morse at most every ten minutes. The squelch must close on silence (a squelch level above 0, or Soft SQ), or the parrot would repeat static. It stops when you change channel; each repeat is listed in the channel history.
+PKT → Parrot on this channel records each transmission heard on the current channel and sends it back a second after it ends, up to 26 seconds (the radio's 30-second limit). A station can check how it sounds, or two stations that cannot hear each other can talk through you. Very short key-ups are not repeated. On amateur channels, with your callsign set in APRS settings, the playback ends with your callsign in Morse at most once per station-ID interval (ten minutes, or your region's: Device → Region). The squelch must close on silence (a squelch level above 0, or Soft SQ), or the parrot would repeat static. It stops when you change channel; each repeat is listed in the channel history.
 
 ## Morse trainer
 
@@ -104,7 +104,7 @@ PKT → Voice keyer holds three recorded messages (named CQ, Net preamble and My
 
 ## ID timer
 
-Amateur rules ask for your callsign every ten minutes during a contact and at its end. On amateur channels the timer starts with your first transmission after you last identified; once ten minutes have passed the phone vibrates and reminds you as you key (unless Morse ID after I talk does it for you). Any Morse ID restarts it; after saying your callsign, tap I just identified in the Voice keyer. PKT shows the time left.
+Amateur rules ask for your callsign at intervals during a contact and at its end: every ten minutes in the US; Device → Region sets your country's interval where it is known (for example five minutes in the Netherlands), and you can change it there. Amateur channels are those inside your region's amateur bands. On them the timer starts with your first transmission after you last identified; once the interval has passed the phone vibrates and reminds you as you key (unless Morse ID after I talk does it for you). Any Morse ID restarts it; after saying your callsign, tap I just identified in the Voice keyer. PKT shows the time left.
 
 ## Morse
 

@@ -112,7 +112,7 @@ public final class FoxHuntDialog {
                 FoxHunt.Estimate est = svc.fox().estimate(); Location me = here[0];
                 if (est != null && me != null) {
                     float[] res = new float[2]; Location.distanceBetween(me.getLatitude(), me.getLongitude(), est.lat, est.lon, res);
-                    sb.append(String.format(Locale.US, "\n%s: %.2f mi %s (%03.0f°)", est.fromBearings ? "Fox estimate from " + est.used + " bearings" : "Strongest mark", res[0] / 1609.344, compass(res[1]), (res[1] + 360) % 360));
+                    sb.append(String.format(Locale.US, "\n%s: %s %s (%03.0f°)", est.fromBearings ? "Fox estimate from " + est.used + " bearings" : "Strongest mark", com.macdmr.radio.region.Region.km() ? com.macdmr.radio.repeaters.GeoUtil.dist(res[0], true) : String.format(Locale.US, "%.2f mi", res[0] / 1609.344), compass(res[1]), (res[1] + 360) % 360));
                 } else if (svc.fox().marks().isEmpty()) sb.append("\nNo marks yet");
                 info.setText(sb.toString());
                 plot.update(me, heading[0]);
@@ -209,7 +209,8 @@ public final class FoxHuntDialog {
             }
             p.setStyle(Paint.Style.FILL); p.setColor(Neo.DIM); p.setTextSize(11 * d); p.setTextAlign(Paint.Align.LEFT);
             double ring = maxM / (0.9 * 3.2);                 // metres between rings
-            cv.drawText(ring >= 1609 ? String.format(Locale.US, "rings %.1f mi apart", ring / 1609.344) : String.format(Locale.US, "rings %.0f m apart", ring), 10 * d, hgt - 10 * d, p);
+            cv.drawText(com.macdmr.radio.region.Region.km() ? (ring >= 1000 ? String.format(Locale.US, "rings %.1f km apart", ring / 1000) : String.format(Locale.US, "rings %.0f m apart", ring))
+                    : ring >= 1609 ? String.format(Locale.US, "rings %.1f mi apart", ring / 1609.344) : String.format(Locale.US, "rings %.0f m apart", ring), 10 * d, hgt - 10 * d, p);
             cv.drawText("N ↑", w - 34 * d, 18 * d, p);
         }
         private static double dist(double la, double lo, double la0, double lo0, double cos) { double x = Math.toRadians(lo - lo0) * 6371000 * cos, y = Math.toRadians(la - la0) * 6371000; return Math.sqrt(x * x + y * y); }

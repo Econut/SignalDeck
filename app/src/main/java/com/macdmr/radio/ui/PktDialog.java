@@ -264,7 +264,14 @@ public final class PktDialog {
         body.addView(r4);
         body.addView(hint("Touch-tone keys heard on any analog channel are decoded and logged" + (pe.dtmfEnabled() ? "." : " (decoder off in Settings).")));
         // ---- Weather ----
-        if (com.macdmr.radio.DeviceProfile.inBands(162_400_000L)) {                 // the weather channels: VHF
+        boolean wxRegion = com.macdmr.radio.region.Region.current(c).weatherRadio;  // NOAA-style weather radio exists in the region (Device → Region)
+        if (com.macdmr.radio.DeviceProfile.inBands(162_400_000L) && !wxRegion) {     // elsewhere: one tap away
+            LinearLayout r6 = row();
+            button(r6, "Show NOAA weather alerts", Theme.REC, x -> wxLog());
+            body.addView(r6);
+            body.addView(hint("Your region (Device \u2192 Region) has no NOAA-style weather radio, so the SAME alert decoder is tucked away here; it still decodes alerts heard on 162.400–162.550 MHz" + (pe.wxEnabled() ? "." : " (off in Settings).")));
+        }
+        if (com.macdmr.radio.DeviceProfile.inBands(162_400_000L) && wxRegion) {     // the weather channels: VHF
         body.addView(section("NOAA weather alerts"));
         LinearLayout r5 = row();
         button(r5, "Alerts heard", Theme.REC, x -> wxLog());

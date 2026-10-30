@@ -8,7 +8,7 @@ Licences, power and the time limit.
 
 ## Licences
 
-You are responsible for the frequencies you use: amateur bands need an amateur licence, GMRS needs a licence in the US, FRS limits power, and NOAA weather, marine and railroad channels are receive-only (the app never transmits there). The standard lists in Add a zone say on each one whether a licence is needed.
+You are responsible for the frequencies you use: amateur bands need an amateur licence, GMRS needs a licence in the US, FRS limits power, the licence-free services differ by country (Add a zone marks those your region does not list as "not legal here"; Device → Region), and NOAA weather, marine and railroad channels are receive-only (the app never transmits there). The standard lists in Add a zone say on each one whether a licence is needed.
 
 ## Time limit
 

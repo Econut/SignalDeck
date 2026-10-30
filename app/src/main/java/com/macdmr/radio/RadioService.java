@@ -1646,7 +1646,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     double km = r[0] / 1000.0, mi = km * 0.621371; float b = (r[1] + 360) % 360;
                     String[] dirs = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
                     String arrow = b < 22.5 || b >= 337.5 ? "\u2191" : b < 67.5 ? "\u2197" : b < 112.5 ? "\u2192" : b < 157.5 ? "\u2198" : b < 202.5 ? "\u2193" : b < 247.5 ? "\u2199" : b < 292.5 ? "\u2190" : "\u2196";
-                    dist = String.format(Locale.US, "\n(%s%s %.1fmi (%.1fkm))", arrow, dirs[(int) Math.round(b / 45.0) % 8], mi, km);
+                    dist = com.macdmr.radio.region.Region.km() ? String.format(Locale.US, "\n(%s%s %.1fkm)", arrow, dirs[(int) Math.round(b / 45.0) % 8], km) : String.format(Locale.US, "\n(%s%s %.1fmi (%.1fkm))", arrow, dirs[(int) Math.round(b / 45.0) % 8], mi, km);
                 }
             } catch (Throwable ignored) { }
             double el = ch.elev;

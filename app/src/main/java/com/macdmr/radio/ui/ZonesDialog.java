@@ -90,11 +90,27 @@ public final class ZonesDialog {
             pickChannels(c, svc, z, () -> { svc.setZone(z.id); finished.run(); });
         }));
         body.addView(own, rowLp(d));
-        body.addView(Neo.sheetSection(c, "Standard lists"));
+        com.macdmr.radio.region.Region region = com.macdmr.radio.region.Region.current(c);
+        body.addView(Neo.sheetSection(c, region.chosen ? "Standard lists for " + region.name : "Standard lists"));
         Set<String> have = new HashSet<>(); for (ChannelStore.Zone z : svc.store().zones()) have.add(z.name);
-        for (ChannelPresets.Preset p : ChannelPresets.all()) {
-            LinearLayout r = card(c, p.zone + "  ·  " + p.channels.size() + " channels", p.region + "  ·  " + p.licence + (have.contains(p.zone) ? "\nYou have a zone called " + p.zone + ": adds the missing channels to it" : ""), p.receiveOnly() ? Neo.AMBER : Neo.CYAN);
+        List<ChannelPresets.Offer> offers = ChannelPresets.offers(region);           // the region's own first; Device → Region
+        final List<android.view.View> hidden = new ArrayList<>();
+        boolean notLegalShown = false, hiddenShown = false;
+        for (ChannelPresets.Offer o : offers) {
+            ChannelPresets.Preset p = o.preset;
+            if (o.legal == ChannelPresets.NOT_LEGAL && !notLegalShown) { notLegalShown = true; body.addView(Neo.sheetSection(c, "Not legal here")); body.addView(Neo.sheetHint(c, "Licence-free services " + region.name + " does not list. They stay here because you may need them elsewhere; whether you may transmit on them is your responsibility.")); }
+            String mark = o.legal == ChannelPresets.NOT_LEGAL ? "Not legal here  ·  " : o.legal == ChannelPresets.PARTLY ? "Partly legal here (some channels)  ·  " : "";
+            LinearLayout r = card(c, p.zone + "  ·  " + p.channels.size() + " channels", mark + p.region + "  ·  " + p.licence + (have.contains(p.zone) ? "\nYou have a zone called " + p.zone + ": adds the missing channels to it" : ""), o.legal == ChannelPresets.NOT_LEGAL ? Neo.RED : p.receiveOnly() ? Neo.AMBER : Neo.CYAN);
             r.setOnClickListener(v -> presetSheet(c, svc, p, finished));
+            if (o.hidden) {
+                if (!hiddenShown) {
+                    hiddenShown = true;
+                    TextView more = Neo.button(c, "Show all lists", "expand", Neo.CYAN); body.addView(more, rowLp(d));
+                    TextView sec = Neo.sheetSection(c, "Lists for other regions"); sec.setVisibility(android.view.View.GONE); body.addView(sec); hidden.add(sec);
+                    more.setOnClickListener(v -> { more.setVisibility(android.view.View.GONE); for (android.view.View h : hidden) h.setVisibility(android.view.View.VISIBLE); });
+                }
+                r.setVisibility(android.view.View.GONE); hidden.add(r);
+            }
             body.addView(r, rowLp(d));
         }
         self[0] = Neo.showSheet(c, body);

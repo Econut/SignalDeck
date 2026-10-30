@@ -18,6 +18,10 @@ On the first start the app takes the country of your SIM card, else the mobile n
 
 Choose your region shows the countries with checked values; type to find any other country (it uses its IARU region's defaults: Region 1 for Europe, Africa and the Middle East, 2 for the Americas, 3 for Asia and the Pacific). Custom starts from one of the three IARU regions' values. If you changed values yourself, the app asks whether to keep them.
 
+## What changes with it
+
+Add a zone lists your region's licence-free services first and marks the others "not legal here"; the ham simplex list uses its calling, APRS and SSTV frequencies. NOAA weather lists, the band scope's weather band and the SAME alerts card are offered where weather radio exists (elsewhere under Show all). The Morse ID and the ID reminder use its amateur band edges (for example 144 to 146 MHz in most of Europe, so 146.520 is not treated as an amateur channel there) and its station-ID interval. Distances (APRS stations, the fox hunt, the map, nearby repeaters, contacts, the logbook) are in kilometres or miles as the region uses, and Distances on the sheet changes it.
+
 ## Your own values
 
 Change next to a value sets your own (for example a local APRS frequency); Reset goes back to the region's. A frequency this radio cannot tune is saved with a warning, and what parks on it (APRS monitoring) is then not offered, as on a radio that does not tune 2 m. ISS and satellite APRS, the KISS TNC and frequencies you tune yourself are not affected.

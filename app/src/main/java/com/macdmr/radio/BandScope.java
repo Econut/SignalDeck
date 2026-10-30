@@ -31,6 +31,13 @@ public final class BandScope {
         new Preset("NOAA weather", 162_400_000, 162_550_000, 25_000),
     };
     public static final int MAX_STEPS = 1200, HISTORY = 120;
+    /** The presets offered for a region (Device → Region): the NOAA weather band only where weather radio exists, the rest under Show all. Indexes into PRESETS. */
+    public static java.util.List<Integer> offered(com.macdmr.radio.region.Region r, boolean all) {
+        java.util.List<Integer> out = new java.util.ArrayList<>();
+        for (int i = 0; i < PRESETS.length; i++) if (all || !weatherPreset(PRESETS[i]) || r.weatherRadio) out.add(i);
+        return out;
+    }
+    static boolean weatherPreset(Preset p) { return p.from >= 162_400_000 && p.to <= 162_550_000; }
 
     public interface Hooks {
         /** Retune for a sweep step (one analog write, squelch closed). */
