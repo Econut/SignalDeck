@@ -28,14 +28,16 @@ import android.widget.Toast;
 import com.macdmr.radio.ChannelStore;
 import com.macdmr.radio.RadioService;
 import com.macdmr.radio.ham.FoxHunt;
+import com.macdmr.radio.ham.FoxPredictor;
 
 import java.util.List;
 import java.util.Locale;
 
 /**
  * Fox hunt: live signal strength (big number, S-meter, peak hold, an optional rising beep), the compass bearing the
- * phone points at, Mark to save a reading, a plot of the marks with the estimated fox, the off-frequency trick for
- * when the signal is too strong, and Be the fox (a beacon every so often on this channel).
+ * phone points at, Mark to save a reading, a map of the hunt with the prediction layers (bearing lines, the signal
+ * heat map with its 50 % and 90 % regions, the combined estimate; the compact plot when no map tiles load), the
+ * off-frequency trick for when the signal is too strong, and Be the fox (a beacon every so often on this channel).
  */
 public final class FoxHuntDialog {
     private FoxHuntDialog() { }
@@ -53,8 +55,35 @@ public final class FoxHuntDialog {
         final SMeterView meter = new SMeterView(c); body.addView(meter);
         final TextView info = Neo.label(c, "", 0xFFBFC8D0, 13, false); info.setPadding(0, (int) (6 * d), 0, (int) (4 * d)); body.addView(info);
 
+        // ---- prediction: which layers, the map (or the plot when no tiles load) ----
+        final android.content.SharedPreferences fp = c.getSharedPreferences("fox", Context.MODE_PRIVATE);
+        final boolean[] layerOn = { fp.getBoolean("predBearings", true), fp.getBoolean("predHeat", true) };
+        final String[] layerKey = { "predBearings", "predHeat" }, layerName = { "Bearings", "Heat map" };
+        final int[] layerAccent = { Neo.CYAN, Neo.AMBER };
+        body.addView(Neo.sheetSection(c, "Prediction"));
+        LinearLayout pills = new LinearLayout(c);
+        final TextView[] pill = new TextView[layerOn.length];
+        for (int i = 0; i < pill.length; i++) {
+            pill[i] = Neo.label(c, layerName[i], layerAccent[i], 14, true); pill[i].setGravity(Gravity.CENTER);
+            pill[i].setPadding((int) (12 * d), (int) (8 * d), (int) (12 * d), (int) (8 * d)); Neo.pillStyle(pill[i], layerOn[i], layerAccent[i]);
+            LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f); pl.setMargins((int) (3 * d), 0, (int) (3 * d), 0);
+            pills.addView(pill[i], pl);
+        }
+        body.addView(pills);
+        final TextView predNote = Neo.label(c, "", Neo.DIM, 12.5f, false); predNote.setPadding(0, (int) (6 * d), 0, (int) (6 * d)); body.addView(predNote);
+
+        final android.widget.FrameLayout view = new android.widget.FrameLayout(c);
+        final MapView mapView = new MapView(c);
         final PlotView plot = new PlotView(c, svc.fox());
-        body.addView(plot, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (240 * d)));
+        final HuntLayer layer = new HuntLayer(c);
+        mapView.setOverlay(layer);
+        view.addView(mapView); view.addView(plot); plot.setVisibility(View.GONE);
+        final TextView swap = Neo.chip(c, "Plot", Neo.CYAN);
+        android.widget.FrameLayout.LayoutParams sl0 = new android.widget.FrameLayout.LayoutParams(android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, android.widget.FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
+        sl0.setMargins((int) (8 * d), (int) (8 * d), 0, 0); view.addView(swap, sl0);
+        body.addView(view, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (300 * d)));
+        swap.setOnClickListener(v -> { boolean toPlot = plot.getVisibility() != View.VISIBLE; plot.setVisibility(toPlot ? View.VISIBLE : View.GONE); mapView.setVisibility(toPlot ? View.GONE : View.VISIBLE); swap.setText(toPlot ? "MAP" : "PLOT"); });
+        body.addView(Neo.sheetHint(c, "Strength-based estimates are rough: walls, cars and your body change readings by 10 dB or more. Take marks in the open, spread out, and hold the phone the same way every time."));
 
         LinearLayout r1 = new LinearLayout(c); r1.setBaselineAligned(false);
         TextView mark = Neo.button(c, "Mark", "locate", Neo.GREEN), beep = Neo.button(c, "Beeper off", "volume", Neo.CYAN), off = Neo.button(c, "Off-frequency", "vfo", Neo.AMBER);
@@ -80,6 +109,37 @@ public final class FoxHuntDialog {
         final Handler h = new Handler(Looper.getMainLooper());
         final android.media.ToneGenerator[] tg = { null };
         final long[] nextBeep = { 0 };
+        final FoxPredictor.Result[] pred = { null }; final int[] gen = { 0 }, seen = { -1 };
+        final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        final Runnable recompute = () -> {
+            final int g = ++gen[0]; final List<FoxHunt.Mark> ms = svc.fox().marks(); seen[0] = ms.size();
+            final FoxPredictor.Options o = new FoxPredictor.Options(); o.bearings = layerOn[0]; o.heat = layerOn[1];
+            if (!o.bearings && !o.heat) { pred[0] = null; layer.set(null, ms); plot.setEstimate(null); mapView.invalidate(); predNote.setText("Prediction off: the estimate is the bearing crossing, as without layers."); return; }
+            worker.execute(() -> {
+                FoxPredictor.Result r = null; try { r = FoxPredictor.predict(ms, o); } catch (Throwable ignored) { }
+                final FoxPredictor.Result res = r;
+                h.post(() -> {
+                    if (g != gen[0]) return;                            // a newer mark or toggle arrived meanwhile
+                    pred[0] = res; layer.set(res, ms); plot.setEstimate(res); mapView.invalidate();
+                    predNote.setText(res == null ? "Mark a reading to start." : (res.note == null ? "" : "Not used yet: " + res.note + ". ") + (res.hasMap() ? "Shaded: where the fox probably is; bright outline 50 %, faint 90 %." : ""));
+                    if (!ms.isEmpty()) {
+                        if (res != null && res.hasMap() && (res.layers & FoxPredictor.HEAT) != 0) mapView.fitBox(res.south, res.west, res.north, res.east);
+                        else {
+                            double s0 = 90, w0 = 180, n0 = -90, e0 = -180;
+                            for (FoxHunt.Mark m : ms) { s0 = Math.min(s0, m.lat); n0 = Math.max(n0, m.lat); w0 = Math.min(w0, m.lon); e0 = Math.max(e0, m.lon); }
+                            if (res != null) { s0 = Math.min(s0, res.lat); n0 = Math.max(n0, res.lat); w0 = Math.min(w0, res.lon); e0 = Math.max(e0, res.lon); }
+                            double pad = 0.002; mapView.fitBox(s0 - pad, w0 - pad, n0 + pad, e0 + pad);
+                        }
+                    }
+                });
+            });
+        };
+        for (int i = 0; i < pill.length; i++) {
+            final int k = i;
+            pill[i].setOnClickListener(v -> { layerOn[k] = !layerOn[k]; Neo.pillStyle(pill[k], layerOn[k], layerAccent[k]); fp.edit().putBoolean(layerKey[k], layerOn[k]).apply(); recompute.run(); });
+        }
+        { final Location l0 = here[0]; if (l0 != null) { mapView.setMe(l0.getLatitude(), l0.getLongitude(), l0.getAccuracy()); mapView.post(() -> mapView.center(l0.getLatitude(), l0.getLongitude(), 16)); } }
+        final long opened = System.currentTimeMillis(); final boolean[] fellBack = { false };
         SensorManager sm = (SensorManager) c.getSystemService(Context.SENSOR_SERVICE);
         Sensor rot = sm == null ? null : sm.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         final SensorEventListener sl = new SensorEventListener() {
@@ -109,13 +169,19 @@ public final class FoxHuntDialog {
                 meter.setDbm(dbm);
                 StringBuilder sb = new StringBuilder();
                 sb.append(Double.isNaN(heading[0]) ? "No compass" : String.format(Locale.US, "Pointing %03.0f° %s", heading[0], compass(heading[0])));
-                FoxHunt.Estimate est = svc.fox().estimate(); Location me = here[0];
+                if (svc.fox().marks().size() != seen[0]) recompute.run();   // a mark added (or cleared)
+                FoxHunt.Estimate est = svc.fox().estimate(); Location me = here[0]; FoxPredictor.Result pr = pred[0];
                 if (est != null && me != null) {
-                    float[] res = new float[2]; Location.distanceBetween(me.getLatitude(), me.getLongitude(), est.lat, est.lon, res);
-                    sb.append(String.format(Locale.US, "\n%s: %s %s (%03.0f°)", est.fromBearings ? "Fox estimate from " + est.used + " bearings" : "Strongest mark", com.macdmr.radio.region.Region.km() ? com.macdmr.radio.repeaters.GeoUtil.dist(res[0], true) : String.format(Locale.US, "%.2f mi", res[0] / 1609.344), compass(res[1]), (res[1] + 360) % 360));
+                    double eLat = pr != null ? pr.lat : est.lat, eLon = pr != null ? pr.lon : est.lon;
+                    float[] res = new float[2]; Location.distanceBetween(me.getLatitude(), me.getLongitude(), eLat, eLon, res);
+                    String what = pr != null ? (pr.layers == 0 ? "Strongest mark" : "Fox estimate (" + pr.layerNames() + (pr.confidence() != null ? ", " + pr.confidence() : "") + ")")
+                            : est.fromBearings ? "Fox estimate from " + est.used + " bearings" : "Strongest mark";
+                    sb.append(String.format(Locale.US, "\n%s: %s %s (%03.0f°)", what, com.macdmr.radio.region.Region.km() ? com.macdmr.radio.repeaters.GeoUtil.dist(res[0], true) : String.format(Locale.US, "%.2f mi", res[0] / 1609.344), compass(res[1]), (res[1] + 360) % 360));
                 } else if (svc.fox().marks().isEmpty()) sb.append("\nNo marks yet");
                 info.setText(sb.toString());
                 plot.update(me, heading[0]);
+                if (me != null) mapView.setMe(me.getLatitude(), me.getLongitude(), me.getAccuracy());
+                if (!fellBack[0] && !mapView.anyTile() && System.currentTimeMillis() - opened > 8000) { fellBack[0] = true; if (plot.getVisibility() != View.VISIBLE) swap.performClick(); }   // no map tiles (offline): the plot
                 if (beeping[0] && dbm != -999 && System.currentTimeMillis() >= nextBeep[0]) {      // faster and higher as the signal rises
                     double s = Math.max(0, Math.min(1, (dbm + 125) / 70.0));
                     try { if (tg[0] == null) tg[0] = new android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 60); tg[0].startTone(s > 0.66 ? android.media.ToneGenerator.TONE_DTMF_D : s > 0.33 ? android.media.ToneGenerator.TONE_DTMF_9 : android.media.ToneGenerator.TONE_DTMF_1, 40); } catch (Throwable ignored) { }
@@ -127,6 +193,7 @@ public final class FoxHuntDialog {
         h.post(tick);
 
         mark.setOnClickListener(v -> {
+            if (svc.isTransmitting()) { Toast.makeText(c, "Not while transmitting: the reading would be your own signal", Toast.LENGTH_SHORT).show(); return; }
             Location me = here[0]; int dbm = svc.lastRssi();
             if (me == null) { Toast.makeText(c, "No position yet: turn on location", Toast.LENGTH_LONG).show(); return; }
             if (dbm == -999) { Toast.makeText(c, "No signal reading yet", Toast.LENGTH_SHORT).show(); return; }
@@ -145,16 +212,18 @@ public final class FoxHuntDialog {
             off.setText(next == 0 ? "Off-frequency" : "+" + (next / 1000) + " kHz");
         });
         map.setOnClickListener(v -> {
-            FoxHunt.Estimate est = svc.fox().estimate();
+            FoxHunt.Estimate est = svc.fox().estimate(); FoxPredictor.Result pr = pred[0];
             if (est == null) { Toast.makeText(c, "Mark a reading first", Toast.LENGTH_SHORT).show(); return; }
-            try { c.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(String.format(Locale.US, "geo:%f,%f?q=%f,%f(Fox)", est.lat, est.lon, est.lat, est.lon)))); } catch (Throwable t) { Toast.makeText(c, "No map app", Toast.LENGTH_SHORT).show(); }
+            double eLat = pr != null ? pr.lat : est.lat, eLon = pr != null ? pr.lon : est.lon;
+            try { c.startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(String.format(Locale.US, "geo:%f,%f?q=%f,%f(Fox)", eLat, eLon, eLat, eLon)))); } catch (Throwable t) { Toast.makeText(c, "No map app", Toast.LENGTH_SHORT).show(); }
         });
-        clear.setOnClickListener(v -> { svc.fox().clear(); peak[0] = -999; });
+        clear.setOnClickListener(v -> { svc.fox().clear(); peak[0] = -999; recompute.run(); });
         foxBtn.setOnClickListener(v -> { String r = svc.setFoxTx(!svc.foxTxOn()); Toast.makeText(c, r, Toast.LENGTH_LONG).show(); foxBtn.setText(svc.foxTxOn() ? "Stop the fox beacon" : "Start the fox beacon"); });
 
         AlertDialog a = Neo.showSheet(c, body);
         a.setOnDismissListener(x -> {
             h.removeCallbacks(tick);
+            worker.shutdownNow(); mapView.shutdown();
             if (sm != null) sm.unregisterListener(sl);
             try { lm.removeUpdates(ll); } catch (Throwable ignored) { }
             if (tg[0] != null) tg[0].release();
@@ -167,9 +236,11 @@ public final class FoxHuntDialog {
     /** The marks around you: dots coloured by strength with their bearing, you in the middle, the estimate as a ring. */
     static final class PlotView extends View {
         private final FoxHunt fox; private Location me; private double heading = Double.NaN;
+        private FoxPredictor.Result pred;                                    // the prediction's estimate, when its layers are on
         private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
         PlotView(Context c, FoxHunt f) { super(c); fox = f; }
         void update(Location l, double hd) { me = l; heading = hd; invalidate(); }
+        void setEstimate(FoxPredictor.Result r) { pred = r; invalidate(); }
 
         @Override protected void onDraw(Canvas cv) {
             float d = Theme.dp(getContext()), w = getWidth(), hgt = getHeight(), cx = w / 2, cy = hgt / 2;
@@ -177,6 +248,7 @@ public final class FoxHuntDialog {
             p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(d); p.setColor(0xFF1A2C3E);
             for (int i = 1; i <= 3; i++) cv.drawCircle(cx, cy, Math.min(cx, cy) * i / 3.2f, p);
             List<FoxHunt.Mark> ms = fox.marks(); FoxHunt.Estimate est = fox.estimate();
+            if (est != null && pred != null) est = new FoxHunt.Estimate(pred.lat, pred.lon, true, 0);
             if (me == null && ms.isEmpty()) { p.setStyle(Paint.Style.FILL); p.setColor(Neo.DIM); p.setTextSize(13 * d); p.setTextAlign(Paint.Align.CENTER); cv.drawText("Marks appear here", cx, cy, p); return; }
             double lat0 = me != null ? me.getLatitude() : ms.get(0).lat, lon0 = me != null ? me.getLongitude() : ms.get(0).lon, cos = Math.cos(Math.toRadians(lat0));
             double maxM = 50;
@@ -214,5 +286,96 @@ public final class FoxHuntDialog {
             cv.drawText("N ↑", w - 34 * d, 18 * d, p);
         }
         private static double dist(double la, double lo, double la0, double lo0, double cos) { double x = Math.toRadians(lo - lo0) * 6371000 * cos, y = Math.toRadians(la - la0) * 6371000; return Math.sqrt(x * x + y * y); }
+    }
+
+    /**
+     * The hunt on the map: the prediction's heat (translucent, cyan to red as it gets likelier) with the 50 % (bright) and
+     * 90 % (faint) outlines, the bearing lines, the marks (coloured by strength; a ring = at the radio's floor) and the
+     * estimate as a green ring.
+     */
+    static final class HuntLayer implements MapView.Overlay {
+        private final float d; private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG), bmp = new Paint(Paint.FILTER_BITMAP_FLAG);
+        private FoxPredictor.Result r; private List<FoxHunt.Mark> marks = new java.util.ArrayList<>();
+        private android.graphics.Bitmap heat; private float[] edge50 = new float[0], edge90 = new float[0];
+        HuntLayer(Context c) { d = Theme.dp(c); }
+
+        void set(FoxPredictor.Result res, List<FoxHunt.Mark> ms) {
+            r = res; marks = ms; heat = null; edge50 = edge90 = new float[0];
+            if (r == null || !r.hasMap()) return;
+            int nx = r.nx, ny = r.ny; float max = 0; for (float v : r.p) max = Math.max(max, v);
+            int[] px = new int[nx * ny];
+            for (int iy = 0; iy < ny; iy++)
+                for (int ix = 0; ix < nx; ix++) {
+                    float v = r.p[iy * nx + ix], t = max > 0 ? v / max : 0;
+                    int a = v >= r.thr90 ? (int) (0x38 + 0x70 * Math.sqrt(t)) : (int) (0x30 * Math.sqrt(t));
+                    px[(ny - 1 - iy) * nx + ix] = Neo.alpha(ramp(t), Math.min(0xB0, a));   // bitmap rows run north to south
+                }
+            heat = android.graphics.Bitmap.createBitmap(px, nx, ny, android.graphics.Bitmap.Config.ARGB_8888);
+            edge50 = edges(r.thr50); edge90 = edges(r.thr90);
+        }
+
+        /** Cyan, green, amber, red: the app's palette from unlikely to likely. */
+        private static int ramp(float t) {
+            int[] stops = { Neo.CYAN, Neo.GREEN, Neo.AMBER, Neo.RED };
+            float x = Math.max(0, Math.min(0.999f, t)) * 3; int k = (int) x; float f = x - k;
+            int a = stops[k], b = stops[k + 1];
+            int rr = (int) (((a >> 16) & 0xFF) * (1 - f) + ((b >> 16) & 0xFF) * f), gg = (int) (((a >> 8) & 0xFF) * (1 - f) + ((b >> 8) & 0xFF) * f), bb = (int) ((a & 0xFF) * (1 - f) + (b & 0xFF) * f);
+            return 0xFF000000 | (rr << 16) | (gg << 8) | bb;
+        }
+
+        /** The region's outline as line segments in grid units (x east, y south from the north-west corner). */
+        private float[] edges(float thr) {
+            int nx = r.nx, ny = r.ny; java.util.ArrayList<Float> out = new java.util.ArrayList<>();
+            for (int iy = 0; iy < ny; iy++)
+                for (int ix = 0; ix < nx; ix++) {
+                    if (r.p[iy * nx + ix] < thr) continue;
+                    float x = ix, y = ny - 1 - iy;
+                    if (iy == ny - 1 || r.p[(iy + 1) * nx + ix] < thr) { out.add(x); out.add(y); out.add(x + 1); out.add(y); }          // north side
+                    if (iy == 0 || r.p[(iy - 1) * nx + ix] < thr) { out.add(x); out.add(y + 1); out.add(x + 1); out.add(y + 1); }       // south
+                    if (ix == 0 || r.p[iy * nx + ix - 1] < thr) { out.add(x); out.add(y); out.add(x); out.add(y + 1); }                  // west
+                    if (ix == nx - 1 || r.p[iy * nx + ix + 1] < thr) { out.add(x + 1); out.add(y); out.add(x + 1); out.add(y + 1); }     // east
+                }
+            float[] a = new float[out.size()]; for (int i = 0; i < a.length; i++) a[i] = out.get(i); return a;
+        }
+
+        @Override public void draw(Canvas cv, MapView m) {
+            if (r != null && heat != null) {
+                float l = m.screenX(r.west), rt = m.screenX(r.east), t = m.screenY(r.north), b = m.screenY(r.south);
+                cv.drawBitmap(heat, null, new android.graphics.RectF(l, t, rt, b), bmp);
+                float sx = (rt - l) / r.nx, sy = (b - t) / r.ny;
+                p.setStyle(Paint.Style.STROKE); p.setStrokeCap(Paint.Cap.ROUND);
+                for (int pass = 0; pass < 2; pass++) {
+                    float[] e = pass == 0 ? edge90 : edge50; if (e.length == 0) continue;
+                    float[] q = new float[e.length]; for (int i = 0; i < e.length; i += 2) { q[i] = l + e[i] * sx; q[i + 1] = t + e[i + 1] * sy; }
+                    p.setStrokeWidth((pass == 0 ? 1.2f : 2f) * d); p.setColor(pass == 0 ? Neo.alpha(Neo.AMBER_LIGHT, 0x80) : 0xFFFFFFFF);
+                    cv.drawLines(q, p);
+                }
+            }
+            int max = -999; for (FoxHunt.Mark k : marks) max = Math.max(max, k.dbm);
+            boolean bearOn = r == null || (r.layers & FoxPredictor.BEARINGS) != 0;
+            for (FoxHunt.Mark k : marks) {                              // bearing lines, 3 km long (they leave the screen when zoomed in)
+                if (!k.hasBearing()) continue;
+                double th = Math.toRadians(k.bearing), len = 3000, cos = Math.cos(Math.toRadians(k.lat));
+                double la = k.lat + Math.toDegrees(Math.cos(th) * len / 6371000), lo = k.lon + Math.toDegrees(Math.sin(th) * len / (6371000 * cos));
+                int col = k.dbm >= -70 ? Neo.RED : k.dbm >= -93 ? Neo.AMBER : Neo.CYAN;
+                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(1.5f * d); p.setColor(Neo.alpha(col, bearOn ? (k.dbm == max ? 0xD0 : 0x80) : 0x40));
+                cv.drawLine(m.screenX(k.lon), m.screenY(k.lat), m.screenX(lo), m.screenY(la), p);
+            }
+            for (FoxHunt.Mark k : marks) {
+                float x = m.screenX(k.lon), y = m.screenY(k.lat);
+                int col = k.dbm >= -70 ? Neo.RED : k.dbm >= -93 ? Neo.AMBER : Neo.CYAN;
+                p.setColor(0xFF07101A); p.setStyle(Paint.Style.FILL); cv.drawCircle(x, y, (k.dbm == max ? 7 : 5.5f) * d, p);
+                p.setColor(col);
+                if (k.dbm <= FoxPredictor.FLOOR_DBM) { p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2 * d); cv.drawCircle(x, y, 4 * d, p); }   // heard nothing here
+                else cv.drawCircle(x, y, (k.dbm == max ? 5.5f : 4) * d, p);
+            }
+            if (r != null && r.layers != 0) {
+                float x = m.screenX(r.lon), y = m.screenY(r.lat);
+                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2.5f * d); p.setColor(Neo.GREEN); cv.drawCircle(x, y, 12 * d, p); cv.drawCircle(x, y, 3 * d, p);
+            } else if (!marks.isEmpty()) {                               // no prediction: today's estimate
+                FoxHunt.Estimate e = FoxHunt.estimate(marks);
+                if (e != null && e.fromBearings) { float x = m.screenX(e.lon), y = m.screenY(e.lat); p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2.5f * d); p.setColor(Neo.GREEN); cv.drawCircle(x, y, 12 * d, p); cv.drawCircle(x, y, 3 * d, p); }
+            }
+        }
     }
 }
