@@ -180,19 +180,27 @@ public final class ChannelPresets {
         return -1;
     }
 
-    public static final class Result { public long zoneId; public int added, reused; public String summary; }
+    public static final class Result { public long zoneId; public int added, reused, skipped; public String summary; }
+
+    /** Whether this radio can use the channel: its receive and transmit frequencies both in the radio's bands. */
+    public static boolean inBands(Ch c, java.util.function.LongPredicate tunable) { return tunable.test(c.rx) && tunable.test(c.tx); }
+    /** How many of the list's channels this radio can use (a UHF-only phone cannot use Marine VHF or a 2 m list). */
+    public static int tunableCount(Preset p, java.util.function.LongPredicate tunable) { int n = 0; for (Ch c : p.channels) if (inBands(c, tunable)) n++; return n; }
 
     /**
      * Add the list's channels and its zone. {@code repeaterTone}: CTCSS sub-code for the repeater channels (sent and
      * received), or -1 for none. A channel already present (same frequencies, mode and tones) is reused, not duplicated.
      */
-    public static Result install(ChannelStore store, Preset p, int repeaterTone) {
+    public static Result install(ChannelStore store, Preset p, int repeaterTone) { return install(store, p, repeaterTone, hz -> true); }
+    /** The same, leaving out the channels this radio cannot tune ({@code tunable}: the profile's bands). */
+    public static Result install(ChannelStore store, Preset p, int repeaterTone, java.util.function.LongPredicate tunable) {
         Result r = new Result();
         ChannelStore.Zone zone = null; for (ChannelStore.Zone z : store.zones()) if (z.name.equals(p.zone)) zone = z;
         if (zone == null) { zone = new ChannelStore.Zone(); zone.name = p.zone; zone.numbers = new int[0]; }
         List<Integer> nums = new ArrayList<>(); for (int n : zone.numbers) nums.add(n);
         if (p.channels.stream().anyMatch(c -> c.digital)) ensureSimplexContact(store);
         for (Ch c : p.channels) {
+            if (!inBands(c, tunable)) { r.skipped++; continue; }
             ChannelStore.Channel ch = build(c, repeaterTone);
             ChannelStore.Channel have = find(store, ch);
             if (have != null) { r.reused++; if (!nums.contains(have.number)) nums.add(have.number); continue; }
@@ -200,7 +208,7 @@ public final class ChannelPresets {
         }
         zone.numbers = new int[nums.size()]; for (int i = 0; i < nums.size(); i++) zone.numbers[i] = nums.get(i);
         r.zoneId = store.saveZone(zone);
-        r.summary = r.added + " channel" + (r.added == 1 ? "" : "s") + " added" + (r.reused > 0 ? ", " + r.reused + " you already had" : "") + " · zone " + p.zone;
+        r.summary = r.added + " channel" + (r.added == 1 ? "" : "s") + " added" + (r.reused > 0 ? ", " + r.reused + " you already had" : "") + (r.skipped > 0 ? ", " + r.skipped + " outside this radio's bands left out" : "") + " · zone " + p.zone;
         return r;
     }
 

@@ -32,6 +32,17 @@ public class RegionPresetsTest {
     private static int pos(List<ChannelPresets.Offer> l, String zone) { for (int i = 0; i < l.size(); i++) if (l.get(i).preset.zone.equals(zone)) return i; return -1; }
     private static List<String> names(ChannelPresets.Preset p) { List<String> n = new ArrayList<>(); for (ChannelPresets.Ch c : p.channels) n.add(c.name + "@" + c.rx); return n; }
 
+    @Test public void listsCountWhatAUhfOnlyRadioCanUse() {
+        java.util.function.LongPredicate uhf = hz -> hz >= 400_000_000L && hz <= 480_000_000L;   // the W6 phones and the Atom XL
+        java.util.Map<String, ChannelPresets.Preset> by = new java.util.HashMap<>();
+        for (ChannelPresets.Preset p : ChannelPresets.all(t.resolve("US"))) by.put(p.zone, p);
+        assertEquals("Marine VHF: none", 0, ChannelPresets.tunableCount(by.get("Marine VHF"), uhf));
+        assertEquals("FRS: all", by.get("FRS").channels.size(), ChannelPresets.tunableCount(by.get("FRS"), uhf));
+        int ham = ChannelPresets.tunableCount(by.get("Ham simplex"), uhf);
+        assertTrue("ham simplex: only its 70 cm channels", ham > 0 && ham < by.get("Ham simplex").channels.size());
+        assertEquals("a radio that tunes everything uses every channel", by.get("Marine VHF").channels.size(), ChannelPresets.tunableCount(by.get("Marine VHF"), hz -> true));
+    }
+
     @Test public void nothingChosenIsTheOldList() {
         List<ChannelPresets.Offer> l = ChannelPresets.offers(t.unchosen());
         List<ChannelPresets.Preset> old = ChannelPresets.all(t.unchosen());

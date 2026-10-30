@@ -100,6 +100,8 @@ public final class ZonesDialog {
             ChannelPresets.Preset p = o.preset;
             if (o.legal == ChannelPresets.NOT_LEGAL && !notLegalShown) { notLegalShown = true; body.addView(Neo.sheetSection(c, "Not legal here")); body.addView(Neo.sheetHint(c, "Licence-free services " + region.name + " does not list. They stay here because you may need them elsewhere; whether you may transmit on them is your responsibility.")); }
             String mark = o.legal == ChannelPresets.NOT_LEGAL ? "Not legal here  ·  " : o.legal == ChannelPresets.PARTLY ? "Partly legal here (some channels)  ·  " : "";
+            int usable = ChannelPresets.tunableCount(p, svc.profile()::tunable);    // a UHF-only radio cannot use Marine VHF or a 2 m list
+            if (usable == 0) mark = "Outside this radio's bands  ·  " + mark; else if (usable < p.channels.size()) mark = usable + " of " + p.channels.size() + " in this radio's bands  ·  " + mark;
             LinearLayout r = card(c, p.zone + "  ·  " + p.channels.size() + " channels", mark + p.region + "  ·  " + p.licence + (have.contains(p.zone) ? "\nYou have a zone called " + p.zone + ": adds the missing channels to it" : ""), o.legal == ChannelPresets.NOT_LEGAL ? Neo.RED : p.receiveOnly() ? Neo.AMBER : Neo.CYAN);
             r.setOnClickListener(v -> presetSheet(c, svc, p, finished));
             if (o.hidden) {
@@ -151,7 +153,7 @@ public final class ZonesDialog {
         final AlertDialog[] self = new AlertDialog[1];
         add.setOnClickListener(v -> {
             ChannelPresets.Result r;
-            try { r = ChannelPresets.install(svc.store(), p, tone[0]); }
+            try { r = ChannelPresets.install(svc.store(), p, tone[0], svc.profile()::tunable); }
             catch (Throwable t) { Toast.makeText(c, "Could not add " + p.zone + ": " + t.getMessage(), Toast.LENGTH_LONG).show(); return; }
             svc.setZone(r.zoneId);
             Toast.makeText(c, r.summary, Toast.LENGTH_LONG).show();

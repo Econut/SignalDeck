@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-30 — Add a zone: lists follow the radio's bands
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| PR 123 region test on the W6Plus DMR (managing agent, 2026-10-30) | Add a zone offered every standard list whatever the radio tunes, and adding one inserted every channel: on a UHF-only phone (the W6 phones, the Atom XL) Marine VHF or the 2 m channels of a ham list became channels the radio cannot tune. A list the radio cannot use is now marked "Outside this radio's bands", one it can use in part says how many channels it can, and adding a list leaves out the channels outside the bands (the result says how many). A phone that tunes everything sees no change. Help (Zones and standard lists) says so. | ChannelPresets, ZonesDialog, HelpView, docs/help, RegionPresetsTest | Host: `listsCountWhatAUhfOnlyRadioCanUse`. **Device (W6Plus DMR, region United States):** MURS and NOAA Weather read "Outside this radio's bands", FRS and GMRS unmarked (no list installed: the owner's channels kept) |
+
 ## 2026-10-30 — Radio notes: charger buzz on both W6 phones, the W6+'s speaker during data sends
 
 | Backlog | Change | Files | Test |
