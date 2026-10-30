@@ -41,8 +41,10 @@ public final class CamcorderAudio implements AudioBackend {
 
     public CamcorderAudio() { this(false); }
     public CamcorderAudio(boolean play) { this(play, GAIN); }
-    public CamcorderAudio(boolean play, int gain) { this(play, gain, null, null); }
-    public CamcorderAudio(boolean play, int gain, String[][] gatewayOn, String[][] gatewayOff) { this.play = play; this.gain = Math.max(1, gain); this.gatewayOn = gatewayOn; this.gatewayOff = gatewayOff; }
+    public CamcorderAudio(boolean play, int gain) { this(play, gain, null, null, 1f); }
+    public CamcorderAudio(boolean play, int gain, String[][] gatewayOn, String[][] gatewayOff, float txScale) { this.play = play; this.gain = Math.max(1, gain); this.gatewayOn = gatewayOn; this.gatewayOff = gatewayOff; this.txScale = txScale; }
+    private volatile float txScale;
+    String setTxScale(float v) { txScale = Math.max(0.001f, Math.min(1f, v)); return "gateway sample factor " + txScale; }
     private final String[][] gatewayOn, gatewayOff;
     private RootShell lineShell;
 
@@ -126,8 +128,10 @@ public final class CamcorderAudio implements AudioBackend {
                     new AudioFormat.Builder().setSampleRate(RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build(),
                     Math.max(tmin, 4 * BLOCK * 2), AudioTrack.MODE_STREAM, AudioManager.AUDIO_SESSION_ID_GENERATE);
             t.play();
+            short[] out = new short[mono.length]; float k = txScale;
+            for (int i = 0; i < mono.length; i++) out[i] = (short) Math.round(mono[i] * k);
             int pos = 0;
-            while (pos < mono.length && !abortPlay) { int n = t.write(mono, pos, Math.min(BLOCK, mono.length - pos)); if (n <= 0) break; pos += n; }
+            while (pos < out.length && !abortPlay) { int n = t.write(out, pos, Math.min(BLOCK, out.length - pos)); if (n <= 0) break; pos += n; }
             long end = System.currentTimeMillis() + 2000;                       // let the buffered tail play out
             while (!abortPlay && t.getPlaybackHeadPosition() < pos && System.currentTimeMillis() < end) Thread.sleep(10);
             return "played " + pos * 1000 / RATE + " ms through the gateway route" + (abortPlay ? " (stopped)" : "");

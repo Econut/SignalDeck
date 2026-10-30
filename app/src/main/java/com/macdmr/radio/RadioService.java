@@ -1047,7 +1047,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         try {
             if (audio == null) {
                 audio = profile.audio == DeviceProfile.Audio.UART_PCM ? new UartPcmAudio(profile.pcmPort, profile.pcmBaud)
-                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback, profile.camcorderGain, profile.gatewayLinesOn, profile.gatewayLinesOff) : vendorOrDirectAudio();
+                        : profile.audio == DeviceProfile.Audio.CAMCORDER ? new CamcorderAudio(profile.appPlayback, profile.camcorderGain, profile.gatewayLinesOn, profile.gatewayLinesOff, profile.txAudioScale) : vendorOrDirectAudio();
                 audio.setSink((b, len) -> { if (!injecting) onRxPcm(b, len); });   // a bench injection replaces the live audio while it plays
                 audio.setGate(() -> squelchOpen && !muted && !rawHeld() && !(profile.appPlayback && pttDown) && !dataQuiet());   // M17 in play, a data mode without MON, or app playback while keyed: the raw FM stays off the speaker; decoded M17 voice has its own track
             }
@@ -2610,6 +2610,8 @@ public class RadioService extends Service implements RadioEngine.Events {
             transmitPcm(pcm, "bench wav", null); return "transmitting " + n / 8 + " ms";
         } catch (Exception e) { return "txwav: " + e; }
     }
+    /** Bench: the gateway route's sample factor until the next restart (the profile's txAudioScale otherwise). */
+    public String diagTxScale(float v) { return audio instanceof CamcorderAudio ? ((CamcorderAudio) audio).setTxScale(v) : "no gateway route on this phone"; }
     public void diagTestTone(int ms) { diagTestTone(ms, false); }
     /** lift is one bench run, at most 40 s, past the 28.5 s refusal. The voice watchdog stays 28 s for every other transmission. */
     public void diagTestTone(int ms, boolean lift) { diagTestTone(ms, lift, 1000, 12000); }
