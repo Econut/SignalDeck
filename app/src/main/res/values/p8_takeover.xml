@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources><string name="p8_takeover_label">P8 Intercom handover</string><string name="p8_takeover_description">Optional P8-only helper. During a requested radio connection it reads Android Settings, checks the Intercom App info page, presses Force stop and its confirmation, then returns to P8 Radio. Inactive outside that bounded handover. It does not read other apps, record screen contents, transmit, change calibration or uninstall Intercom. Disable here at any time.</string></resources>

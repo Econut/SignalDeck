@@ -916,6 +916,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile float[] p8Spectrum=new float[com.macdmr.radio.dsp.Spectrum.BANDS];
     private volatile String p8Meter="No PCM measurements yet";
     public String p8AudioMeter(){return p8Meter;}
+    public void p8StartupMessage(String text){log("P8 startup: "+text);}
     private Runnable p8AfterClose;
     private boolean p8RestoreOnClose;
     private final java.util.concurrent.ConcurrentHashMap<P8RxProtocol.Channel,ChannelStore.Channel> p8Tunes=new java.util.concurrent.ConcurrentHashMap<>();

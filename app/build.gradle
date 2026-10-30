@@ -26,13 +26,13 @@ android {
         buildConfigField 'boolean', 'P8_OFFLINE', p8OfflineBuild.toString()
         buildConfigField 'boolean', 'P8_OPEN_PROBE_REVIEWED', p8OpenProbeReviewed.toString()
         buildConfigField 'boolean', 'P8_TX_TEST_REVIEWED', p8TxTestReviewed.toString()
-        manifestPlaceholders = [appLabel: p8OfflineBuild ? 'P8 Radio (modified)' : 'SignalDeck',
+        manifestPlaceholders = [p8HelperEnabled: p8OfflineBuild.toString(), appLabel: p8OfflineBuild ? 'P8 Radio (modified)' : 'SignalDeck',
                                 appIcon: p8OfflineBuild ? '@drawable/ic_p8_lab' : '@mipmap/ic_launcher']
         minSdk 29
         targetSdk 34
         testInstrumentationRunner "com.macdmr.radio.P8UiInstrumentation"
-        versionCode 145
-        versionName p8OfflineBuild ? "1.0.0-beta.20-p8-main.7c" : "1.0.0-beta.20"
+        versionCode 146
+        versionName p8OfflineBuild ? "1.0.0-beta.20-p8-main.8" : "1.0.0-beta.20"
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }   // the phones this radio family ships in are ARM; keeps the Vosk natives to two ABIs
     }
 

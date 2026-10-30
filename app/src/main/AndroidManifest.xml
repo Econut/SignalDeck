@@ -90,6 +90,12 @@
                 <data android:mimeType="text/comma-separated-values" />
             </intent-filter>
         </activity>
+        <service android:name=".P8TakeoverAccessibility" android:exported="true"
+            android:label="@string/p8_takeover_label" android:enabled="${p8HelperEnabled}"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/p8_takeover_accessibility" />
+        </service>
         <service android:name=".RadioService" android:exported="false" android:foregroundServiceType="microphone|location" />
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.files" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />

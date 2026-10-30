@@ -25,7 +25,6 @@ Completed means the issue's bounded scope was implemented and verified on the te
 
 ## Planned
 
-- [#3 — Independent cold startup and reliable Intercom handover](https://github.com/Econut/SignalDeck/issues/3)
 - [#9 — DMR003BN digital interoperability with AnyTone D878UV](https://github.com/Econut/SignalDeck/issues/9)
 - [#11 — Low-battery crash, background and lock-screen reliability](https://github.com/Econut/SignalDeck/issues/11)
 - [#12 — Phone-only mode: safely power down the radio module](https://github.com/Econut/SignalDeck/issues/12)
@@ -35,7 +34,7 @@ Completed means the issue's bounded scope was implemented and verified on the te
 
 ## In Progress
 
-No feature implementation is actively underway at this tracker snapshot.
+- [#3 — Independent cold startup and reliable Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.8 optional Settings-only Accessibility handover and five-second ACK-ready notice implemented; installed for live validation. Cold module initialization remains unresolved.
 
 ## Testing
 

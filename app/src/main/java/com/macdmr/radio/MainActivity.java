@@ -45,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     private com.macdmr.radio.ui.MessagesView messages;
     private View editor;
     private RadioService svc;
+    private P8Startup p8Startup;
     private final TextView[] tabs = new TextView[5];
     private final android.widget.ImageView[] tabIcon = new android.widget.ImageView[5];
     private final View[] tabCell = new View[5];
@@ -62,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
             if (!svc.isReady() && svc.profile().verified) svc.bringUp();          // an untested profile waits for Device → Take over
             ui.post(rssiTick); ui.removeCallbacks(modeTick); ui.post(modeTick);
             applyPendingLocation(); applyOpenNets(); applyCodeplug();
+            if(svc.p8Main()){p8Startup=new P8Startup(MainActivity.this,svc);ui.postDelayed(p8Startup::open,500);}
             ui.postDelayed(MainActivity.this::announceCoverage, 3000);
             variantTries = 0; ui.removeCallbacks(variantCheck); ui.postDelayed(variantCheck, 8000);
             if (!svc.p8Main() && !svc.profile().verified && !getSharedPreferences("radio", MODE_PRIVATE).getBoolean("unsupportedShown", false)) { getSharedPreferences("radio", MODE_PRIVATE).edit().putBoolean("unsupportedShown", true).apply(); show(4); device.offerChecks(true); }
@@ -185,7 +187,11 @@ public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_LAT = "com.macdmr.radio.lat", EXTRA_LON = "com.macdmr.radio.lon";
     private double[] pendingLocation;
 
-    @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); setIntent(i); takeSharedLocation(i); takeOpenNets(i); takeCodeplug(i); }
+    @Override protected void onNewIntent(Intent i) { super.onNewIntent(i); setIntent(i); takeSharedLocation(i); takeOpenNets(i); takeCodeplug(i);
+        if(svc!=null && svc.p8Main() && Intent.ACTION_MAIN.equals(i.getAction()) && !P8TakeoverAccessibility.active()){
+            if(p8Startup!=null)p8Startup.close();p8Startup=new P8Startup(this,svc);ui.postDelayed(p8Startup::open,500);
+        }
+    }
 
     /** A net reminder was tapped: open the Nets page (once the service is there). */
     public static final String EXTRA_NETS = "com.macdmr.radio.nets";
@@ -446,8 +452,11 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    @Override protected void onResume(){super.onResume();if(p8Startup!=null)p8Startup.resume();}
+
     @Override protected void onDestroy() {
         super.onDestroy();
+        if(p8Startup!=null)p8Startup.close();
         try { if (finishReceiver != null) unregisterReceiver(finishReceiver); } catch (Throwable ignored) { }
         ui.removeCallbacks(rssiTick); ui.removeCallbacks(modeTick);
         if (svc != null) { intercom.detach(); diagnostics.detach(); }

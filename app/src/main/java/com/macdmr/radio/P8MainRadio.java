@@ -43,6 +43,9 @@ public final class P8MainRadio {
     }
     /** Normal Android app cannot force-stop a different UID: use the existing Android release UI. */
     public static void takeOver(Context c,RadioService service){
+        if(P8TakeoverAccessibility.available()){
+            P8Startup.connect(c,service,error->{if(error!=null)android.widget.Toast.makeText(c,error,android.widget.Toast.LENGTH_LONG).show();});return;
+        }
         try{if((c.getPackageManager().getApplicationInfo("com.wtwd.ucee.dmr",0).flags&android.content.pm.ApplicationInfo.FLAG_STOPPED)!=0){service.bringUp();return;}}
         catch(android.content.pm.PackageManager.NameNotFoundException e){android.widget.Toast.makeText(c,"Stock Intercom package is missing; cannot establish ownership",android.widget.Toast.LENGTH_LONG).show();return;}
         new android.app.AlertDialog.Builder(c).setTitle("Release Intercom")
