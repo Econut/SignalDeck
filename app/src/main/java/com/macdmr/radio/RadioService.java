@@ -1879,7 +1879,27 @@ public class RadioService extends Service implements RadioEngine.Events {
             stockImportPending = false; int keep = store.activeNumber(); selectChannel(keep);
         }
         log(n >= 0 ? "imported " + n + " channels from the stock app" + (err.length() > 0 ? " (" + err + ")" : "") : "stock import failed: " + err);
-        return n >= 0 ? "Imported " + n + " channels" + (err.length() > 0 ? " (" + err + ")" : "") : "Import failed: " + err;
+        String tones = n > 0 ? toneNote(store.all()) : null;
+        if (tones != null) history("warn", "🎵 " + tones);
+        return n >= 0 ? "Imported " + n + " channels" + (err.length() > 0 ? " (" + err + ")" : "") + (tones != null ? ". " + tones : "") : "Import failed: " + err;
+    }
+
+    /**
+     * The imported analog channels that only open for a sub-audible tone, said once: the W6Plus DMR's stock app sets
+     * CTCSS 62.5 Hz on every factory channel without showing it, so a radio sending no tone is never heard there
+     * (owner, 2026-10-29). Nothing is changed; null when no analog channel has a receive tone.
+     */
+    static String toneNote(List<ChannelStore.Channel> chans) {
+        int n = 0, analog = 0; java.util.Map<String, Integer> kinds = new java.util.TreeMap<>();
+        for (ChannelStore.Channel c : chans) {
+            if (c.isDigital() || c.isM17()) continue;
+            analog++;
+            if (c.rxType != 0) { n++; kinds.merge(com.macdmr.radio.dsp.ToneTable.toneLabel(c.rxType, c.rxSubCode), 1, Integer::sum); }
+        }
+        if (n == 0) return null;
+        String which = kinds.size() == 1 ? " (" + kinds.keySet().iterator().next() + ")" : "";
+        return (n == analog ? "All " + n : n + " of " + analog) + " imported analog channels open only for a receive tone" + which
+                + ", as the stock app had them: a radio that sends no tone is not heard there. Set RX tone type to None in the channel editor if you need to";
     }
 
     private volatile boolean stockImportPending;

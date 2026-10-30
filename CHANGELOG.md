@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-30 — Stock import: says which analog channels need a receive tone
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Owner, 2026-10-29 (W6Plus DMR analog receive "not working") | The W6Plus DMR's stock app puts CTCSS 62.5 Hz on every factory channel without showing it, and SignalDeck imported that faithfully, so another radio sending no tone was never heard. After a stock import SignalDeck now says how many imported analog channels open only for a receive tone (and which tone when they share one), in the import result and the history; nothing is changed. Help (Device → Tools, Re-import) explains it. | RadioService, HelpView, docs/help, StockToneNoteTest | Host: `StockToneNoteTest` |
+
 ## 2026-10-29 — ANYSECU W6+: its own transmit audio at a usable level; SSTV, FT8, RTTY, DTMF and PSK31 sending decoded
 
 | Backlog | Change | Files | Test |
