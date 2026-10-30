@@ -261,8 +261,9 @@ public final class DeviceProfile {
      * the W6+'s: power gpio322; the receive audio reaches Android on the camcorder input behind the speaker route
      * (dmr_state, ext_pa_en, gpio183), which the stock app switches on the module's RECEIVE_START / RECEIVE_STOP pushes
      * (SpeakUtil.startGroup / stopGroup); it keys with the PTT line gpio188 and the mic lines and never sends 0x26. The
-     * module keeps the vendor's image (no loader). Never read the flyscale_misc attributes. Not verified yet: no automatic
-     * take-over, no transmit.
+     * module keeps the vendor's image (no loader). Never read the flyscale_misc attributes. Revision 2 (owner, 2026-10-29):
+     * verified; transmit tested in the cage on 446.000 MHz at low power (FM tone key, DMR group call CC1 TG 9 decoded from
+     * a HackRF capture, the 28 s watchdog unkeyed), carrier about +1.6 kHz against the HackRF.
      */
     public static final DeviceProfile ANYSECU_W6_DMR = new DeviceProfile(
             "ANYSECU W6Plus DMR", "/dev/ttyS2", 57600, Audio.CAMCORDER, null, 0,
@@ -272,9 +273,9 @@ public final class DeviceProfile {
             new String[] {
                     "allow untrusted_app console_device chr_file { open read write ioctl getattr lock }",
                     "typeattribute console_device mlstrustedobject" },
-            null, true, false);
+            null, true, true);
     static {
-        ANYSECU_W6_DMR.id = "anysecu-w6plus-dmr"; ANYSECU_W6_DMR.revision = 1;
+        ANYSECU_W6_DMR.id = "anysecu-w6plus-dmr"; ANYSECU_W6_DMR.revision = 2;
         // 0x23 writes 2026-10-29 (nothing keyed): 400.000-480.000 acknowledged; 399.995, 395, 136 and 174 MHz never answered
         // (UHF only, whatever "dual band" in the listing means); 480.005 and 485 acknowledged too, receive there unmeasured,
         // so the band stays the stock app's 400.000-480.000.
