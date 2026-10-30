@@ -29,6 +29,7 @@ import com.macdmr.radio.ChannelStore;
 import com.macdmr.radio.RadioService;
 import com.macdmr.radio.ham.FoxHunt;
 import com.macdmr.radio.ham.FoxPredictor;
+import com.macdmr.radio.ham.FoxSignalGate;
 
 import java.util.List;
 import java.util.Locale;
@@ -102,6 +103,78 @@ public final class FoxHuntDialog {
         TextView map = Neo.button(c, "Open in maps", "map", Neo.CYAN), clear = Neo.button(c, "Clear marks", "close", Neo.RED);
         for (TextView b : new TextView[] { map, clear }) { b.setTextSize(14); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (6 * d), (int) (3 * d), 0); r2.addView(b, lp); }
         body.addView(r2);
+        // ---- which readings count: any signal, or only the fox's own transmissions (its tone, or its DMR ID and colour code) ----
+        final FoxSignalGate gate = new FoxSignalGate();
+        final boolean[] foxOnly = { fp.getBoolean("foxOnly", false) };
+        final double[] foxTone = { fp.getFloat("foxTone", -1) };            // -1 = the channel's tone squelch
+        final int[] foxId = { fp.getInt("foxId", 0) }, foxCc = { fp.getInt("foxCc", -1) };
+        final int[] autoM = { fp.getInt("autoMarkM", 0) };                   // 0 = auto-marks off
+        body.addView(Neo.sheetSection(c, "Fox signal"));
+        LinearLayout fsRow = new LinearLayout(c);
+        final TextView anyPill = Neo.label(c, "Any signal", Neo.CYAN, 14, true), onlyPill = Neo.label(c, "Only the fox's", Neo.VIOLET, 14, true);
+        for (TextView t : new TextView[] { anyPill, onlyPill }) { t.setGravity(Gravity.CENTER); t.setPadding((int) (12 * d), (int) (8 * d), (int) (12 * d), (int) (8 * d)); LinearLayout.LayoutParams pl = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f); pl.setMargins((int) (3 * d), 0, (int) (3 * d), 0); fsRow.addView(t, pl); }
+        body.addView(fsRow);
+        LinearLayout fsRow2 = new LinearLayout(c); fsRow2.setBaselineAligned(false);
+        final TextView setFox = Neo.button(c, "Set the fox", "radio", Neo.VIOLET), autoBtn = Neo.button(c, "Auto-marks off", "locate", Neo.GREEN);
+        for (TextView b : new TextView[] { setFox, autoBtn }) { b.setTextSize(13.5f); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (8 * d), (int) (3 * d), 0); fsRow2.addView(b, lp); }
+        body.addView(fsRow2);
+        final TextView foxState = Neo.label(c, "", Neo.MUTED, 12.5f, false); foxState.setPadding(0, (int) (6 * d), 0, 0); body.addView(foxState);
+        final Runnable applyFox = () -> {
+            FoxSignalGate.Fox f = new FoxSignalGate.Fox(); f.only = foxOnly[0];
+            ChannelStore.Channel cur = svc.current();
+            if (cur != null && cur.isDigital()) { f.digital = true; f.id = foxId[0]; f.cc = foxCc[0]; }
+            else if (foxTone[0] > 0) f.toneHz = foxTone[0];
+            else if (cur != null && cur.rxType == 1) f.toneHz = com.macdmr.radio.dsp.ToneTable.ctcssHz(cur.rxSubCode);
+            else if (cur != null && (cur.rxType == 2 || cur.rxType == 3)) f.dcs = true;
+            gate.setFox(f);
+            Neo.pillStyle(anyPill, !foxOnly[0], Neo.CYAN); Neo.pillStyle(onlyPill, foxOnly[0], Neo.VIOLET);
+            setFox.setVisibility(foxOnly[0] ? View.VISIBLE : View.INVISIBLE);
+            setFox.setText("Fox: " + f.describe());
+            autoBtn.setText(autoM[0] == 0 ? "Auto-marks off" : "Auto-mark every " + autoM[0] + " m");
+        };
+        applyFox.run();
+        anyPill.setOnClickListener(v -> { foxOnly[0] = false; fp.edit().putBoolean("foxOnly", false).apply(); applyFox.run(); });
+        onlyPill.setOnClickListener(v -> { foxOnly[0] = true; fp.edit().putBoolean("foxOnly", true).apply(); applyFox.run(); });
+        autoBtn.setOnClickListener(v -> { int[] steps = { 0, 50, 100, 200, 25 }; int k = 0; for (int i = 0; i < steps.length; i++) if (steps[i] == autoM[0]) k = i; autoM[0] = steps[(k + 1) % steps.length]; fp.edit().putInt("autoMarkM", autoM[0]).apply(); applyFox.run(); });
+        setFox.setOnClickListener(v -> {
+            ChannelStore.Channel cur = svc.current();
+            if (cur != null && cur.isDigital()) {
+                LinearLayout col = new LinearLayout(c); col.setOrientation(LinearLayout.VERTICAL); col.setPadding((int) (20 * d), (int) (8 * d), (int) (20 * d), 0);
+                final android.widget.EditText idE = new android.widget.EditText(c), ccE = new android.widget.EditText(c);
+                idE.setHint("Fox DMR ID (empty = any caller)"); ccE.setHint("Colour code 0-15 (empty = any)");
+                for (android.widget.EditText e : new android.widget.EditText[] { idE, ccE }) { e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER); e.setSingleLine(true); e.setTextColor(Neo.TEXT); e.setTypeface(Neo.uiSemi(c)); col.addView(e); }
+                if (foxId[0] > 0) idE.setText(String.valueOf(foxId[0])); if (foxCc[0] >= 0) ccE.setText(String.valueOf(foxCc[0]));
+                final int last = svc.lastCallerId();
+                AlertDialog.Builder b = new AlertDialog.Builder(c).setTitle("The fox on DMR").setView(col)
+                        .setPositiveButton("Save", (x, y) -> {
+                            int id = 0, cc = -1;
+                            try { id = Integer.parseInt(idE.getText().toString().trim()); } catch (RuntimeException ignored) { }
+                            try { cc = Integer.parseInt(ccE.getText().toString().trim()); } catch (RuntimeException ignored) { }
+                            foxId[0] = Math.max(0, Math.min(16_777_215, id)); foxCc[0] = cc < 0 || cc > 15 ? -1 : cc;
+                            fp.edit().putInt("foxId", foxId[0]).putInt("foxCc", foxCc[0]).apply(); applyFox.run();
+                        }).setNegativeButton("Cancel", null);
+                if (last > 0) b.setNeutralButton("Last caller " + last, (x, y) -> { foxId[0] = last; fp.edit().putInt("foxId", last).apply(); applyFox.run(); });
+                b.show();
+                return;
+            }
+            final java.util.List<String> items = new java.util.ArrayList<>(); final java.util.List<Double> tones = new java.util.ArrayList<>();
+            String own = cur == null ? null : com.macdmr.radio.dsp.ToneTable.toneLabel(cur.rxType, cur.rxSubCode);
+            items.add(own == null || own.equals("—") ? "The channel's tone squelch (none set: any reception)" : "The channel's tone squelch (" + own + ")"); tones.add(-1.0);
+            double heard = svc.heardToneHz();
+            if (heard > 0) { items.add(String.format(Locale.US, "The tone heard now (%.1f Hz)", heard)); tones.add(heard); }
+            items.add("Pick a CTCSS tone…"); tones.add(0.0);
+            new AlertDialog.Builder(c).setTitle("The fox's tone").setItems(items.toArray(new String[0]), (x, w) -> {
+                double t = tones.get(w);
+                if (t == 0) {
+                    int n = com.macdmr.radio.dsp.ToneConverter.ctcssCount(); String[] ls = new String[n];
+                    for (int i = 0; i < n; i++) ls[i] = com.macdmr.radio.dsp.ToneConverter.ctcssLabelAt(i) + " Hz";
+                    new AlertDialog.Builder(c).setTitle("CTCSS tone").setItems(ls, (x2, k) -> { foxTone[0] = com.macdmr.radio.dsp.ToneConverter.ctcssHz(k); fp.edit().putFloat("foxTone", (float) foxTone[0]).apply(); applyFox.run(); }).show();
+                    return;
+                }
+                foxTone[0] = t; fp.edit().putFloat("foxTone", (float) t).apply(); applyFox.run();
+            }).show();
+        });
+
 
         if (!svc.profile().rssi) {                                          // no signal readings (the W6): only the fox side works
             for (int i = body.getChildCount() - 1; i >= 1; i--) body.removeViewAt(i);   // keep the title, drop the hunt
@@ -118,6 +191,8 @@ public final class FoxHuntDialog {
         final Handler h = new Handler(Looper.getMainLooper());
         final android.media.ToneGenerator[] tg = { null };
         final long[] nextBeep = { 0 };
+        final int[] chSeen = { Integer.MIN_VALUE };
+        final double[] hring = new double[6]; java.util.Arrays.fill(hring, Double.NaN); final int[] hpos = { 0 };   // the last 1.5 s of headings: is the phone held steady?
         final FoxPredictor.Result[] pred = { null }; final int[] gen = { 0 }, seen = { -1 };
         final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
         final com.macdmr.radio.coverage.Terrain terrain = new com.macdmr.radio.coverage.Terrain(c);   // used on the worker only
@@ -209,9 +284,35 @@ public final class FoxHuntDialog {
                 big.setTextColor(dbm >= -70 ? Neo.RED : dbm >= -93 ? Neo.AMBER : Neo.CYAN);
                 sub.setText((dbm == -999 ? "no reading" : "dBm  ·  " + SMeterView.sUnits(dbm)) + (peak[0] != -999 ? "  ·  peak " + peak[0] : "") + (offset[0] != 0 ? "  ·  tuned " + (offset[0] / 1000) + " kHz off" : ""));
                 meter.setDbm(dbm);
+                // the fox-signal gate: which readings count, the waiting mark, auto-marks
+                long now = System.currentTimeMillis(); ChannelStore.Channel cc0 = svc.current();
+                FoxSignalGate.Now fn = new FoxSignalGate.Now(); fn.t = now;
+                fn.rx = svc.rxActive(); fn.mcuRx = svc.mcuReceiving(); fn.softSq = svc.softSqOn(); fn.tx = svc.isTransmitting();
+                fn.toneHz = svc.heardToneHz(); fn.caller = svc.currentCallerId(); fn.cc = svc.currentCallerCc(); fn.channelCc = cc0 != null && cc0.isDigital() ? cc0.cc : -1;
+                hring[hpos[0]++ % hring.length] = heading[0];
+                boolean foxOn = gate.update(fn);
+                gate.reading(svc.lastRssiAt(), dbm, heading[0], svc.lastTunedAt());
+                Location me0 = here[0];
+                if (me0 != null) {
+                    int lv = gate.takeIfReady();
+                    if (lv != -999) addMark(c, svc, me0, lv, heading[0], Double.NaN, "Marked the fox at");
+                    else if (autoM[0] > 0) {
+                        List<FoxHunt.Mark> ms0 = svc.fox().marks(); FoxHunt.Mark last = ms0.isEmpty() ? null : ms0.get(ms0.size() - 1);
+                        int al = gate.autoTake(true, last == null ? Double.NaN : FoxPredictor.metres(last.lat, last.lon, me0.getLatitude(), me0.getLongitude()), autoM[0]);
+                        if (al != -999) addMark(c, svc, me0, al, FoxSignalGate.steadyHeading(hring, 12), Double.NaN, "Auto-mark");
+                    }
+                }
+                { String mt = gate.waiting() ? "Waiting…" : "Mark"; if (!mt.contentEquals(mark.getText())) mark.setText(mt); }
+                FoxSignalGate.Fox ff = gate.fox();
+                foxState.setText(!ff.only ? (autoM[0] > 0 ? "Auto-marks: one mark per reception, once you have moved " + autoM[0] + " m from the last mark." : "Every reading counts, whoever transmits.")
+                        : (!ff.digital && ff.dcs && fn.softSq ? "Soft SQ holds the radio's squelch open, so DCS cannot tell the fox apart: turn Soft SQ off. " : "")
+                          + (gate.waiting() ? "Waiting for the fox… the mark is taken at its next transmission." : foxOn ? "The fox is on the air: readings count." : "The fox is not on the air: readings wait for it.")
+                          + (autoM[0] > 0 ? " Auto-marks every " + autoM[0] + " m." : ""));
                 StringBuilder sb = new StringBuilder();
                 sb.append(Double.isNaN(heading[0]) ? "No compass" : String.format(Locale.US, "Pointing %03.0f° %s", heading[0], compass(heading[0])));
-                if (svc.fox().marks().size() != seen[0]) recompute.run();   // a mark added (or cleared)
+                if (svc.fox().marks().size() != seen[0]) recompute.run();
+                ChannelStore.Channel chNow = svc.current(); int chKey = chNow == null ? 0 : chNow.number * 4 + (chNow.isDigital() ? 1 : 0) + chNow.rxType * 8 + chNow.rxSubCode * 64;
+                if (chKey != chSeen[0]) { chSeen[0] = chKey; applyFox.run(); }   // the channel (or its tone) changed: the fox's tone or DMR setting follows   // a mark added (or cleared)
                 FoxHunt.Estimate est = svc.fox().estimate(); Location me = here[0]; FoxPredictor.Result pr = pred[0];
                 if (est != null && me != null) {
                     double eLat = pr != null ? pr.lat : est.lat, eLon = pr != null ? pr.lon : est.lon;
@@ -238,9 +339,15 @@ public final class FoxHuntDialog {
             if (svc.isTransmitting()) { Toast.makeText(c, "Not while transmitting: the reading would be your own signal", Toast.LENGTH_SHORT).show(); return; }
             Location me = here[0]; int dbm = svc.lastRssi();
             if (me == null) { Toast.makeText(c, "No position yet: turn on location", Toast.LENGTH_LONG).show(); return; }
+            if (gate.fox().only) {                                          // only the fox's: from its transmission, now or at the next one
+                if (gate.waiting()) { gate.cancel(); Toast.makeText(c, "Mark cancelled", Toast.LENGTH_SHORT).show(); return; }
+                gate.requestMark(); int lv = gate.takeIfReady();
+                if (lv != -999) addMark(c, svc, me, lv, heading[0], Double.NaN, "Marked the fox at");
+                else { Toast.makeText(c, "Waiting for the fox: the mark is taken at its next transmission (tap Mark again to cancel)", Toast.LENGTH_LONG).show(); }
+                return;
+            }
             if (dbm == -999) { Toast.makeText(c, "No signal reading yet", Toast.LENGTH_SHORT).show(); return; }
-            svc.fox().add(new FoxHunt.Mark(me.getLatitude(), me.getLongitude(), dbm, heading[0], System.currentTimeMillis()));
-            Toast.makeText(c, String.format(Locale.US, "Marked %d dBm%s", dbm, Double.isNaN(heading[0]) ? "" : String.format(Locale.US, " toward %03.0f°", heading[0])), Toast.LENGTH_SHORT).show();
+            addMark(c, svc, me, dbm, heading[0], Double.NaN, "Marked");
         });
         beep.setOnClickListener(v -> { beeping[0] = !beeping[0]; beep.setText(beeping[0] ? "Beeper on" : "Beeper off"); });
         off.setOnClickListener(v -> {
@@ -271,6 +378,12 @@ public final class FoxHuntDialog {
             if (tg[0] != null) tg[0].release();
             if (offset[0] != 0) svc.foxOffset(0);       // back on the channel
         });
+    }
+
+    /** Save a mark here and say so. */
+    static void addMark(Context c, RadioService svc, Location me, int dbm, double bearing, double sigma, String how) {
+        svc.fox().add(new FoxHunt.Mark(me.getLatitude(), me.getLongitude(), dbm, bearing, System.currentTimeMillis(), sigma));
+        Toast.makeText(c, String.format(Locale.US, "%s %d dBm%s", how, dbm, Double.isNaN(bearing) ? "" : String.format(Locale.US, " toward %03.0f°", bearing) + (Double.isNaN(sigma) ? "" : String.format(Locale.US, " (±%.0f°)", sigma))), Toast.LENGTH_SHORT).show();
     }
 
     static String compass(double deg) { String[] n = { "N", "NE", "E", "SE", "S", "SW", "W", "NW" }; return n[(int) Math.round(((deg % 360) + 360) % 360 / 45.0) % 8]; }

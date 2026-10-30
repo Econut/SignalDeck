@@ -76,7 +76,8 @@ public class RadioService extends Service implements RadioEngine.Events {
     private volatile int rssi = -999;
     private volatile long rxStart;
     private volatile boolean rxCounts;   // decided at RECEIVE_START: the matching STOP can arrive after a retune, when "current" is already the next channel
-    private volatile int lastCaller, lastCallType, lastTarget;
+    private volatile int lastCaller, lastCallType, lastTarget, lastCallerCc = -1;
+    private volatile long tunedAt, rssiAt;   // the last channel/VFO write to the module and the last signal reading (fox hunt: settle and fresh readings)
     private String link = "stopped";
     private final com.macdmr.radio.dsp.SoftSquelch softSq = new com.macdmr.radio.dsp.SoftSquelch();
     private volatile boolean monitorOn, recordOn, squelchOpen;
@@ -1202,7 +1203,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 if (step == 1) {
                     int band = ch.rxFreq < 300_000_000 ? 1 : ch.band;
                     synchronized (tunes) { tunes.addLast(new Object[] { ch, false }); }
-                    engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
+                    tunedAt = System.currentTimeMillis(); engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
                     engine.setMonitor(false); engine.setSquelch(hardwareSq(ch));
                     what[0] = "channel (0x23), monitor 2 (0x2F), squelch " + hardwareSq(ch) + " (0x30)";
                 } else { engine.setMonitorRaw(0); what[0] = "monitor 0 (0x2F)"; }
@@ -1552,7 +1553,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         try {
             int band = ch.rxFreq < 300_000_000 ? 1 : ch.band;
             synchronized (tunes) { tunes.addLast(new Object[] { ch, false }); }   // answered like any channel write
-            engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
+            tunedAt = System.currentTimeMillis(); engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
             if (profile.globalSquelch) engine.setSquelch(hardwareSq(ch));
             if (dataReceive) scheduleDataHold(true);
         } catch (IOException e) { log("squelch rewrite: " + e); }
@@ -1574,10 +1575,10 @@ public class RadioService extends Service implements RadioEngine.Events {
             if (ch.isDigital()) {
                 int id = !fromStore && ch.mode > 0 ? ch.mode : localId();          // VFO may transmit under another DMR ID
                 int[] call = tgOverride.call(ch);
-                engine.setDigital(ch.rxFreq, ch.txFreq, id, tgOverride.groups(ch), call[0], call[1], ch.power, ch.cc, ch.inSlot, ch.outSlot, 8, 4);
+                tunedAt = System.currentTimeMillis(); engine.setDigital(ch.rxFreq, ch.txFreq, id, tgOverride.groups(ch), call[0], call[1], ch.power, ch.cc, ch.inSlot, ch.outSlot, 8, 4);
                 engine.setInterrupt(ch.interrupt == 1);
             } else if (ch.isM17()) {
-                engine.setAnalog(ch.rxFreq, ch.txFreq, 1, ch.power, hardwareSq(ch), 0, 0, 0, 0, 8, 2);   // wide FM; M17 is layered on top
+                tunedAt = System.currentTimeMillis(); engine.setAnalog(ch.rxFreq, ch.txFreq, 1, ch.power, hardwareSq(ch), 0, 0, 0, 0, 8, 2);   // wide FM; M17 is layered on top
                 lastChannelWrite = System.currentTimeMillis();
                 if (profile.globalSquelch) {
                     final boolean mon = monitorOn && !moved(ch); final int sq = hardwareSq(ch); final long token = ++postWriteToken;
@@ -1586,7 +1587,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 }
             } else {
                 int band = ch.rxFreq < 300_000_000 ? 1 : ch.band;      // VHF must be band=1 (band=0 deafens the RX)
-                engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
+                tunedAt = System.currentTimeMillis(); engine.setAnalog(ch.rxFreq, ch.txFreq, band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, 8, 2);
                 lastChannelWrite = System.currentTimeMillis();
                 if (profile.globalSquelch) {                              // this module's squelch follows 0x30; QuickChat sends monitor and squelch 200 ms after the channel's acknowledgement
                     final boolean mon = monitorOn && !moved(ch); final int sq = hardwareSq(ch); final long token = ++postWriteToken;
@@ -2722,7 +2723,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 if (agoldBridge() && !synthRx) lineReported();           // an edge from the line itself
                 receiving = true; dmrEvent("start", 0, 0, 0);
                 if (current != null && current.isDigital()) {           // a DMR call: forget the last talker, ask who this is now and again a second later
-                    lastCaller = 0; callLogged = false;
+                    lastCaller = 0; lastCallerCc = -1; callLogged = false;
                     if (!agoldBridge()) for (long ms : new long[] { 300, 1200 }) ui.postDelayed(() -> { if (receiving) worker.execute(() -> { try { engine.queryCallerInfo(); } catch (IOException ignored) { } }); }, ms);
                 }
                 bridgeReception(true);
@@ -3030,7 +3031,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void rssi(int raw, double dbm) { if (scope.running()) { scope.onRssi(raw); return; }   // a sweep step's reading: not the channel's signal, not for the coverage log
         rssi0(raw, dbm); }
-    private void rssi0(int raw, double dbm) { agoldRssi(dbm); rssi = (int) Math.round(dbm); if (coverage != null && AgoldUsb.coverageReadingUsable(agoldBridge(), System.currentTimeMillis(), ownCycleUntil)) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
+    private void rssi0(int raw, double dbm) { agoldRssi(dbm); rssi = (int) Math.round(dbm); rssiAt = System.currentTimeMillis(); if (coverage != null && AgoldUsb.coverageReadingUsable(agoldBridge(), System.currentTimeMillis(), ownCycleUntil)) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     private volatile String moduleVersion = "";
     private volatile long versionAt;
     @Override public void version(int v, String text) {
@@ -3121,7 +3122,7 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (caller <= 0) return;
         dmrEvent("caller", type, caller, target, cc, slot);
         final String ccts = cc >= 0 ? "  CC " + cc + " TS " + (slot + 1) : "";   // appended by the promiscuous firmware while MON is on
-        lastCaller = caller; lastCallType = type; lastTarget = target;
+        lastCaller = caller; lastCallType = type; lastTarget = target; if (cc >= 0) lastCallerCc = cc;
         refreshControls();   // the car screens show who is talking
         if (callLogged && caller == loggedCaller && target == loggedTarget) return;
         callLogged = true; loggedCaller = caller; loggedTarget = target;
@@ -3538,6 +3539,14 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     public boolean isTransmitting() { return transmitting || pttDown; }
     public int lastRssi() { return rssi; }
+    /** When the last signal reading arrived (ms), and when the module was last retuned (a channel or VFO write): readings need ~0.7 s after it. */
+    public long lastRssiAt() { return rssiAt; }
+    public long lastTunedAt() { return tunedAt; }
+    /** The last DMR caller (kept after the call ends, 0 = none yet) and the colour code the promiscuous firmware reported for it (-1 = not reported: the module passed only the channel's). */
+    public int lastCallerId() { return lastCaller; }
+    public int currentCallerCc() { return dmrCallNow() ? lastCallerCc : -1; }
+    /** The CTCSS tone decoded from the received audio right now (Hz), or 0. */
+    public double heardToneHz() { double hz = toneBank.detectedHz(); return hz > 0 ? hz : 0; }
     /** Who is talking on a DMR channel right now (name from the contacts or RadioID, or the ID), else "". */
     public String currentCaller() {
         if (!dmrCallNow()) return "";
@@ -4146,7 +4155,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     // ---- band scope (BandScope): receive-only sweeps ----
     final BandScope scope = new BandScope(new BandScope.Hooks() {
-        @Override public void tune(int hz) throws Exception { engine.setAnalog(hz, hz, hz < 300_000_000 ? 1 : 0, 0, scopeSq, 0, 0, 0, 0, 8, 2); if (dataReceive) scheduleDataHold(true); }   // low power, nothing keyed
+        @Override public void tune(int hz) throws Exception { tunedAt = System.currentTimeMillis(); engine.setAnalog(hz, hz, hz < 300_000_000 ? 1 : 0, 0, scopeSq, 0, 0, 0, 0, 8, 2); if (dataReceive) scheduleDataHold(true); }   // low power, nothing keyed
         @Override public void query() throws Exception { engine.queryRssi(); }
         @Override public void restore() {                                   // inline (Talk waits for it on the worker thread)
             ChannelStore.Channel ch = vfo != null ? vfo : current;
@@ -4277,7 +4286,7 @@ public class RadioService extends Service implements RadioEngine.Events {
     /** Bench (DiagReceiver): re-send the current analog channel/VFO with another module volume byte (normally 8). */
     public void diagAnalogVolume(final int vol) {
         final ChannelStore.Channel ch = vfo != null ? vfo : current; if (ch == null || ch.isDigital()) return;
-        worker.execute(() -> { try { engine.setAnalog(ch.rxFreq, ch.txFreq, ch.band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, vol, 2); log("bench: module volume " + vol); } catch (Exception e) { log("bench volume: " + e); } });
+        worker.execute(() -> { try { tunedAt = System.currentTimeMillis(); engine.setAnalog(ch.rxFreq, ch.txFreq, ch.band, ch.power, hardwareSq(ch), ch.rxType, ch.rxSubCode, ch.txType, ch.txSubCode, vol, 2); log("bench: module volume " + vol); } catch (Exception e) { log("bench volume: " + e); } });
     }
 
     // ---- bench: play a WAV into the receive path as if the radio heard it (DiagReceiver, adb only) ----

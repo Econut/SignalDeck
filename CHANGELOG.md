@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Fox hunt: count only the fox's own transmissions, auto-marks
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Fox hunt prediction PR 3 (phonedmrapp `docs/plan-fox-hunt-prediction.md` §8.3) | New **Fox signal** group on the fox hunt sheet: **Any signal** (default, unchanged behaviour) or **Only the fox's**. Analog: the fox's CTCSS (the channel's tone squelch, the tone the existing CTCSS decoder bank hears now, or one picked from the list), or the channel's DCS squelch (module squelch only, refused with Soft SQ on and said so; DCS from audio stays infeasible). DMR: the fox's DMR ID (or "Last caller") and optional colour code, from the 0x2B caller info (the CC the promiscuous firmware reports, else the channel's). New pure-Java `ham/FoxSignalGate`: a reading counts only during a matching reception, from 0.3 s into it, 0.7 s after the last channel/VFO write and not in the last 0.6 s before the match ends (squelch tail); a mark averages the transmission's last 4 confirmed readings. **Mark** with Only the fox's while the fox is silent shows **Waiting…** and takes the mark at its next transmission (tap again to cancel). **Auto-marks** (off by default; 50/100/200/25 m): one mark per matching transmission (per reception with Any signal) once GPS says you moved that far from the last mark, with the compass bearing only when the phone was steady (±12° over 1.5 s); never while transmitting. RadioService exposes the last retune and reading times, the last caller and its CC, and the decoded CTCSS tone. Settings in prefs `fox`. Help: Fox hunt → Fox signal. Restricted mode: no new id (inside the fox-hunt mode). | `ham/FoxSignalGate.java` (new), `ui/FoxHuntDialog.java`, `RadioService.java`, `ui/HelpView.java`, `docs/help/` | Host test `FoxSignalGateTest` (any-signal, tone match/mismatch, DCS with/without Soft SQ, DMR caller/CC incl. the channel's CC, start/settle/tail windows, stale readings, waiting-then-mark and cancel, auto-mark once per transmission and the distance rule, never while transmitting, steady heading across north); full suite and release build. Not device-tested: needs a check with a real fox (CTCSS detection timing, DMR caller timing, DCS with the module squelch). |
+
 ## 2026-10-29 — Transmit test session and build identity for fork testers
 
 | Backlog | Change | Files | Test |
