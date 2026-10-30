@@ -149,10 +149,10 @@ Build from a clean, pushed commit when you can, so the maintainer can rebuild ex
 - For transmit: the transmit test session's `tx-report.json` (in the report zip) and any recordings with their SHA-256.
 - Where: a GitHub issue using the device template, or attached to your Discussions thread. One thread per phone model,
   so other owners of the same phone can add their results.
-- **GitHub templates:** before your first key, open a **Starting transmit tests** issue (phone model, your fork and
+- **GitHub templates:** before your first key, open a **Starting transmit tests** issue ([new issue](https://github.com/IIMacGyverII/SignalDeck/issues/new/choose), [form](../.github/ISSUE_TEMPLATE/transmit-test-start.yml)) (phone model, your fork and
   commit, your equipment, the band, the licence confirmation; it has no callsign field, keep it that way). Afterwards,
-  a **Transmit test results** issue with the report zip, a result per step and the recordings. A pull request from your
-  fork gets a checklist (`.github/pull_request_template.md`): device report and tx-report.json attached, the profile
+  a **Transmit test results** issue ([form](../.github/ISSUE_TEMPLATE/transmit-test-results.yml)) with the report zip, a result per step and the recordings. A pull request from your
+  fork gets a checklist ([`.github/pull_request_template.md`](../.github/pull_request_template.md)): device report and tx-report.json attached, the profile
   left at `verified = false`, and the tests of section 3.
 
 ## 5. Who decides, and what happens then
