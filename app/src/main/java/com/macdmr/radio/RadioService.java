@@ -119,6 +119,11 @@ public class RadioService extends Service implements RadioEngine.Events {
     });
     private volatile int parrotChannel = -1;
     private volatile long txStartedAt;
+    /** True while SignalDeck itself unkeys: a SEND_STOP then is ours, not the radio's time-out (the W6+ reports it before ptt() returns). */
+    private volatile boolean unkeying;
+    private void unkey() throws IOException { unkeying = true; try { engine.ptt(false); } finally { unkeying = false; } }
+    /** The label of the transmission SignalDeck plays itself (APRS, FT8, SSTV …), for its history line; null for voice. */
+    private volatile String pcmTxLabel;
 
     // ---- voice keyer and the ten-minute identification timer ----
     private final com.macdmr.radio.ham.VoiceKeyer keyer = new com.macdmr.radio.ham.VoiceKeyer(this);
@@ -690,12 +695,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                     thermal.beforeLong();
                     heatWatch = heatWatchdog(label);
                 }
-                pttDown = true;
+                pttDown = true; txStartedAt = System.currentTimeMillis(); pcmTxLabel = label;   // the history line and the time-out check are about this transmission
                 if (audio != null) audio.stopRx();
                 engine.ptt(true);
                 log("TX " + label + " (" + ms + " ms)");
                 try { Thread.sleep(200); if (audio != null) log(audio.playPcm(pcm)); }
-                finally { if (heatWatch != null) heatWatch.interrupt(); engine.ptt(false); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); holdAfterTx(); }
+                finally { if (heatWatch != null) heatWatch.interrupt(); unkey(); pttDown = false; thermal.after(ms); if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true); holdAfterTx(); }
                 if (ms > ThermalGuard.LONG_MS) history("tx", "\uD83D\uDCFB Long transmission " + Math.round(ms / 1000.0) + " s (" + label + "); " + thermal.state());
                 if (onDone != null) onDone.run();
             } catch (Throwable t) { log("TX " + label + ": " + t); try { engine.ptt(false); } catch (Throwable ignored) { } pttDown = false; }
@@ -1938,7 +1943,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (txInhibited()) { log("PTT blocked: receive-only channel"); history("warn", "⛔ TX blocked on a receive-only channel"); return; }
                     if (pttDown) return;
                     pttDown = true; refreshControls();
-                    txChannel = current; txInCar = inCar; txCharging = charging(); txDropNoted = false; txStartedAt = System.currentTimeMillis();
+                    txChannel = current; txInCar = inCar; txCharging = charging(); txDropNoted = false; txStartedAt = System.currentTimeMillis(); pcmTxLabel = null;
                     try { ChannelStore.Channel tc = current; int[] tcall = tc != null ? tgOverride.call(tc) : null; if (tc != null && tc.isDigital() && tcall[0] > 0) { ChannelStore.Contact pc = store.contactByNumber(tcall[0], tcall[1] == 0 ? 0 : 1); if (pc != null) store.contactSent(pc.id, txStartedAt, "DMR voice", "on " + tc.name); } } catch (Throwable e) { }
                     idTimerOnKey();
                     if (audio != null) audio.stopRx();              // never play the RX stream while the mic is live (feedback)
@@ -1974,7 +1979,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                         ChannelStore.Channel tc = current;
                         short[] id = tc != null && !tc.isDigital() && amateurBand(tc.txFreq) && packet != null && System.currentTimeMillis() - txStartedAt < 25_000 ? packet.cwIdIfDue(System.currentTimeMillis()) : null;
                         if (id != null && audio != null) { log("Morse ID after the transmission"); audio.playPcm(id); history("pkt", "\uD83D\uDD24 Morse ID " + packet.callsign()); }   // the station identification every ten minutes
-                    } finally { engine.ptt(false); }
+                    } finally { unkey(); }
                     if (rxAudioOn && audio != null && (!agoldBridge() || receiving)) audio.startRx(true);
                     if (dataReceive) scheduleDataHold(true);   // the unkey path rewrites the voice filter; put the hold back
                 }
@@ -2507,7 +2512,7 @@ public class RadioService extends Service implements RadioEngine.Events {
             Frame rst = sym40(new byte[] { 3 });
             if (rst == null || rst.sr != 0) { log("tones: no symbol engine"); history("warn", "\u26A0\uFE0F This firmware did not accept a tone-queue reset"); return; }
             if (ms > ThermalGuard.LONG_MS) thermal.beforeLong();
-            pttDown = true; txStartedAt = System.currentTimeMillis(); refreshControls();
+            pttDown = true; txStartedAt = System.currentTimeMillis(); pcmTxLabel = label; refreshControls();
             if (audio != null) audio.stopRx();
             java.util.List<byte[]> bodies = com.macdmr.radio.ham.ToneQueue.bodies(amplitude, pairs);
             for (int i = 0; i < bodies.size(); i++) {
@@ -2744,8 +2749,8 @@ public class RadioService extends Service implements RadioEngine.Events {
                 break;
             }
             case 3: transmitting = true; refreshControls(); if (coverage != null) coverage.onTxStart(); ui.post(() -> { for (Listener l : listeners) l.onTx(true); }); break;
-            case 4: status4At = System.currentTimeMillis(); transmitting = false; refreshControls(); if (coverage != null) coverage.onTxEnd(); history(m17Tx ? "m17" : "tx", m17Tx ? "📻 M17 TX" : "📻 Voice TX");
-                if (pttDown && !m17Tx && System.currentTimeMillis() - txStartedAt > 100_000) history("warn", "\u23F1 The radio ended the transmission itself: its 120 s time-out"); ui.post(() -> { for (Listener l : listeners) l.onTx(false); }); break;
+            case 4: status4At = System.currentTimeMillis(); transmitting = false; refreshControls(); if (coverage != null) coverage.onTxEnd(); String pl = pcmTxLabel; pcmTxLabel = null; history(m17Tx ? "m17" : "tx", m17Tx ? "📻 M17 TX" : pl != null ? "📻 TX: " + pl : "📻 Voice TX");
+                if (pttDown && !m17Tx && !unkeying && System.currentTimeMillis() - txStartedAt > 100_000) history("warn", "\u23F1 The radio ended the transmission itself: its 120 s time-out"); ui.post(() -> { for (Listener l : listeners) l.onTx(false); }); break;
             case 5: try { engine.fetchSms(); } catch (IOException ignored) { } break;             // SMS_RECEIVED -> ask for it
             case 8: smsResult(true); break;
             case 9: smsResult(false); break;
