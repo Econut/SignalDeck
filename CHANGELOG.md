@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Device: About this radio (specs, what works, known quirks, test-unit measurements)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Radio notes (owner, 2026-10-29) | New **About this radio** tile on the Device page ("Specs and known quirks") opens a sheet for the phone in use: module, modes, bands, power (not measured yet everywhere), connection, stock and modified firmware, what works (works / partly / no / not tested), known quirks in user terms, and what was measured on our test unit (worded as one unit; yours may differ), all text selectable. One data file, `assets/radios/radios.json`, has an entry for every built-in profile (Armor 26 Ultra, Atom XL, W6+, W6Plus DMR incl. its +1.6 kHz carrier offset and low DMR voice audio, Armor 20WT and Xplore 1 marked untested / in testing, and a generic entry for unknown phones). `RadioNotesExportTest` writes `docs/radios/` (a page per radio, an index, and `radios.json` in the website's shape) and fails while it is out of date (`-PexportRadios=true` regenerates); it also fails when a built-in profile has no entry, an unverified profile is marked tested, or an entry is empty. Help: Device → About this radio (docs/help regenerated). README links docs/radios. | `RadioNotes.java` (new), `assets/radios/radios.json` (new), `ui/DeviceView.java`, `ui/HelpView.java`, `app/build.gradle`, `RadioNotesExportTest.java` (new), `docs/radios/` (new), `docs/help/`, `README.md` | Host: all 531 tests pass (RadioNotesExportTest new: every built-in profile has notes, entries complete and plain, docs/radios current, website JSON parses back); release build compiles. Not device-tested (no phone used). |
+
 ## 2026-10-29 — Help: fox hunt and coverage on the Atom XL
 
 | Backlog | Change | Files | Test |

@@ -209,12 +209,13 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         LinearLayout reimport = Neo.tile(c, "import", Neo.AMBER, "Re-import", "Channels from the stock app");
         radioIdTile = Neo.tile(c, "globe", Neo.CYAN, "RadioID list", "");
         LinearLayout report = Neo.tile(c, "report", Neo.VIOLET, "Device report", "Support reports and checks");
+        LinearLayout about = Neo.tile(c, "module", Neo.GREEN, "About this radio", "Specs and known quirks");
         LinearLayout upd = Neo.tile(c, "update", Neo.CYAN, "Updates", "Release and beta builds");
         LinearLayout help = Neo.tile(c, "help", Neo.GREEN, "Help & how-to", "Every screen explained");
         LinearLayout diag = Neo.tile(c, "diag", Neo.AMBER, "Diagnostics", "Live protocol log");
         LinearLayout widget = Neo.tile(c, "widget", Neo.VIOLET, "Home widget", "Channel, scan and Talk");
         LinearLayout sos = Neo.tile(c, "alert", Neo.RED, "Emergency", "Send your position");
-        java.util.List<LinearLayout> tl = new java.util.ArrayList<>(java.util.Arrays.asList(backup, restore, reimport, radioIdTile, report, upd, help, diag, widget, sos));
+        java.util.List<LinearLayout> tl = new java.util.ArrayList<>(java.util.Arrays.asList(backup, restore, reimport, radioIdTile, report, about, upd, help, diag, widget, sos));
         if (!com.macdmr.radio.DeviceProfile.detect().dmr()) tl.remove(radioIdTile);   // names for DMR IDs: nothing to look up without DMR
         if (tl.size() % 2 == 1) tl.add(null);
         LinearLayout[] tiles = tl.toArray(new LinearLayout[0]);
@@ -230,6 +231,7 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
         reimport.setOnClickListener(v -> doReimport());
         radioIdTile.setOnClickListener(v -> doRadioId());
         report.setOnClickListener(v -> reportMenu());
+        about.setOnClickListener(v -> radioNotesSheet());
         upd.setOnClickListener(v -> com.macdmr.radio.Updater.show(c));
         help.setOnClickListener(v -> { if (host != null) host.openHelp(); });
         diag.setOnClickListener(v -> { if (host != null) host.openDiagnostics(); });
@@ -242,6 +244,75 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
                 + "\n\nSignalDeck " + com.macdmr.radio.BuildConfig.VERSION_NAME + ", the standalone edition of DMRModHooks.", Neo.DIM, 12.5f, Neo.uiMedium(c));
         foot.setLineSpacing(0, 1.1f); foot.setPadding((int) (2 * d), (int) (8 * d), (int) (2 * d), 0);
         body.addView(foot);
+    }
+
+    /** About this radio: the active profile's notes (assets/radios/radios.json, also docs/radios in the repository). */
+    private void radioNotesSheet() {
+        Context c = getContext(); float d = Theme.dp(c);
+        com.macdmr.radio.RadioNotes.Entry e = com.macdmr.radio.RadioNotes.forActive(c);
+        LinearLayout box = Neo.sheetBody(c, "About this radio");
+        if (e == null) { box.addView(Neo.sheetHint(c, "No notes are available for this radio.")); Neo.showSheet(c, box); return; }
+        TextView name = Neo.text(c, e.name + (e.variant != null ? " · " + e.variant : ""), Neo.TEXT, 18, Neo.ui(c));
+        name.setPadding((int) (2 * d), (int) (8 * d), 0, (int) (4 * d)); box.addView(name);
+        int sc = "ok".equals(e.status) ? Neo.GREEN : "beta".equals(e.status) || "prog".equals(e.status) ? Neo.AMBER : Neo.RED;
+        LinearLayout chips = new LinearLayout(c); chips.addView(Neo.chip(c, e.statusText(), sc)); box.addView(chips);
+        box.addView(notesText(c, e.summary, Neo.TEXT, 15));
+        if (e.radio != null) {
+            box.addView(Neo.sheetSection(c, "The radio"));
+            if (e.radio.module != null) box.addView(specRow(c, "Module", e.radio.module));
+            if (!e.radio.modes.isEmpty()) box.addView(specRow(c, "Modes", android.text.TextUtils.join(", ", e.radio.modes)));
+            if (!e.radio.bands.isEmpty()) box.addView(specRow(c, "Bands", com.macdmr.radio.RadioNotes.bandsText(e.radio)));
+            box.addView(specRow(c, "Power", e.radio.txPowerW == null ? "Not measured yet" : android.text.TextUtils.join(" / ", e.radio.txPowerW) + " W"));
+            if (e.radio.link != null) box.addView(specRow(c, "Connection", e.radio.link));
+        }
+        if (e.firmware != null) {
+            if (e.firmware.stock != null) box.addView(specRow(c, "Stock firmware", e.firmware.stock));
+            if (e.firmware.modified != null) box.addView(specRow(c, "Modified firmware", e.firmware.modified));
+            if (e.firmware.note != null) box.addView(notesText(c, e.firmware.note, Neo.MUTED, 13));
+        }
+        if (!e.features.isEmpty()) {
+            box.addView(Neo.sheetSection(c, "What works"));
+            for (com.macdmr.radio.RadioNotes.Feature f : e.features) {
+                int fc = "yes".equals(f.state) ? Neo.GREEN : "partial".equals(f.state) ? Neo.AMBER : "no".equals(f.state) ? Neo.RED : Neo.CYAN;
+                String st = "yes".equals(f.state) ? "Works" : "partial".equals(f.state) ? "Partly" : "no".equals(f.state) ? "No" : "Not tested";
+                box.addView(specRow(c, f.name, st + (f.note != null ? " · " + f.note : ""), fc));
+            }
+        }
+        if (!e.quirks.isEmpty()) {
+            box.addView(Neo.sheetSection(c, "Known quirks"));
+            for (com.macdmr.radio.RadioNotes.Quirk q : e.quirks) noteCard(c, box, q.title, q.text, null);
+        }
+        if (!e.measured.isEmpty()) {
+            box.addView(Neo.sheetSection(c, "Measured on our test unit"));
+            box.addView(Neo.sheetHint(c, "Measured on one test unit; your radio may differ."));
+            for (com.macdmr.radio.RadioNotes.Measured m : e.measured) noteCard(c, box, m.what, m.note, m.value);
+        }
+        for (com.macdmr.radio.RadioNotes.Section s : e.sections) { box.addView(Neo.sheetSection(c, s.head)); box.addView(notesText(c, s.text, Neo.TEXT, 14)); }
+        box.addView(Neo.sheetHint(c, "These notes are built into SignalDeck (" + e.id + ") and also in the project's repository under docs/radios."));
+        Neo.showSheet(c, box);
+    }
+    private static TextView notesText(Context c, String s, int color, float sp) {
+        float d = Theme.dp(c); TextView t = Neo.text(c, s, color, sp, Neo.uiMedium(c));
+        t.setLineSpacing(0, 1.12f); t.setTextIsSelectable(true); t.setPadding((int) (2 * d), (int) (6 * d), (int) (2 * d), (int) (4 * d)); return t;
+    }
+    private static LinearLayout specRow(Context c, String label, String value) { return specRow(c, label, value, Neo.TEXT); }
+    private static LinearLayout specRow(Context c, String label, String value, int accent) {
+        float d = Theme.dp(c);
+        LinearLayout r = new LinearLayout(c); r.setPadding((int) (2 * d), (int) (3 * d), 0, (int) (3 * d));
+        TextView l = Neo.text(c, label, Neo.MUTED, 13.5f, Neo.uiSemi(c)); l.setTextIsSelectable(true);
+        TextView v = Neo.text(c, value, accent == Neo.TEXT ? Neo.TEXT : Neo.light(accent), 13.5f, Neo.uiMedium(c)); v.setTextIsSelectable(true); v.setLineSpacing(0, 1.08f);
+        r.addView(l, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.38f)); r.addView(v, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 0.62f));
+        return r;
+    }
+    private static void noteCard(Context c, LinearLayout box, String title, String text, String value) {
+        float d = Theme.dp(c);
+        LinearLayout card = new LinearLayout(c); card.setOrientation(VERTICAL); card.setBackground(Neo.rowCard(c));
+        card.setPadding((int) (12 * d), (int) (9 * d), (int) (12 * d), (int) (9 * d));
+        TextView t = Neo.text(c, title, Neo.TEXT, 15, Neo.ui(c)); t.setTextIsSelectable(true); card.addView(t);
+        if (value != null) { TextView v = Neo.text(c, value, Neo.CYAN_LIGHT, 14.5f, Neo.uiSemi(c)); v.setTextIsSelectable(true); card.addView(v); }
+        if (text != null) { TextView x = Neo.text(c, text, Neo.MUTED, 13.5f, Neo.uiMedium(c)); x.setLineSpacing(0, 1.1f); x.setTextIsSelectable(true); x.setPadding(0, (int) (3 * d), 0, 0); card.addView(x); }
+        LayoutParams cl = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT); cl.setMargins(0, 0, 0, (int) (8 * d));
+        box.addView(card, cl);
     }
 
     /** The project's mission statement (also at the top of the README). */

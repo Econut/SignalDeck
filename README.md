@@ -102,6 +102,8 @@ These are limits of the radio module, measured on the reference phone. SignalDec
 
 ## Phones
 
+Specs, what works, known quirks and test-unit measurements for each phone: [docs/radios](docs/radios/README.md) (in the app: **Device → About this radio**).
+
 | Phone | Status |
 |---|---|
 | **Ulefone Armor 26 Ultra** (walkie-talkie model) | Tested — the reference phone. Custom ROMs and GSIs work too: SignalDeck takes the radio audio straight from the sound card when the vendor audio service is missing. |

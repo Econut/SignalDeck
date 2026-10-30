@@ -79,6 +79,7 @@ dependencies {
 // -PexportHelp=true makes HelpExportTest write docs/help from the in-app guide instead of checking it
 tasks.withType(Test).configureEach {
     systemProperty 'signaldeck.exportHelp', (project.findProperty('exportHelp') ?: 'false').toString()
+    systemProperty 'signaldeck.exportRadios', (project.findProperty('exportRadios') ?: 'false').toString()   // RadioNotesExportTest writes docs/radios
 }
 
 configurations.all {
