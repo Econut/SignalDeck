@@ -2621,7 +2621,13 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
 
     /** Ask the module for the signal strength (on the radio worker: never a serial write on the main thread). */
-    public void pollRssi() { if (scope.running() || engine.rawSession()) return; worker.execute(() -> { try { if (engine.isOpen() && !engine.rawSession()) engine.queryRssi(); } catch (IOException ignored) { } }); }
+    /** A signal reading for a display (the S-meter, SignalDeck Web); held on the Atom XL during a reception ({@link AgoldUsb#holdsRxRead}). */
+    public void pollRssi() { pollRssi(false); }
+    /** A signal reading for a measurement (fox hunt, coverage, checks): taken during a reception too, at the cost of a possible capture drop on the Atom XL. */
+    public void pollRssiMeasure() { pollRssi(true); }
+    private void pollRssi(boolean measure) { if (scope.running() || engine.rawSession()) return;
+        if (!measure && AgoldUsb.holdsRxRead(agoldBridge(), receiving, synthRx)) return;
+        worker.execute(() -> { try { if (engine.isOpen() && !engine.rawSession()) engine.queryRssi(); } catch (IOException ignored) { } }); }
 
     // ---- listeners ----------------------------------------------------------------------------------
 
@@ -3561,7 +3567,7 @@ public class RadioService extends Service implements RadioEngine.Events {
                 double want = com.macdmr.radio.dsp.ToneTable.ctcssHz(ch.rxSubCode), got = toneBank.detectedHz();
                 return want > 0 && got > 0 && Math.abs(want - got) < 1.5;
             }
-            @Override public void pollRssi() { RadioService.this.pollRssi(); }
+            @Override public void pollRssi() { RadioService.this.pollRssiMeasure(); }
             @Override public void event(String line) { history("cov", line); }
         });
         return coverage;

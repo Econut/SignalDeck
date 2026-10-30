@@ -158,6 +158,13 @@ final class AgoldUsb {
      * silent, and that blip was counted as a missed reception and restarted the bridge.
      */
     static final long LINE_MISS_MIN_MS = 3000;
+    /**
+     * No signal reading for the S-meter while the line reports a reception: a command crossing the bridge's USB link while
+     * it streams audio breaks the stream (2026-10-29, RTTY/speech from a HackRF on 401.025 MHz: 12 of 12 receptions clean
+     * with no 0x32 during them, against 1 drop in 6 with a reading every 0.5 to 2 s). The watchdog's own receptions (found
+     * from the signal) keep reading, they end on it; measurement tools read anyway.
+     */
+    static boolean holdsRxRead(boolean agold, boolean lineReception, boolean synthetic) { return agold && lineReception && !synthetic; }
     static boolean countsAsLineMiss(long heldMs) { return heldMs >= LINE_MISS_MIN_MS; }
     /** At least this long between two automatic bridge power-cycles of any kind. */
     static final long AUTO_CYCLE_GAP_MS = 20_000;

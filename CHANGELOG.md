@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: no signal reading for the meter while a reception streams
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture drops (managing agent, 2026-10-29) | A command crossing the bridge's USB link while it streams receive audio breaks the stream (then a bridge restart). The S-meter's signal reading (0x32 every 0.5–2 s) was the only regular one, so on the Atom XL the display reads (S-meter, SignalDeck Web) are held while the line reports a reception and the meter shows the last reading; receptions found from the signal keep reading (they end on it), and fox hunt, coverage, the two-radio test, the checks and the Diagnostics button read anyway (new `pollRssiMeasure`). Other traffic is already quiet during a reception: the scanner holds, the caller query waits for the capture to end, the module watch speaks only after 6 s without an answer; channel writes and MON are your own actions. Help updated | AgoldUsb, RadioService, DmrAudioCheck, FirstRunCheck, SecondRadioTest, FoxHuntDialog, DiagnosticsView, HelpView, AgoldUsbTest | Atom XL 2026-10-29, RTTY/speech from a HackRF on 401.025 MHz: 12 of 12 receptions clean with no reads during them (bench build), against 1 drop in 6 on main and 2–3 in 8 for two read-pattern variants; host tests |
+
 ## 2026-10-29 — Device report: the lines a stock app names, an honest protocol hint, and -r on a stopped app
 
 | Backlog | Change | Files | Test |

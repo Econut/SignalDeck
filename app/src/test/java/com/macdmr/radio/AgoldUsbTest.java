@@ -151,6 +151,13 @@ public class AgoldUsbTest {
         assertTrue("then host mode is left", r.indexOf("echo 0 > " + AgoldUsb.USB_PATH) > offAgain);
     }
 
+    @Test public void theSMeterHoldsItsReadingOnlyDuringAReportedAtomXlReception() {
+        assertTrue(AgoldUsb.holdsRxRead(true, true, false));      // the line reported it: no command while the audio streams
+        assertFalse(AgoldUsb.holdsRxRead(true, true, true));      // found from the signal: the watchdog needs the readings to end it
+        assertFalse(AgoldUsb.holdsRxRead(true, false, false));    // idle
+        assertFalse(AgoldUsb.holdsRxRead(false, true, false));    // other phones
+    }
+
     @Test public void onlyALongUnreportedReceptionCountsAgainstTheLine() {
         assertFalse("a 1 s blip from a transmitter on another band", AgoldUsb.countsAsLineMiss(220));
         assertFalse(AgoldUsb.countsAsLineMiss(2999));

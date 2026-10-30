@@ -149,7 +149,7 @@ public final class FirstRunCheck {
         long bytes0 = svc.rxAudioBytes(), t0 = System.currentTimeMillis();
         int samples = 0, heard = 0, rmin = 0, rmax = -999; StringBuilder rs = new StringBuilder();
         while (System.currentTimeMillis() - t0 < seconds * 1000L) {
-            svc.pollRssi(); Thread.sleep(1000);
+            svc.pollRssiMeasure(); Thread.sleep(1000);
             int v = svc.lastRssi(); samples++; if (svc.rxActive()) heard++;
             if (v > -999) { rmax = Math.max(rmax, v); rmin = rmin == 0 ? v : Math.min(rmin, v); }
             if (samples <= 60) rs.append(v).append(svc.rxActive() ? "*" : "").append(' ');
@@ -365,7 +365,7 @@ public final class FirstRunCheck {
             String cap = raw != null ? svc.captureRxAudio(raw, 5000) : "no report folder";
             svc.benchCapture(false);
             StringBuilder rs = new StringBuilder();
-            for (int i = 0; i < 5; i++) { svc.pollRssi(); Thread.sleep(1200); rs.append(svc.lastRssi()).append(' '); }
+            for (int i = 0; i < 5; i++) { svc.pollRssiMeasure(); Thread.sleep(1200); rs.append(svc.lastRssi()).append(' '); }
             Thread.sleep(1000);
             r.append("RSSI readings (dBm, -999 = no answer): ").append(rs.toString().trim()).append('\n');
             r.append("receive audio: ").append(cap).append('\n');

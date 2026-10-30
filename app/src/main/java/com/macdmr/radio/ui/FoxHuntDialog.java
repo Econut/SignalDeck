@@ -100,7 +100,7 @@ public final class FoxHuntDialog {
 
         final Runnable tick = new Runnable() {
             @Override public void run() {
-                svc.pollRssi();
+                svc.pollRssiMeasure();
                 int dbm = svc.lastRssi();
                 if (dbm != -999 && dbm > peak[0]) peak[0] = dbm;
                 big.setText(dbm == -999 ? "--" : String.valueOf(dbm));
