@@ -104,8 +104,11 @@ Each that the phone can do; mark the others "not supported" with the reason.
 
 ## 6. Make your own phone compatible
 
-If you write code: fork SignalDeck, add a profile for your phone (see the existing profiles in `DeviceProfile.java` and
-the device report's findings), and open a pull request with your test results from section 3. Keep transmit off
+If you write code: **fork** SignalDeck on GitHub, add a profile for your phone in your fork (see the existing profiles in
+`DeviceProfile.java` and the device report's findings), and then open a pull request **from your fork** with your test
+results from section 3. You don't need to be a collaborator for this: a pull request from a fork is GitHub's normal way
+for anyone to offer changes, and nothing is merged until the maintainer has reviewed it. You can also just share a link
+to your fork in your Discussions thread. Keep transmit off
 (`verified = false`) in the PR; the maintainer turns it on after the Beta checks. Never add code that loads module
 firmware for a phone it wasn't made for.
 
