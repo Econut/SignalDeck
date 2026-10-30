@@ -124,4 +124,60 @@ public class FoxPredictorTest {
         assertTrue("the grid reaches past 2 km, was " + (r.north - r.south) * 111000, (r.north - r.south) * 111_000 > 3000);
         assertEquals("rough", r.confidence());
     }
+
+    // ---- terrain ------------------------------------------------------------------------------------------
+
+    /** A north-south ridge 70 m high and ~120 m wide, 250 m east of (LAT, LON); flat elsewhere. No download. */
+    static final com.macdmr.radio.coverage.Predictor.Elevation RIDGE = (la, lo) -> {
+        double x = Math.toRadians(lo - LON) * 6371000 * Math.cos(Math.toRadians(LAT)) - 250;
+        return 70 * Math.exp(-x * x / (2 * 60 * 60));
+    };
+    static final double[][] ACROSS = { { -400, 300 }, { -300, -400 }, { -100, 600 }, { 500, 0 }, { 600, 400 }, { 450, -400 }, { 800, 100 }, { 700, -200 } };
+
+    /** Readings from a fox at (0, 0): n = 2 plus what the ridge takes away. */
+    static List<FoxHunt.Mark> overTheRidge() {
+        double[] fox = at(0, 0); List<FoxHunt.Mark> out = new ArrayList<>();
+        for (double[] s : ACROSS) {
+            double[] p = at(s[0], s[1]);
+            double l = FoxPredictor.terrainLoss(RIDGE, fox[0], fox[1], p[0], p[1], 1.5, 146e6);
+            out.add(new FoxHunt.Mark(p[0], p[1], (int) Math.round(-40 - 20 * Math.log10(FoxPredictor.metres(p[0], p[1], fox[0], fox[1])) - l), Double.NaN, 0));
+        }
+        return out;
+    }
+
+    @Test public void theRidgeCostsTheMarksBehindIt() {
+        double[] fox = at(0, 0), west = at(-300, -400), east = at(500, 0);
+        assertTrue("a clear path loses little", Math.abs(FoxPredictor.terrainLoss(RIDGE, fox[0], fox[1], west[0], west[1], 1.5, 146e6)) < 3);
+        assertTrue("the ridge costs 10 dB or more", FoxPredictor.terrainLoss(RIDGE, fox[0], fox[1], east[0], east[1], 1.5, 146e6) > 10);
+        double low = FoxPredictor.terrainLoss(RIDGE, fox[0], fox[1], east[0], east[1], 1.5, 146e6), high = FoxPredictor.terrainLoss(RIDGE, fox[0], fox[1], east[0], east[1], 30, 146e6);
+        assertTrue("the fox's antenna height matters: " + high + " vs " + low, Math.abs(high - low) > 1);
+    }
+
+    @Test public void terrainFindsTheFoxBehindARidge() {
+        List<FoxHunt.Mark> ms = overTheRidge();
+        double[] fox = at(0, 0);
+        FoxPredictor.Options plain = opts(false, true), terr = opts(false, true);
+        terr.terrain = true; terr.elevation = RIDGE; terr.cache = new FoxPredictor.TerrainCache();
+        FoxPredictor.Result a = FoxPredictor.predict(ms, plain), b = FoxPredictor.predict(ms, terr);
+        double ea = FoxPredictor.metres(a.lat, a.lon, fox[0], fox[1]), eb = FoxPredictor.metres(b.lat, b.lon, fox[0], fox[1]);
+        assertEquals(FoxPredictor.HEAT | FoxPredictor.TERRAIN, b.layers);
+        assertTrue("with terrain within 75 m (three squares), was " + eb, eb < 75);
+        assertTrue("terrain helps: " + eb + " vs " + ea, eb < ea / 2);
+        // the cache: one more mark only works out the new paths (the grid sits on the same lattice)
+        int first = terr.cache.computed();
+        double[] q = at(-200, 100); ms.add(new FoxHunt.Mark(q[0], q[1], (int) Math.round(-40 - 20 * Math.log10(FoxPredictor.metres(q[0], q[1], fox[0], fox[1]))), Double.NaN, 0));
+        FoxPredictor.predict(ms, terr);
+        int second = terr.cache.computed() - first;
+        assertTrue("reused the cache: " + second + " new vs " + first, second < first / 2);
+    }
+
+    @Test public void terrainWithoutGroundOrHeatMapSaysSo() {
+        List<FoxHunt.Mark> ms = overTheRidge();
+        FoxPredictor.Options o = opts(false, true); o.terrain = true;                      // nothing loaded for the area
+        FoxPredictor.Result r = FoxPredictor.predict(ms, o);
+        assertEquals(FoxPredictor.HEAT, r.layers); assertTrue(r.note.contains("no terrain for this area yet"));
+        o = opts(true, false); o.terrain = true; o.elevation = RIDGE;
+        r = FoxPredictor.predict(ms, o);
+        assertEquals(0, r.layers & FoxPredictor.TERRAIN); assertTrue(r.note.contains("heat map"));
+    }
 }

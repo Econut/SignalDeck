@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Fox hunt: Terrain layer for the prediction
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Fox hunt prediction PR 2 (phonedmrapp `docs/plan-fox-hunt-prediction.md` §3) | A third Prediction switch, **Terrain** (off by default; stored in prefs), refines the heat map with the ground: for each square and mark the profile's knife-edge diffraction loss over smooth ground (new `Propagation.terrainExcess`, factored out of `pathLoss` with no change to the coverage maps) is added to the path-loss model, so squares behind a ridge from a strong mark drop out. Coarse to fine: 100 m blocks (at most 40 a side) first, then every 25 m square of the blocks holding the likeliest 90 % (at most 120 blocks); losses cached per mark and square, the grid on a fixed 0.01° lattice so a new mark reuses them; worker thread. Ground heights from `coverage/Terrain` (zoom-11 terrarium tiles, shared with the coverage maps): until the area's tiles are on the phone the sheet says "no terrain for this area yet" and offers **Download terrain (about N MB)** with a confirm; offline afterwards. Fox antenna height button: on the ground 1.5 m / on a roof 10 m / on a tower 30 m. Terrain needs the heat map on (the sheet says so). Help: Fox hunt → Terrain. Restricted mode: no new id (inside the fox-hunt mode; the download is a network action like the coverage maps'). | `ham/FoxPredictor.java`, `coverage/Propagation.java`, `coverage/Terrain.java`, `ui/FoxHuntDialog.java`, `ui/HelpView.java`, `docs/help/` | Host tests in `FoxPredictorTest` with a synthetic ridge (an `Elevation` in the test, no download): the ridge costs the marks behind it 10 dB or more, a clear path little, the fox's antenna height changes the loss; with terrain the heat map lands within 75 m of a fox behind the ridge and at less than half the plain heat map's error; one more mark reuses the cache (fewer than half the paths recomputed); no terrain loaded / heat map off say so. `PredictorTest` (coverage) unchanged and passing. Not device-tested (no device in this session). |
+
 ## 2026-10-29 — Fox hunt: prediction map (bearings + signal heat map, combined estimate)
 
 | Backlog | Change | Files | Test |

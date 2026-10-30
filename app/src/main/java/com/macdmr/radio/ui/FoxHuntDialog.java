@@ -57,9 +57,9 @@ public final class FoxHuntDialog {
 
         // ---- prediction: which layers, the map (or the plot when no tiles load) ----
         final android.content.SharedPreferences fp = c.getSharedPreferences("fox", Context.MODE_PRIVATE);
-        final boolean[] layerOn = { fp.getBoolean("predBearings", true), fp.getBoolean("predHeat", true) };
-        final String[] layerKey = { "predBearings", "predHeat" }, layerName = { "Bearings", "Heat map" };
-        final int[] layerAccent = { Neo.CYAN, Neo.AMBER };
+        final boolean[] layerOn = { fp.getBoolean("predBearings", true), fp.getBoolean("predHeat", true), fp.getBoolean("predTerrain", false) };
+        final String[] layerKey = { "predBearings", "predHeat", "predTerrain" }, layerName = { "Bearings", "Heat map", "Terrain" };
+        final int[] layerAccent = { Neo.CYAN, Neo.AMBER, Neo.GREEN };
         body.addView(Neo.sheetSection(c, "Prediction"));
         LinearLayout pills = new LinearLayout(c);
         final TextView[] pill = new TextView[layerOn.length];
@@ -70,6 +70,15 @@ public final class FoxHuntDialog {
             pills.addView(pill[i], pl);
         }
         body.addView(pills);
+        // terrain: the download (once per area) and how high the fox's antenna is
+        final double[] aglChoices = { FoxPredictor.FOX_AGL, 10, 30 }; final String[] aglNames = { "Fox on the ground", "Fox on a roof (10 m)", "Fox on a tower (30 m)" };
+        final int[] agl = { Math.max(0, Math.min(2, fp.getInt("foxAgl", 0))) };
+        final LinearLayout terrRow = new LinearLayout(c); terrRow.setBaselineAligned(false);
+        final TextView aglBtn = Neo.button(c, aglNames[agl[0]], null, Neo.GREEN), dlBtn = Neo.button(c, "Download terrain", "globe", Neo.GREEN);
+        for (TextView b : new TextView[] { aglBtn, dlBtn }) { b.setTextSize(13.5f); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (8 * d), (int) (3 * d), 0); terrRow.addView(b, lp); }
+        dlBtn.setVisibility(View.GONE);
+        terrRow.setVisibility(layerOn[2] ? View.VISIBLE : View.GONE);
+        body.addView(terrRow);
         final TextView predNote = Neo.label(c, "", Neo.DIM, 12.5f, false); predNote.setPadding(0, (int) (6 * d), 0, (int) (6 * d)); body.addView(predNote);
 
         final android.widget.FrameLayout view = new android.widget.FrameLayout(c);
@@ -111,15 +120,36 @@ public final class FoxHuntDialog {
         final long[] nextBeep = { 0 };
         final FoxPredictor.Result[] pred = { null }; final int[] gen = { 0 }, seen = { -1 };
         final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
+        final com.macdmr.radio.coverage.Terrain terrain = new com.macdmr.radio.coverage.Terrain(c);   // used on the worker only
+        final FoxPredictor.TerrainCache tcache = new FoxPredictor.TerrainCache();
+        final double[][] tbox = { null };                                       // the area the terrain must cover {s, w, n, e}
         final Runnable recompute = () -> {
             final int g = ++gen[0]; final List<FoxHunt.Mark> ms = svc.fox().marks(); seen[0] = ms.size();
-            final FoxPredictor.Options o = new FoxPredictor.Options(); o.bearings = layerOn[0]; o.heat = layerOn[1];
+            final FoxPredictor.Options o = new FoxPredictor.Options(); o.bearings = layerOn[0]; o.heat = layerOn[1]; o.terrain = layerOn[2];
+            o.foxAgl = aglChoices[agl[0]]; o.cache = tcache;
+            ChannelStore.Channel cur = svc.current(); if (cur != null && cur.rxFreq > 0) o.hz = cur.rxFreq;
+            dlBtn.setVisibility(View.GONE);
             if (!o.bearings && !o.heat) { pred[0] = null; layer.set(null, ms); plot.setEstimate(null); mapView.invalidate(); predNote.setText("Prediction off: the estimate is the bearing crossing, as without layers."); return; }
+            final double[] box; if (ms.isEmpty()) box = null; else {
+                double s0 = 90, w0 = 180, n0 = -90, e0 = -180;
+                for (FoxHunt.Mark m : ms) { s0 = Math.min(s0, m.lat); n0 = Math.max(n0, m.lat); w0 = Math.min(w0, m.lon); e0 = Math.max(e0, m.lon); }
+                double padLat = 3000 / 111_320.0, padLon = 3000 / (111_320.0 * Math.cos(Math.toRadians((s0 + n0) / 2)));   // the grid reaches ~1.5 km past the marks; room to grow
+                box = new double[] { s0 - padLat, w0 - padLon, n0 + padLat, e0 + padLon };
+            }
+            tbox[0] = box;
+            final boolean useTerrain = o.terrain && o.heat && box != null;
+            if (useTerrain) predNote.setText("Working out the terrain\u2026");
             worker.execute(() -> {
+                int missing = 0;
+                if (useTerrain) {
+                    int[] t = terrain.tiles(box[0], box[1], box[2], box[3]); missing = t[1];
+                    if (missing == 0 && terrain.load(box[0], box[1], box[2], box[3], null) == null) o.elevation = terrain;   // from the phone, no network
+                }
                 FoxPredictor.Result r = null; try { r = FoxPredictor.predict(ms, o); } catch (Throwable ignored) { }
-                final FoxPredictor.Result res = r;
+                final FoxPredictor.Result res = r; final int miss = missing;
                 h.post(() -> {
                     if (g != gen[0]) return;                            // a newer mark or toggle arrived meanwhile
+                    if (miss > 0) { dlBtn.setText(String.format(Locale.US, "Download terrain (about %.1f MB)", Math.max(0.1, miss * com.macdmr.radio.coverage.Terrain.TILE_BYTES / 1e6))); dlBtn.setVisibility(View.VISIBLE); }
                     pred[0] = res; layer.set(res, ms); plot.setEstimate(res); mapView.invalidate();
                     predNote.setText(res == null ? "Mark a reading to start." : (res.note == null ? "" : "Not used yet: " + res.note + ". ") + (res.hasMap() ? "Shaded: where the fox probably is; bright outline 50 %, faint 90 %." : ""));
                     if (!ms.isEmpty()) {
@@ -136,8 +166,20 @@ public final class FoxHuntDialog {
         };
         for (int i = 0; i < pill.length; i++) {
             final int k = i;
-            pill[i].setOnClickListener(v -> { layerOn[k] = !layerOn[k]; Neo.pillStyle(pill[k], layerOn[k], layerAccent[k]); fp.edit().putBoolean(layerKey[k], layerOn[k]).apply(); recompute.run(); });
+            pill[i].setOnClickListener(v -> { layerOn[k] = !layerOn[k]; Neo.pillStyle(pill[k], layerOn[k], layerAccent[k]); fp.edit().putBoolean(layerKey[k], layerOn[k]).apply(); terrRow.setVisibility(layerOn[2] ? View.VISIBLE : View.GONE); recompute.run(); });
         }
+        aglBtn.setOnClickListener(v -> { agl[0] = (agl[0] + 1) % aglChoices.length; aglBtn.setText(aglNames[agl[0]]); fp.edit().putInt("foxAgl", agl[0]).apply(); recompute.run(); });
+        dlBtn.setOnClickListener(v -> {
+            final double[] box = tbox[0]; if (box == null) return;
+            new AlertDialog.Builder(c).setTitle("Download terrain").setMessage("Ground heights for this area " + dlBtn.getText().toString().replace("Download terrain ", "") + ", downloaded once and kept on the phone for later hunts and the coverage maps, so the Terrain layer works offline afterwards.")
+                    .setPositiveButton("Download", (x, y) -> {
+                        dlBtn.setVisibility(View.GONE); predNote.setText("Downloading terrain\u2026");
+                        worker.execute(() -> {
+                            String err = terrain.load(box[0], box[1], box[2], box[3], (done, total) -> h.post(() -> predNote.setText("Downloading terrain " + done + " of " + total + "\u2026")));
+                            h.post(() -> { if (err != null) Toast.makeText(c, err, Toast.LENGTH_LONG).show(); recompute.run(); });
+                        });
+                    }).setNegativeButton("Not now", null).show();
+        });
         { final Location l0 = here[0]; if (l0 != null) { mapView.setMe(l0.getLatitude(), l0.getLongitude(), l0.getAccuracy()); mapView.post(() -> mapView.center(l0.getLatitude(), l0.getLongitude(), 16)); } }
         final long opened = System.currentTimeMillis(); final boolean[] fellBack = { false };
         SensorManager sm = (SensorManager) c.getSystemService(Context.SENSOR_SERVICE);
