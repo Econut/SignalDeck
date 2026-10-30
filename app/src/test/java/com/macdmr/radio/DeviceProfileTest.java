@@ -49,6 +49,9 @@ public class DeviceProfileTest {
         for (String[] l : p.gatewayLinesOn) { relay |= l[0].contains("relay_state") && l[1].equals("1"); ampOff |= l[0].contains("ext_pa_en") && l[1].equals("0"); }
         assertTrue(relay); assertTrue(ampOff);
         assertTrue(p.gatewayLinesOff[0][0].contains("relay_state") && p.gatewayLinesOff[0][1].equals("0"));
+        boolean ampBack = false;                             // without a snapshot the off list alone must leave the speaker working
+        for (String[] l : p.gatewayLinesOff) ampBack |= l[0].contains("ext_pa_en") && l[1].equals("1");
+        assertTrue(ampBack);
         for (String[][] ls : new String[][][] { p.gatewayLinesOn, p.gatewayLinesOff }) for (String[] l : ls) assertFalse("never a flyscale_misc node", l[0].contains("flyscale_misc"));
         assertEquals(0.03f, p.txAudioScale, 1e-6); assertEquals(0.03f, p.copy(true, true).txAudioScale, 1e-6);
         assertNull(DeviceProfile.ANYSECU_W6.gatewayLinesOn); assertEquals(1f, DeviceProfile.ANYSECU_W6.txAudioScale, 1e-6);

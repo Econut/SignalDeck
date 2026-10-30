@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — W6Plus DMR gateway route: the speaker amplifier comes back even without a snapshot
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| PR 114 review (managing agent, 2026-10-29) | When a gateway node could not be read before a transmission of SignalDeck's own audio, only the stock off list ran afterwards and the speaker amplifier stayed off. The W6Plus DMR's off list now ends with the idle values of what the route changes (dmr_state 0, speaker amplifier on); the snapshot, when there is one, is still written back last. | DeviceProfile, DeviceProfileTest | Host suite |
+
 ## 2026-10-29 — ANYSECU W6Plus DMR: APRS and SignalDeck's other sounds go on the air (the stock app's gateway route)
 
 | Backlog | Change | Files | Test |
