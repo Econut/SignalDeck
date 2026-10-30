@@ -5,6 +5,11 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | W6 two-phone tests (2026-10-29) | The W6+ had borrowed the W6Plus DMR's transmit level (0.03), but its relay path is about 16 dB quieter: its DTMF arrived under the decoder's floor and PSK31 lost words. Its level is now 0.2 (the path is linear to 0.5), provisional until the HackRF measures its deviation. Radio notes: W6+ SSTV and FT8 sending yes. | DeviceProfile, radios.json, docs/radios, DeviceProfileTest | **Device (W6+ → W6Plus DMR, 434.000 MHz low power, both on battery):** at 0.2, DTMF 16/16, PSK31 in full, SSTV Robot 24 clean (118 lines), RTTY and FT8 decoded; at 0.03 DTMF failed and SSTV was speckled. Also found: with both phones on mains chargers a 120 Hz buzz entered the over-the-air audio in both directions (gone on battery). |
+## 2026-10-29 — PSK31: the first word is no longer lost over the radio
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-29) | PSK31 led with one second of phase reversals, which over an FM radio goes to the transmitter's key-up and the receiver's carrier search, so the receiving phone locked just as the first characters went by ("tQ PSK31 …" for "CQ PSK31 …", in both directions between two phones). The lead is now two seconds; a transmission holds 52 characters instead of 55 so it still fits the radio's limit. | Psk31, PacketEngine, TextModesTest | Host: `psk31FirstWordSurvivesALateStart` (the first 1.2 s cut off: "p1 BENCH" before, "CQ PSK31 BENCH" now). **Device (ANYSECU W6+ ↔ W6Plus DMR, 434.000 MHz low power):** "CQ PSK31 FROM W6DMR LONG LEAD" and "CQ PSK31 FROM W6PLUS LONG LEAD" decoded in full both ways (before: "tQ …", "dQ …") |
 
 ## 2026-10-29 — Fox hunt: Spin for the bearing (body-shadow sweep)
 

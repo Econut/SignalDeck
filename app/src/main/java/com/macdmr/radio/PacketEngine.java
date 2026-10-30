@@ -452,7 +452,7 @@ public final class PacketEngine {
         final double hz = m == 1 ? (rtty != null && rtty.locked() ? rtty.markHz() : 2125) : (psk != null && psk.locked() ? psk.freq() : 1000);
         final java.util.List<String> parts = new java.util.ArrayList<>();
         StringBuilder cur = new StringBuilder();
-        int limit = m == 1 ? 130 : 55;                                    // characters that fit about 26 s with the lead and tail (capitals are the longest in PSK31)
+        int limit = m == 1 ? 130 : 52;                                    // characters that fit about 26 s with the lead and tail (capitals are the longest in PSK31)
         for (String w : text.trim().split(" ")) { if (cur.length() + w.length() + 1 > limit && cur.length() > 0) { parts.add(cur.toString()); cur.setLength(0); } if (cur.length() > 0) cur.append(' '); cur.append(w); }
         if (cur.length() > 0) parts.add(cur.toString());
         synchronized (this) { textRx.append("\n> ").append(text.trim()).append('\n'); } textPost();
