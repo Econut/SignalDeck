@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Bench: APRS message, DTMF send and FT8 answer from the DIAG broadcast
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-29) | Bench-only DIAG commands for headless two-phone tests: `aprsmsg --es to CALL-N --es text …` (as from the UI: acked and retried), `dtmfsend --es seq …`, and `ft8 --ez reply true` (answer the newest CQ heard, as a tap on it would). Nothing user-facing. | DiagReceiver | **Device (W6+ ↔ W6Plus DMR):** used for the FT8 QSO, the DTMF and the APRS message tests of 2026-10-29 |
+
 ## 2026-10-29 — Fox hunt: Spin for the bearing (body-shadow sweep)
 
 | Backlog | Change | Files | Test |
