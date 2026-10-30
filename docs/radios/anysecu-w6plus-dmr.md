@@ -2,9 +2,9 @@
 
 # ANYSECU W6Plus DMR
 
-*DMR (V69) · Being brought up · profile anysecu-w6plus-dmr*
+*DMR (V69) · In testing · profile anysecu-w6plus-dmr*
 
-The W6+ body with a UHF DMR module; receive works, transmit is held back until the profile is confirmed.
+The W6+ body with a UHF DMR module; DMR and FM receive and transmit work.
 
 ## The radio
 
@@ -24,10 +24,10 @@ SignalDeck does not load module firmware on this phone.
 | Feature | State | Note |
 |---|---|---|
 | Signal meter | Works |  |
-| FM receive | Works |  |
-| FM transmit | Not tested | Blocked in the app until the profile is confirmed; one bench test passed |
-| DMR receive | Partly | Calls and caller ID detected; voice audio level is very low |
-| DMR transmit | Not tested | Blocked in the app until the profile is confirmed; one bench test decoded |
+| FM receive | Works | Tested with another radio (2026-10-29); check the channel's CTCSS/DCS setting if nothing is heard |
+| FM transmit | Works | Tested on the bench (2026-10-29) |
+| DMR receive | Works | Tested with another DMR radio; voice level on the phone is low (under investigation) |
+| DMR transmit | Works | Tested with another DMR radio (2026-10-29) |
 | M17 receive | Not tested |  |
 | M17 transmit | No | No module firmware loading on this phone |
 | APRS | Not tested | Sending is not possible: the microphone is the only transmit audio |
@@ -43,10 +43,6 @@ SignalDeck does not load module firmware on this phone.
 ### UHF only
 
 Despite "dual band" in some listings, the radio answers only 400 to 480 MHz; VHF frequencies are never acknowledged.
-
-### Transmit is held back
-
-The profile is not confirmed yet, so SignalDeck does not take over the radio by itself and does not transmit on it. One owner-authorized bench test keyed FM and DMR correctly.
 
 ### The microphone is the only transmit audio
 
