@@ -303,6 +303,15 @@ public final class DiagReceiver extends BroadcastReceiver {
                 if (i.getBooleanExtra("dump", false)) for (String l : pe.textReceived().split("\n")) Log.i("DiagReceiver", "text rx: " + l);
                 Log.i("DiagReceiver", "text: mode " + pe.textMode() + ", " + pe.textStatus()); break;
             } else break;
+            case "term": if (s.packet() != null) {                              // bench: packet terminal: --ez accept, --es connect CALL-N, --es send LINE, --ez disconnect, --ez dump (log the transcript)
+                com.macdmr.radio.PacketEngine pe = s.packet();
+                if (i.hasExtra("accept")) pe.setAcceptConnections(i.getBooleanExtra("accept", false));
+                String to = i.getStringExtra("connect"); if (to != null) Log.i("DiagReceiver", "term connect: " + pe.terminalConnect(to, i.getStringExtra("via")));
+                String line = i.getStringExtra("send"); if (line != null) Log.i("DiagReceiver", "term send: " + pe.terminalSend(line));
+                if (i.getBooleanExtra("disconnect", false)) pe.terminalDisconnect();
+                if (i.getBooleanExtra("dump", false)) for (String l : pe.transcriptText().split("\n")) if (!l.isEmpty()) Log.i("DiagReceiver", "term: " + l);
+                Log.i("DiagReceiver", "term state: " + pe.terminalState() + ", accept " + pe.acceptConnections()); break;
+            } else break;
             case "aprsmsg": if (s.packet() != null) Log.i("DiagReceiver", "aprsmsg: " + s.packet().sendMessage(i.getStringExtra("to"), i.getStringExtra("text"))); break;   // bench: an APRS message (--es to CALL-N, --es text), acked and retried as from the UI
             case "dtmfsend": if (s.packet() != null) Log.i("DiagReceiver", "dtmfsend: " + s.packet().sendDtmf(i.getStringExtra("seq"))); break;   // bench: send a DTMF sequence (--es seq 0-9*#ABCD)
             case "sstvtx": if (s.packet() != null) {                            // bench: send a colour-bar test card marked N0CALL, --ei mode (SSTVEncoder mode, default Robot 24 colour)
