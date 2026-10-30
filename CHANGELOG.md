@@ -5,6 +5,11 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | PR 123 region test on the W6Plus DMR (managing agent, 2026-10-30) | Add a zone offered every standard list whatever the radio tunes, and adding one inserted every channel: on a UHF-only phone (the W6 phones, the Atom XL) Marine VHF or the 2 m channels of a ham list became channels the radio cannot tune. A list the radio cannot use is now marked "Outside this radio's bands", one it can use in part says how many channels it can, and adding a list leaves out the channels outside the bands (the result says how many). A phone that tunes everything sees no change. Help (Zones and standard lists) says so. | ChannelPresets, ZonesDialog, HelpView, docs/help, RegionPresetsTest | Host: `listsCountWhatAUhfOnlyRadioCanUse`. **Device (W6Plus DMR, region United States):** MURS and NOAA Weather read "Outside this radio's bands", FRS and GMRS unmarked (no list installed: the owner's channels kept) |
+## 2026-10-30 — W6Plus DMR: a fox's CTCSS tone is recognised (fox hunt "Only the fox's", tone heard)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Fox hunt test (PRs 126/128) on the W6Plus DMR (managing agent, 2026-10-30) | The CTCSS decoder skips windows below a dead-air floor set on the Armor's loud vendor audio (per-sample energy 4×10⁵, RMS ~630). The W6Plus DMR's camcorder input carries a carrier with only its tone at RMS ~24 (the tone ~300× above the other bins), so the fox's tone was never recognised and "Only the fox's" never counted a reading. The floor is now a profile value (`toneEnergyMin`, default unchanged); the W6Plus DMR uses 200 (RMS ~14, above its idle input), the ratio tests still keep noise and voice out. | CtcssDecoderBank, DeviceProfile, RadioService, CtcssFloorTest | Host: `CtcssFloorTest` (a lone weak tone locks only with the low floor; noise as loud does not). **Device (W6Plus DMR hunter, W6+ fox, CTCSS 100.0 Hz, 434.000 MHz low power):** before, "The fox is not on the air" through a 5 s key; after, "The fox is on the air: readings count" about 2.5–3 s into the key, back to waiting after it; a key without the tone stayed ignored |
 
 ## 2026-10-30 — Radio notes: charger buzz on both W6 phones, the W6+'s speaker during data sends
 
