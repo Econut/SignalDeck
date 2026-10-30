@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — ANYSECU W6+: APRS and SignalDeck's other sounds on the air through the same relay; W6Plus DMR data modes decoded
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (owner, 2026-10-29) | The W6+ (same board as the W6Plus DMR) has the same gateway relay nodes, although its stock app never uses them; its profile now uses them too, so APRS, Morse ID, tones, RTTY, SSTV and FT8 go on the air instead of keying with the microphone open (same snapshot/restore, level 0.03, media volume held at 10 of 25). Help: "Radios that do less" describes the route on both W6 phones, and the W6Plus DMR section says all four data modes decoded. Radio notes: W6Plus DMR SSTV/FT8 sending yes; W6+ APRS sending yes, SSTV/FT8 sending untested. | DeviceProfile, HelpView, docs/help, radios.json, docs/radios, DeviceProfileTest | **Device (second cage, 434.000 MHz low power, 2026-10-29):** W6Plus DMR → W6+: APRS (N0CALL), RTTY (the full line), FT8 (`CQ DMRTST`, −8 dB, dt +1.8 s) and an SSTV Robot 24 colour test card decoded on the W6+. W6+ → W6Plus DMR: a 1 kHz tone through the relay received clean, and an N0CALL APRS packet decoded 2 of 2; the W6+ lines read back at idle after every key, and its module answered right after. Host suite |
+
 ## 2026-10-29 — W6Plus DMR: its own transmit audio no longer depends on the media volume
 
 | Backlog | Change | Files | Test |
