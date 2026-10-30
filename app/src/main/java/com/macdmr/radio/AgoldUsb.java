@@ -164,6 +164,14 @@ final class AgoldUsb {
      * with no 0x32 during them, against 1 drop in 6 with a reading every 0.5 to 2 s). The watchdog's own receptions (found
      * from the signal) keep reading, they end on it; measurement tools read anyway.
      */
+    /**
+     * Whether a capture that ended or never delivered calls for a bridge restart. Not when it was opened for a reception
+     * found only from the signal and got no audio at all: the module plays nothing for energy from another transmitter
+     * close by, and the bridge streams only while the module plays, so the capture's I/O error says nothing about the
+     * bridge (2026-10-29 21:41: a 3 s burst from another phone in the cage restarted the bridge). A line that is really
+     * stuck still restarts through the missed-reception count ({@link #countsAsLineMiss}).
+     */
+    static boolean restartForCapture(boolean signalOnlyReception, long audioBytes) { return !(signalOnlyReception && audioBytes == 0); }
     static boolean holdsRxRead(boolean agold, boolean lineReception, boolean synthetic) { return agold && lineReception && !synthetic; }
     static boolean countsAsLineMiss(long heldMs) { return heldMs >= LINE_MISS_MIN_MS; }
     /** At least this long between two automatic bridge power-cycles of any kind. */

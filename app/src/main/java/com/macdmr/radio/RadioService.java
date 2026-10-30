@@ -2759,8 +2759,12 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (!dmr && a != null && ((AlsaDirectAudio) a).capturing()) return;
                     if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); }
                     if (a != null) {
+                        captureSignalOnly = synthRx; captureBytesAtStart = rxAudioBytes();
                         String r = a.startRx(true); log(r);
-                        if (r != null && r.contains("no audio block yet")) recoverBridgeAudio("the USB capture delivered nothing");
+                        if (r != null && r.contains("no audio block yet")) {
+                            if (captureCallsForRestart()) recoverBridgeAudio("the USB capture delivered nothing");
+                            else log("a reception found from the signal: no audio yet, no bridge restart");
+                        }
                     } }
                 else { if (a != null) a.stopRx(); if (packet != null && !dmr) packet.streamEnded(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
             } catch (Throwable t) { log("bridge capture: " + t); }
@@ -2896,8 +2900,12 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (w > 0) { log("bridge restart for the " + why + " held back: another automatic restart ran " + (AgoldUsb.AUTO_CYCLE_GAP_MS - w) / 1000 + " s ago"); return false; }
         lastAutoCycleAt = System.currentTimeMillis(); return true;
     }
+    // the capture last opened for a reception: was that reception found only from the signal, and the audio count then
+    private volatile boolean captureSignalOnly; private volatile long captureBytesAtStart;
+    private boolean captureCallsForRestart() { return AgoldUsb.restartForCapture(captureSignalOnly, rxAudioBytes() - captureBytesAtStart); }
     private void captureEnded(String err) {
         if (agoldBridge() && System.currentTimeMillis() < ownCycleUntil) { log("the capture ended with our own bridge restart: no recovery (" + err + ")"); return; }
+        if (agoldBridge() && !captureCallsForRestart()) { log("a reception found from the signal gave no audio (another transmitter close by, most likely): no bridge restart (" + err + ")"); return; }
         recoverBridgeAudio("the USB capture ended by itself (" + err + ")");
     }
     private void powerCycleOrGiveUp() throws IOException {

@@ -151,6 +151,13 @@ public class AgoldUsbTest {
         assertTrue("then host mode is left", r.indexOf("echo 0 > " + AgoldUsb.USB_PATH) > offAgain);
     }
 
+    @Test public void aSilentSignalOnlyCaptureDoesNotRestartTheBridge() {
+        assertFalse(AgoldUsb.restartForCapture(true, 0));         // energy from elsewhere: the module played nothing
+        assertTrue(AgoldUsb.restartForCapture(true, 4096));       // it played, then the capture died: restart
+        assertTrue(AgoldUsb.restartForCapture(false, 0));         // the line reported it and nothing came: restart
+        assertTrue(AgoldUsb.restartForCapture(false, 4096));
+    }
+
     @Test public void theSMeterHoldsItsReadingOnlyDuringAReportedAtomXlReception() {
         assertTrue(AgoldUsb.holdsRxRead(true, true, false));      // the line reported it: no command while the audio streams
         assertFalse(AgoldUsb.holdsRxRead(true, true, true));      // found from the signal: the watchdog needs the readings to end it

@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: a burst from another transmitter no longer restarts the bridge
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL false starts (2026-10-29) | A signal well above the floor with the reception line silent starts a reception found from the signal, which opens the capture. For energy from another transmitter close by the module plays nothing, the bridge streams nothing, and the capture ended with an I/O error 2 s later, which power-cycled the bridge (about 12 s without the radio; seen 21:41 with another phone keying in the same cage). Now a capture opened for such a reception that got no audio at all ends without a restart (`AgoldUsb.restartForCapture`); a line that is really stuck still restarts through the missed-reception count (3 s and longer, twice) | AgoldUsb, RadioService, AgoldUsbTest | Host tests; device: next HackRF slot (a short off-channel burst) |
+
 ## 2026-10-29 — W6Plus DMR gateway route: the speaker amplifier comes back even without a snapshot
 
 | Backlog | Change | Files | Test |
