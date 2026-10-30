@@ -133,7 +133,9 @@
         {"title": "Low tones are cut hard", "text": "The receiver removes almost everything below about 300 Hz, more steeply than the Armor. Voice is fine; M17 receive uses its own calibration for it."},
         {"title": "SignalDeck plays the audio", "text": "The module's own speaker route stays off at a fixed volume and SignalDeck plays the radio audio itself, so the phone's volume keys work as usual. There is a slight delay."},
         {"title": "DCS codes", "text": "DCS tone squelch works with normal-polarity codes only."},
-        {"title": "Small screen", "text": "The screen is 480 by 854. SignalDeck uses a compact intercom layout here."}
+        {"title": "Small screen", "text": "The screen is 480 by 854. SignalDeck uses a compact intercom layout here."},
+        {"title": "Its speaker stays on while it sends data", "text": "SignalDeck's own sounds (APRS, tones, SSTV, FT8) go through a relay to the radio, and the phone's speaker amplifier cannot be switched off for that moment, so the tones can be heard from the phone while it transmits them."},
+        {"title": "Mains chargers put a buzz on the air", "text": "With the phone on a mains charger, a 120 Hz buzz got into its transmitted and received audio in a test with two of these phones; data modes that tolerate noise (RTTY, FT8, APRS) still decoded, DTMF and PSK31 did not. On battery, or on a clean charger, it is gone."}
       ],
       "measured": [
         {"what": "Receive response at 250 Hz", "value": "-48 dB", "note": "-57 dB at 125 to 187 Hz (HackRF test transmissions)."},
@@ -174,7 +176,8 @@
         {"title": "The app's own sounds go through a gateway relay", "text": "Your voice goes from the microphone straight to the radio. Sounds SignalDeck makes itself (APRS, Morse ID, tones, SSTV, FT8) go through the relay the stock app uses for its network gateway, which feeds the phone's audio to the radio's microphone input while it transmits. It is a voice path: nothing below about 300 Hz and a cut above 3 kHz, so M17 cannot be sent."},
         {"title": "Transmit frequency runs high", "text": "Our test unit transmitted about 1.6 kHz above the set frequency on FM and DMR alike, measured against a test receiver whose own error is part of that figure. It is inside what most DMR radios accept, but a narrow or strict receiver, or a DMR hotspot, may need its receive offset adjusted or may show a high bit error rate for this radio."},
         {"title": "DMR voice audio is quiet", "text": "DMR calls are detected with the caller's ID, but the decoded voice reaches the app far below FM audio. This is under investigation."},
-        {"title": "Its transmitter desensitises nearby radios", "text": "While it keys, a radio close by on another UHF frequency hears less (its signal reading drops), though it does not open."}
+        {"title": "Its transmitter desensitises nearby radios", "text": "While it keys, a radio close by on another UHF frequency hears less (its signal reading drops), though it does not open."},
+        {"title": "Mains chargers put a buzz on the air", "text": "With the phone on a mains charger, a 120 Hz buzz got into its transmitted and received audio in a test with two of these phones; data modes that tolerate noise (RTTY, FT8, APRS) still decoded, DTMF and PSK31 did not. On battery, or on a clean charger, it is gone."}
       ],
       "measured": [
         {"what": "Carrier offset", "value": "about +1.6 kHz", "note": "+1598, +1575 and +1604 Hz on three keys (2026-10-29). Includes the test receiver's own error: the same receiver reads an Armor 26 Ultra +0.8 to 1.0 kHz high, so this radio alone is probably 0.6 to 0.8 kHz (about 1.5 ppm) high. Measured on one test unit; your radio may differ."},

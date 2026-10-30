@@ -543,6 +543,14 @@
         {
           "title": "Small screen",
           "text": "The screen is 480 by 854. SignalDeck uses a compact intercom layout here."
+        },
+        {
+          "title": "Its speaker stays on while it sends data",
+          "text": "SignalDeck's own sounds (APRS, tones, SSTV, FT8) go through a relay to the radio, and the phone's speaker amplifier cannot be switched off for that moment, so the tones can be heard from the phone while it transmits them."
+        },
+        {
+          "title": "Mains chargers put a buzz on the air",
+          "text": "With the phone on a mains charger, a 120 Hz buzz got into its transmitted and received audio in a test with two of these phones; data modes that tolerate noise (RTTY, FT8, APRS) still decoded, DTMF and PSK31 did not. On battery, or on a clean charger, it is gone."
         }
       ],
       "measured": [
@@ -700,6 +708,10 @@
         {
           "title": "Its transmitter desensitises nearby radios",
           "text": "While it keys, a radio close by on another UHF frequency hears less (its signal reading drops), though it does not open."
+        },
+        {
+          "title": "Mains chargers put a buzz on the air",
+          "text": "With the phone on a mains charger, a 120 Hz buzz got into its transmitted and received audio in a test with two of these phones; data modes that tolerate noise (RTTY, FT8, APRS) still decoded, DTMF and PSK31 did not. On battery, or on a clean charger, it is gone."
         }
       ],
       "measured": [

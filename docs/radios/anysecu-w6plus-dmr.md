@@ -60,6 +60,10 @@ DMR calls are detected with the caller's ID, but the decoded voice reaches the a
 
 While it keys, a radio close by on another UHF frequency hears less (its signal reading drops), though it does not open.
 
+### Mains chargers put a buzz on the air
+
+With the phone on a mains charger, a 120 Hz buzz got into its transmitted and received audio in a test with two of these phones; data modes that tolerate noise (RTTY, FT8, APRS) still decoded, DTMF and PSK31 did not. On battery, or on a clean charger, it is gone.
+
 ## Measured on our test unit
 
 Measured on one test unit; your radio may differ.

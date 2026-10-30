@@ -65,6 +65,14 @@ DCS tone squelch works with normal-polarity codes only.
 
 The screen is 480 by 854. SignalDeck uses a compact intercom layout here.
 
+### Its speaker stays on while it sends data
+
+SignalDeck's own sounds (APRS, tones, SSTV, FT8) go through a relay to the radio, and the phone's speaker amplifier cannot be switched off for that moment, so the tones can be heard from the phone while it transmits them.
+
+### Mains chargers put a buzz on the air
+
+With the phone on a mains charger, a 120 Hz buzz got into its transmitted and received audio in a test with two of these phones; data modes that tolerate noise (RTTY, FT8, APRS) still decoded, DTMF and PSK31 did not. On battery, or on a clean charger, it is gone.
+
 ## Measured on our test unit
 
 Measured on one test unit; your radio may differ.

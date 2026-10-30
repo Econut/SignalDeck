@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-30 — Radio notes: charger buzz on both W6 phones, the W6+'s speaker during data sends
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (managing agent, 2026-10-30) | Known quirks added to Device → About this radio and docs/radios: on a mains charger a 120 Hz buzz enters both W6 phones' over-the-air audio (DTMF and PSK31 then fail, RTTY/FT8/APRS pass; gone on battery), and the W6+'s speaker amplifier cannot be switched off while SignalDeck's own sounds go through its relay (its ext_pa_en ignores 0), so they are heard from the phone. | radios.json, docs/radios | Measured 2026-10-29 on the two bench phones (charger: 85 % of a silent key's audio was 120 Hz harmonics, 5 % on battery). |
+
 ## 2026-10-29 — ANYSECU W6+: its own transmit audio at a usable level; SSTV, FT8, RTTY, DTMF and PSK31 sending decoded
 
 | Backlog | Change | Files | Test |
