@@ -3018,7 +3018,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void rssi(int raw, double dbm) { if (scope.running()) { scope.onRssi(raw); return; }   // a sweep step's reading: not the channel's signal, not for the coverage log
         rssi0(raw, dbm); }
-    private void rssi0(int raw, double dbm) { agoldRssi(dbm); rssi = (int) Math.round(dbm); if (coverage != null) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
+    private void rssi0(int raw, double dbm) { agoldRssi(dbm); rssi = (int) Math.round(dbm); if (coverage != null && AgoldUsb.coverageReadingUsable(agoldBridge(), System.currentTimeMillis(), ownCycleUntil)) coverage.onRssi(rssi); if (hearing()) refreshControls(); /* the car screen's signal meter */ ui.post(() -> { for (Listener l : listeners) l.onRssi(rssi); }); }
     private volatile String moduleVersion = "";
     private volatile long versionAt;
     @Override public void version(int v, String text) {
