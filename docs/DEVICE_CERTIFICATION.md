@@ -1,6 +1,6 @@
 # Getting your phone certified for SignalDeck
 
-**Version 1, 2026-10-29. This is a living document:** it changes as we learn from new phones. The history is at the
+**Version 2, 2026-10-29. This is a living document:** it changes as we learn from new phones. The history is at the
 bottom, and every change is in this file's git history. Questions and suggestions are welcome in GitHub Discussions
 or an issue.
 
@@ -65,7 +65,9 @@ Share), and a one-line result per step.
 
 ### 3.3 Transmit (for Beta) (TX)
 This step needs a way to check your own signal: a second radio, plus ideally an SDR (an RTL-SDR is enough for most
-checks) or a service monitor. Transmit is off in the app below Beta; the maintainer sends a test build for this step.
+checks) or a service monitor. Transmit is off in the app below Beta; the maintainer sends a test build for this step,
+or, in your own fork, you set `verified = true` for your profile in your build only (section 6). Run the steps with
+the **transmit test session** (section 3.5): it keys, times and records each one for you.
 1. **FM voice:** key for 5 s on a simplex channel; the second radio hears you clearly and at a normal level.
 2. **Release:** the transmission ends when you release the key, every time. The app's 28 s limit ends a held key.
 3. **Frequency:** with an SDR, note how far your carrier is from the channel frequency (a few hundred Hz is normal;
@@ -83,13 +85,75 @@ Each that the phone can do; mark the others "not supported" with the reason.
 5. **Restart and reboot:** SignalDeck takes the radio again after the app restarts and after a phone reboot (with "Own
    the radio at boot" on); handing back to the stock app works.
 
+### 3.5 The transmit test session (TX)
+**Device → Device report → Transmit test session** runs section 3.3 for you and writes the evidence we need.
+
+- **When it opens:** only when your profile may transmit: verified, or verified in your fork's own build (the report
+  then says the flag came from your build, not from the official profile list). Never while an advisory has switched
+  transmit off, and never while Restricted mode keeps transmitting off.
+- **Safety first:** a sheet with the rules of section 1 (licence, dummy load or low power on a simplex frequency you
+  may use, short keys, attended, heat). Switch each one on, then Start. Every step has Skip and Stop, and every key has
+  a **Release now** button.
+- **The steps:** FM voice key (5 s) · release check (three 2 s keys, each must end with the module's SEND_STOP) · the
+  28 s limit (one key SignalDeck does not release; its watchdog must end it) · frequency offset and deviation (an
+  optional 10 s key while you measure, then you type the values) · DMR group call (5 s, DMR phones; did the other
+  radio show your caller ID) · heat (five 3 s keys, temperatures before and after).
+- **Recorded by the app, per key:** UTC time, channel number and name, receive and transmit frequency, power, mode
+  (FM or DMR, with colour code, slot and talkgroup), how the radio was keyed (the PTT path), the module's status
+  replies with their times, who released the key (app, watchdog, tester, module), and the battery and processor
+  temperatures before and after.
+- **Entered by you:** whether the receiving radio heard it (yes / no / not checked) and notes, the measured offset and
+  deviation, your measuring equipment and receiving radio, and a recording: pick the file on the phone (SignalDeck
+  stores its name and SHA-256, not the file) or give a link (with its SHA-256 if you have it).
+- **Output:** `tx-report.json` in the device report folder (Download/DMR/DeviceReport), a "Transmit test session"
+  section in report.txt and the same in 00_SUMMARY.txt. Share the report zip, or tx-report.json on its own.
+- **Privacy:** the callsign and DMR ID set in the app are replaced by `<callsign>` and `<dmr id>` in everything it
+  writes, and e-mail addresses are masked. Do not type them into notes anyway.
+
+`tx-report.json`, schema version 1:
+
+| Field | Meaning |
+|---|---|
+| `schema`, `type` | `1`, `"signaldeck-tx-report"`; a later schema gets a new number |
+| `created`, `finished` | UTC times of the session |
+| `build` | the build identity (section 3.6) |
+| `phone`, `module` | manufacturer, model, device, Android version; the radio module's version string |
+| `safety` | `confirmedUtc` and the rules the tester confirmed |
+| `equipment`, `receiver` | the measuring equipment and the receiving radio, as typed |
+| `recordings[]` | `name` or `url`, `sha256`, `bytes` (`-1` when unknown) |
+| `steps[]` | `id` (`fm`, `release`, `watchdog`, `measure`, `dmr`, `heat`), `title`, `result` (`pass`, `fail`, `recorded`, `skipped`, `not run`), `auto` (what the app found), `tester` (`heard`, `callerId`, `notes`), `measured` (`offsetHz`, `deviationHz`, null when not measured), `keys[]` |
+| `keys[]` | `startUtc`, `plannedMs` (0 = held for the 28 s limit), `durationMs`, `releasedBy`, `refused`, `channel` (`number`, `name`, `mode`, `rxHz`, `txHz`, `power`, `bandwidth`, `colorCode`, `slot`, `talkgroup`), `pttPath`, `statuses[]` (`tMs`, `code`, `name`), `sendStartMs`, `sendStopMs`, `batteryC` and `processorC` (`before`, `after`, null when unreadable) |
+
+Times inside a key are milliseconds from the moment SignalDeck pressed the key; `-1` means the module never reported it.
+
+### 3.6 Build identity
+Every device report (report.txt section "SignalDeck build", `build` in report.json, the top of 00_SUMMARY.txt) and
+every transmit test says exactly what was tested:
+
+- version, git **commit** (short and full), **branch**, the **repository** it was built from (`git remote get-url
+  origin`, with any user name, password or token removed), whether the working tree had **uncommitted changes**, and
+  the **build time** (UTC); "unknown" when the build machine had no git;
+- the SHA-256 of the **signing certificate** and whether the build is **official** (signed with the project's release
+  key, whose public fingerprint is in `BuildIdentity.OFFICIAL_CERT_SHA256`) or a **fork** (any other key);
+- the **profile**: id, revision, built in or from the signed list, verified, transmit switched off by an advisory, and
+  "transmit forced on" when the phone's owner overrode such an advisory; and whether `verified = true` is in the
+  official signed profile list or only in this build.
+
+Build from a clean, pushed commit when you can, so the maintainer can rebuild exactly your build.
+
 ## 4. What to send
 
 - The **device report** (3.1) and, for each level, the results above: a table with each step, pass/fail, and a note.
 - Logs from Device → Diagnostics → Share for anything that failed.
 - Measurements with the tool you used (for example "RTL-SDR, carrier +0.6 kHz").
+- For transmit: the transmit test session's `tx-report.json` (in the report zip) and any recordings with their SHA-256.
 - Where: a GitHub issue using the device template, or attached to your Discussions thread. One thread per phone model,
   so other owners of the same phone can add their results.
+- **GitHub templates:** before your first key, open a **Starting transmit tests** issue (phone model, your fork and
+  commit, your equipment, the band, the licence confirmation; it has no callsign field, keep it that way). Afterwards,
+  a **Transmit test results** issue with the report zip, a result per step and the recordings. A pull request from your
+  fork gets a checklist (`.github/pull_request_template.md`): device report and tx-report.json attached, the profile
+  left at `verified = false`, and the tests of section 3.
 
 ## 5. Who decides, and what happens then
 
@@ -108,10 +172,14 @@ If you write code: **fork** SignalDeck on GitHub, add a profile for your phone i
 `DeviceProfile.java` and the device report's findings), and then open a pull request **from your fork** with your test
 results from section 3. You don't need to be a collaborator for this: a pull request from a fork is GitHub's normal way
 for anyone to offer changes, and nothing is merged until the maintainer has reviewed it. You can also just share a link
-to your fork in your Discussions thread. Keep transmit off
-(`verified = false`) in the PR; the maintainer turns it on after the Beta checks. Never add code that loads module
-firmware for a phone it wasn't made for.
+to your fork in your Discussions thread. To run the transmit tests (3.3) in your fork, set `verified = true` for your
+profile in your own build only; every report from that build is marked as a fork build with your commit and repository,
+and says the flag came from your build. Keep transmit off (`verified = false`) in the PR; the maintainer turns it on
+after the Beta checks. Never add code that loads module firmware for a phone it wasn't made for.
 
 ## History
 
+- **v2 (2026-10-29):** the transmit test session (3.5) and `tx-report.json` schema 1; build identity in every report
+  (3.6); testing transmit in a fork's own build with `verified = true`; the Starting transmit tests and Transmit test
+  results issue templates and the pull request checklist (section 4).
 - **v1 (2026-10-29):** first version: levels, tests per level, evidence, review.
