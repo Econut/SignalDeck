@@ -2712,7 +2712,11 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (uiLog) ui.post(() -> { for (Listener l : listeners) l.onLog(s); });
     }
 
+    /** The transmit test session's view of the module's status replies (Device report → Transmit test session); null otherwise. */
+    public volatile java.util.function.BiConsumer<Integer, String> statusTap;
+
     @Override public void status(int code, String name) {
+        java.util.function.BiConsumer<Integer, String> tap = statusTap; if (tap != null) try { tap.accept(code, name); } catch (Throwable ignored) { }
         switch (code) {
             case 1: if (agoldBridge() && receiving) { if (synthRx) { synthRx = false; lineReported(); log("reception line caught up with the signal"); } break; }   // already open: an edge after a signal-started reception
                 if (agoldBridge() && !synthRx) lineReported();           // an edge from the line itself

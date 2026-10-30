@@ -95,6 +95,8 @@ public final class DeviceReport {
         if (vn != null) kv(r, "phone (vendor partition)", vn);
         DeviceProfile dp = DeviceProfile.detect();
         kv(r, "profile detected", dp.supported ? dp.name + (dp.verified ? "" : " (untested on hardware)") : "none (this is an unsupported phone)");
+        BuildIdentity.Info build = BuildIdentity.gather(c);
+        h(r, "SignalDeck build"); r.append(build.text());              // which commit, repository and signing key made this build (official or fork)
 
         p.step("Serial ports");
         h(r, "Serial ports (File API)");
@@ -198,6 +200,7 @@ public final class DeviceReport {
 
         File txt = new File(dir, "report.txt");
         try (OutputStream o = new FileOutputStream(txt)) { o.write(r.toString().getBytes("UTF-8")); }
+        writeJson(dir, build);                                             // Run all checks rewrites it with its summary and draft
         try (OutputStream o = new FileOutputStream(new File(dir, "00_SUMMARY.txt"))) { o.write(summary(RadioService.running, txt).getBytes("UTF-8")); } catch (Throwable ignored) { }   // also when the folder is sent by hand, not through Share
         p.step("Zipping");
         File zip = new File(new File(c.getCacheDir(), "share"), dir.getName() + ".zip"); zip.getParentFile().mkdirs();
@@ -206,6 +209,22 @@ public final class DeviceReport {
             if (fs != null) for (File f : fs) { z.putNextEntry(new ZipEntry(f.getName())); try (InputStream in = new FileInputStream(f)) { byte[] b = new byte[65536]; int n; while ((n = in.read(b)) > 0) z.write(b, 0, n); } z.closeEntry(); }
         }
         return zip;
+    }
+
+    /** The phone fields of report.json. */
+    static java.util.Map<String, String> phoneFields() {
+        java.util.Map<String, String> ph = new java.util.LinkedHashMap<>();
+        ph.put("manufacturer", Build.MANUFACTURER); ph.put("model", Build.MODEL); ph.put("device", Build.DEVICE);
+        ph.put("android", Build.VERSION.RELEASE); ph.put("build", Build.DISPLAY);
+        return ph;
+    }
+
+    /** report.json beside report.txt: the report's facts as data, with the build identity. */
+    public static void writeJson(File dir, BuildIdentity.Info build) {
+        if (dir == null) return;
+        try (OutputStream o = new FileOutputStream(new File(dir, "report.json"))) {
+            o.write(ReportJson.build(readReport(dir), phoneFields(), build == null ? null : build.toJson()).toString(2).getBytes("UTF-8"));
+        } catch (Throwable t) { android.util.Log.w("DeviceReport", "report.json: " + t); }
     }
 
     /** The newest report folder, or null. */
@@ -423,6 +442,7 @@ public final class DeviceReport {
         b.append("phone: ").append(Build.MANUFACTURER).append(' ').append(Build.MODEL).append(" \u00B7 Android ").append(Build.VERSION.RELEASE).append(" \u00B7 ").append(Build.DISPLAY).append('\n');
         String vn = vendorName(); if (vn != null) b.append("phone per its vendor partition: ").append(vn).append('\n');   // a GSI names itself, not the phone
         b.append("SignalDeck: ").append(BuildConfig.VERSION_NAME).append(" \u00B7 up ").append(android.os.SystemClock.elapsedRealtime() / 60_000).append(" min since the phone booted\n");
+        try { b.append(BuildIdentity.gather(svc).text()); } catch (Throwable ignored) { }     // commit, repository, official or fork, profile flags
         if (svc != null) {
             DeviceProfile dp = svc.profile();
             b.append("profile: ").append(dp.name).append(" (").append(dp.id).append(" revision ").append(dp.revision).append(dp.verified ? ", verified" : ", not verified yet").append(")\n");
@@ -448,11 +468,20 @@ public final class DeviceReport {
             int[] r = svc.engine().rssiCounts();
             b.append(String.format(java.util.Locale.US, "signal readings: %d, of them %d the module's \"no reading\" value%s\n", r[0], r[1], r[1] > 0 ? " (shown as no signal)" : ""));
         }
+        b.append(txSection(reportTxt.getParentFile()));
         String checks = lastSection(rep, "Summary");                    // Run all checks' verdict, which ends with the draft profile
         if (checks != null) b.append("\nlatest Run all checks:\n").append(checks.trim()).append('\n');
         b.append("\nThe raw sections follow in report.txt (newest checks at the end).\n");
         return b.toString();
     }
+    /** The transmit test session's readable section from tx-report.json in a report folder (already redacted), or "". */
+    static String txSection(File dir) {
+        File f = dir == null ? null : new File(dir, TxReport.FILE);
+        if (f == null || !f.exists()) return "";
+        try { return "\n" + TxReport.fromJson(new org.json.JSONObject(new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8"))).summaryText(); }
+        catch (Throwable t) { return "\ntransmit test session: " + TxReport.FILE + " could not be read (" + t.getMessage() + ")\n"; }
+    }
+
     private static String lastVerdict(String rep, String header) {
         int k = rep.lastIndexOf(header); if (k < 0) return null;
         int v = rep.indexOf("verdict:\n", k); if (v < 0) return null;

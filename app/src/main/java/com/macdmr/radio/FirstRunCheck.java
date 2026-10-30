@@ -120,13 +120,7 @@ public final class FirstRunCheck {
           String draft = DraftProfile.text((d == null ? "" : DeviceReport.readReport(d)) + "\n==== Summary ====\n" + sum);
           DeviceReport.append("Draft profile", draft); sum.append(draft); }
         DeviceReport.append("Summary", sum.toString());
-        { File d = DeviceReport.newestDir();                                  // report.json: the same facts as data, for scripts/report_diff.py
-          if (d != null) try (java.io.FileOutputStream o = new java.io.FileOutputStream(new File(d, "report.json"))) {
-              java.util.Map<String, String> ph = new java.util.LinkedHashMap<>();
-              ph.put("manufacturer", android.os.Build.MANUFACTURER); ph.put("model", android.os.Build.MODEL); ph.put("device", android.os.Build.DEVICE);
-              ph.put("android", android.os.Build.VERSION.RELEASE); ph.put("build", android.os.Build.DISPLAY);
-              o.write(ReportJson.build(DeviceReport.readReport(d), ph).toString(2).getBytes("UTF-8"));
-          } catch (Throwable t) { android.util.Log.w("BenchChecks", "report.json: " + t); } }
+        DeviceReport.writeJson(DeviceReport.newestDir(), BuildIdentity.gather(c));   // report.json: the same facts as data, for scripts/report_diff.py
         p.step("Zipping");
         return DeviceReport.zipNewest(c, true);
     }

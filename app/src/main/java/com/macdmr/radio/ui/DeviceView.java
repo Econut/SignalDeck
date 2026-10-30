@@ -462,7 +462,8 @@ public class DeviceView extends LinearLayout implements RadioService.Listener {
     private void reportMenu() {
         final Context c = getContext();
         new android.app.AlertDialog.Builder(c).setTitle("Device report")
-                .setItems(new String[] { "Help support this phone (step by step)", "Generate device report", "Share last report", "Capture the PTT key (10 s)", "Radio probe (root)", "Open a GitHub issue with the facts filled in", "What is in it?", "Radio audio check (no sound, DMR or analog)" , "Second radio test (guided)", "Radio firmware files (root, you choose)"}, (dd, w) -> {
+                .setItems(new String[] { "Help support this phone (step by step)", "Generate device report", "Share last report", "Capture the PTT key (10 s)", "Radio probe (root)", "Open a GitHub issue with the facts filled in", "What is in it?", "Radio audio check (no sound, DMR or analog)" , "Second radio test (guided)", "Radio firmware files (root, you choose)", "Transmit test session (transmits)"}, (dd, w) -> {
+                    if (w == 10) { TxTestScreen.open(c, svc, this::shareReport); return; }
                     if (w == 9) { firmwareFilesIntro(); return; }
                     if (w == 7) { dmrAudioCheckIntro(); return; }
                     if (w == 8) { secondRadioIntro(); return; }
