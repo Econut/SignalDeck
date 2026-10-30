@@ -34,7 +34,7 @@ Completed means the issue's bounded scope was implemented and verified on the te
 
 ## In Progress
 
-- [#3 — Independent cold startup and reliable Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.8 optional Settings-only Accessibility handover and five-second ACK-ready notice implemented; installed for live validation. Cold module initialization remains unresolved.
+- [#3 — Independent cold startup and reliable Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.8 optional Settings-only Accessibility handover and five-second ACK-ready notice implemented; two warm handovers verified (50/42 ms tune ACK), ready notice shown/dismissed. Normal reboot retained helper but booted with PTT output0/stock absent, correctly blocking connection. Cold recovery/initialization remains unresolved.
 
 ## Testing
 
