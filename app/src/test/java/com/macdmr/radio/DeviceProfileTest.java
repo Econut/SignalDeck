@@ -55,7 +55,9 @@ public class DeviceProfileTest {
         for (String[][] ls : new String[][][] { p.gatewayLinesOn, p.gatewayLinesOff }) for (String[] l : ls) assertFalse("never a flyscale_misc node", l[0].contains("flyscale_misc"));
         assertEquals(0.03f, p.txAudioScale, 1e-6); assertEquals(0.03f, p.copy(true, true).txAudioScale, 1e-6);
         assertEquals(0.4f, p.gatewayVolume, 1e-6); assertEquals(0.4f, p.copy(true, true).gatewayVolume, 1e-6);
-        assertNull(DeviceProfile.ANYSECU_W6.gatewayLinesOn); assertEquals(1f, DeviceProfile.ANYSECU_W6.txAudioScale, 1e-6);
+        // the W6+ (same board) has the same relay; its stock app never used it, a tone and APRS through it decoded on a W6Plus DMR
+        assertNotNull(DeviceProfile.ANYSECU_W6.gatewayLinesOn); assertEquals(0.03f, DeviceProfile.ANYSECU_W6.txAudioScale, 1e-6);
+        for (String[] l : DeviceProfile.ANYSECU_W6.gatewayLinesOn) assertFalse(l[0].contains("flyscale_misc"));
         for (String[][] ls : new String[][][] { p.rxLinesOn, p.rxLinesOff, p.txLinesOn, p.txLinesOff, p.muteLines })
             for (String[] l : ls) assertFalse("never the flyscale_misc attributes", l[0].contains("flyscale_misc"));
     }

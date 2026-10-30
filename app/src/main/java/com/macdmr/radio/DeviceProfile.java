@@ -255,6 +255,11 @@ public final class DeviceProfile {
         // readable, levels 7-9 only clean signals, static never opens.
         ANYSECU_W6.softSqThresholds = new double[] { 11, 9.5, 8, 6.5, 5, 4, 3.3, 2.8, 2.4 }; ANYSECU_W6.softSqCloseCap = 12;
         ANYSECU_W6.rxDetectNode = "/sys/class/gpio/gpio189/value";
+        // the W6Plus DMR's gateway relay for SignalDeck's own transmit audio: the same nodes exist on the W6+ (same board) though
+        // its stock app never uses them; a tone and an N0CALL APRS packet sent through them decoded on a W6Plus DMR (2026-10-29)
+        ANYSECU_W6.gatewayLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/relay_state/relay_state", "1" }, { "/sys/class/gpio/gpio223/value", "1" }, { "/sys/class/gpio/gpio222/value", "1" }, { "/sys/class/gpio/gpio179/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" } };
+        ANYSECU_W6.gatewayLinesOff = new String[][] { { "/sys/kernel/relay_state/relay_state", "0" }, { "/sys/class/gpio/gpio223/value", "0" }, { "/sys/class/gpio/gpio179/value", "0" }, { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
+        ANYSECU_W6.txAudioScale = 0.03f; ANYSECU_W6.gatewayVolume = 0.4f;   // the W6Plus DMR's level; the deviation is still to be measured on this phone
         // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)
         ANYSECU_W6.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
         // the speaker route only: the stock app skips it at volume 0; the amplifier must stay on, the camcorder input is behind it (measured: amplifier off = silent recording)
