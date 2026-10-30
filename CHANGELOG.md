@@ -5,6 +5,11 @@
 | Backlog | Change | Files | Test |
 |---|---|---|---|
 | W6 two-phone tests (managing agent, 2026-10-30) | Known quirks added to Device → About this radio and docs/radios: on a mains charger a 120 Hz buzz enters both W6 phones' over-the-air audio (DTMF and PSK31 then fail, RTTY/FT8/APRS pass; gone on battery), and the W6+'s speaker amplifier cannot be switched off while SignalDeck's own sounds go through its relay (its ext_pa_en ignores 0), so they are heard from the phone. | radios.json, docs/radios | Measured 2026-10-29 on the two bench phones (charger: 85 % of a silent key's audio was 120 Hz harmonics, 5 % on battery). |
+## 2026-10-30 — Bench: the packet terminal from the DIAG broadcast
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-30) | Bench-only DIAG `term`: `--ez accept` (incoming connections), `--es connect CALL-N` (`--es via`), `--es send LINE`, `--ez disconnect`, `--ez dump` (logs the transcript); always logs the state. Nothing user-facing. | DiagReceiver | **Device (W6Plus DMR ↔ W6+, 434.000 MHz low power):** DMRTST-7 connected to BNCHW6-1 (accepting), one line each way arrived in both transcripts, and the disconnect completed on both sides |
 
 ## 2026-10-29 — ANYSECU W6+: its own transmit audio at a usable level; SSTV, FT8, RTTY, DTMF and PSK31 sending decoded
 
