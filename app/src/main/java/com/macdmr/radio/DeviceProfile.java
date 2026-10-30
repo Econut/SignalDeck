@@ -308,7 +308,9 @@ public final class DeviceProfile {
         // path lifts 2.5 kHz by ~8 dB (pre-emphasis), cuts below 300 Hz (100-250 Hz at the floor) and above 3 kHz, so no M17
         // over audio. An N0CALL APRS packet decoded at 0.04 (p99 3.8 kHz) and 0.03 (p99 2.85 kHz): 0.03 keeps AFSK off the limiter.
         ANYSECU_W6_DMR.txAudioScale = 0.03f;
-        ANYSECU_W6_DMR.gatewayLinesOff = new String[][] { { "/sys/kernel/relay_state/relay_state", "0" }, { "/sys/class/gpio/gpio223/value", "0" }, { "/sys/class/gpio/gpio179/value", "0" } };
+        // ... and the idle values of what start8541ToDmr changed (speaker amplifier on, dmr_state 0, measured between receptions
+        // 2026-10-29), so a play whose snapshot of the nodes failed still leaves the speaker working
+        ANYSECU_W6_DMR.gatewayLinesOff = new String[][] { { "/sys/kernel/relay_state/relay_state", "0" }, { "/sys/class/gpio/gpio223/value", "0" }, { "/sys/class/gpio/gpio179/value", "0" }, { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
     }
 
     /** Any other phone: nothing is touched until a device report has been made and a profile written. */

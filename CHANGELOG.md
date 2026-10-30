@@ -1,5 +1,16 @@
 # SignalDeck changelog
 
+## 2026-10-29 — W6Plus DMR gateway route: the speaker amplifier comes back even without a snapshot
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| PR 114 review (managing agent, 2026-10-29) | When a gateway node could not be read before a transmission of SignalDeck's own audio, only the stock off list ran afterwards and the speaker amplifier stayed off. The W6Plus DMR's off list now ends with the idle values of what the route changes (dmr_state 0, speaker amplifier on); the snapshot, when there is one, is still written back last. | DeviceProfile, DeviceProfileTest | Host suite |
+## 2026-10-29 — Serial speed set with Magisk's busybox stty (the W6Plus DMR's radio was silent after a reboot)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6Plus DMR cold boot (2026-10-29) | On phones without a stock serial library SignalDeck sets the port with stty. Android's own stty answers "done" but leaves these ports' speed unchanged, so on the W6Plus DMR the port stayed at 9600 after a reboot and the 57600-baud module never answered (it only worked before because the stock app had set the port first). SignalDeck now uses Magisk's busybox stty when it is installed, as it already did on the Atom XL. | RootSetup | **Device (W6Plus DMR):** a reboot with SignalDeck opened before the stock app ever ran: the port went from 9600 to 57600 and the module answered (signal readings); before the fix the same sequence left it silent. Host suite |
+
 ## 2026-10-29 — ANYSECU W6Plus DMR: APRS and SignalDeck's other sounds go on the air (the stock app's gateway route)
 
 | Backlog | Change | Files | Test |
