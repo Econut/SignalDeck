@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Serial speed set with Magisk's busybox stty (the W6Plus DMR's radio was silent after a reboot)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6Plus DMR cold boot (2026-10-29) | On phones without a stock serial library SignalDeck sets the port with stty. Android's own stty answers "done" but leaves these ports' speed unchanged, so on the W6Plus DMR the port stayed at 9600 after a reboot and the 57600-baud module never answered (it only worked before because the stock app had set the port first). SignalDeck now uses Magisk's busybox stty when it is installed, as it already did on the Atom XL. | RootSetup | **Device (W6Plus DMR):** a reboot with SignalDeck opened before the stock app ever ran: the port went from 9600 to 57600 and the module answered (signal readings); before the fix the same sequence left it silent. Host suite |
+
 ## 2026-10-29 — ANYSECU W6Plus DMR: APRS and SignalDeck's other sounds go on the air (the stock app's gateway route)
 
 | Backlog | Change | Files | Test |
