@@ -160,10 +160,10 @@
         {"id": "dmr_rx", "name": "DMR receive", "state": "yes", "note": "Tested with another DMR radio; voice level on the phone is low (under investigation)"},
         {"id": "dmr_tx", "name": "DMR transmit", "state": "yes", "note": "Tested with another DMR radio (2026-10-29)"},
         {"id": "m17_rx", "name": "M17 receive", "state": "untested", "note": null},
-        {"id": "m17_tx", "name": "M17 transmit", "state": "no", "note": "No module firmware loading on this phone"},
-        {"id": "aprs", "name": "APRS", "state": "untested", "note": "Sending is not possible: the microphone is the only transmit audio"},
-        {"id": "sstv", "name": "SSTV", "state": "untested", "note": "Sending is not possible: the microphone is the only transmit audio"},
-        {"id": "ft8", "name": "FT8 over FM", "state": "untested", "note": "Sending is not possible: the microphone is the only transmit audio"},
+        {"id": "m17_tx", "name": "M17 transmit", "state": "no", "note": "The transmit audio path cuts everything below about 300 Hz, and module firmware is not loaded on this phone"},
+        {"id": "aprs", "name": "APRS", "state": "yes", "note": "Sending decoded on the bench (2026-10-29), through the stock app's gateway relay; receive untested (UHF only, so not 144.390)"},
+        {"id": "sstv", "name": "SSTV", "state": "untested", "note": "Sending goes through the same gateway relay as APRS; not checked yet"},
+        {"id": "ft8", "name": "FT8 over FM", "state": "untested", "note": "Sending goes through the same gateway relay as APRS; not checked yet"},
         {"id": "pager", "name": "POCSAG pager", "state": "no", "note": null},
         {"id": "firmware_loader", "name": "Module firmware loader", "state": "no", "note": "The vendor's module image stays"},
         {"id": "android_auto", "name": "Android Auto", "state": "untested", "note": null},
@@ -171,7 +171,7 @@
       ],
       "quirks": [
         {"title": "UHF only", "text": "Despite \"dual band\" in some listings, the radio answers only 400 to 480 MHz; VHF frequencies are never acknowledged."},
-        {"title": "The microphone is the only transmit audio", "text": "The module takes its transmit audio straight from the phone's microphone. The app cannot send tones, Morse, APRS packets, SSTV pictures or FT8 through it."},
+        {"title": "The app's own sounds go through a gateway relay", "text": "Your voice goes from the microphone straight to the radio. Sounds SignalDeck makes itself (APRS, Morse ID, tones, SSTV, FT8) go through the relay the stock app uses for its network gateway, which feeds the phone's audio to the radio's microphone input while it transmits. It is a voice path: nothing below about 300 Hz and a cut above 3 kHz, so M17 cannot be sent."},
         {"title": "Transmit frequency runs high", "text": "Our test unit transmitted about 1.6 kHz above the set frequency on FM and DMR alike, measured against a test receiver whose own error is part of that figure. It is inside what most DMR radios accept, but a narrow or strict receiver, or a DMR hotspot, may need its receive offset adjusted or may show a high bit error rate for this radio."},
         {"title": "DMR voice audio is quiet", "text": "DMR calls are detected with the caller's ID, but the decoded voice reaches the app far below FM audio. This is under investigation."},
         {"title": "Its transmitter desensitises nearby radios", "text": "While it keys, a radio close by on another UHF frequency hears less (its signal reading drops), though it does not open."}
@@ -181,7 +181,8 @@
         {"what": "DMR outer deviation", "value": "1815 Hz", "note": "Nominal is 1944 Hz (2026-10-29, one test unit)."},
         {"what": "DMR voice audio", "value": "about 50 dB below FM", "note": "At the camcorder input (2026-10-29, one test unit)."},
         {"what": "FM receive audio", "value": "-32 dBFS", "note": "A 1 kHz tone at 2.5 kHz deviation, 12 dB louder than the W6+ (2026-10-29)."},
-        {"what": "Heat during the bench test", "value": "battery 42.1 to 42.8 °C, processor 51 to 53 °C", "note": "Including a 28 s key (2026-10-29)."}
+        {"what": "Heat during the bench test", "value": "battery 42.1 to 42.8 °C, processor 51 to 53 °C", "note": "Including a 28 s key (2026-10-29)."},
+        {"what": "Transmit audio response (gateway route)", "value": "300 Hz -17 dB, 2.5 kHz +7.8 dB against 1 kHz", "note": "500 Hz -9, 3 kHz +3, 3.5 kHz -31 dB; 100 to 250 Hz at the noise floor; the module limits near 4.3 kHz (2026-10-29, one test unit)."}
       ],
       "firmware": {"stock": "DMR006.U4A.V140", "modified": null, "note": "SignalDeck does not load module firmware on this phone."},
       "sections": [],

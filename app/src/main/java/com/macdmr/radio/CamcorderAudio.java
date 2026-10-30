@@ -19,7 +19,8 @@ import android.media.MediaRecorder;
  * HackRF tone: docs/w6/RX_AUDIO_TEST.md). The audio goes to SignalDeck's squelch, recorder, captions and decoders as
  * 8 kHz stereo frames with L == R like the other backends. With {@code play} (the profile's appPlayback) it is also
  * played here, through the gate, on Android's media stream, and the module's own speaker route stays off; without it
- * the speaker is the module's own path. Transmit audio goes from the microphone to the module directly (its lines).
+ * the speaker is the module's own path. Voice goes from the microphone to the module directly (its lines); audio SignalDeck
+ * makes itself (APRS, tones, pictures) goes through the profile's gateway lines when it has them (the W6Plus DMR), else nowhere.
  */
 public final class CamcorderAudio implements AudioBackend {
     static final int RATE = 8000, BLOCK = 256;          // 32 ms blocks

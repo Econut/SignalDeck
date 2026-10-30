@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — ANYSECU W6Plus DMR: APRS and SignalDeck's other sounds go on the air (the stock app's gateway route)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6Plus DMR data transmit (owner, 2026-10-29) | The W6Plus DMR took its transmit audio only from the microphone, so SignalDeck's own sounds (APRS, Morse ID, tones, SSTV, FT8, DTMF) would have keyed the radio with the microphone open. The stock app has a PoC gateway (SpeakUtil.start8541ToDmr) whose relay puts the phone's audio output on the module's microphone input; SignalDeck now uses those lines around each such transmission: it reads the nodes first and writes their old values back afterwards, even on an error, and plays the samples on the media stream with the speaker amplifier off. New profile fields `gatewayLinesOn`/`gatewayLinesOff` and `txAudioScale` (W6Plus DMR 0.03: SignalDeck's encoders write near full scale, and the module limits near 4.3 kHz). Bench: DIAG `testtone` takes `--ei hz` and `--ei amp`, new `tonesweep` (100–3500 Hz in one key) and `txscale`. Help: the phone's section says what goes through the route and that M17 cannot. | CamcorderAudio, DeviceProfile, RadioService, DiagReceiver, HelpView, docs/help, radios.json, docs/radios, DeviceProfileTest | Host suite. **Device (W6Plus DMR, cage, 446.000 MHz low power, HackRF, 2026-10-29):** a 1 kHz tone through the route came out clean; the lines read back at idle after every key. Sweep at a low level against 1 kHz: 300 Hz −17 dB, 500 Hz −9, 2.5 kHz +7.8, 3 kHz +3, 3.5 kHz −31, 100–250 Hz at the floor (no M17 over audio). An N0CALL APRS packet (1.6 s flags, frame twice) decoded with a good FCS at factor 0.04 (p99 deviation 3.8 kHz) and 0.03 (p99 2.85 kHz). SSTV, FT8 and RTTY are not decoded yet. |
+
 ## 2026-10-29 — Device: About this radio (specs, what works, known quirks, test-unit measurements)
 
 | Backlog | Change | Files | Test |

@@ -43,6 +43,15 @@ public class DeviceProfileTest {
         assertEquals(4, p.camcorderGain); assertEquals(12, DeviceProfile.ANYSECU_W6.camcorderGain); assertEquals(4, p.copy(true, false).camcorderGain);
         assertNotNull(p.rxLinesOn); assertNotNull(p.txLinesOn);
         assertEquals("/sys/class/gpio/gpio188/value", p.txLinesOn[p.txLinesOn.length - 1][0]);   // the PTT line goes last
+        // the stock app's PoC gateway route for audio SignalDeck makes itself: relay on, speaker amplifier off; relay off again after
+        assertNotNull(p.gatewayLinesOn); assertNotNull(p.gatewayLinesOff);
+        boolean relay = false, ampOff = false;
+        for (String[] l : p.gatewayLinesOn) { relay |= l[0].contains("relay_state") && l[1].equals("1"); ampOff |= l[0].contains("ext_pa_en") && l[1].equals("0"); }
+        assertTrue(relay); assertTrue(ampOff);
+        assertTrue(p.gatewayLinesOff[0][0].contains("relay_state") && p.gatewayLinesOff[0][1].equals("0"));
+        for (String[][] ls : new String[][][] { p.gatewayLinesOn, p.gatewayLinesOff }) for (String[] l : ls) assertFalse("never a flyscale_misc node", l[0].contains("flyscale_misc"));
+        assertEquals(0.03f, p.txAudioScale, 1e-6); assertEquals(0.03f, p.copy(true, true).txAudioScale, 1e-6);
+        assertNull(DeviceProfile.ANYSECU_W6.gatewayLinesOn); assertEquals(1f, DeviceProfile.ANYSECU_W6.txAudioScale, 1e-6);
         for (String[][] ls : new String[][][] { p.rxLinesOn, p.rxLinesOff, p.txLinesOn, p.txLinesOff, p.muteLines })
             for (String[] l : ls) assertFalse("never the flyscale_misc attributes", l[0].contains("flyscale_misc"));
     }

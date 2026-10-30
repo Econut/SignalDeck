@@ -305,8 +305,9 @@ public final class DeviceProfile {
         // poc_spk_en on, speaker amplifier off; stop8541ToDmr turns the relay and poc_spk_en off again
         ANYSECU_W6_DMR.gatewayLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/relay_state/relay_state", "1" }, { "/sys/class/gpio/gpio223/value", "1" }, { "/sys/class/gpio/gpio222/value", "1" }, { "/sys/class/gpio/gpio179/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" } };
         // HackRF 2026-10-29, 446.000 MHz: 1 kHz deviates ~1.09 Hz per sample unit, the module limits near 4.3 kHz, and the
-        // path lifts 2.5 kHz by ~8 dB (pre-emphasis) and cuts below 300 Hz; 0.04 puts a full-scale 2200 Hz near 3.3 kHz
-        ANYSECU_W6_DMR.txAudioScale = 0.04f;
+        // path lifts 2.5 kHz by ~8 dB (pre-emphasis), cuts below 300 Hz (100-250 Hz at the floor) and above 3 kHz, so no M17
+        // over audio. An N0CALL APRS packet decoded at 0.04 (p99 3.8 kHz) and 0.03 (p99 2.85 kHz): 0.03 keeps AFSK off the limiter.
+        ANYSECU_W6_DMR.txAudioScale = 0.03f;
         ANYSECU_W6_DMR.gatewayLinesOff = new String[][] { { "/sys/kernel/relay_state/relay_state", "0" }, { "/sys/class/gpio/gpio223/value", "0" }, { "/sys/class/gpio/gpio179/value", "0" } };
     }
 

@@ -29,10 +29,10 @@ SignalDeck does not load module firmware on this phone.
 | DMR receive | Works | Tested with another DMR radio; voice level on the phone is low (under investigation) |
 | DMR transmit | Works | Tested with another DMR radio (2026-10-29) |
 | M17 receive | Not tested |  |
-| M17 transmit | No | No module firmware loading on this phone |
-| APRS | Not tested | Sending is not possible: the microphone is the only transmit audio |
-| SSTV | Not tested | Sending is not possible: the microphone is the only transmit audio |
-| FT8 over FM | Not tested | Sending is not possible: the microphone is the only transmit audio |
+| M17 transmit | No | The transmit audio path cuts everything below about 300 Hz, and module firmware is not loaded on this phone |
+| APRS | Works | Sending decoded on the bench (2026-10-29), through the stock app's gateway relay; receive untested (UHF only, so not 144.390) |
+| SSTV | Not tested | Sending goes through the same gateway relay as APRS; not checked yet |
+| FT8 over FM | Not tested | Sending goes through the same gateway relay as APRS; not checked yet |
 | POCSAG pager | No |  |
 | Module firmware loader | No | The vendor's module image stays |
 | Android Auto | Not tested |  |
@@ -44,9 +44,9 @@ SignalDeck does not load module firmware on this phone.
 
 Despite "dual band" in some listings, the radio answers only 400 to 480 MHz; VHF frequencies are never acknowledged.
 
-### The microphone is the only transmit audio
+### The app's own sounds go through a gateway relay
 
-The module takes its transmit audio straight from the phone's microphone. The app cannot send tones, Morse, APRS packets, SSTV pictures or FT8 through it.
+Your voice goes from the microphone straight to the radio. Sounds SignalDeck makes itself (APRS, Morse ID, tones, SSTV, FT8) go through the relay the stock app uses for its network gateway, which feeds the phone's audio to the radio's microphone input while it transmits. It is a voice path: nothing below about 300 Hz and a cut above 3 kHz, so M17 cannot be sent.
 
 ### Transmit frequency runs high
 
@@ -71,5 +71,6 @@ Measured on one test unit; your radio may differ.
 | DMR voice audio | about 50 dB below FM | At the camcorder input (2026-10-29, one test unit). |
 | FM receive audio | \-32 dBFS | A 1 kHz tone at 2.5 kHz deviation, 12 dB louder than the W6+ (2026-10-29). |
 | Heat during the bench test | battery 42.1 to 42.8 °C, processor 51 to 53 °C | Including a 28 s key (2026-10-29). |
+| Transmit audio response (gateway route) | 300 Hz -17 dB, 2.5 kHz +7.8 dB against 1 kHz | 500 Hz -9, 3 kHz +3, 3.5 kHz -31 dB; 100 to 250 Hz at the noise floor; the module limits near 4.3 kHz (2026-10-29, one test unit). |
 
 [All radios](README.md)

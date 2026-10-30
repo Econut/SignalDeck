@@ -635,25 +635,25 @@
           "id": "m17_tx",
           "name": "M17 transmit",
           "state": "no",
-          "note": "No module firmware loading on this phone"
+          "note": "The transmit audio path cuts everything below about 300 Hz, and module firmware is not loaded on this phone"
         },
         {
           "id": "aprs",
           "name": "APRS",
-          "state": "untested",
-          "note": "Sending is not possible: the microphone is the only transmit audio"
+          "state": "yes",
+          "note": "Sending decoded on the bench (2026-10-29), through the stock app's gateway relay; receive untested (UHF only, so not 144.390)"
         },
         {
           "id": "sstv",
           "name": "SSTV",
           "state": "untested",
-          "note": "Sending is not possible: the microphone is the only transmit audio"
+          "note": "Sending goes through the same gateway relay as APRS; not checked yet"
         },
         {
           "id": "ft8",
           "name": "FT8 over FM",
           "state": "untested",
-          "note": "Sending is not possible: the microphone is the only transmit audio"
+          "note": "Sending goes through the same gateway relay as APRS; not checked yet"
         },
         {
           "id": "pager",
@@ -686,8 +686,8 @@
           "text": "Despite \"dual band\" in some listings, the radio answers only 400 to 480 MHz; VHF frequencies are never acknowledged."
         },
         {
-          "title": "The microphone is the only transmit audio",
-          "text": "The module takes its transmit audio straight from the phone's microphone. The app cannot send tones, Morse, APRS packets, SSTV pictures or FT8 through it."
+          "title": "The app's own sounds go through a gateway relay",
+          "text": "Your voice goes from the microphone straight to the radio. Sounds SignalDeck makes itself (APRS, Morse ID, tones, SSTV, FT8) go through the relay the stock app uses for its network gateway, which feeds the phone's audio to the radio's microphone input while it transmits. It is a voice path: nothing below about 300 Hz and a cut above 3 kHz, so M17 cannot be sent."
         },
         {
           "title": "Transmit frequency runs high",
@@ -727,6 +727,11 @@
           "what": "Heat during the bench test",
           "value": "battery 42.1 to 42.8 °C, processor 51 to 53 °C",
           "note": "Including a 28 s key (2026-10-29)."
+        },
+        {
+          "what": "Transmit audio response (gateway route)",
+          "value": "300 Hz -17 dB, 2.5 kHz +7.8 dB against 1 kHz",
+          "note": "500 Hz -9, 3 kHz +3, 3.5 kHz -31 dB; 100 to 250 Hz at the noise floor; the module limits near 4.3 kHz (2026-10-29, one test unit)."
         }
       ],
       "firmware": {
