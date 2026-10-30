@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Atom XL: no coverage reading while the bridge restarts
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL coverage (2026-10-29) | The coverage log skips signal readings while SignalDeck restarts the radio's USB bridge and for 1.5 s after it (the module's reading needs ~0.7 s after a power-up). On the bench a reading taken 24 ms after a restart was stored as -109 dBm beside two of -74 from the same carrier | AgoldUsb, RadioService, AgoldUsbTest | Host tests |
+
 ## 2026-10-29 — W6Plus DMR gateway route: the speaker amplifier comes back even without a snapshot
 
 | Backlog | Change | Files | Test |

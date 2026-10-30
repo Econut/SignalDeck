@@ -164,6 +164,12 @@ final class AgoldUsb {
      * with no 0x32 during them, against 1 drop in 6 with a reading every 0.5 to 2 s). The watchdog's own receptions (found
      * from the signal) keep reading, they end on it; measurement tools read anyway.
      */
+    /**
+     * A signal reading for the coverage log: not while SignalDeck restarts the bridge, nor in the grace after it
+     * ({@code ownCycleUntil}, 1.5 s, past the ~0.7 s the module's reading needs after a power-up). 2026-10-29 21:51 a
+     * reading taken 24 ms after the power-cycle was stored as -109 dBm beside two of -74 from the same carrier.
+     */
+    static boolean coverageReadingUsable(boolean agold, long now, long ownCycleUntil) { return !agold || now >= ownCycleUntil; }
     static boolean holdsRxRead(boolean agold, boolean lineReception, boolean synthetic) { return agold && lineReception && !synthetic; }
     static boolean countsAsLineMiss(long heldMs) { return heldMs >= LINE_MISS_MIN_MS; }
     /** At least this long between two automatic bridge power-cycles of any kind. */
