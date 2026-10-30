@@ -30,6 +30,7 @@ import com.macdmr.radio.RadioService;
 import com.macdmr.radio.ham.FoxHunt;
 import com.macdmr.radio.ham.FoxPredictor;
 import com.macdmr.radio.ham.FoxSignalGate;
+import com.macdmr.radio.ham.SpinBearing;
 
 import java.util.List;
 import java.util.Locale;
@@ -100,8 +101,8 @@ public final class FoxHuntDialog {
         for (TextView b : new TextView[] { mark, beep, off }) { b.setTextSize(14); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (8 * d), (int) (3 * d), 0); r1.addView(b, lp); }
         body.addView(r1);
         LinearLayout r2 = new LinearLayout(c); r2.setBaselineAligned(false);
-        TextView map = Neo.button(c, "Open in maps", "map", Neo.CYAN), clear = Neo.button(c, "Clear marks", "close", Neo.RED);
-        for (TextView b : new TextView[] { map, clear }) { b.setTextSize(14); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (6 * d), (int) (3 * d), 0); r2.addView(b, lp); }
+        TextView spin = Neo.button(c, "Spin", "spin", Neo.VIOLET), map = Neo.button(c, "Open in maps", "map", Neo.CYAN), clear = Neo.button(c, "Clear marks", "close", Neo.RED);
+        for (TextView b : new TextView[] { spin, map, clear }) { b.setTextSize(14); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (6 * d), (int) (3 * d), 0); r2.addView(b, lp); }
         body.addView(r2);
         // ---- which readings count: any signal, or only the fox's own transmissions (its tone, or its DMR ID and colour code) ----
         final FoxSignalGate gate = new FoxSignalGate();
@@ -192,6 +193,7 @@ public final class FoxHuntDialog {
         final android.media.ToneGenerator[] tg = { null };
         final long[] nextBeep = { 0 };
         final int[] chSeen = { Integer.MIN_VALUE };
+        final SpinBearing[] spinNow = { null }; final long[] spinLastAt = { 0 };
         final double[] hring = new double[6]; java.util.Arrays.fill(hring, Double.NaN); final int[] hpos = { 0 };   // the last 1.5 s of headings: is the phone held steady?
         final FoxPredictor.Result[] pred = { null }; final int[] gen = { 0 }, seen = { -1 };
         final java.util.concurrent.ExecutorService worker = java.util.concurrent.Executors.newSingleThreadExecutor();
@@ -292,6 +294,12 @@ public final class FoxHuntDialog {
                 hring[hpos[0]++ % hring.length] = heading[0];
                 boolean foxOn = gate.update(fn);
                 gate.reading(svc.lastRssiAt(), dbm, heading[0], svc.lastTunedAt());
+                List<FoxSignalGate.Reading> fresh = gate.drain(); SpinBearing sp = spinNow[0];
+                if (sp != null) {                                               // a spin: every heading, and the readings the fox-signal setting lets through
+                    sp.heading(now, heading[0]);
+                    if (gate.fox().only) for (FoxSignalGate.Reading r : fresh) sp.add(r.at, r.heading, r.dbm);
+                    else { long at = svc.lastRssiAt(); if (at > spinLastAt[0] && at >= svc.lastTunedAt() + FoxSignalGate.SETTLE_MS && !fn.tx) { spinLastAt[0] = at; sp.add(at, heading[0], dbm); } }
+                }
                 Location me0 = here[0];
                 if (me0 != null) {
                     int lv = gate.takeIfReady();
@@ -349,6 +357,12 @@ public final class FoxHuntDialog {
             if (dbm == -999) { Toast.makeText(c, "No signal reading yet", Toast.LENGTH_SHORT).show(); return; }
             addMark(c, svc, me, dbm, heading[0], Double.NaN, "Marked");
         });
+        spin.setOnClickListener(v -> {
+            if (svc.isTransmitting()) { Toast.makeText(c, "Not while transmitting: the reading would be your own signal", Toast.LENGTH_SHORT).show(); return; }
+            if (Double.isNaN(heading[0])) { Toast.makeText(c, "The spin needs the phone's compass", Toast.LENGTH_LONG).show(); return; }
+            if (here[0] == null) { Toast.makeText(c, "No position yet: turn on location", Toast.LENGTH_LONG).show(); return; }
+            spinLastAt[0] = svc.lastRssiAt(); showSpin(c, svc, spinNow, here, gate);
+        });
         beep.setOnClickListener(v -> { beeping[0] = !beeping[0]; beep.setText(beeping[0] ? "Beeper on" : "Beeper off"); });
         off.setOnClickListener(v -> {
             ChannelStore.Channel cur = svc.current(); if (cur == null) return;
@@ -378,6 +392,102 @@ public final class FoxHuntDialog {
             if (tg[0] != null) tg[0].release();
             if (offset[0] != 0) svc.foxOffset(0);       // back on the channel
         });
+    }
+
+    /** The spin sheet: guidance while the hunter turns, then the fitted bearing to save as a mark (or a retry). The fox hunt's tick feeds {@code slot[0]}. */
+    static void showSpin(Context c, RadioService svc, SpinBearing[] slot, Location[] here, FoxSignalGate gate) {
+        float d = Theme.dp(c);
+        LinearLayout body = Neo.sheetBody(c, "Spin for the bearing");
+        body.addView(Neo.sheetHint(c, "Hold the phone flat against your chest, top pointing ahead, and turn slowly on the spot through a full circle (20 to 40 seconds). Your body hides the signal from behind: the strongest direction is toward the fox, the weakest away from it."));
+        final SpinView ring = new SpinView(c);
+        body.addView(ring, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (int) (260 * d)));
+        final TextView guide = Neo.text(c, "Start turning", Neo.CYAN_LIGHT, 24, Neo.ui(c)); guide.setGravity(Gravity.CENTER); body.addView(guide);
+        final TextView detail = Neo.label(c, "", Neo.MUTED, 13, false); detail.setGravity(Gravity.CENTER); detail.setPadding(0, (int) (4 * d), 0, (int) (4 * d)); body.addView(detail);
+        LinearLayout row = new LinearLayout(c); row.setBaselineAligned(false);
+        final TextView left = Neo.button(c, "Fit now", "check", Neo.AMBER), save = Neo.button(c, "Save mark", "locate", Neo.GREEN);
+        for (TextView b : new TextView[] { left, save }) { b.setTextSize(14); Neo.fit(b); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f); lp.setMargins((int) (3 * d), (int) (8 * d), (int) (3 * d), 0); row.addView(b, lp); }
+        save.setVisibility(View.GONE); body.addView(row);
+        final SpinBearing.Result[] res = { null };
+        final Handler h = new Handler(Looper.getMainLooper());
+        slot[0] = new SpinBearing();
+        final Runnable done = () -> {
+            SpinBearing sp = slot[0]; if (sp == null) return;
+            SpinBearing.Result r = sp.fit(); res[0] = r; ring.set(sp, r);
+            guide.setText(r.ok ? String.format(Locale.US, "Fox toward %03.0f\u00B0 %s", r.bearing, compass(r.bearing)) : "Try again");
+            guide.setTextColor(r.ok ? Neo.GREEN_LIGHT : Neo.AMBER_LIGHT);
+            detail.setText(r.ok ? String.format(Locale.US, "Within about \u00B1%.0f\u00B0 (from the %s, %.0f dB between strongest and weakest, %d readings)", r.sigma, r.fromNull ? "weakest direction, behind you" : "strongest direction", r.depth, r.samples) : r.retry);
+            left.setText("Spin again"); save.setVisibility(r.ok ? View.VISIBLE : View.GONE);
+        };
+        final Runnable upd = new Runnable() {
+            @Override public void run() {
+                SpinBearing sp = slot[0]; if (sp == null) return;
+                if (res[0] == null) {
+                    ring.set(sp, null);
+                    boolean wait = gate.fox().only && !gate.active(); String g = sp.guide();
+                    guide.setText(wait ? "Waiting for the fox" : g); guide.setTextColor(wait ? Neo.MUTED : "Slower".equals(g) ? Neo.AMBER_LIGHT : Neo.CYAN_LIGHT);
+                    detail.setText(String.format(Locale.US, "%.0f %% of the circle  \u00B7  %d readings  \u00B7  turned %.0f\u00B0", sp.covered() * 100, sp.samples(), sp.turned()) + (wait ? "\nOnly the fox's transmissions count: keep turning slowly while it is on the air." : ""));
+                    if (sp.complete()) done.run();
+                }
+                h.postDelayed(this, 250);
+            }
+        };
+        left.setOnClickListener(v -> {
+            if (res[0] == null) { done.run(); return; }
+            res[0] = null; slot[0] = new SpinBearing(); left.setText("Fit now"); save.setVisibility(View.GONE); guide.setText("Start turning");
+        });
+        final AlertDialog a = Neo.showSheet(c, body);
+        save.setOnClickListener(v -> {
+            SpinBearing.Result r = res[0]; Location me = here[0];
+            if (r == null || !r.ok) return;
+            if (me == null) { Toast.makeText(c, "No position yet: turn on location", Toast.LENGTH_LONG).show(); return; }
+            addMark(c, svc, me, (int) Math.round(r.peakDb), r.bearing, r.sigma, "Spin mark");
+            a.dismiss();
+        });
+        a.setOnDismissListener(x -> { h.removeCallbacks(upd); slot[0] = null; });
+        h.post(upd);
+    }
+
+    /**
+     * The spin on screen, north up: 36 sectors around a ring, filled as readings arrive (cyan weak to red strong), where
+     * the phone points now, and after the fit the smoothed curve as a polar line with the bearing as a green arrow.
+     */
+    static final class SpinView extends View {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG); private double[] means = new double[0]; private double heading = Double.NaN, turned; private SpinBearing.Result r;
+        SpinView(Context c) { super(c); }
+        void set(SpinBearing sp, SpinBearing.Result res) { means = sp.sectorMeans(); heading = sp.lastHeading(); turned = sp.turned(); r = res; invalidate(); }
+
+        @Override protected void onDraw(Canvas cv) {
+            float d = Theme.dp(getContext()), cx = getWidth() / 2f, cy = getHeight() / 2f, rad = Math.min(cx, cy) - 16 * d, sw = 16 * d;
+            double lo = 0, hi = 0; boolean any = false;
+            for (double m : means) if (!Double.isNaN(m)) { if (!any) { lo = m; hi = m; any = true; } lo = Math.min(lo, m); hi = Math.max(hi, m); }
+            android.graphics.RectF box = new android.graphics.RectF(cx - rad, cy - rad, cx + rad, cy + rad);
+            p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(sw); p.setStrokeCap(Paint.Cap.BUTT);
+            for (int k = 0; k < means.length; k++) {
+                double m = means[k]; float t = any && hi > lo ? (float) ((m - lo) / (hi - lo)) : 0.5f;
+                p.setColor(Double.isNaN(m) ? 0xFF16263A : HuntLayer.ramp(t));
+                cv.drawArc(box, -90 + k * 10 + 0.8f, 10 - 1.6f, false, p);   // canvas angles start east; ours north
+            }
+            p.setStrokeWidth(1.2f * d); p.setColor(0xFF1A2C3E); cv.drawCircle(cx, cy, rad * 0.62f, p); cv.drawCircle(cx, cy, rad * 0.31f, p);
+            p.setStyle(Paint.Style.FILL); p.setColor(Neo.DIM); p.setTextSize(12 * d); p.setTextAlign(Paint.Align.CENTER);
+            cv.drawText("N", cx, cy - rad + sw / 2 + 18 * d, p);
+            if (r != null && r.curve != null) {                             // the fitted curve: weakest near the middle, strongest out toward the ring
+                android.graphics.Path path = new android.graphics.Path(); double span = Math.max(1, r.peakDb - r.nullDb);
+                for (int i = 0; i <= r.curve.length; i++) {
+                    double v = r.curve[i % r.curve.length], th = Math.toRadians(i * 360.0 / r.curve.length); float rr = (float) (rad * (0.25 + 0.6 * (v - r.nullDb) / span));
+                    float x = cx + (float) Math.sin(th) * rr, y = cy - (float) Math.cos(th) * rr; if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+                }
+                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(2 * d); p.setColor(Neo.alpha(Neo.CYAN, 0xC0)); cv.drawPath(path, p);
+                if (r.ok) { double th = Math.toRadians(r.bearing); p.setStrokeWidth(3 * d); p.setColor(Neo.GREEN); cv.drawLine(cx, cy, cx + (float) Math.sin(th) * rad, cy - (float) Math.cos(th) * rad, p); }
+            } else {
+                p.setStyle(Paint.Style.FILL); p.setColor(Neo.TEXT); p.setTextSize(30 * d); p.setTypeface(Neo.display(getContext()));
+                cv.drawText(String.format(Locale.US, "%.0f\u00B0", Math.min(360, turned)), cx, cy + 10 * d, p); p.setTypeface(null);
+            }
+            if (!Double.isNaN(heading)) {                                   // where the phone points now
+                double th = Math.toRadians(heading); float r0 = rad - sw, r1 = rad + sw / 2;
+                p.setStyle(Paint.Style.STROKE); p.setStrokeWidth(3 * d); p.setColor(0xFFFFFFFF);
+                cv.drawLine(cx + (float) Math.sin(th) * r0, cy - (float) Math.cos(th) * r0, cx + (float) Math.sin(th) * r1, cy - (float) Math.cos(th) * r1, p);
+            }
+        }
     }
 
     /** Save a mark here and say so. */
@@ -470,7 +580,7 @@ public final class FoxHuntDialog {
         }
 
         /** Cyan, green, amber, red: the app's palette from unlikely to likely. */
-        private static int ramp(float t) {
+        static int ramp(float t) {
             int[] stops = { Neo.CYAN, Neo.GREEN, Neo.AMBER, Neo.RED };
             float x = Math.max(0, Math.min(0.999f, t)) * 3; int k = (int) x; float f = x - k;
             int a = stops[k], b = stops[k + 1];

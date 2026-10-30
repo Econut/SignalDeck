@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Fox hunt: Spin for the bearing (body-shadow sweep)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Fox hunt prediction PR 4 (phonedmrapp `docs/plan-fox-hunt-prediction.md` §8.2) | **Spin** button on the fox hunt sheet opens a spin sheet: hold the phone against your chest and turn through a full circle; the sheet samples the signal with the compass heading (every reading, ~2–4 Hz), shows a north-up ring of 36 sectors filling with readings (palette cyan→red), the phone's heading, degrees turned, coverage and guidance (**Slower** above 45°/s, **Keep turning** below 4°/s, **Keep going**). Done at a full circle with readings all round (or **Fit now**): new pure-Java `ham/SpinBearing` smooths the curve with a 20° circular Gaussian (a weighted mean, so an uneven turn does not bias it), takes the bearing at the peak or, when the null is deeper than the peak is prominent (body shadow), opposite the null (both refined by a parabola), and a quality sigma (5–40°) from depth against the residual scatter and the feature's half-depth width; too shallow (< 6 dB or < 3 × scatter), a gap > 45° or < 16 readings asks for a **retry** instead of storing. **Save mark** stores the mark with the bearing and `bearingSigma` (used by the Bearings layer) and the peak level. Readings follow the Fox signal setting (only the fox's confirmed readings when it is on; "Waiting for the fox" in between), skip the 0.7 s retune settle and transmissions. New icon `spin`. Help: Fox hunt → Spin for the bearing. Restricted mode: no new id. | `ham/SpinBearing.java` (new), `ui/FoxHuntDialog.java`, `ui/Neo.java`, `ui/HelpView.java`, `docs/help/` | Host test `SpinBearingTest` (cardioid body-shadow pattern with 2 dB noise over 20 fox directions within 15°; uneven turn speed within 15°; partial coverage and too few readings retry; null-based case uses the null within 8°; peak-based case uses the peak; flat and 4 dB patterns retry; cleaner sweeps get a tighter sigma; guidance Slower / Keep going / Keep turning and completion across north); full suite and release build. Not device-tested: the spin needs a field check (compass steadiness against the chest, real body-shadow depth, the RSSI rate during a turn). |
+
 ## 2026-10-29 — Fox hunt: count only the fox's own transmissions, auto-marks
 
 | Backlog | Change | Files | Test |
