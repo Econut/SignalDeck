@@ -34,6 +34,10 @@ While a station keeps transmitting, a reading is stored every 2 seconds as long 
 
 NOAA Weather Radio channels (162.400 to 162.550 MHz) transmit all the time, so on them every reading is stored, heard or not: weak spots and dead zones show up in blue instead of staying empty. Give the NOAA channel its transmitter's location (channel editor → Location), select it, turn on logging and drive around: the map shows that transmitter's real coverage, and the prediction calibrates itself from it.
 
+## On the Unihertz Atom XL
+
+Coverage logging reads the signal during receptions, because that is what it maps. On this phone, whose radio sits behind a USB bridge chip, readings during a reception may cut its audio for a few seconds (SignalDeck restarts the bridge by itself); the stored readings are not affected.
+
 ## While scanning
 
 Logging carries on during a scan: whenever the scan stops on a channel that has a location and hears it, the readings are stored for that repeater. Each channel keeps its own quiet noise floor across scan visits, so a transmission after the scan stops on a repeater is judged too.

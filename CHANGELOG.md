@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — Help: fox hunt and coverage on the Atom XL
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| Atom XL capture drops (managing agent, 2026-10-29) | The Fox hunt and Coverage maps help gain an "On the Unihertz Atom XL" section: they read the signal during receptions, which on this phone may cut the audio for a few seconds (a reading every 2 s dropped 2 of 2 receptions on the bench; the S-meter itself holds since PR 110) | HelpView, docs/help | Help export regenerated; host tests |
+
 ## 2026-10-29 — Atom XL: no signal reading for the meter while a reception streams
 
 | Backlog | Change | Files | Test |

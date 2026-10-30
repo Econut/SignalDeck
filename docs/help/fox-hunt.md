@@ -22,6 +22,10 @@ Hold the phone against your chest and turn slowly: your body blocks the signal f
 
 Near the transmitter every reading is at the top of the scale. Off-frequency listens 10, 20 or 30 kHz above the channel, where the fox's signal is much weaker, so the readings start to change again as you move. Closing the sheet tunes back to the channel.
 
+## On the Unihertz Atom XL
+
+Its radio sits behind a USB bridge chip that stops the sound when a command crosses the link while a reception plays. The hunt reads the signal anyway, because it needs the readings, so on this phone readings during a reception may cut its audio for a few seconds (SignalDeck restarts the bridge by itself). The bearing and the readout are not affected.
+
 ## Be the fox
 
 Start the fox beacon sends 5 seconds of beeps on the current channel every minute until you stop it or change channel; on amateur channels your callsign follows in Morse. PKT lights while it runs. Hide the phone, with a full battery.
