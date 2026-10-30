@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — PSK31: the first word is no longer lost over the radio
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-29) | PSK31 led with one second of phase reversals, which over an FM radio goes to the transmitter's key-up and the receiver's carrier search, so the receiving phone locked just as the first characters went by ("tQ PSK31 …" for "CQ PSK31 …", in both directions between two phones). The lead is now two seconds; a transmission holds 52 characters instead of 55 so it still fits the radio's limit. | Psk31, PacketEngine, TextModesTest | Host: `psk31FirstWordSurvivesALateStart` (the first 1.2 s cut off: "p1 BENCH" before, "CQ PSK31 BENCH" now). Device: below |
+
 ## 2026-10-29 — Fox hunt: Spin for the bearing (body-shadow sweep)
 
 | Backlog | Change | Files | Test |
