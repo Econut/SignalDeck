@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — History: data transmissions named, no false "120 s time-out"
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-29) | Every transmission SignalDeck plays itself (APRS, FT8, SSTV, RTTY, tones) was logged as "Voice TX", and on the ANYSECU W6+ each one was followed by "The radio ended the transmission itself: its 120 s time-out": that path never set the start time the check compares against, and the W6+ reports the end of a transmission before SignalDeck's unkey returns. Now such a transmission is logged by its name (e.g. "TX: FT8 …"), it sets the start time, and an end SignalDeck caused itself (its unkey) is never taken for the radio's time-out, so a long SSTV mode ending normally is not flagged either. | RadioService | **Device (W6+, 434.000 MHz low power):** after an APRS key the history reads "TX: bench wav" with no time-out line; before, every 13 s FT8 key gave "Voice TX" plus the time-out warning. Host suite |
+
 ## 2026-10-29 — Region: channel lists, weather radio, band edges and units by country
 
 | Backlog | Change | Files | Test |
