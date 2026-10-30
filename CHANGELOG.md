@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — ANYSECU W6+: its own transmit audio at a usable level; SSTV, FT8, RTTY, DTMF and PSK31 sending decoded
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-29) | The W6+ had borrowed the W6Plus DMR's transmit level (0.03), but its relay path is about 16 dB quieter: its DTMF arrived under the decoder's floor and PSK31 lost words. Its level is now 0.2 (the path is linear to 0.5), provisional until the HackRF measures its deviation. Radio notes: W6+ SSTV and FT8 sending yes. | DeviceProfile, radios.json, docs/radios, DeviceProfileTest | **Device (W6+ → W6Plus DMR, 434.000 MHz low power, both on battery):** at 0.2, DTMF 16/16, PSK31 in full, SSTV Robot 24 clean (118 lines), RTTY and FT8 decoded; at 0.03 DTMF failed and SSTV was speckled. Also found: with both phones on mains chargers a 120 Hz buzz entered the over-the-air audio in both directions (gone on battery). |
+
 ## 2026-10-29 — Fox hunt: Spin for the bearing (body-shadow sweep)
 
 | Backlog | Change | Files | Test |
