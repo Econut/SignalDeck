@@ -227,6 +227,11 @@ public final class DiagReceiver extends BroadcastReceiver {
                 if (i.hasExtra("advance")) com.macdmr.radio.ham.Ft8Station.txAdvanceMs = Math.max(0, Math.min(3000, i.getIntExtra("advance", 1100)));
                 String m = i.getStringExtra("msg"); if (m != null) Log.i("DiagReceiver", "ft8 send: " + f.sendText(m));
                 if (i.getBooleanExtra("cq", false)) Log.i("DiagReceiver", "ft8 cq: " + f.callCq());
+                if (i.getBooleanExtra("reply", false)) {                      // bench: answer the newest CQ heard, as a tap on it would
+                    com.macdmr.radio.ham.Ft8Station.Heard cq = null;
+                    for (com.macdmr.radio.ham.Ft8Station.Heard h : f.heard()) if (h.cq) cq = h;
+                    Log.i("DiagReceiver", "ft8 reply: " + (cq == null ? "no CQ heard" : f.reply(cq)));
+                }
                 if (i.getBooleanExtra("halt", false)) f.haltTx();
                 for (com.macdmr.radio.ham.Ft8Station.Heard h : f.heard()) Log.i("DiagReceiver", "ft8 heard " + h.time() + " " + h.d);
                 Log.i("DiagReceiver", "ft8: " + f.status() + ", running " + f.running() + ", tx " + f.txEnabled() + " " + f.nextMessage() + ", parity " + f.txParity() + ", advance " + com.macdmr.radio.ham.Ft8Station.txAdvanceMs);
