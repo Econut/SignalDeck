@@ -34,10 +34,11 @@ Completed means the issue's bounded scope was implemented and verified on the te
 
 ## In Progress
 
-- [#3 — Independent cold startup and reliable Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.8 optional Settings-only Accessibility handover and five-second ACK-ready notice implemented; two warm handovers verified (50/42 ms tune ACK), ready notice shown/dismissed. Normal reboot retained helper but booted with PTT output0/stock absent, correctly blocking connection. Cold recovery/initialization remains unresolved.
+No feature implementation is actively underway at this snapshot; startup changes are in Testing.
 
 ## Testing
 
+- [#3 — Startup, setup and Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.8b bundled setup/helper and opted-in cold recovery; one app-only cold reboot and missing-microphone grant path passed. Stock initialization remains a dependency; field/repetition tests pending.
 - [#1 — Analogue FM radio adapter: qualify RX/TX reliability](https://github.com/Econut/SignalDeck/issues/1)
 - [#6 — FM scanning: field validation of faster dwell settings](https://github.com/Econut/SignalDeck/issues/6)
 - [#7 — Programmable physical buttons: validate both P8 keys](https://github.com/Econut/SignalDeck/issues/7)
@@ -58,10 +59,11 @@ Completed means the issue's bounded scope was implemented and verified on the te
 
 ## Evidence and review
 
+- [Installation/setup and cold-start test scope](docs/p8-setup.md).
 - [Technical contribution handover](docs/p8-contribution-handover.md): baseline, build commands and limitations.
 - [Hardware/protocol findings](docs/uniwa-p8.md), [takeover/lifecycle review](docs/p8-intercom-force-stop-review.md), [recovery tests](docs/p8-field-recovery.md).
 - [Channel/scan test milestones](docs/p8-channels-and-scan-lists.md), [CSV contract and fixtures](docs/p8-csv-format-v1.md).
-- Focused host suite re-run 30 October: **102 tests, zero failures/errors/skips** against main.7c source, using the existing dependency cache. Not a clean-machine or new live RF test.
+- Focused host suite re-run 30 October: **126 tests, zero failures/errors/skips** for the startup/setup policies and existing P8 scope, using the existing dependency cache. Not a clean-machine or new live RF test.
 - Early [main-radio notes](docs/p8-main-radio.md) describe initial bounded TX failures; later peer-received voice was confirmed by the operator. Private host logs/receipts are not public fixtures. Distinguish operator observations, isolated tests and independently reproducible evidence.
 - DMR voice, fastest-scan weak/short-signal capture, calibrated RF measurements and comprehensive background reliability remain unverified.
 

@@ -43,6 +43,7 @@ public final class P8MainRadio {
     }
     /** Normal Android app cannot force-stop a different UID: use the existing Android release UI. */
     public static void takeOver(Context c,RadioService service){
+        if(P8TakeoverAccessibility.available() && c instanceof MainActivity){((MainActivity)c).startP8FromSetup();return;}
         if(P8TakeoverAccessibility.available()){
             P8Startup.connect(c,service,error->{if(error!=null)android.widget.Toast.makeText(c,error,android.widget.Toast.LENGTH_LONG).show();});return;
         }

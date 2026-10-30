@@ -135,16 +135,21 @@ public class MainActivity extends AppCompatActivity {
         show(0);
         takeSharedLocation(getIntent()); takeOpenNets(getIntent()); takeCodeplug(getIntent());
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
+        if (!BuildConfig.P8_OFFLINE && ActivityCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED)
             ActivityCompat.requestPermissions(this, android.os.Build.VERSION.SDK_INT >= 33 ? new String[] { Manifest.permission.RECORD_AUDIO, Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.ACCESS_FINE_LOCATION, "android.permission.READ_MEDIA_AUDIO" } : new String[] { Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.READ_EXTERNAL_STORAGE }, 1);
         Intent si = new Intent(this, RadioService.class);
         RadioService.exiting = false;                                // opened again after an exit: the radio comes back
         finishReceiver = new android.content.BroadcastReceiver() { @Override public void onReceive(Context cx, Intent in) { try { unbindService(conn); } catch (Throwable ignored) { } finishAndRemoveTask(); } };
         if (android.os.Build.VERSION.SDK_INT >= 33) registerReceiver(finishReceiver, new android.content.IntentFilter(ACTION_FINISH), Context.RECEIVER_NOT_EXPORTED);
         else registerReceiver(finishReceiver, new android.content.IntentFilter(ACTION_FINISH));
-        startForegroundService(si);
-        bindService(si, conn, Context.BIND_AUTO_CREATE);
+        if(BuildConfig.P8_OFFLINE && !com.macdmr.radio.ui.P8SetupWizard.microphone(this))com.macdmr.radio.ui.P8SetupWizard.show(this,null);
+        else startRadioService();
     }
+
+    private boolean radioBinding;
+    private void startRadioService(){if(radioBinding)return;Intent si=new Intent(this,RadioService.class);startForegroundService(si);bindService(si,conn,Context.BIND_AUTO_CREATE);radioBinding=true;}
+    @Override public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(BuildConfig.P8_OFFLINE && request==88 && com.macdmr.radio.ui.P8SetupWizard.microphone(this))startRadioService();if((request==88 || request==89) && p8Startup!=null)p8Startup.resume();}
+    public void startP8FromSetup(){if(!com.macdmr.radio.ui.P8SetupWizard.microphone(this))return;if(svc==null){startRadioService();return;}if(p8Startup!=null)p8Startup.close();p8Startup=new P8Startup(this,svc);p8Startup.openExplicit();}
 
     /** Once the radio is up and its version known: is this phone's stock firmware in the firmware catalogue? Asks once per new variant. */
     private int variantTries;

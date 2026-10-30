@@ -26,7 +26,7 @@ The intention is to share the source, evidence and limitations with the original
 | Phone | UNIWA P8, MediaTek MT6765, Android 14 |
 | Stock Android build | `P8_EU_U4_A14_NEU_EN_V1.0.1_20250814` |
 | Radio module | `DMR003BN.UV4P.V026` |
-| Latest device-tested P8 build | `1.0.0-beta.20-p8-main.7c` / version code 145 |
+| Latest device-tested P8 build | `1.0.0-beta.20-p8-main.8b` / version code 148 |
 | Source branch | [`uniwa-p8-support`](https://github.com/Econut/SignalDeck/tree/uniwa-p8-support) |
 | Original development base | Upstream `a22aaed` / beta.20; upstream has since advanced |
 
@@ -51,7 +51,7 @@ Existing upstream features visible elsewhere in the application should not be as
 
 ## Screenshots from the P8
 
-These are **actual device screenshots of main.7c**, not mockups. Channels and group names illustrate the installed test setup; they are not a recommended frequency plan or permission to transmit. Screens were captured without initiating a P8 transmission or changing saved settings.
+These are **actual device screenshots of main.7c** (historical interface gallery; current setup is documented separately), not mockups. Channels and group names illustrate the installed test setup; they are not a recommended frequency plan or permission to transmit. Screens were captured without initiating a P8 transmission or changing saved settings.
 
 <table>
 <tr>
@@ -80,7 +80,7 @@ The original interface screenshots remain in the [upstream README](README-upstre
 
 ## Current limitations — please read before trying it
 
-- **Startup and handover are unfinished.** After some cold starts, the stock Intercom app must initialize the radio before SignalDeck can connect. Root-free Android still requires a manual Intercom Force stop through App info. Do not disable/remove Intercom expecting that dependency to be solved.
+- **Startup is under field validation.** A bundled, user-enabled Accessibility helper now automates Intercom Force stop. Optional release-only cold recovery orchestrated stock initialization and takeover in one reboot test. Stock Intercom remains required; this is not an independent replacement of its initialization protocol. See [setup and test scope](docs/p8-setup.md).
 - **Recovery is bounded, not a factory reset.** It closes the current session, releases and verifies PTT, and clears resolved connection faults. It does not hide failed UART restoration or unexpected hardware states. Persistent logs help investigate field incidents.
 - **DMR is not yet validated end to end on this P8.** Packet construction and settings are not evidence of working P8 DMR voice reception/transmission.
 - **Fast scanning is experimental.** 0.6/0.4-second FM settings passed isolated timing/hold checks, but require field testing for weak and short signals. Actual hop time includes retuning/scheduling overhead. DMR dwell remains 1.5 seconds.
@@ -101,7 +101,7 @@ With the repository's normal Android build dependencies (JDK 17, SDK 34 and conf
 
 The flags explicitly enable the P8 hardware boundaries. They do not establish hardware compatibility or authorise RF transmission. Use your own development signing configuration; no private signing credentials are included here. The P8 edition's app ID is `com.macdmr.radio.p8lab`.
 
-On matching hardware, keep Intercom installed, initialize it when necessary, then use the P8 menu's Connect/handover instructions. Use [Recover radio connection](docs/p8-field-recovery.md) if a resolved fault remains latched. Saved channels/settings are separate from the APK; use CSV to transfer channel books.
+On matching hardware, follow the [first-run setup](docs/p8-setup.md) and keep Intercom installed for automatic initialization and fallback. Use [Recover radio connection](docs/p8-field-recovery.md) if a resolved fault remains latched. Saved channels/settings are separate from the APK; use CSV to transfer channel books.
 
 ## Development notes and tests
 

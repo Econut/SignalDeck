@@ -35,7 +35,7 @@ public final class P8TakeoverAccessibility extends AccessibilityService {
             callback=done;policy=new P8TakeoverPolicy(SystemClock.elapsedRealtime());
             startActivity(new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:"+STOCK)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             ui.post(tick);
-        }catch(Exception e){finish("Cannot prepare Intercom handover: "+e.getMessage());}
+        }catch(Exception e){String error="Cannot prepare Intercom handover: "+e.getMessage();if(callback!=null)finish(error);else done.accept(error);}
     }
     private boolean released(){
         if(P8Receiver.active())return false;
