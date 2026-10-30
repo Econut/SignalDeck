@@ -227,6 +227,11 @@ public final class DiagReceiver extends BroadcastReceiver {
                 if (i.hasExtra("advance")) com.macdmr.radio.ham.Ft8Station.txAdvanceMs = Math.max(0, Math.min(3000, i.getIntExtra("advance", 1100)));
                 String m = i.getStringExtra("msg"); if (m != null) Log.i("DiagReceiver", "ft8 send: " + f.sendText(m));
                 if (i.getBooleanExtra("cq", false)) Log.i("DiagReceiver", "ft8 cq: " + f.callCq());
+                if (i.getBooleanExtra("reply", false)) {                      // bench: answer the newest CQ heard, as a tap on it would
+                    com.macdmr.radio.ham.Ft8Station.Heard cq = null;
+                    for (com.macdmr.radio.ham.Ft8Station.Heard h : f.heard()) if (h.cq) cq = h;
+                    Log.i("DiagReceiver", "ft8 reply: " + (cq == null ? "no CQ heard" : f.reply(cq)));
+                }
                 if (i.getBooleanExtra("halt", false)) f.haltTx();
                 for (com.macdmr.radio.ham.Ft8Station.Heard h : f.heard()) Log.i("DiagReceiver", "ft8 heard " + h.time() + " " + h.d);
                 Log.i("DiagReceiver", "ft8: " + f.status() + ", running " + f.running() + ", tx " + f.txEnabled() + " " + f.nextMessage() + ", parity " + f.txParity() + ", advance " + com.macdmr.radio.ham.Ft8Station.txAdvanceMs);
@@ -298,6 +303,8 @@ public final class DiagReceiver extends BroadcastReceiver {
                 if (i.getBooleanExtra("dump", false)) for (String l : pe.textReceived().split("\n")) Log.i("DiagReceiver", "text rx: " + l);
                 Log.i("DiagReceiver", "text: mode " + pe.textMode() + ", " + pe.textStatus()); break;
             } else break;
+            case "aprsmsg": if (s.packet() != null) Log.i("DiagReceiver", "aprsmsg: " + s.packet().sendMessage(i.getStringExtra("to"), i.getStringExtra("text"))); break;   // bench: an APRS message (--es to CALL-N, --es text), acked and retried as from the UI
+            case "dtmfsend": if (s.packet() != null) Log.i("DiagReceiver", "dtmfsend: " + s.packet().sendDtmf(i.getStringExtra("seq"))); break;   // bench: send a DTMF sequence (--es seq 0-9*#ABCD)
             case "sstvtx": if (s.packet() != null) {                            // bench: send a colour-bar test card marked N0CALL, --ei mode (SSTVEncoder mode, default Robot 24 colour)
                 android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(320, 240, android.graphics.Bitmap.Config.ARGB_8888);
                 android.graphics.Canvas cv = new android.graphics.Canvas(bmp); android.graphics.Paint pt = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
