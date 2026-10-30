@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — FT8: contacts with non-standard callsigns complete
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-29) | Two FT8 bugs, both found by a two-phone contact: a caller with a non-standard call (more than three letters after the digit, or an unusual prefix) can only reply with the two calls, no grid, and SignalDeck ignored that reply and kept calling CQ; and a station whose own call is non-standard could not send its report at all (the packer refused a hashed sender, and "W9XYZ DMRTST R-12" fits no message). Now a two-call reply to a CQ is answered with a report (a repeat keeps that report), `<CALL>` packs as the call's 22-bit hash, and SignalDeck writes its own non-standard call that way next to a report, as WSJT-X does. Help (FT8) explains it. | Ft8Station, Ft8Message, HelpView, docs/help, Ft8StationTest | Host: `cqAnsweredByANonStandardCaller`, `aNonStandardCallAnswersACqAndCompletesTheQso`, `bracketedCallsPackAsHashes`. **Device (ANYSECU W6+ ↔ W6Plus DMR, 434.000 MHz low power, 2026-10-29):** CQ BNCHW6 → BNCHW6 DMRTST → DMRTST <BNCHW6> −07 → BNCHW6 <DMRTST> R−08 → DMRTST <BNCHW6> RR73 → BNCHW6 <DMRTST> 73, both stations idle at the end; before the fix the CQ station ignored the first reply for 5 periods |
+
 ## 2026-10-29 — ANYSECU W6+: APRS and SignalDeck's other sounds on the air through the same relay; W6Plus DMR data modes decoded
 
 | Backlog | Change | Files | Test |

@@ -128,6 +128,8 @@ public class Ft8StationTest {
         st.onDecoded(h.now / 15000, java.util.Collections.singletonList(new Ft8.Decode(raw.freqHz, raw.dtS, -12, raw.payload, "<W9XYZ> DMRTST")));
         assertEquals("DMRTST", st.partner());
         assertEquals("<...> W9XYZ -12", nextTx(h, st));              // the caller's call goes out hashed (this test's decoder has not heard it)
+        st.onDecoded(h.now / 15000, java.util.Collections.singletonList(new Ft8.Decode(raw.freqHz, raw.dtS, -20, raw.payload, "<W9XYZ> DMRTST")));
+        assertEquals("a repeated call keeps the report first sent", "<...> W9XYZ -12", nextTx(h, st));
         Ft8.Decode r = d("W9XYZ <DMRTST> R-05", -11);
         st.onDecoded(h.now / 15000, java.util.Collections.singletonList(new Ft8.Decode(r.freqHz, r.dtS, -11, r.payload, "W9XYZ <DMRTST> R-05")));
         assertEquals("<...> W9XYZ RR73", nextTx(h, st));
