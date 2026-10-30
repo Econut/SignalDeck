@@ -31,7 +31,8 @@ public class DeviceProfileTest {
         assertEquals("/dev/ttyS2", p.controlPort);
         assertEquals(57600, p.baud);
         assertTrue(p.dmr());
-        assertFalse("not run on the phone yet: no automatic take-over, no transmit", p.verified);
+        assertTrue("revision 2 (owner, 2026-10-29): transmit tested in the cage", p.verified);
+        assertEquals(2, p.revision);
         assertFalse("the vendor's module image stays: no loader", p.firmwareLoader());
         assertFalse(p.symbolEngine());
         assertFalse(p.copy(true, false).firmwareLoader());

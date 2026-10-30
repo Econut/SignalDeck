@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-29 — ANYSECU W6Plus DMR: verified, transmit on (profile revision 2)
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6Plus DMR transmit (owner, 2026-10-29) | The owner asked for transmit on this phone: the W6Plus DMR profile goes to revision 2 with verified on, so SignalDeck transmits on it and may take the radio at boot like the other verified phones. Help: the phone's section says what was tested on air and what is still open (DMR voice level, texts). | DeviceProfile, HelpView, docs/help, DeviceProfileTest | Host suite. **Device (W6Plus DMR, cage, 446.000 MHz low power, HackRF, 2026-10-29):** FM 1 kHz key and a DMR key (CC1, group call TG 9, bench source ID decoded by our own decoder), watchdog unkey at 28 s, heat fine; carrier about +1.6 kHz against the HackRF. The owner's own keys follow on this build. |
+
 ## 2026-10-29 — Help: fox hunt and coverage on the Atom XL
 
 | Backlog | Change | Files | Test |
