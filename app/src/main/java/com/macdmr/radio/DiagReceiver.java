@@ -252,7 +252,12 @@ public final class DiagReceiver extends BroadcastReceiver {
             case "testtone": {                                                  // bench: key a 1 kHz tone for --ei ms (≤ 5 s, or ≤ 40 s with --ez lift) on the current channel or VFO
                 boolean lift = i.getBooleanExtra("lift", false);
                 int ms = Math.max(200, Math.min(lift ? 40000 : 5000, i.getIntExtra("ms", 2000)));
-                Log.i("DiagReceiver", "testtone " + ms + " ms" + (lift ? " lift" : "")); s.diagTestTone(ms, lift); break;
+                int hz = Math.max(50, Math.min(3800, i.getIntExtra("hz", 1000))), amp = Math.max(100, Math.min(30000, i.getIntExtra("amp", 12000)));
+                Log.i("DiagReceiver", "testtone " + hz + " Hz amp " + amp + " " + ms + " ms" + (lift ? " lift" : "")); s.diagTestTone(ms, lift, hz, amp); break;
+            }
+            case "tonesweep": {                                                 // bench: 100-3500 Hz, 400 ms each with 100 ms gaps (7 s), --ei amp (default 12000)
+                int amp = Math.max(100, Math.min(30000, i.getIntExtra("amp", 12000)));
+                Log.i("DiagReceiver", "tonesweep amp " + amp); s.diagToneSweep(amp); break;
             }
             case "vfooff": s.diagVfoOff(); break;
             case "audiopath": { String pth = i.getStringExtra("path"); if ("auto".equals(pth) || "vendor".equals(pth) || "direct".equals(pth)) s.diagAudioPath(pth); else Log.w("DiagReceiver", "audiopath: auto | vendor | direct"); break; }   // bench: the receive/transmit audio path

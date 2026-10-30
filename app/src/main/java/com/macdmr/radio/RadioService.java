@@ -2612,12 +2612,23 @@ public class RadioService extends Service implements RadioEngine.Events {
     }
     public void diagTestTone(int ms) { diagTestTone(ms, false); }
     /** lift is one bench run, at most 40 s, past the 28.5 s refusal. The voice watchdog stays 28 s for every other transmission. */
-    public void diagTestTone(int ms, boolean lift) {
+    public void diagTestTone(int ms, boolean lift) { diagTestTone(ms, lift, 1000, 12000); }
+    /** Bench: a test tone of {@code hz} at {@code amp} (of 32767). */
+    public void diagTestTone(int ms, boolean lift, int hz, int amp) {
         if (ms < 200) ms = 200;
         if (lift) ms = Math.min(ms, 40000); else ms = Math.min(ms, 5000);
         short[] pcm = new short[8000 * ms / 1000];
-        for (int i = 0; i < pcm.length; i++) pcm[i] = (short) (12000 * Math.sin(2 * Math.PI * 1000 * i / 8000.0));
-        transmitPcm(pcm, "1 kHz test tone " + ms + " ms", null, lift);
+        for (int i = 0; i < pcm.length; i++) pcm[i] = (short) (amp * Math.sin(2 * Math.PI * hz * i / 8000.0));
+        transmitPcm(pcm, hz + " Hz test tone " + ms + " ms", null, lift);
+    }
+    /** Bench: the transmit path's frequency response in one key, 400 ms per tone at {@code amp}, a 100 ms gap between them. */
+    static final int[] SWEEP_HZ = { 100, 150, 200, 250, 300, 400, 500, 700, 1000, 1500, 2000, 2500, 3000, 3500 };
+    public void diagToneSweep(int amp) {
+        int per = 3200, gap = 800;
+        short[] pcm = new short[SWEEP_HZ.length * (per + gap)];
+        for (int k = 0; k < SWEEP_HZ.length; k++)
+            for (int i = 0; i < per; i++) pcm[k * (per + gap) + i] = (short) (amp * Math.sin(2 * Math.PI * SWEEP_HZ[k] * i / 8000.0));
+        transmitPcm(pcm, "tone sweep 100-3500 Hz", null, true);
     }
 
     /** Ask the module for the signal strength (on the radio worker: never a serial write on the main thread). */
