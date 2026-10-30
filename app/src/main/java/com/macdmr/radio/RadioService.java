@@ -2706,7 +2706,7 @@ public class RadioService extends Service implements RadioEngine.Events {
 
     @Override public void status(int code, String name) {
         switch (code) {
-            case 1: if (agoldBridge() && receiving) { if (synthRx) { synthRx = false; lineReported(); log("reception line caught up with the signal"); } break; }   // already open: an edge after a signal-started reception
+            case 1: if (agoldBridge() && receiving) { if (synthRx) { synthRx = false; lineReported(); log("reception line caught up with the signal"); if (!captureRunning()) bridgeCapture(true); } break; }   // a capture closed for silence reopens   // already open: an edge after a signal-started reception
                 if (agoldBridge() && !synthRx) lineReported();           // an edge from the line itself
                 receiving = true; dmrEvent("start", 0, 0, 0);
                 if (current != null && current.isDigital()) {           // a DMR call: forget the last talker, ask who this is now and again a second later
@@ -2750,6 +2750,15 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (!agoldBridge()) return;
         final AudioBackend a = rxAudioOn && audio instanceof AlsaDirectAudio ? audio : null;
         final boolean dmr = current != null && current.isDigital();
+        if (on && synthRx && !monRx) {                                       // found from the signal only: no capture yet (AgoldUsb.captureOpenDelay)
+            long wait = AgoldUsb.captureOpenDelay(true, false, System.currentTimeMillis() - synthStartAt);
+            if (wait > 0) {
+                if (a != null && ((AlsaDirectAudio) a).capturing()) worker.execute(() -> { try { a.stopRx(); } catch (Throwable ignored) { } });   // the last reception's tail: not this one's, and it would run into the bridge's I/O error
+                log("reception found from the signal: the capture waits " + wait + " ms for the line or for the reception to last");
+                ui.postDelayed(() -> { if (receiving && synthRx && !captureRunning()) bridgeCapture(true); }, wait);
+                return;
+            }
+        }
         worker.execute(() -> {
             try {
                 // while the bridge streams audio it cuts every frame on the port after 12 bytes (measured 2026-10-28), so
@@ -2759,12 +2768,14 @@ public class RadioService extends Service implements RadioEngine.Events {
                     if (!dmr && a != null && ((AlsaDirectAudio) a).capturing()) return;
                     if (a != null) a.stopRx(); if (dmr) { engine.queryCallerInfo(); Thread.sleep(150); }
                     if (a != null) {
-                        captureSignalOnly = synthRx; captureBytesAtStart = rxAudioBytes();
+                        final long bytes0 = rxAudioBytes();
                         String r = a.startRx(true); log(r);
-                        if (r != null && r.contains("no audio block yet")) {
-                            if (captureCallsForRestart()) recoverBridgeAudio("the USB capture delivered nothing");
-                            else log("a reception found from the signal: no audio yet, no bridge restart");
-                        }
+                        if (synthRx) ui.postDelayed(() -> {
+                            if (!receiving || !AgoldUsb.closeSilentSignalOnlyCapture(synthRx, monRx, rxAudioBytes() - bytes0) || !captureRunning()) return;
+                            log("no audio " + AgoldUsb.SIGNAL_ONLY_AUDIO_WAIT_MS + " ms into a reception found from the signal (another transmitter close by, most likely): capture closed before the bridge times out");
+                            worker.execute(() -> { try { a.stopRx(); } catch (Throwable t) { log("capture close: " + t); } });
+                        }, AgoldUsb.SIGNAL_ONLY_AUDIO_WAIT_MS);
+                        if (r != null && r.contains("no audio block yet") && !(synthRx && !monRx)) recoverBridgeAudio("the USB capture delivered nothing");   // a signal-only one is closed for silence above instead
                     } }
                 else { if (a != null) a.stopRx(); if (packet != null && !dmr) packet.streamEnded(); if (dmr) { Thread.sleep(100); engine.queryCallerInfo(); } }
             } catch (Throwable t) { log("bridge capture: " + t); }
@@ -2900,12 +2911,8 @@ public class RadioService extends Service implements RadioEngine.Events {
         if (w > 0) { log("bridge restart for the " + why + " held back: another automatic restart ran " + (AgoldUsb.AUTO_CYCLE_GAP_MS - w) / 1000 + " s ago"); return false; }
         lastAutoCycleAt = System.currentTimeMillis(); return true;
     }
-    // the capture last opened for a reception: was that reception found only from the signal, and the audio count then
-    private volatile boolean captureSignalOnly; private volatile long captureBytesAtStart;
-    private boolean captureCallsForRestart() { return AgoldUsb.restartForCapture(captureSignalOnly, rxAudioBytes() - captureBytesAtStart); }
     private void captureEnded(String err) {
         if (agoldBridge() && System.currentTimeMillis() < ownCycleUntil) { log("the capture ended with our own bridge restart: no recovery (" + err + ")"); return; }
-        if (agoldBridge() && !captureCallsForRestart()) { log("a reception found from the signal gave no audio (another transmitter close by, most likely): no bridge restart (" + err + ")"); return; }
         recoverBridgeAudio("the USB capture ended by itself (" + err + ")");
     }
     private void powerCycleOrGiveUp() throws IOException {
