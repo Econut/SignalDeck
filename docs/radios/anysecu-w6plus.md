@@ -30,9 +30,9 @@ The stock app carries no module firmware file and the module has no read command
 | DMR transmit | No | No DMR in this module |
 | M17 receive | Works | With its own calibration |
 | M17 transmit | No | Needs the DMR module's firmware engine |
-| APRS | Partly | Receive works; sending not tested yet |
-| SSTV | Partly | Receive works; sending not tested yet |
-| FT8 over FM | Partly | Receive works; sending not tested yet |
+| APRS | Works | Receive works; sending through the gateway relay decoded by a second phone (2026-10-29) |
+| SSTV | Partly | Receive works; sending goes through the gateway relay, not checked yet |
+| FT8 over FM | Partly | Receive works; sending goes through the gateway relay, not checked yet |
 | POCSAG pager | No |  |
 | Band scope | No | Needs signal readings |
 | Module firmware loader | No |  |

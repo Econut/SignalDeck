@@ -473,20 +473,20 @@
         {
           "id": "aprs",
           "name": "APRS",
-          "state": "partial",
-          "note": "Receive works; sending not tested yet"
+          "state": "yes",
+          "note": "Receive works; sending through the gateway relay decoded by a second phone (2026-10-29)"
         },
         {
           "id": "sstv",
           "name": "SSTV",
           "state": "partial",
-          "note": "Receive works; sending not tested yet"
+          "note": "Receive works; sending goes through the gateway relay, not checked yet"
         },
         {
           "id": "ft8",
           "name": "FT8 over FM",
           "state": "partial",
-          "note": "Receive works; sending not tested yet"
+          "note": "Receive works; sending goes through the gateway relay, not checked yet"
         },
         {
           "id": "pager",
@@ -641,19 +641,19 @@
           "id": "aprs",
           "name": "APRS",
           "state": "yes",
-          "note": "Sending decoded on the bench (2026-10-29), through the stock app's gateway relay; receive untested (UHF only, so not 144.390)"
+          "note": "Sending decoded on the bench (HackRF) and by a second phone, through the stock app's gateway relay; receive tested from a second phone on UHF (144.390 is out of band)"
         },
         {
           "id": "sstv",
           "name": "SSTV",
-          "state": "untested",
-          "note": "Sending goes through the same gateway relay as APRS; not checked yet"
+          "state": "yes",
+          "note": "Robot 24 colour sent through the gateway relay decoded clean by a second phone (2026-10-29); UHF only, so not 144.500"
         },
         {
           "id": "ft8",
           "name": "FT8 over FM",
-          "state": "untested",
-          "note": "Sending goes through the same gateway relay as APRS; not checked yet"
+          "state": "yes",
+          "note": "Sent through the gateway relay and decoded by a second phone (2026-10-29)"
         },
         {
           "id": "pager",

@@ -290,6 +290,22 @@ public final class DiagReceiver extends BroadcastReceiver {
                 com.macdmr.radio.pkt.AFSKDecoderIQ.PREFILTER = !legacy; com.macdmr.radio.pkt.AFSKDecoderIQ.toneFilterSize = legacy ? 32 : 52;
                 Log.i("DiagReceiver", "afsk decoder: " + (legacy ? "legacy" : "new")); break;
             }
+            case "text": if (s.packet() != null) {                              // bench: --ei mode 0 off / 1 RTTY / 2 PSK31 (listen + send mode), --es send TEXT, --ez dump (log what was received), --ez clear
+                com.macdmr.radio.PacketEngine pe = s.packet();
+                if (i.hasExtra("mode")) pe.setTextMode(Math.max(0, Math.min(2, i.getIntExtra("mode", 0))));
+                if (i.getBooleanExtra("clear", false)) pe.textClear();
+                String t = i.getStringExtra("send"); if (t != null) Log.i("DiagReceiver", "text send: " + pe.textSend(t));
+                if (i.getBooleanExtra("dump", false)) for (String l : pe.textReceived().split("\n")) Log.i("DiagReceiver", "text rx: " + l);
+                Log.i("DiagReceiver", "text: mode " + pe.textMode() + ", " + pe.textStatus()); break;
+            } else break;
+            case "sstvtx": if (s.packet() != null) {                            // bench: send a colour-bar test card marked N0CALL, --ei mode (SSTVEncoder mode, default Robot 24 colour)
+                android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(320, 240, android.graphics.Bitmap.Config.ARGB_8888);
+                android.graphics.Canvas cv = new android.graphics.Canvas(bmp); android.graphics.Paint pt = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+                int[] bars = { 0xFFFFFFFF, 0xFFFFFF00, 0xFF00FFFF, 0xFF00FF00, 0xFFFF00FF, 0xFFFF0000, 0xFF0000FF, 0xFF000000 };
+                for (int k = 0; k < bars.length; k++) { pt.setColor(bars[k]); cv.drawRect(k * 40, 0, k * 40 + 40, 160, pt); }
+                pt.setColor(0xFF202020); cv.drawRect(0, 160, 320, 240, pt); pt.setColor(0xFFFFFFFF); pt.setTextSize(44); cv.drawText("N0CALL", 70, 220, pt);
+                Log.i("DiagReceiver", "sstvtx: " + s.packet().sendSstv(bmp, i.getIntExtra("mode", com.macdmr.radio.pkt.SSTVEncoder.ROBOT_24_COLOR))); break;
+            } else break;
             case "sstv": {                                                      // bench: --ez on, --ez park (144.500), --ez cont (continuous Robot 36)
                 if (s.packet() != null && i.hasExtra("cont")) s.packet().setSstvContinuousMode(i.getBooleanExtra("cont", false));
                 Log.i("DiagReceiver", "sstv: " + s.sstvMonitor(i.getBooleanExtra("on", false), i.getBooleanExtra("park", true))); break;

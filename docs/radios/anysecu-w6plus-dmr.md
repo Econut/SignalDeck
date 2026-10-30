@@ -30,9 +30,9 @@ SignalDeck does not load module firmware on this phone.
 | DMR transmit | Works | Tested with another DMR radio (2026-10-29) |
 | M17 receive | Not tested |  |
 | M17 transmit | No | The transmit audio path cuts everything below about 300 Hz, and module firmware is not loaded on this phone |
-| APRS | Works | Sending decoded on the bench (2026-10-29), through the stock app's gateway relay; receive untested (UHF only, so not 144.390) |
-| SSTV | Not tested | Sending goes through the same gateway relay as APRS; not checked yet |
-| FT8 over FM | Not tested | Sending goes through the same gateway relay as APRS; not checked yet |
+| APRS | Works | Sending decoded on the bench (HackRF) and by a second phone, through the stock app's gateway relay; receive tested from a second phone on UHF (144.390 is out of band) |
+| SSTV | Works | Robot 24 colour sent through the gateway relay decoded clean by a second phone (2026-10-29); UHF only, so not 144.500 |
+| FT8 over FM | Works | Sent through the gateway relay and decoded by a second phone (2026-10-29) |
 | POCSAG pager | No |  |
 | Module firmware loader | No | The vendor's module image stays |
 | Android Auto | Not tested |  |
