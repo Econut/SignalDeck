@@ -298,6 +298,8 @@ public final class DiagReceiver extends BroadcastReceiver {
                 if (i.getBooleanExtra("dump", false)) for (String l : pe.textReceived().split("\n")) Log.i("DiagReceiver", "text rx: " + l);
                 Log.i("DiagReceiver", "text: mode " + pe.textMode() + ", " + pe.textStatus()); break;
             } else break;
+            case "aprsmsg": if (s.packet() != null) Log.i("DiagReceiver", "aprsmsg: " + s.packet().sendMessage(i.getStringExtra("to"), i.getStringExtra("text"))); break;   // bench: an APRS message (--es to CALL-N, --es text), acked and retried as from the UI
+            case "dtmfsend": if (s.packet() != null) Log.i("DiagReceiver", "dtmfsend: " + s.packet().sendDtmf(i.getStringExtra("seq"))); break;   // bench: send a DTMF sequence (--es seq 0-9*#ABCD)
             case "sstvtx": if (s.packet() != null) {                            // bench: send a colour-bar test card marked N0CALL, --ei mode (SSTVEncoder mode, default Robot 24 colour)
                 android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(320, 240, android.graphics.Bitmap.Config.ARGB_8888);
                 android.graphics.Canvas cv = new android.graphics.Canvas(bmp); android.graphics.Paint pt = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
