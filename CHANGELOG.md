@@ -1,5 +1,11 @@
 # SignalDeck changelog
 
+## 2026-10-30 — Bench: the packet terminal from the DIAG broadcast
+
+| Backlog | Change | Files | Test |
+|---|---|---|---|
+| W6 two-phone tests (2026-10-30) | Bench-only DIAG `term`: `--ez accept` (incoming connections), `--es connect CALL-N` (`--es via`), `--es send LINE`, `--ez disconnect`, `--ez dump` (logs the transcript); always logs the state. Nothing user-facing. | DiagReceiver | **Device (W6Plus DMR ↔ W6+, 434.000 MHz low power):** DMRTST-7 connected to BNCHW6-1 (accepting), one line each way arrived in both transcripts, and the disconnect completed on both sides |
+
 ## 2026-10-29 — ANYSECU W6+: its own transmit audio at a usable level; SSTV, FT8, RTTY, DTMF and PSK31 sending decoded
 
 | Backlog | Change | Files | Test |
