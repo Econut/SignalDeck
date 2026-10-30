@@ -259,7 +259,11 @@ public final class DeviceProfile {
         // its stock app never uses them; a tone and an N0CALL APRS packet sent through them decoded on a W6Plus DMR (2026-10-29)
         ANYSECU_W6.gatewayLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/relay_state/relay_state", "1" }, { "/sys/class/gpio/gpio223/value", "1" }, { "/sys/class/gpio/gpio222/value", "1" }, { "/sys/class/gpio/gpio179/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" } };
         ANYSECU_W6.gatewayLinesOff = new String[][] { { "/sys/kernel/relay_state/relay_state", "0" }, { "/sys/class/gpio/gpio223/value", "0" }, { "/sys/class/gpio/gpio179/value", "0" }, { "/sys/kernel/dmr_state/dmr_state", "0" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
-        ANYSECU_W6.txAudioScale = 0.03f; ANYSECU_W6.gatewayVolume = 0.4f;   // the W6Plus DMR's level; the deviation is still to be measured on this phone
+        // the relay path on the W6+ is ~16 dB quieter than the W6Plus DMR's for the same samples: at 0.03 its DTMF arrived at
+        // RMS 50 (under the decoder's floor) and PSK31 lost words; it is linear up to 0.5 (no harmonics) and at 0.2 DTMF (16/16),
+        // PSK31, SSTV Robot 24 (clean, 118 lines), RTTY and FT8 all decoded on a W6Plus DMR (2026-10-29). Provisional until the
+        // HackRF measures its deviation.
+        ANYSECU_W6.txAudioScale = 0.2f; ANYSECU_W6.gatewayVolume = 0.4f;
         // the stock app's receStart / receEnd (speaker path; the camcorder input carries the audio while these are set)
         ANYSECU_W6.rxLinesOn = new String[][] { { "/sys/kernel/dmr_state/dmr_state", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "0" }, { "/sys/class/gpio/gpio183/value", "1" }, { "/sys/kernel/ext_pa_en/ext_pa_en", "1" } };
         // the speaker route only: the stock app skips it at volume 0; the amplifier must stay on, the camcorder input is behind it (measured: amplifier off = silent recording)

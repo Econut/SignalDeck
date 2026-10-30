@@ -479,14 +479,14 @@
         {
           "id": "sstv",
           "name": "SSTV",
-          "state": "partial",
-          "note": "Receive works; sending goes through the gateway relay, not checked yet"
+          "state": "yes",
+          "note": "Receive works; Robot 24 colour sent through the gateway relay decoded clean by a second phone (2026-10-29); UHF only, so not 144.500"
         },
         {
           "id": "ft8",
           "name": "FT8 over FM",
-          "state": "partial",
-          "note": "Receive works; sending goes through the gateway relay, not checked yet"
+          "state": "yes",
+          "note": "Receive works; sent through the gateway relay, a full QSO with a second phone completed (2026-10-29)"
         },
         {
           "id": "pager",
