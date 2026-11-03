@@ -123,4 +123,3 @@ Focused host tests cover protocol framing, settings, CSV, channel scopes, RSSI, 
 ```
 
 No personal firmware backups, calibration dumps, stock APKs, private keys or personal channel-export files are included in this contribution. Original project and third-party credit notices remain in [COPYRIGHT](COPYRIGHT).
-
