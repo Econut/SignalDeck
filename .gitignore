@@ -16,3 +16,15 @@ app/.cxx/
 # User reports and files shared for support (never commit)
 temp/
 __pycache__/
+
+# Local P8 APKs, reports and device backups stay outside public source history
+*.apk
+*.img
+*.p12
+*.pfx
+.env
+.env.*
+!.env.example
+/device-reports/
+/firmware-backups/
+/p8-private/

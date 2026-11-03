@@ -4,15 +4,16 @@
 
 Experimental P8 compatibility work for technical handover to **[IIMacGyverII, the original SignalDeck developer](https://github.com/IIMacGyverII/SignalDeck)**. This is not an independent product release or a promise of upstream acceptance.
 
-The **Project Status is the main tracker**. This page is its readable summary, last reconciled 30 October 2026. Each linked issue records progress, source/evidence, uncertainties and acceptance criteria. Historical milestone documents are evidence, not separate current work lists.
+The **Project Status is the main tracker**. This page is its readable summary, last reconciled 3 November 2026. Each linked issue records progress, source/evidence, uncertainties and acceptance criteria. Historical milestone documents are evidence, not separate current work lists.
 
 ## Current priorities
 
-1. Reliable cold startup and predictable Intercom handover (#3).
-2. Diagnose low-battery/restart incidents and qualify background operation (#11).
-3. Finish analogue/scanning/button field checks (#1, #6, #7).
-4. Develop the agreed Windows CPS workflow (#13), using the existing channel schema.
-5. Stage DMR interoperability tests with the owner's AnyTone D878UV (#9).
+1. Collect the new beta.31 device report and prepare the maintainer’s staged contributions (#20).
+2. Continue field qualification of startup/handover (#3).
+3. Diagnose low-battery/restart incidents and qualify background operation (#11).
+4. Finish analogue/scanning/button field checks (#1, #6, #7).
+5. Windows CPS remains a later project (#13), using the existing channel schema.
+6. Stage DMR interoperability tests with the owner's AnyTone D878UV (#9).
 
 ## Status summary
 
@@ -29,15 +30,14 @@ Completed means the issue's bounded scope was implemented and verified on the te
 - [#11 — Low-battery crash, background and lock-screen reliability](https://github.com/Econut/SignalDeck/issues/11)
 - [#13 — Windows CPS: Read radio, edit channel book, Write radio](https://github.com/Econut/SignalDeck/issues/13)
 - [#19 — Small-screen secondary-menu layout polish](https://github.com/Econut/SignalDeck/issues/19)
-- [#20 — Maintainer handover: reproducible build and sanitized evidence](https://github.com/Econut/SignalDeck/issues/20)
 
 ## In Progress
 
-No feature implementation is actively underway at this snapshot; startup changes are in Testing.
+- [#20 — Maintainer handover and fresh device report](https://github.com/Econut/SignalDeck/issues/20): supplied beta.31 APK checked; passive reporting flow reviewed, live collection pending P8 connection. [Preparation and repository review scope](docs/p8-beta31-report-preparation.md). The maintainer requested smaller engine/profile, opt-in access, layout and general-feature contributions against current main.
 
 ## Testing
 
-- [#3 — Startup, setup and Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.9c own enable/init/version/tune sequence, bundled setup/helper and bounded release-only recovery. One locked-boot/off/open test passed without a stock launch. See [initialization evidence](docs/p8-independent-initialization.md); field/repetition tests pending.
+- [#3 — Startup, setup and Intercom handover](https://github.com/Econut/SignalDeck/issues/3): main.9c own enable/init/version/tune sequence, bundled setup/helper and bounded release-only recovery. One locked-boot/off/open test passed without a stock launch. See [initialization evidence](docs/p8-independent-initialization.md); operator reports recent stable use; broader field/repetition tests pending.
 - [#1 — Analogue FM radio adapter: qualify RX/TX reliability](https://github.com/Econut/SignalDeck/issues/1)
 - [#6 — FM scanning: field validation of faster dwell settings](https://github.com/Econut/SignalDeck/issues/6)
 - [#7 — Programmable physical buttons: validate both P8 keys](https://github.com/Econut/SignalDeck/issues/7)

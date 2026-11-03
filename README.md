@@ -2,6 +2,8 @@
 
 **[Development roadmap](ROADMAP.md) · [Live feature board](https://github.com/users/Econut/projects/1)** — current priorities, testing, verified work and blockers for the P8 technical handover.
 
+[Fresh beta.31 device report preparation](docs/p8-beta31-report-preparation.md): APK checks and staged upstream contribution plan.
+
 **A modified application based on [SignalDeck](https://github.com/IIMacGyverII/SignalDeck), created by [IIMacGyverII](https://github.com/IIMacGyverII).**
 
 This fork explores running the original SignalDeck radio interface on the **UNIWA P8**, using its existing Android firmware and radio drivers. Our aim is a dependable everyday radio application with root-free hardware access where the P8 firmware permits it, while keeping the original Intercom application available as a fallback.
@@ -121,3 +123,4 @@ Focused host tests cover protocol framing, settings, CSV, channel scopes, RSSI, 
 ```
 
 No personal firmware backups, calibration dumps, stock APKs, private keys or personal channel-export files are included in this contribution. Original project and third-party credit notices remain in [COPYRIGHT](COPYRIGHT).
+
